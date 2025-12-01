@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Custom Global Styles from Original HTML */
+@layer utilities {
+  .mask-fade-edges {
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  }
+
+  .video-vignette {
+    mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+    -webkit-mask-image: radial-gradient(circle at center, black 60%, transparent 100%);
+  }
+
+  .hide-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Animation Keyframes if not using arbitrary values for everything, 
+   but we used arbitrary values or standard classes for most.
+   However, 'float' animation was custom in the input. 
+   I used gsap for it in SteamPlatform.js, but maybe good to have as backup or for other elements.
+*/
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
