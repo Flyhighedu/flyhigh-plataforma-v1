@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-import { supabase } from '../lib/supabaseClient';
+import { supabaseNew as supabase } from '../lib/supabaseClientNew';
 
 const ImpactContext = createContext();
 

@@ -34,16 +34,22 @@ export default function Navbar() {
       ([entry]) => {
         setIsImpactVisible(entry.isIntersecting);
       },
-      { threshold: 0.3 } // Trigger when 30% of the section is visible
+      { threshold: 0.3 }
     );
 
-    const section = document.getElementById('impact-engine');
-    if (section) {
-      observer.observe(section);
-    }
+    const attemptObserve = () => {
+      const section = document.getElementById('impact-engine');
+      if (section) {
+        observer.observe(section);
+      } else {
+        setTimeout(attemptObserve, 500);
+      }
+    };
+
+    attemptObserve();
 
     return () => {
-      if (section) observer.unobserve(section);
+      observer.disconnect();
     };
   }, []);
 

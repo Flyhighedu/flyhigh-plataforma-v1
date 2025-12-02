@@ -8,7 +8,7 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useImpact } from '../context/ImpactContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabaseNew as supabase } from '../lib/supabaseClientNew';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
