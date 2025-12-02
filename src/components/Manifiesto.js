@@ -4,7 +4,7 @@ import React from 'react';
 
 export default function Manifiesto() {
     return (
-        <section className="relative w-full min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+        <section className="relative z-[70] w-full min-h-screen bg-slate-50 flex flex-col lg:flex-row">
             <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-auto min-h-[400px] lg:order-1">
                 <img
                     src="https://flyhighedu.com.mx/wp-content/uploads/2025/11/Diseno-sin-titulo-1.png"
