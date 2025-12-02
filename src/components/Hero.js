@@ -147,7 +147,7 @@ export default function Hero() {
                     <video
                         ref={videoRef}
                         className="absolute inset-0 w-full h-full object-cover object-center opacity-80 hover:opacity-100 transition-opacity duration-500"
-                        src="https://flyhighedu.com.mx/wp-content/uploads/2025/11/kling_20251130_Image_to_Video__3700_0.mp4"
+                        src="/videos/Videoportada.mp4"
                         autoPlay
                         muted
                         loop
@@ -314,7 +314,7 @@ export default function Hero() {
                         >
                             <video
                                 className="w-full h-full object-contain"
-                                src="https://flyhighedu.com.mx/wp-content/uploads/2025/11/Trailer-comp.mp4"
+                                src="/videos/Trailer.mp4"
                                 controls
                                 autoPlay
                                 playsInline
