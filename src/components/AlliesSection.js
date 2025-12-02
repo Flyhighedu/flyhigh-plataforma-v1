@@ -4,12 +4,10 @@ import { Heart, School, Building2, Plus, ArrowRight, Sparkles } from 'lucide-rea
 const AlliesSection = () => {
     // --- DATOS (MOCK DATA) ---
     const sponsors = [
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-ccfdsp.png", name: "FÁBRICA SAN PEDRO" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-parque.png", name: "PARQUE NACIONAL" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-secretaria-cultura-y-turismo.png", name: "SEC. CULTURA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/logo-museo-del-agua-png.png", name: "MUSEO DEL AGUA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/bonanza.png", name: "LA BONANZA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/strong-plastic.png", name: "STRONG PLASTIC" },
+        { logo: "/img/logo ccfdsp.png", name: "FÁBRICA SAN PEDRO" },
+        { logo: "/img/logo parque.png", name: "PARQUE NACIONAL" },
+        { logo: "/img/logo secretaria cultura y turismo.png", name: "SEC. CULTURA" },
+        { logo: "/img/museo del agua azul png.png", name: "MUSEO DEL AGUA" },
     ];
 
     const schools = Array(10).fill("Escuela Impulsora");
@@ -114,6 +112,24 @@ const AlliesSection = () => {
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-pink-100 text-pink-500 text-[10px] font-bold uppercase tracking-widest shadow-sm mb-3">
                         <Sparkles size={12} className="fill-pink-200" />
                         Aliados Fly High
+                    </div>
+
+                    {/* NUEVOS LOGOS CENTRALES (Strong Plastic & Bonanza) */}
+                    <div className="flex justify-center items-start gap-8 mb-6">
+                        {/* Strong Plastic */}
+                        <div className="flex flex-col items-center gap-2 group">
+                            <img src="/img/strong plastic.png" alt="Strong Plastic" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-[1px] h-12 bg-slate-200 mt-1"></div>
+
+                        {/* Bonanza */}
+                        <div className="flex flex-col items-center gap-2 group">
+                            <img src="/img/bonanza.png" alt="La Bonanza" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
+                        </div>
                     </div>
                     <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
                         Impulsado por <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-500">Gigantes y Corazones</span>
