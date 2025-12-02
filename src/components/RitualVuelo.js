@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Rocket, Eye, Globe2 } from 'lucide-react';
+import { motion, useScroll, useTransform, useMotionTemplate } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -15,6 +16,13 @@ export default function RitualVuelo() {
     const [activeIndex, setActiveIndex] = useState(0);
     const [isSnapping, setIsSnapping] = useState(false); // Inicia desactivado para permitir la animación
     const [particles, setParticles] = useState([]);
+
+    // Framer Motion Scroll Hook for the container
+    const { scrollXProgress } = useScroll({ container: scrollContainerRef });
+
+    // Transform scroll progress to brightness (1 -> 0.5)
+    const brightness = useTransform(scrollXProgress, [0, 1], [1, 0.5]);
+    const filter = useMotionTemplate`brightness(${brightness})`;
 
     useEffect(() => {
         // Generar partículas solo en el cliente
@@ -113,16 +121,12 @@ export default function RitualVuelo() {
             const progress = Math.min(Math.max(scrollLeft / maxScroll, 0), 1);
 
             // 1. Parallax Vertical del Fondo
-            // El fondo mide 200% de altura. 
-            // Progress 0 (Inicio) -> translateY(-50%) (Vemos la mitad inferior: Tierra/Gris)
-            // Progress 1 (Fin) -> translateY(0%) (Vemos la mitad superior: Cielo/Azul)
             if (backgroundRef.current) {
                 const translateY = -50 + (progress * 50);
                 backgroundRef.current.style.transform = `translateY(${translateY}%)`;
             }
 
             // 2. Opacidad de Partículas (Polvo de Hadas)
-            // Aparecen gradualmente hacia el final (del 50% al 100%)
             if (particlesRef.current) {
                 const opacity = Math.max(0, (progress - 0.5) * 2);
                 particlesRef.current.style.opacity = opacity;
@@ -186,7 +190,7 @@ export default function RitualVuelo() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
                 <div className="text-center max-w-3xl mx-auto mb-10">
                     <h2 className="font-['Outfit',sans-serif] font-extrabold text-3xl sm:text-5xl text-slate-900 mb-4 tracking-tight leading-tight">
-                        ¡El Vuelo <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00C6FF] to-[#0072FF] drop-shadow-sm">Comienza!</span>
+                        ¡El Vuelo <motion.span style={{ filter }} className="text-transparent bg-clip-text bg-gradient-to-r from-[#00C6FF] to-[#0072FF] drop-shadow-sm">Comienza!</motion.span>
                     </h2>
                     <p className="text-slate-500 text-base sm:text-lg font-medium max-w-xl mx-auto leading-relaxed">
                         Transformamos tu patio escolar en una plataforma de despegue.

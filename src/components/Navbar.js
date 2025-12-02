@@ -34,7 +34,7 @@ export default function Navbar() {
       ([entry]) => {
         setIsImpactVisible(entry.isIntersecting);
       },
-      { threshold: 0.3 }
+      { threshold: 0.2, rootMargin: "0px 0px -50% 0px" }
     );
 
     const attemptObserve = () => {
@@ -61,13 +61,18 @@ export default function Navbar() {
   ];
 
   return (
-    <div className="fixed top-0 left-0 right-0 px-5 pt-4 pb-2 flex justify-between items-center z-50 pointer-events-none">
+    <div className="fixed top-0 left-0 right-0 px-5 pt-4 pb-2 flex justify-between items-center z-[100] pointer-events-none">
 
       {/* Píldora Izquierda: Menú + Logo */}
       <div className="relative pointer-events-auto">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          animate={{
+            y: 0,
+            opacity: isImpactVisible ? 0 : 1,
+            x: isImpactVisible ? -100 : 0,
+            pointerEvents: isImpactVisible ? 'none' : 'auto'
+          }}
           className="bg-white px-3 py-2 rounded-full shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
@@ -116,9 +121,11 @@ export default function Navbar() {
       </div>
 
       {/* Píldora Derecha: Contador / CTA (Soft Clay Progress) */}
-      <a
+      <motion.a
+        layout
         href="#impact-engine"
-        className={`relative group pointer-events-auto cursor-pointer ${isImpactVisible ? 'pointer-events-none' : ''}`}
+        className={`group pointer-events-auto cursor-pointer ${isImpactVisible ? 'absolute left-1/2 -translate-x-1/2 pointer-events-none' : 'relative'}`}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
         <motion.div
           animate={
@@ -185,7 +192,7 @@ export default function Navbar() {
 
           </div>
         </motion.div>
-      </a>
+      </motion.a>
 
     </div>
   );
