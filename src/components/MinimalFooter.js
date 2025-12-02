@@ -57,7 +57,7 @@ const MinimalFooter = () => {
                 {/* Opcional: Si quieres dar crédito al desarrollador o mantenerlo limpio, puedes quitar esto */}
                 <div className="mt-8 pt-4 border-t border-slate-50 text-center md:text-right">
                     <p className="text-[10px] text-slate-300">
-                        Diseñado con ❤ para el futuro de México.
+                        Diseñado con ❤ para el futuro de México. <span className="mx-1">•</span> Hecho con orgullo en Uruapan.
                     </p>
                 </div>
 
