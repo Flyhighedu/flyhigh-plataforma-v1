@@ -43,7 +43,7 @@ export default function PlanVuelo() {
     }, []);
 
     return (
-        <div ref={sectionRef} className="relative z-20 bg-white w-full snap-start -mt-1">
+        <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
             <section className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative overflow-hidden">
 
                 {/* Styles for this component */}
