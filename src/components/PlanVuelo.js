@@ -218,8 +218,8 @@ export default function PlanVuelo() {
 
             </section>
 
-            {/* PATCH: Intersection Fix - White background behind the transition */}
-            <div className="absolute bottom-0 left-0 w-full h-[50vh] bg-white z-[-10]"></div>
+            {/* PATCH: Independent White Canvas - Massive patch to ensure no gaps */}
+            <div className="absolute top-[50%] left-0 w-full h-[200vh] bg-white z-[-50] pointer-events-none"></div>
         </div>
     );
 }
