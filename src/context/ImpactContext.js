@@ -18,6 +18,10 @@ export const ImpactProvider = ({ children }) => {
                 .select('total_sponsored_kids')
                 .single();
 
+            if (error) {
+                console.log('Error Supabase:', error);
+            }
+
             if (data) {
                 setServerTotal(data.total_sponsored_kids);
             }
