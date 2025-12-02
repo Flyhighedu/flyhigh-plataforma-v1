@@ -217,6 +217,9 @@ export default function PlanVuelo() {
                 </div>
 
             </section>
+
+            {/* PATCH: Intersection Fix - White background behind the transition */}
+            <div className="absolute bottom-0 left-0 w-full h-[50vh] bg-white z-[-10]"></div>
         </div>
     );
 }
