@@ -382,22 +382,44 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
         const val = parseInt(e.target.value);
         setSliderValue(val);
         const count = calculateChildren(val);
-        if (count !== childCount && navigator.vibrate) {
-            if (count === 400 || count === 800) navigator.vibrate(200); else if (count % 10 === 0) navigator.vibrate(40); else navigator.vibrate(10);
+
+        if (count !== childCount) {
+            if (navigator.vibrate) {
+                if (count === 400 || count === 800) navigator.vibrate(200);
+                else if (count % 10 === 0) navigator.vibrate(40);
+                else navigator.vibrate(10);
+            }
+
+            // REAL-TIME PHRASE UPDATE
+            const specificOptions = IMPACT_PHRASES[count];
+            if (specificOptions) {
+                setPhrase(specificOptions[Math.floor(Math.random() * specificOptions.length)]);
+            } else {
+                setPhrase("Estás cambiando su destino para siempre.");
+            }
         }
+
         setChildCount(count);
         if (onImpactChange) onImpactChange(count);
         setIsLegend(count === 400 || count === 800);
-        setShowPhrase(false);
+
+        // Keep phrase visible during drag
+        setShowPhrase(true);
         setIsDragging(true);
-        if (Math.random() > 0.6) { const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; const type = Math.random() > 0.7 ? 'plane' : 'heart'; setParticles(p => [...p, { id, x: 50 + (Math.random() - 0.5) * 30, type }]); }
+
+        if (Math.random() > 0.6) {
+            const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const type = Math.random() > 0.7 ? 'plane' : 'heart';
+            setParticles(p => [...p, { id, x: 50 + (Math.random() - 0.5) * 30, type }]);
+        }
     };
+
     const handleRelease = () => {
         setIsDragging(false);
         setShowPhrase(true);
-        const specificOptions = IMPACT_PHRASES[childCount];
-        if (specificOptions) setPhrase(specificOptions[Math.floor(Math.random() * specificOptions.length)]);
-        else setPhrase("Estás cambiando su destino para siempre.");
+        // Optional: Refresh phrase on release or keep the last one
+        // const specificOptions = IMPACT_PHRASES[childCount];
+        // if (specificOptions) setPhrase(specificOptions[Math.floor(Math.random() * specificOptions.length)]);
     };
     const removeParticle = (id) => setParticles(prev => prev.filter(p => p.id !== id));
     const cost = childCount * 40;
@@ -436,7 +458,10 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
 
             {/* Phrase (Moved Above Slider) */}
             <div className="h-12 flex items-center justify-center px-4 mb-2">
-                <p className={`font-bold text-sm leading-tight text-center transition-all duration-300 ${showPhrase ? 'opacity-100 scale-100 translate-y-0 animate-in zoom-in fade-in slide-in-from-bottom-2' : 'opacity-0 scale-95 translate-y-2'} ${textMain}`}>
+                <p
+                    key={phrase}
+                    className={`font-bold text-sm leading-tight text-center transition-all duration-300 ${showPhrase ? 'opacity-100 scale-100 translate-y-0 animate-in zoom-in fade-in slide-in-from-bottom-2' : 'opacity-0 scale-95 translate-y-2'} ${textMain}`}
+                >
                     {phrase}
                 </p>
             </div>

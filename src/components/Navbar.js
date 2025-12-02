@@ -87,9 +87,9 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <img
-              src="https://flyhighedu.com.mx/wp-content/uploads/2025/09/LOGO-WEB-200x40-1.png"
+              src="/img/logoFH.png"
               alt="Fly High Logo"
-              className="h-[18px] w-auto object-contain brightness-0"
+              className="h-8 w-auto object-contain"
             />
           </div>
         </motion.div>
