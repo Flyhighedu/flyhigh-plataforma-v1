@@ -41,20 +41,30 @@ const cards = [
     }
 ];
 
+// Triple the cards for infinite scroll illusion
+const displayCards = [...cards, ...cards, ...cards];
+
 export default function ExperienciaInmersiva() {
     const carouselRef = React.useRef(null);
     const [isAutoplay, setIsAutoplay] = React.useState(true);
     const isAutoplayRef = React.useRef(true); // Ref for immediate access in loop
 
-    // Triple the cards for infinite scroll illusion
-    const displayCards = [...cards, ...cards, ...cards];
+    const resumeTimerRef = React.useRef(null);
 
     // Stop autoplay on interaction
     const stopAutoplay = () => {
-        if (isAutoplayRef.current) {
-            setIsAutoplay(false);
-            isAutoplayRef.current = false;
-        }
+        setIsAutoplay(false);
+        isAutoplayRef.current = false;
+        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    };
+
+    // Resume autoplay after delay
+    const resumeAutoplay = () => {
+        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = setTimeout(() => {
+            setIsAutoplay(true);
+            isAutoplayRef.current = true;
+        }, 3000);
     };
 
     // Autoplay Scroll Logic
@@ -65,8 +75,7 @@ export default function ExperienciaInmersiva() {
 
         // Initialize scroll position to the middle set (Start of Set B)
         if (carousel) {
-            // We need to wait for layout to be stable, but this is a decent attempt
-            // A better way is to check if scrollLeft is 0 and we have width
+            // We need to wait for layout to be stable
             if (carousel.scrollLeft === 0 && carousel.scrollWidth > 0) {
                 carousel.scrollLeft = carousel.scrollWidth / 3;
             }
@@ -85,6 +94,39 @@ export default function ExperienciaInmersiva() {
             } else {
                 carousel.scrollLeft += scrollSpeed;
             }
+
+            // SYNC VIDEOS: Ensure all clones play at the exact same time
+            // This prevents "flashing" when jumping between clones
+            const allVideos = document.querySelectorAll('.monolith-video');
+            const videoGroups = {};
+
+            // Group by ID
+            allVideos.forEach(v => {
+                const id = v.getAttribute('data-id');
+                if (!videoGroups[id]) videoGroups[id] = [];
+                videoGroups[id].push(v);
+            });
+
+            // Sync each group
+            Object.values(videoGroups).forEach(group => {
+                // Find the "master" video (the one currently playing/visible)
+                // We prefer the one in the middle set (Set B) if possible, or just the first playing one
+                const master = group.find(v => !v.paused) || group[0];
+
+                if (master && !master.paused) {
+                    group.forEach(slave => {
+                        if (slave !== master) {
+                            // Sync Time if drifted
+                            if (Math.abs(slave.currentTime - master.currentTime) > 0.1) {
+                                slave.currentTime = master.currentTime;
+                            }
+                            // Sync State
+                            if (slave.paused) slave.play().catch(() => { });
+                        }
+                    });
+                }
+            });
+
             animationFrameId = requestAnimationFrame(animateScroll);
         };
 
@@ -92,7 +134,10 @@ export default function ExperienciaInmersiva() {
             animationFrameId = requestAnimationFrame(animateScroll);
         }
 
-        return () => cancelAnimationFrame(animationFrameId);
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+        };
     }, [isAutoplay]);
 
     // Handle Manual Infinite Scroll Reset
@@ -122,16 +167,45 @@ export default function ExperienciaInmersiva() {
             ? { rootMargin: '0px -45% 0px -45%', threshold: 0.1 } // Desktop: Only center strip activates
             : { threshold: 0.5 }; // Mobile: Standard visibility
 
+        // Track visibility of each card ID to sync clones
+        const visibleCards = new Map(); // Map<id, Set<element>>
+
         const observer = new IntersectionObserver(
             (entries) => {
+                const affectedIds = new Set();
+
                 entries.forEach((entry) => {
                     const video = entry.target;
-                    if (entry.isIntersecting) {
-                        video.play().catch(() => { }); // Ignore autoplay errors
-                    } else {
-                        video.pause();
-                        video.currentTime = 0; // Optional: Reset video when out of focus
+                    const id = video.getAttribute('data-id');
+                    if (!id) return;
+
+                    if (!visibleCards.has(id)) {
+                        visibleCards.set(id, new Set());
                     }
+
+                    const visibleSet = visibleCards.get(id);
+
+                    if (entry.isIntersecting) {
+                        visibleSet.add(video);
+                    } else {
+                        visibleSet.delete(video);
+                    }
+                    affectedIds.add(id);
+                });
+
+                // Sync playback for affected IDs
+                affectedIds.forEach((id) => {
+                    const visibleSet = visibleCards.get(id);
+                    const isAnyVisible = visibleSet && visibleSet.size > 0;
+                    const allClones = document.querySelectorAll(`.monolith-video[data-id="${id}"]`);
+
+                    allClones.forEach((clone) => {
+                        if (isAnyVisible) {
+                            clone.play().catch(() => { });
+                        } else {
+                            clone.pause();
+                        }
+                    });
                 });
             },
             options
@@ -143,7 +217,7 @@ export default function ExperienciaInmersiva() {
         return () => {
             videos.forEach((video) => observer.unobserve(video));
         };
-    }, [displayCards]); // Re-run when cards change
+    }, []); // Empty dependency array as we query DOM dynamically
 
     return (
         <section id="experiencia-inmersiva" className="min-h-screen w-full snap-start flex flex-col justify-center relative z-[60] overflow-x-hidden py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)] my-0">
@@ -217,10 +291,12 @@ export default function ExperienciaInmersiva() {
                 {/* CARRUSEL DE MONOLITOS (VIDEO) */}
                 <div
                     ref={carouselRef}
-                    className={`flex overflow-x-auto gap-6 md:gap-8 pb-12 hide-scroll px-4 -mx-4 md:mx-0 pt-4 ${isAutoplay ? '' : 'snap-x snap-mandatory'}`}
+                    className={`flex overflow-x-auto gap-6 md:gap-8 pb-12 hide-scroll px-4 -mx-4 md:mx-0 pt-4 md:pt-20 ${isAutoplay ? '' : 'snap-x snap-mandatory'}`}
                     style={{ scrollBehavior: 'auto' }}
                     onMouseEnter={stopAutoplay}
+                    onMouseLeave={resumeAutoplay}
                     onTouchStart={stopAutoplay}
+                    onTouchEnd={resumeAutoplay}
                     onClick={stopAutoplay}
                     onScroll={handleScroll}
                 >
@@ -229,6 +305,7 @@ export default function ExperienciaInmersiva() {
                             <div className={`monolith-card relative h-[60vh] md:h-[550px] rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.25),0_0_0_1px_rgba(255,255,255,0.1)_inset] cursor-pointer group bg-slate-900 ${index % 2 !== 0 ? 'md:-mt-12' : ''}`}>
                                 <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative z-0 transform-gpu">
                                     <video
+                                        data-id={card.id}
                                         src={card.video}
                                         className="monolith-video absolute inset-0 w-full h-full object-cover opacity-90"
                                         autoPlay
