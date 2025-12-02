@@ -164,7 +164,7 @@ const PaymentModal = ({ isOpen, onClose, childCount, amount }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
@@ -441,51 +441,58 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
                 </p>
             </div>
 
-            {/* Slider Optimized */}
-            <div className="w-full relative px-2 mb-8 group pt-4 touch-none" ref={sliderRef}>
-                <div className={`flex justify-between mb-8 text-[10px] font-bold uppercase tracking-widest px-1 transition-colors duration-300 ${isLegend ? 'text-yellow-500/50' : 'text-slate-400'}`}>
+            {/* Slider Optimized (Native-Like Feel) */}
+            <div className="w-full px-2 mb-8 group pt-4">
+                <div className={`flex justify-between mb-2 text-[10px] font-bold uppercase tracking-widest px-1 transition-colors duration-300 ${isLegend ? 'text-yellow-500/50' : 'text-slate-400'}`}>
                     <span>1 Pasajero</span><span>2 Escuelas</span>
                 </div>
 
-                {/* Track Background */}
-                <div className="relative w-full h-8 bg-slate-100 rounded-full shadow-inner overflow-hidden ring-1 ring-black/5">
-                    {/* Progress Bar (GPU Accelerated) */}
+                {/* Hit Area Container (64px height for easy grabbing) */}
+                <div className="relative w-full h-16 flex items-center touch-none" ref={sliderRef}>
+
+                    {/* Track Background */}
+                    <div className="absolute w-full h-8 bg-slate-100 rounded-full shadow-inner overflow-hidden ring-1 ring-black/5">
+                        {/* Progress Bar (GPU Accelerated) */}
+                        <div
+                            className={`absolute top-0 left-0 h-full origin-left will-change-transform ${isLegend ? 'bg-gradient-to-r from-yellow-300 to-amber-500' : 'bg-gradient-to-r from-cyan-400 to-fuchsia-500'}`}
+                            style={{
+                                width: '100%',
+                                transform: `scaleX(${childCount === 800 ? 1 : Math.max(sliderValue, 6) / 100})`,
+                                transformOrigin: 'left',
+                                transition: isDragging ? 'none' : 'transform 0.1s linear'
+                            }}
+                        ></div>
+                    </div>
+
+                    {/* Invisible Native Input (The REAL Hit Area - Covers Full Height) */}
+                    <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={sliderValue}
+                        onInput={handleInput}
+                        onChange={handleInput}
+                        onTouchStart={() => setIsDragging(true)}
+                        onTouchEnd={handleRelease}
+                        onMouseDown={() => setIsDragging(true)}
+                        onMouseUp={handleRelease}
+                        className="absolute inset-0 w-full h-full opacity-0 z-50 cursor-grab active:cursor-grabbing appearance-none"
+                    />
+
+                    {/* Visual Thumb (Pointer Events None - Input handles interaction) */}
                     <div
-                        className={`absolute top-0 left-0 h-full origin-left will-change-transform ${isLegend ? 'bg-gradient-to-r from-yellow-300 to-amber-500' : 'bg-gradient-to-r from-cyan-400 to-fuchsia-500'}`}
+                        className="absolute w-12 h-12 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center pointer-events-none z-40 border-4 border-white ring-1 ring-slate-100 will-change-transform"
                         style={{
-                            width: '100%',
-                            transform: `scaleX(${childCount === 800 ? 1 : Math.max(sliderValue, 6) / 100})`,
-                            transformOrigin: 'left',
+                            left: 0,
+                            top: '50%',
+                            transform: `translate3d(${thumbPosition}px, -50%, 0)`,
                             transition: isDragging ? 'none' : 'transform 0.1s linear'
                         }}
-                    ></div>
-                </div>
-
-                {/* Invisible Touch Area (Hit Area Optimized) */}
-                <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={sliderValue}
-                    onInput={handleInput}
-                    onChange={handleInput}
-                    onTouchStart={() => setIsDragging(true)}
-                    onTouchEnd={handleRelease}
-                    onMouseDown={() => setIsDragging(true)}
-                    onMouseUp={handleRelease}
-                    className={`absolute inset-0 w-full h-full opacity-0 z-30 top-4 h-20 cursor-grab active:cursor-grabbing`}
-                />
-
-                {/* Thumb (GPU Accelerated) */}
-                <div
-                    className="absolute top-[5.1rem] w-12 h-12 bg-white rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center pointer-events-none z-20 border-4 border-white ring-1 ring-slate-100 will-change-transform"
-                    style={{
-                        left: 0,
-                        transform: `translate3d(${thumbPosition}px, -50%, 0)`,
-                        transition: isDragging ? 'none' : 'transform 0.1s linear'
-                    }}
-                >
-                    {isLegend ? <Trophy size={20} className="text-amber-500 fill-current" /> : <Plane size={20} className="text-cyan-600 -rotate-45" />}
+                    >
+                        {/* Aura Visual (Requested Expansion) */}
+                        <div className="absolute inset-0 -m-4 rounded-full bg-white/0" />
+                        {isLegend ? <Trophy size={20} className="text-amber-500 fill-current" /> : <Plane size={20} className="text-cyan-600 -rotate-45" />}
+                    </div>
                 </div>
             </div>
 
