@@ -64,7 +64,7 @@ export default function Hero() {
 
     return (
         // LIENZO "OFF-WHITE" PREMIUM (#F2F2F7)
-        <div className="h-screen w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 sticky top-0 z-0">
+        <div className="h-[100dvh] w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 sticky top-0 z-0">
 
             {/* =====================================================================================
           2. ZONA SPLIT 65/35 (Título vs. Misión)
@@ -248,7 +248,7 @@ export default function Hero() {
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.5 }}
-                        className="bg-white/10 backdrop-blur-xl border-t border-x border-white/20 rounded-t-[24px] rounded-b-none px-4 pt-4 pb-10 md:pb-4 shadow-2xl flex flex-col gap-4 pointer-events-auto relative overflow-hidden"
+                        className="bg-white/10 backdrop-blur-xl border-t border-x border-white/20 rounded-t-[24px] rounded-b-none px-4 pt-4 pb-12 md:pb-4 shadow-2xl flex flex-col gap-4 pointer-events-auto relative overflow-hidden"
                     >
                         {/* 1. TEXTO TÉCNICO (Fuente Inter, Uppercase, Pequeño) */}
                         <div className="text-center">
