@@ -6,7 +6,7 @@ import ExperienciaInmersiva from '@/components/ExperienciaInmersiva';
 import PlanVuelo from '@/components/PlanVuelo';
 import SteamPlatform from '@/components/SteamPlatform';
 import Manifiesto from '@/components/Manifiesto';
-import ImpactEngineGoldenMaster from '@/components/ImpactEngineGoldenMaster';
+import NewImpactCounter from '@/components/NewImpactCounter';
 import AlliesSection from '@/components/AlliesSection';
 import MinimalFooter from '@/components/MinimalFooter';
 
@@ -21,7 +21,7 @@ export default function Home() {
       <ExperienciaInmersiva />
       <SteamPlatform />
       <Manifiesto />
-      <ImpactEngineGoldenMaster />
+      <NewImpactCounter />
       <AlliesSection />
       <MinimalFooter />
     </main>
