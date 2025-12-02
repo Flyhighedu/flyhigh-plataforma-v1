@@ -7,7 +7,7 @@ import { supabaseNew as supabase } from '../lib/supabaseClientNew';
 const ImpactContext = createContext();
 
 export const ImpactProvider = ({ children }) => {
-    const [serverTotal, setServerTotal] = useState(7450); // Fallback initial value
+    const [serverTotal, setServerTotal] = useState(null);
     const [localDonation, setLocalDonation] = useState(0);
 
     // 1. Fetch Initial Data & Subscribe to Realtime
@@ -49,7 +49,7 @@ export const ImpactProvider = ({ children }) => {
     }, []);
 
     // Derived state for display
-    const totalImpact = serverTotal + localDonation;
+    const totalImpact = serverTotal === null ? null : serverTotal + localDonation;
 
     return (
         <ImpactContext.Provider value={{ totalImpact, setLocalDonation }}>

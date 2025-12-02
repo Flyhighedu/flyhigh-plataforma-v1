@@ -411,8 +411,16 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
                     )}
                 </div>
             </div>
+
+            {/* Phrase (Moved Above Slider) */}
+            <div className="h-12 flex items-center justify-center px-4 mb-2">
+                <p className={`font-bold text-sm leading-tight text-center transition-all duration-300 ${showPhrase ? 'opacity-100 scale-100 translate-y-0 animate-in zoom-in fade-in slide-in-from-bottom-2' : 'opacity-0 scale-95 translate-y-2'} ${textMain}`}>
+                    {phrase}
+                </p>
+            </div>
+
             {/* Slider */}
-            <div className="w-full relative px-2 mb-8 group pt-8">
+            <div className="w-full relative px-2 mb-8 group pt-4">
                 <div className={`flex justify-between mb-8 text-[10px] font-bold uppercase tracking-widest px-1 transition-colors duration-300 ${isLegend ? 'text-yellow-500/50' : 'text-slate-400'}`}>
                     <span>1 Pasajero</span><span>2 Escuelas</span>
                 </div>
@@ -424,11 +432,9 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
                     {isLegend ? <Trophy size={20} className="text-amber-500 fill-current" /> : <Plane size={20} className="text-cyan-600 -rotate-45" />}
                 </div>
             </div>
+
             {/* Footer */}
             <div className="w-full text-center space-y-6">
-                <div className="h-8 flex items-center justify-center px-4">
-                    <p className={`font-bold text-sm leading-tight transition-all duration-500 transform ${showPhrase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} ${textMain}`}>{phrase}</p>
-                </div>
                 {!isLegend && (
                     <div className="inline-flex items-center justify-center space-x-2 bg-slate-100/80 py-2.5 px-6 rounded-xl text-sm text-slate-400">
                         <span>$40</span><span className="text-xs text-slate-300">✕</span><span className="font-semibold text-slate-500">{childCount}</span><span className="text-xs text-slate-300">=</span><strong className="text-slate-700">${cost.toLocaleString()}</strong>

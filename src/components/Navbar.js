@@ -135,7 +135,7 @@ export default function Navbar() {
           {/* 2. BARRA DE PROGRESO (Gradiente Azul) */}
           <div
             className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-1000 ease-out opacity-100 group-hover:opacity-0 transition-opacity duration-300"
-            style={{ width: `${Math.min((totalImpact / 30000) * 100, 100)}%` }}
+            style={{ width: `${totalImpact === null ? 0 : Math.min((totalImpact / 30000) * 100, 100)}%` }}
           ></div>
 
           {/* 3. FONDO HOVER (Gradiente Rosa - Aparece en Hover SOLO si NO estamos en la sección) */}
@@ -158,14 +158,18 @@ export default function Navbar() {
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex items-center justify-center font-['Inter',sans-serif] font-bold text-xs text-slate-700 tabular-nums"
                   >
-                    {!isImpactVisible && mobileShowCTA ? "APADRINAR" : `${totalImpact.toLocaleString()} / 30k Niños`}
+                    {!isImpactVisible && mobileShowCTA ? "APADRINAR" : (totalImpact === null ? "..." : `${totalImpact.toLocaleString()} / 30k Niños`)}
                   </motion.span>
                 </AnimatePresence>
               </div>
 
               {/* Desktop Text (Static) */}
               <span className="hidden md:inline font-['Inter',sans-serif] font-bold text-xs text-slate-700 group-hover:text-white tabular-nums mix-blend-multiply">
-                {totalImpact.toLocaleString()} / 30k Niños
+                {totalImpact === null ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  `${totalImpact.toLocaleString()} / 30k Niños`
+                )}
               </span>
 
               <Rocket size={14} className="text-slate-600 md:text-white/80 mix-blend-multiply" />
