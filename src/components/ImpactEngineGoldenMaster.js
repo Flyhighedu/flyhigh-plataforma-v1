@@ -112,19 +112,21 @@ const CheckoutForm = ({ amount, onSuccess }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
             <PaymentElement />
             {message && <div className="text-red-500 text-sm">{message}</div>}
-            <button
-                disabled={isLoading || !stripe || !elements}
-                className="w-full bg-black text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-lg active:scale-95 group relative overflow-hidden"
-            >
-                {isLoading ? (
-                    <span className="animate-pulse">Procesando...</span>
-                ) : (
-                    <>
-                        <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                        <span className="font-medium tracking-wide">Donar ${amount.toLocaleString()}</span>
-                    </>
-                )}
-            </button>
+            <div className="sticky bottom-0 bg-white pt-4 pb-2 z-10 border-t border-slate-50">
+                <button
+                    disabled={isLoading || !stripe || !elements}
+                    className="w-full bg-black text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-lg active:scale-95 group relative overflow-hidden"
+                >
+                    {isLoading ? (
+                        <span className="animate-pulse">Procesando...</span>
+                    ) : (
+                        <>
+                            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                            <span className="font-medium tracking-wide">Donar ${amount.toLocaleString()}</span>
+                        </>
+                    )}
+                </button>
+            </div>
         </form>
     );
 };
@@ -170,7 +172,7 @@ const PaymentModal = ({ isOpen, onClose, childCount, amount }) => {
             ></div>
 
             {/* Modal Blindado */}
-            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 transform scale-100 ring-1 ring-white/20 animate-in zoom-in-95">
+            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl transition-all duration-300 transform scale-100 ring-1 ring-white/20 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto my-8 scrollbar-hide">
 
                 {step !== 'success' && (
                     <button
