@@ -7,7 +7,7 @@ export default function Manifiesto() {
         <section className="relative z-[70] w-full min-h-screen bg-slate-50 flex flex-col lg:flex-row">
             <div className="relative w-full lg:w-1/2 h-[50vh] lg:h-auto min-h-[400px] lg:order-1">
                 <img
-                    src="https://flyhighedu.com.mx/wp-content/uploads/2025/11/Diseno-sin-titulo-1.png"
+                    src="/img/Manifiesto.png"
                     className="absolute inset-0 w-full h-full object-cover"
                     alt="Niño mirando al cielo"
                 />

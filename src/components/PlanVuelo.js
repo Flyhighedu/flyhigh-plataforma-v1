@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { MapPin, PlayCircle, ArrowDown } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -10,9 +10,12 @@ gsap.registerPlugin(ScrollTrigger);
 export default function PlanVuelo() {
     const sectionRef = useRef(null);
     const visorRef = useRef(null);
+    const videoRef = useRef(null); // Reference for the video element
     const buttonRef = useRef(null);
     const curtainRef = useRef(null);
     const headerRef = useRef(null);
+
+    const [shouldLoad, setShouldLoad] = useState(false); // Lazy load state
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -75,6 +78,49 @@ export default function PlanVuelo() {
 
         return () => ctx.revert();
     }, []);
+
+    // OPTIMIZACIÓN AGRESIVA: IntersectionObserver para Lazy Load y Playback
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // 1. Observer para Lazy Load (Preload cuando se acerca)
+        const loadObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        setShouldLoad(true); // Cambia preload="none" a "metadata"
+                        loadObserver.disconnect(); // Ya no necesitamos observar
+                    }
+                });
+            },
+            { rootMargin: "200px" } // 200px antes de llegar
+        );
+
+        // 2. Observer para Playback (Play solo cuando es visible)
+        const playbackObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && shouldLoad) {
+                        // Entra en pantalla -> Play
+                        video.play().catch(() => { });
+                    } else {
+                        // Sale de pantalla -> Pause (Libera decodificador)
+                        video.pause();
+                    }
+                });
+            },
+            { threshold: 0.1 } // Al menos 10% visible
+        );
+
+        loadObserver.observe(visorRef.current);
+        playbackObserver.observe(visorRef.current);
+
+        return () => {
+            loadObserver.disconnect();
+            playbackObserver.disconnect();
+        };
+    }, [shouldLoad]);
 
     return (
         <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
@@ -174,11 +220,14 @@ export default function PlanVuelo() {
                                         style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)' }}
                                     >
                                         <video
+                                            ref={videoRef}
                                             className="w-full h-full object-cover opacity-90"
-                                            autoPlay
+                                            poster="/img/poster-visor.jpg" // Supervivencia: Imagen si falla carga
+                                            preload={shouldLoad ? "metadata" : "none"} // Lazy Load
                                             muted
                                             loop
                                             playsInline
+                                            style={{ transform: 'translateZ(0)' }} // Hardware Acceleration
                                         >
                                             <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
                                         </video>
