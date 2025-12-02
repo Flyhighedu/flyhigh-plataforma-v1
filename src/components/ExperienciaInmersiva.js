@@ -146,7 +146,7 @@ export default function ExperienciaInmersiva() {
     }, [displayCards]); // Re-run when cards change
 
     return (
-        <section id="experiencia-inmersiva" className="min-h-screen w-full snap-start flex flex-col justify-center relative overflow-x-hidden py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)] my-0">
+        <section id="experiencia-inmersiva" className="min-h-screen w-full snap-start flex flex-col justify-center relative z-[60] overflow-x-hidden py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)] my-0">
 
             {/* Custom Styles */}
             <style jsx>{`

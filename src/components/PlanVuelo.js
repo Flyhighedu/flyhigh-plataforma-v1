@@ -219,7 +219,7 @@ export default function PlanVuelo() {
             </section>
 
             {/* PATCH: Independent White Canvas - Massive patch to ensure no gaps */}
-            <div className="absolute top-[50%] left-0 w-full h-[200vh] bg-white z-[-50] pointer-events-none"></div>
+            <div className="absolute top-[50%] left-0 w-full h-[200vh] z-[-50] pointer-events-none" style={{ backgroundColor: '#FFFFFF' }}></div>
         </div>
     );
 }
