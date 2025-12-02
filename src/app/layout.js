@@ -2,8 +2,8 @@ import "./globals.css";
 import { ImpactProvider } from '../context/ImpactContext';
 
 export const metadata = {
-    title: "Fly High Edu | Masterpiece V15 Final",
-    description: "Meta 2025-2026: 30,000 Niños al Cielo",
+    title: "Fly High Edu",
+    description: "Inspirando a través del vuelo. Experiencias educativas inmersivas con drones y realidad virtual en Uruapan.",
 };
 
 export default function RootLayout({ children }) {
