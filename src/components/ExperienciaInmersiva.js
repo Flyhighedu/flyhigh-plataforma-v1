@@ -33,22 +33,24 @@ const cards = [
     }
 ];
 
-const VideoCard = ({ card, isActive, onVideoEnded }) => {
+const VideoCard = ({ card, isActive, onVideoEnded, sectionVisible, shouldLoad }) => {
     const videoRef = useRef(null);
 
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        if (isActive) {
-            // Play when active
+        if (isActive && sectionVisible) {
+            // Play ONLY if active AND section is visible
             video.play().catch(() => { });
         } else {
-            // Pause and reset to start when inactive (acting as a cover)
+            // Pause if inactive OR section is not visible
             video.pause();
-            video.currentTime = 0;
+            if (!isActive) {
+                video.currentTime = 0; // Reset only if not active (cover mode)
+            }
         }
-    }, [isActive]);
+    }, [isActive, sectionVisible]);
 
     return (
         <div
@@ -68,7 +70,7 @@ const VideoCard = ({ card, isActive, onVideoEnded }) => {
                     className="absolute inset-0 w-full h-full object-cover"
                     muted
                     playsInline
-                    preload="metadata"
+                    preload={shouldLoad ? "metadata" : "none"} // Lazy Load
                     onEnded={onVideoEnded}
                 />
 
@@ -93,6 +95,42 @@ const VideoCard = ({ card, isActive, onVideoEnded }) => {
 export default function ExperienciaInmersiva() {
     const [activeIndex, setActiveIndex] = useState(0);
     const carouselRef = useRef(null);
+    const sectionRef = useRef(null);
+    const [sectionVisible, setSectionVisible] = useState(false);
+    const [shouldLoad, setShouldLoad] = useState(false);
+
+    // 0. SMART PLAYBACK & LAZY LOAD OBSERVERS
+    useEffect(() => {
+        const section = sectionRef.current;
+        if (!section) return;
+
+        // 1. Playback Observer (Strict visibility)
+        const playbackObserver = new IntersectionObserver(
+            ([entry]) => {
+                setSectionVisible(entry.isIntersecting);
+            },
+            { threshold: 0 } // Trigger as soon as 1 pixel is visible
+        );
+
+        // 2. Preload Observer (Load before arrival)
+        const preloadObserver = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setShouldLoad(true);
+                    preloadObserver.disconnect(); // Load once
+                }
+            },
+            { rootMargin: "200px" } // Start loading 200px before arrival
+        );
+
+        playbackObserver.observe(section);
+        preloadObserver.observe(section);
+
+        return () => {
+            playbackObserver.disconnect();
+            preloadObserver.disconnect();
+        };
+    }, []);
 
     // 1. SCROLL OBSERVER: Detect Active Slide (More robust than IntersectionObserver)
     const handleScroll = () => {
@@ -156,7 +194,7 @@ export default function ExperienciaInmersiva() {
     };
 
     return (
-        <section id="experiencia-inmersiva" className="min-h-screen w-full flex flex-col justify-center relative z-[60] py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]">
+        <section ref={sectionRef} id="experiencia-inmersiva" className="min-h-screen w-full flex flex-col justify-center relative z-[60] py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]">
 
             {/* Custom Styles for Hide Scrollbar */}
             <style jsx>{`
@@ -220,6 +258,8 @@ export default function ExperienciaInmersiva() {
                             card={{ ...card, index }}
                             isActive={index === activeIndex}
                             onVideoEnded={handleVideoEnded}
+                            sectionVisible={sectionVisible}
+                            shouldLoad={shouldLoad}
                         />
                     ))}
                 </div>

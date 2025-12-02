@@ -133,8 +133,8 @@ export default function PlanVuelo() {
                 <style jsx>{`
                     /* Animación de Flotación (Floating) - GPU Optimized */
                     @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-15px); }
+                        0%, 100% { transform: translate3d(0, 0, 0); }
+                        50% { transform: translate3d(0, -15px, 0); }
                     }
 
                     .animate-float {
@@ -186,7 +186,11 @@ export default function PlanVuelo() {
                     </div>
 
                     {/* 2. LA ATRACCIÓN (Pure CSS VR Visor) */}
-                    <div ref={visorRef} className="relative w-full max-w-3xl mx-auto flex flex-col items-center opacity-0 translate-y-[300px] will-change-transform transform-gpu">
+                    <div
+                        ref={visorRef}
+                        className="relative w-full max-w-3xl mx-auto flex flex-col items-center opacity-0 translate-y-[300px] will-change-transform transform-gpu"
+                        style={{ backfaceVisibility: 'hidden' }}
+                    >
 
                         {/* SVG Definition for Visor Shape (Goggle with Nose Notch) */}
                         <svg width="0" height="0" className="absolute">
@@ -198,7 +202,7 @@ export default function PlanVuelo() {
                         </svg>
 
                         {/* Wrapper for Visor + Shadow */}
-                        <div className="relative w-full aspect-[16/9] md:aspect-[2/1] animate-float">
+                        <div className="relative w-full aspect-[16/9] md:aspect-[2/1] animate-float" style={{ backfaceVisibility: 'hidden' }}>
 
                             {/* SEPARATED SHADOW ELEMENT (Static & Diffuse, moves with parent) */}
                             <div
@@ -212,12 +216,12 @@ export default function PlanVuelo() {
                                 {/* Hardware Body (White Glossy) - Masked by SVG */}
                                 <div
                                     className="absolute inset-0 bg-white"
-                                    style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)' }}
+                                    style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                 >
                                     {/* Video Screen (Inside) */}
                                     <div
                                         className="absolute inset-x-[3%] inset-y-[10%] bg-slate-900 overflow-hidden shadow-inner"
-                                        style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)' }}
+                                        style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                     >
                                         <video
                                             ref={videoRef}
