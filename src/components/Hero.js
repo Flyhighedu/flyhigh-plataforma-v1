@@ -248,7 +248,7 @@ export default function Hero() {
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.5 }}
-                        className="bg-white/10 backdrop-blur-xl border-t border-x border-white/20 rounded-t-[24px] rounded-b-none p-4 shadow-2xl flex flex-col gap-4 pointer-events-auto relative overflow-hidden"
+                        className="bg-white/10 backdrop-blur-xl border-t border-x border-white/20 rounded-t-[24px] rounded-b-none px-4 pt-4 pb-16 md:pb-4 shadow-2xl flex flex-col gap-4 pointer-events-auto relative overflow-hidden"
                     >
                         {/* 1. TEXTO TÉCNICO (Fuente Inter, Uppercase, Pequeño) */}
                         <div className="text-center">
