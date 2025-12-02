@@ -1,228 +1,164 @@
 'use client';
 
-import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const cards = [
     {
         id: 1,
         title: "FÁBRICA\nSAN PEDRO",
         subtitle: "Acceso Exclusivo",
-        video: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/clip-fsp.mp4",
-        logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-ccfdsp.png"
+        video: "/videos/Capsula FabricaSanPedro.mp4",
+        logo: "/img/logo ccfdsp.png"
     },
     {
         id: 2,
         title: "PARQUE\nNACIONAL",
         subtitle: "Acceso Exclusivo",
-        video: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/capsula-parque-presentacion-web-1.mp4",
-        logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-parque.png"
+        video: "/videos/capsula parque presentacion web (1).mp4",
+        logo: "/img/logo parque.png"
     },
     {
         id: 3,
         title: "SECRETARÍA\nDE CULTURA",
         subtitle: "Acceso Exclusivo",
-        video: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/capsula-secretaria-de-cultura-presentacion-web-1.mp4",
-        logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-secretaria-cultura-y-turismo.png"
+        video: "/videos/capsula secretaria de cultura presentacion web (1).mp4",
+        logo: "/img/logo secretaria cultura y turismo.png"
     },
     {
         id: 4,
         title: "MUSEO\nDEL AGUA",
         subtitle: "Acceso Exclusivo",
-        video: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/clip-museo-del-agua-8s.mp4",
-        logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/logo-museo-del-agua-png.png"
-    },
-    {
-        id: 5,
-        title: "FÁBRICA\nSAN PEDRO",
-        subtitle: "Acceso Exclusivo",
-        video: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/clip-fsp.mp4",
-        logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-ccfdsp.png"
+        video: "/videos/CapsulaMuseodelAgua.mp4",
+        logo: "/img/museo del agua azul png.png"
     }
 ];
 
-// Triple the cards for infinite scroll illusion
-const displayCards = [...cards, ...cards, ...cards];
+const VideoCard = ({ card, isActive, onVideoEnded }) => {
+    const videoRef = useRef(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (isActive) {
+            // Play when active
+            video.play().catch(() => { });
+        } else {
+            // Pause and reset to start when inactive (acting as a cover)
+            video.pause();
+            video.currentTime = 0;
+        }
+    }, [isActive]);
+
+    return (
+        <div
+            data-index={card.index}
+            className="carousel-item snap-center shrink-0 w-[85vw] md:w-[400px] transition-transform duration-500 ease-out"
+            style={{
+                transform: isActive ? 'scale(1)' : 'scale(0.9)',
+                opacity: isActive ? 1 : 0.6
+            }}
+        >
+            <div className="relative h-[60vh] md:h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-900 shadow-2xl">
+
+                {/* VIDEO AS COVER: Always rendered, paused if inactive */}
+                <video
+                    ref={videoRef}
+                    src={card.video}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onEnded={onVideoEnded}
+                />
+
+                {/* OVERLAYS (Always Visible) */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none"></div>
+
+                <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between z-10 pointer-events-none">
+                    <div className="flex flex-col text-left">
+                        <span className="text-white/60 text-[9px] font-bold uppercase tracking-wider mb-1">{card.subtitle}</span>
+                        <span className="text-white font-['Outfit',sans-serif] font-black text-xl leading-none tracking-tight whitespace-pre-line">{card.title}</span>
+                    </div>
+                    <div className="w-16 h-16 flex items-center justify-center">
+                        <img src={card.logo} alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
 
 export default function ExperienciaInmersiva() {
-    const carouselRef = React.useRef(null);
-    const [isAutoplay, setIsAutoplay] = React.useState(true);
-    const isAutoplayRef = React.useRef(true); // Ref for immediate access in loop
+    const [activeIndex, setActiveIndex] = useState(0);
+    const carouselRef = useRef(null);
 
-    const resumeTimerRef = React.useRef(null);
-
-    // Stop autoplay on interaction
-    const stopAutoplay = () => {
-        setIsAutoplay(false);
-        isAutoplayRef.current = false;
-        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    };
-
-    // Resume autoplay after delay
-    const resumeAutoplay = () => {
-        if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-        resumeTimerRef.current = setTimeout(() => {
-            setIsAutoplay(true);
-            isAutoplayRef.current = true;
-        }, 3000);
-    };
-
-    // Autoplay Scroll Logic
-    React.useEffect(() => {
-        const carousel = carouselRef.current;
-        let animationFrameId;
-        let scrollSpeed = 0.5; // Pixels per frame
-
-        // Initialize scroll position to the middle set (Start of Set B)
-        if (carousel) {
-            // We need to wait for layout to be stable
-            if (carousel.scrollLeft === 0 && carousel.scrollWidth > 0) {
-                carousel.scrollLeft = carousel.scrollWidth / 3;
-            }
-        }
-
-        const animateScroll = () => {
-            // Stop immediately if autoplay is disabled
-            if (!carousel || !isAutoplayRef.current) return;
-
-            const oneSetWidth = carousel.scrollWidth / 3;
-
-            // Infinite Scroll Reset Logic
-            // If we've scrolled past the second set (Start of Set C), reset to Start of Set B
-            if (carousel.scrollLeft >= oneSetWidth * 2) {
-                carousel.scrollLeft = oneSetWidth;
-            } else {
-                carousel.scrollLeft += scrollSpeed;
-            }
-
-            // SYNC VIDEOS: Ensure all clones play at the exact same time
-            // This prevents "flashing" when jumping between clones
-            const allVideos = document.querySelectorAll('.monolith-video');
-            const videoGroups = {};
-
-            // Group by ID
-            allVideos.forEach(v => {
-                const id = v.getAttribute('data-id');
-                if (!videoGroups[id]) videoGroups[id] = [];
-                videoGroups[id].push(v);
-            });
-
-            // Sync each group
-            Object.values(videoGroups).forEach(group => {
-                // Find the "master" video (the one currently playing/visible)
-                // We prefer the one in the middle set (Set B) if possible, or just the first playing one
-                const master = group.find(v => !v.paused) || group[0];
-
-                if (master && !master.paused) {
-                    group.forEach(slave => {
-                        if (slave !== master) {
-                            // Sync Time if drifted
-                            if (Math.abs(slave.currentTime - master.currentTime) > 0.1) {
-                                slave.currentTime = master.currentTime;
-                            }
-                            // Sync State
-                            if (slave.paused) slave.play().catch(() => { });
-                        }
-                    });
-                }
-            });
-
-            animationFrameId = requestAnimationFrame(animateScroll);
-        };
-
-        if (isAutoplay) {
-            animationFrameId = requestAnimationFrame(animateScroll);
-        }
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-        };
-    }, [isAutoplay]);
-
-    // Handle Manual Infinite Scroll Reset
+    // 1. SCROLL OBSERVER: Detect Active Slide (More robust than IntersectionObserver)
     const handleScroll = () => {
-        if (isAutoplay) return; // Handled by animation loop
+        const container = carouselRef.current;
+        if (!container) return;
 
+        // Calculate center of the visible carousel area
+        const containerCenter = container.scrollLeft + (container.clientWidth / 2);
+
+        let closestIndex = activeIndex;
+        let minDistance = Number.MAX_VALUE;
+
+        const items = container.querySelectorAll('.carousel-item');
+        items.forEach((item) => {
+            const index = parseInt(item.getAttribute('data-index'), 10);
+            if (isNaN(index)) return;
+
+            // Calculate center of the item relative to the container
+            // item.offsetLeft is relative to the offsetParent (the container, if positioned)
+            const itemCenter = item.offsetLeft + (item.offsetWidth / 2);
+
+            const distance = Math.abs(containerCenter - itemCenter);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestIndex = index;
+            }
+        });
+
+        if (closestIndex !== activeIndex) {
+            setActiveIndex(closestIndex);
+        }
+    };
+
+    // 2. AUTO-ADVANCE LOGIC
+    const handleVideoEnded = () => {
+        const nextIndex = (activeIndex + 1) % cards.length;
+        scrollToIndex(nextIndex);
+    };
+
+    const scrollToIndex = (index) => {
         const carousel = carouselRef.current;
         if (!carousel) return;
 
-        const oneSetWidth = carousel.scrollWidth / 3;
+        const items = carousel.querySelectorAll('.carousel-item');
+        const targetItem = items[index];
 
-        // If we reach the start of Set C, jump back to start of Set B
-        if (carousel.scrollLeft >= oneSetWidth * 2) {
-            carousel.scrollLeft = oneSetWidth;
-        }
-        // If we reach the start of Set A (0), jump forward to start of Set B
-        else if (carousel.scrollLeft <= 0) {
-            carousel.scrollLeft = oneSetWidth;
+        if (targetItem) {
+            // Calculate position to center the item
+            const containerWidth = carousel.clientWidth;
+            const itemWidth = targetItem.offsetWidth;
+            const itemLeft = targetItem.offsetLeft;
+
+            const newScrollLeft = itemLeft - (containerWidth / 2) + (itemWidth / 2);
+
+            carousel.scrollTo({
+                left: newScrollLeft,
+                behavior: 'smooth'
+            });
         }
     };
 
-    // Intersection Observer for Video Playback
-    React.useEffect(() => {
-        const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-
-        const options = isDesktop
-            ? { rootMargin: '0px -45% 0px -45%', threshold: 0.1 } // Desktop: Only center strip activates
-            : { threshold: 0.5 }; // Mobile: Standard visibility
-
-        // Track visibility of each card ID to sync clones
-        const visibleCards = new Map(); // Map<id, Set<element>>
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const affectedIds = new Set();
-
-                entries.forEach((entry) => {
-                    const video = entry.target;
-                    const id = video.getAttribute('data-id');
-                    if (!id) return;
-
-                    if (!visibleCards.has(id)) {
-                        visibleCards.set(id, new Set());
-                    }
-
-                    const visibleSet = visibleCards.get(id);
-
-                    if (entry.isIntersecting) {
-                        visibleSet.add(video);
-                    } else {
-                        visibleSet.delete(video);
-                    }
-                    affectedIds.add(id);
-                });
-
-                // Sync playback for affected IDs
-                affectedIds.forEach((id) => {
-                    const visibleSet = visibleCards.get(id);
-                    const isAnyVisible = visibleSet && visibleSet.size > 0;
-                    const allClones = document.querySelectorAll(`.monolith-video[data-id="${id}"]`);
-
-                    allClones.forEach((clone) => {
-                        if (isAnyVisible) {
-                            clone.play().catch(() => { });
-                        } else {
-                            clone.pause();
-                        }
-                    });
-                });
-            },
-            options
-        );
-
-        const videos = document.querySelectorAll('.monolith-video');
-        videos.forEach((video) => observer.observe(video));
-
-        return () => {
-            videos.forEach((video) => observer.unobserve(video));
-        };
-    }, []); // Empty dependency array as we query DOM dynamically
-
     return (
-        <section id="experiencia-inmersiva" className="min-h-screen w-full snap-start flex flex-col justify-center relative z-[60] overflow-x-hidden py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)] my-0">
+        <section id="experiencia-inmersiva" className="min-h-screen w-full flex flex-col justify-center relative z-[60] py-20 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]">
 
-            {/* Custom Styles */}
+            {/* Custom Styles for Hide Scrollbar */}
             <style jsx>{`
                 .hide-scroll::-webkit-scrollbar { display: none; }
                 
@@ -234,16 +170,6 @@ export default function ExperienciaInmersiva() {
                     font-weight: 900;
                     line-height: 0.8;
                 }
-
-                /* Animaciones Monolito */
-                .monolith-card { 
-                    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-                    transform: translateZ(0); /* Force GPU layer to fix overflow clipping */
-                    will-change: transform;
-                }
-                .monolith-card:hover { transform: translateY(-15px) translateZ(0); }
-                .monolith-video { transition: transform 1.5s ease; }
-                .monolith-card:hover .monolith-video { transform: scale(1.1); }
             `}</style>
 
             {/* WATERMARK GIGANTE (Profundidad 3D) */}
@@ -251,83 +177,63 @@ export default function ExperienciaInmersiva() {
                 <span className="watermark-text text-[15vw] md:text-[18vw] opacity-40">INMERSIÓN</span>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full">
+            {/* HEADER */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full text-center mb-10">
+                <div className="inline-flex items-center gap-3 bg-slate-900 px-8 py-3 rounded-full mb-8 shadow-2xl">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+                    <span className="text-purple-300 font-bold tracking-[0.2em] text-sm uppercase">Experiencia Inmersiva</span>
+                </div>
+                <h3 className="font-['Outfit',sans-serif] font-black text-5xl md:text-8xl text-slate-900 leading-[0.9] tracking-tighter mb-6">
+                    EXPEDICIÓN <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500">INMERSIVA.</span>
+                </h3>
+                <p className="text-slate-500 text-base md:text-xl leading-relaxed max-w-3xl mx-auto text-pretty px-4 mb-4">
+                    Al aterrizar los espera una experiencia inmersiva que preparamos con nuestras instituciones aliadas.
+                </p>
 
-                {/* Header Centrado con Botón Estilo Píldora */}
-                <div className="flex flex-col items-center text-center mb-6 md:mb-10 pt-0 relative">
-
-                    {/* Botón Experiencia */}
-                    <div className="inline-flex items-center gap-3 bg-slate-900 px-8 py-3 rounded-full mb-8 shadow-2xl z-20 hover:scale-105 transition-transform duration-300">
-                        <div className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
-                        <span className="text-purple-300 font-bold tracking-[0.2em] text-sm uppercase">Experiencia Inmersiva</span>
+                {/* DATA POINTS */}
+                <div className="grid grid-cols-2 gap-4 md:flex md:flex-row md:gap-16 mt-2 justify-center px-4">
+                    <div className="flex flex-col items-center gap-2 group text-center">
+                        <div className="h-1 w-12 bg-purple-200 group-hover:bg-purple-600 transition-colors rounded-full mb-2"></div>
+                        <p className="font-bold text-slate-900 text-lg leading-tight">Acceso Total</p>
+                        <p className="text-slate-500 text-xs md:text-sm max-w-[150px] md:max-w-[200px] leading-snug">All Access incluido.</p>
                     </div>
-
-                    {/* Título Centrado */}
-                    <div className="max-w-4xl mx-auto z-10">
-                        <h3 className="font-['Outfit',sans-serif] font-black text-5xl md:text-8xl text-slate-900 leading-[0.9] tracking-tighter mb-6">
-                            EXPEDICIÓN <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500">INMERSIVA.</span>
-                        </h3>
-                        <p className="text-slate-500 text-base md:text-xl leading-relaxed max-w-3xl mx-auto text-pretty px-4 mb-4">
-                            Al aterrizar los espera una experiencia inmersiva que preparamos con nuestras instituciones aliadas.
-                        </p>
-                    </div>
-
-                    {/* DATA POINTS */}
-                    <div className="grid grid-cols-2 gap-4 md:flex md:flex-row md:gap-16 mt-2 justify-center px-4">
-                        <div className="flex flex-col items-center gap-2 group text-center">
-                            <div className="h-1 w-12 bg-purple-200 group-hover:bg-purple-600 transition-colors rounded-full mb-2"></div>
-                            <p className="font-bold text-slate-900 text-lg leading-tight">Acceso Total</p>
-                            <p className="text-slate-500 text-xs md:text-sm max-w-[150px] md:max-w-[200px] leading-snug">All Access incluido.</p>
-                        </div>
-                        <div className="flex flex-col items-center gap-2 group text-center">
-                            <div className="h-1 w-12 bg-pink-200 group-hover:bg-pink-600 transition-colors rounded-full mb-2"></div>
-                            <p className="font-bold text-slate-900 text-lg leading-tight">Tecnología Inmersiva</p>
-                            <p className="text-slate-500 text-xs md:text-sm max-w-[150px] md:max-w-[200px] leading-snug">Vuela dentro de la historia sin límites.</p>
-                        </div>
+                    <div className="flex flex-col items-center gap-2 group text-center">
+                        <div className="h-1 w-12 bg-pink-200 group-hover:bg-pink-600 transition-colors rounded-full mb-2"></div>
+                        <p className="font-bold text-slate-900 text-lg leading-tight">Tecnología Inmersiva</p>
+                        <p className="text-slate-500 text-xs md:text-sm max-w-[150px] md:max-w-[200px] leading-snug">Vuela dentro de la historia sin límites.</p>
                     </div>
                 </div>
+            </div>
 
-                {/* CARRUSEL DE MONOLITOS (VIDEO) */}
+            {/* CAROUSEL CONTAINER */}
+            <div className="relative w-full max-w-[1400px] mx-auto">
                 <div
                     ref={carouselRef}
-                    className={`flex overflow-x-auto gap-6 md:gap-8 pb-12 hide-scroll px-4 -mx-4 md:mx-0 pt-4 md:pt-20 ${isAutoplay ? '' : 'snap-x snap-mandatory'}`}
-                    style={{ scrollBehavior: 'auto' }}
-                    onMouseEnter={stopAutoplay}
-                    onMouseLeave={resumeAutoplay}
-                    onTouchStart={stopAutoplay}
-                    onTouchEnd={resumeAutoplay}
-                    onClick={stopAutoplay}
                     onScroll={handleScroll}
+                    className="flex overflow-x-auto snap-x snap-mandatory hide-scroll gap-6 px-[5vw] md:px-[calc(50%-200px)] pb-12"
+                    style={{ scrollBehavior: 'smooth' }}
                 >
-                    {displayCards.map((card, index) => (
-                        <div key={index} className="snap-center shrink-0 w-[85vw] md:w-[400px]">
-                            <div className={`monolith-card relative h-[60vh] md:h-[550px] rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.25),0_0_0_1px_rgba(255,255,255,0.1)_inset] cursor-pointer group bg-slate-900 ${index % 2 !== 0 ? 'md:-mt-12' : ''}`}>
-                                <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative z-0 transform-gpu">
-                                    <video
-                                        data-id={card.id}
-                                        src={card.video}
-                                        className="monolith-video absolute inset-0 w-full h-full object-cover opacity-90"
-                                        autoPlay
-                                        muted
-                                        loop
-                                        playsInline
-                                        preload="metadata"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
+                    {cards.map((card, index) => (
+                        <VideoCard
+                            key={card.id + '-' + index}
+                            card={{ ...card, index }}
+                            isActive={index === activeIndex}
+                            onVideoEnded={handleVideoEnded}
+                        />
+                    ))}
+                </div>
 
-                                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between z-10">
-                                        <div className="flex flex-col">
-                                            <span className="text-white/60 text-[9px] font-bold uppercase tracking-wider mb-1">{card.subtitle}</span>
-                                            <span className="text-white font-['Outfit',sans-serif] font-black text-xl leading-none tracking-tight whitespace-pre-line">{card.title}</span>
-                                        </div>
-                                        <div className="w-16 h-16 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <img src={card.logo} alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                {/* DOT INDICATORS */}
+                <div className="flex justify-center gap-3 mt-4">
+                    {cards.map((_, index) => (
+                        <button
+                            key={index}
+                            onClick={() => scrollToIndex(index)}
+                            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${index === activeIndex ? 'bg-purple-600 w-8' : 'bg-slate-300 hover:bg-slate-400'
+                                }`}
+                            aria-label={`Go to slide ${index + 1}`}
+                        />
                     ))}
                 </div>
             </div>

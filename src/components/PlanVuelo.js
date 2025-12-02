@@ -12,6 +12,7 @@ export default function PlanVuelo() {
     const visorRef = useRef(null);
     const buttonRef = useRef(null);
     const curtainRef = useRef(null);
+    const headerRef = useRef(null);
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -42,10 +43,26 @@ export default function PlanVuelo() {
                 }
             );
 
+            // 0.5 Header Text Slide In (Removed opacity to fix gradient bug)
+            gsap.fromTo(headerRef.current,
+                { y: 50 },
+                {
+                    y: 0,
+                    duration: 1,
+                    ease: "power3.out",
+                    scrollTrigger: {
+                        trigger: sectionRef.current,
+                        start: "top 85%", // Starts when top of section is 85% down the viewport (almost immediately)
+                        toggleActions: "play none none reverse"
+                    }
+                }
+            );
+
             // 1. Visor moves UP from below (y: 100% or similar) to center (y: 0)
             tl.fromTo(visorRef.current,
                 { y: 300, opacity: 0 }, // Start state: down and invisible
-                { y: 0, opacity: 1, duration: 2, ease: "power2.out" }
+                { y: 0, opacity: 1, duration: 2, ease: "power2.out" },
+                0.2 // Slight delay after text starts
             )
                 // 2. Button fades in at the end (overlapping with visor arrival)
                 .fromTo(buttonRef.current,
@@ -94,14 +111,14 @@ export default function PlanVuelo() {
 
                 {/* Fondo Dinámico - Optimized with translate3d for GPU */}
                 <div className="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none">
-                    <div className="absolute -top-20 -right-20 w-[800px] h-[800px] bg-blue-50/80 rounded-full blur-[120px] transform-gpu"></div>
-                    <div className="absolute top-1/3 -left-20 w-[400px] h-[400px] bg-purple-50/60 rounded-full blur-[100px] transform-gpu"></div>
+                    <div className="absolute -top-20 -right-20 w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(239,246,255,0.8)_0%,transparent_70%)] transform-gpu"></div>
+                    <div className="absolute top-1/3 -left-20 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(250,245,255,0.6)_0%,transparent_70%)] transform-gpu"></div>
                 </div>
 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full h-full flex flex-col justify-center">
 
                     {/* 1. HEADER */}
-                    <div className="text-center mb-1 md:mb-2 shrink-0 relative">
+                    <div ref={headerRef} className="text-center mb-1 md:mb-2 shrink-0 relative">
 
                         <div className="inline-flex items-center gap-2 px-6 py-2 md:px-4 md:py-1.5 rounded-full bg-slate-900 text-white mb-2 md:mb-3 shadow-lg">
                             <span className="relative flex h-2 w-2">
@@ -163,7 +180,7 @@ export default function PlanVuelo() {
                                             loop
                                             playsInline
                                         >
-                                            <source src="https://flyhighedu.com.mx/wp-content/uploads/2025/10/Teaser-web2.mp4" type="video/mp4" />
+                                            <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
                                         </video>
 
                                         {/* Screen Glare / Reflection */}

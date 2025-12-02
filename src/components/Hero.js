@@ -9,12 +9,13 @@ const AlliesMarquee = () => {
     // Lista de ejemplo de 8 aliados (Placeholders con iconos)
     // Lista de aliados reales con logos
     const allies = [
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-ccfdsp.png", name: "FÁBRICA SAN PEDRO" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-parque.png", name: "PARQUE NACIONAL" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/10/logo-secretaria-cultura-y-turismo.png", name: "SEC. CULTURA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/logo-museo-del-agua-png.png", name: "MUSEO DEL AGUA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/bonanza.png", name: "LA BONANZA" },
-        { logo: "https://flyhighedu.com.mx/wp-content/uploads/2025/11/strong-plastic.png", name: "STRONG PLASTIC" },
+        { logo: "/img/logo ccfdsp.png", name: "FÁBRICA SAN PEDRO" },
+        { logo: "/img/logo parque.png", name: "PARQUE NACIONAL" },
+        { logo: "/img/logo secretaria cultura y turismo.png", name: "SEC. CULTURA" },
+        { logo: "/img/museo del agua azul png.png", name: "MUSEO DEL AGUA" },
+        { logo: "/img/logo huatapera.png", name: "HUATAPERA" },
+        { logo: "/img/bonanza.png", name: "LA BONANZA" },
+        { logo: "/img/strong plastic.png", name: "STRONG PLASTIC" },
     ];
 
     // Duplicamos la lista para el efecto de loop infinito
