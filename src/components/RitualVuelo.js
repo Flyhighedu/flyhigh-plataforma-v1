@@ -152,18 +152,34 @@ export default function RitualVuelo() {
         }
     };
 
+    // 3. Opacity Layers Logic (GPU Optimized)
+    const opacityLayer2 = useTransform(scrollXProgress, [0.2, 0.5], [0, 1]);
+    const opacityLayer3 = useTransform(scrollXProgress, [0.5, 0.8], [0, 1]);
+
     return (
         <section id="how-it-works" className="relative z-10 w-full rounded-t-[3rem] sm:rounded-t-[5rem] pt-20 pb-16 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden min-h-screen flex flex-col justify-center bg-slate-100">
 
-            {/* --- FONDO PARALLAX --- */}
+            {/* --- FONDO PARALLAX (CAPAS DE OPACIDAD - GPU OPTIMIZED) --- */}
             <div
                 ref={backgroundRef}
-                className="absolute inset-0 w-full h-[200%] -z-20 pointer-events-none transition-transform duration-100 ease-linear will-change-transform"
-                style={{
-                    background: 'linear-gradient(to bottom, #0072FF 0%, #00C6FF 20%, #BFDBFE 50%, #E2E8F0 80%, #F5F7FA 100%)',
-                    transform: 'translateY(-50%)' // Estado inicial: Tierra
-                }}
-            ></div>
+                className="absolute inset-0 w-full h-[200%] -z-20 pointer-events-none will-change-transform"
+                style={{ transform: 'translateY(-50%) translateZ(0)' }} // Force GPU
+            >
+                {/* Capa 1 (Base): Cyan/Blue (Paso 1) */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_bottom,#00C6FF_0%,#BFDBFE_50%,#F5F7FA_100%)]"></div>
+
+                {/* Capa 2: Blue/Indigo (Paso 2) */}
+                <motion.div
+                    style={{ opacity: opacityLayer2 }}
+                    className="absolute inset-0 bg-[linear-gradient(to_bottom,#0072FF_0%,#BFDBFE_50%,#F5F7FA_100%)]"
+                ></motion.div>
+
+                {/* Capa 3: Night Blue (Paso 3 - Con Estrellas - Balanceado) */}
+                <motion.div
+                    style={{ opacity: opacityLayer3 }}
+                    className="absolute inset-0 bg-[linear-gradient(to_bottom,#0f172a_0%,#1e3a8a_50%,#0f172a_100%)]"
+                ></motion.div>
+            </div>
 
             {/* --- PARTÍCULAS (POLVO DE HADAS) --- */}
             <div
@@ -206,11 +222,11 @@ export default function RitualVuelo() {
                         onScroll={handleScroll}
                         onTouchStart={handleInteraction}
                         onMouseDown={handleInteraction}
-                        className={`flex overflow-x-auto gap-6 pb-8 hide-scroll sm:grid sm:grid-cols-3 sm:gap-8 sm:overflow-visible px-4 sm:px-0 pt-6 ${isSnapping ? 'snap-x snap-mandatory' : ''}`}
+                        className={`flex overflow-x-auto gap-6 pb-8 hide-scroll sm:grid sm:grid-cols-3 sm:gap-8 sm:overflow-visible px-4 sm:px-0 pt-6 will-change-transform transform-gpu ${isSnapping ? 'snap-x snap-mandatory' : ''}`}
                     >
 
                         {/* PASO 1 */}
-                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12">
+                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
                             <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-[#00C6FF] shadow-md border border-white z-10 group-hover:scale-110 transition-transform">1</div>
                                 <div className="w-full aspect-square bg-blue-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
@@ -222,7 +238,7 @@ export default function RitualVuelo() {
                         </div>
 
                         {/* PASO 2 */}
-                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12">
+                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
                             <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-[#0072FF] shadow-md border border-white z-10 group-hover:scale-110 transition-transform">2</div>
                                 <div className="w-full aspect-square bg-indigo-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
@@ -234,7 +250,7 @@ export default function RitualVuelo() {
                         </div>
 
                         {/* PASO 3 */}
-                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12">
+                        <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
                             <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-pink-500 shadow-md border border-white z-10 group-hover:scale-110 transition-transform">3</div>
                                 <div className="w-full aspect-square bg-pink-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
