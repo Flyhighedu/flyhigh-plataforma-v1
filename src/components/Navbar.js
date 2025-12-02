@@ -34,7 +34,7 @@ export default function Navbar() {
       ([entry]) => {
         setIsImpactVisible(entry.isIntersecting);
       },
-      { threshold: 0.98 }
+      { threshold: 0.6 }
     );
 
     const attemptObserve = () => {
