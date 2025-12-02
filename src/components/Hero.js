@@ -54,6 +54,28 @@ export default function Hero() {
         }
     }, [isModalOpen]);
 
+    // OPTIMIZACIÓN DE RENDIMIENTO: Pausar video cuando no es visible
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!videoRef.current) return;
+
+            // Si el usuario ha bajado más allá de la altura del viewport (Hero oculto)
+            if (window.scrollY > window.innerHeight) {
+                if (!videoRef.current.paused) {
+                    videoRef.current.pause();
+                }
+            } else {
+                // Si el Hero es visible y el modal no está abierto
+                if (videoRef.current.paused && !isModalOpen) {
+                    videoRef.current.play().catch(() => { });
+                }
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [isModalOpen]);
+
     const openModal = () => {
         setIsModalOpen(true);
         if (videoRef.current) videoRef.current.pause();
