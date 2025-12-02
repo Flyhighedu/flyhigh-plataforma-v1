@@ -11,6 +11,7 @@ export default function PlanVuelo() {
     const sectionRef = useRef(null);
     const visorRef = useRef(null);
     const buttonRef = useRef(null);
+    const curtainRef = useRef(null);
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -24,6 +25,22 @@ export default function PlanVuelo() {
                     // markers: true, // Uncomment for debugging
                 }
             });
+
+            // 0. White Curtain Animation (Fades in immediately as section enters)
+            gsap.fromTo(curtainRef.current,
+                { opacity: 0 },
+                {
+                    opacity: 1,
+                    duration: 0.1, // Very fast fade in
+                    ease: "none",
+                    scrollTrigger: {
+                        trigger: sectionRef.current,
+                        start: "top bottom", // Starts when top of section hits bottom of viewport
+                        end: "top top", // Ends when top of section hits top of viewport
+                        scrub: true,
+                    }
+                }
+            );
 
             // 1. Visor moves UP from below (y: 100% or similar) to center (y: 0)
             tl.fromTo(visorRef.current,
@@ -44,7 +61,10 @@ export default function PlanVuelo() {
 
     return (
         <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
-            <section className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative overflow-hidden">
+            {/* White Curtain (Fixed Background) */}
+            <div ref={curtainRef} className="fixed inset-0 bg-white z-40 pointer-events-none opacity-0" />
+
+            <section className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative z-50 overflow-hidden">
 
                 {/* Styles for this component */}
                 <style jsx>{`
