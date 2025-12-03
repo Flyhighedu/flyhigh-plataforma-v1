@@ -13,8 +13,8 @@ const AlliesSection = () => {
     const schools = Array(10).fill("Escuela Impulsora");
 
     const donors = [
-        "Hector Avila", "Alberto Avila", "Emilio Cuadra", "Alejandro",
-        "Carlos Tafolla", "Kevin Fuentes", "Anaid Rios", "Brandon Campos",
+        "Hector Avila", "Alberto Avila", "Emilio Herrera", "Alejandro",
+        "Carlos Bautista", "Kevin Fuentes", "Anaid Rios", "Brandon Campos",
         "David Sanchez", "Socorro Aguilar", "Rosa Rios", "Cleopatra Guerrero"
     ];
 
@@ -118,16 +118,20 @@ const AlliesSection = () => {
                     <div className="flex justify-center items-start gap-8 mb-6">
                         {/* Strong Plastic */}
                         <div className="flex flex-col items-center gap-2 group">
-                            <img src="/img/strong plastic.png" alt="Strong Plastic" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="h-20 flex items-center justify-center">
+                                <img src="/img/logo sp Negro.png" alt="Strong Plastic" className="h-20 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
                         </div>
 
                         {/* Divider */}
-                        <div className="w-[1px] h-12 bg-slate-200 mt-1"></div>
+                        <div className="w-[1px] h-16 bg-slate-200 mt-3"></div>
 
                         {/* Bonanza */}
                         <div className="flex flex-col items-center gap-2 group">
-                            <img src="/img/bonanza.png" alt="La Bonanza" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="h-20 flex items-center justify-center">
+                                <img src="/img/bonanza.png" alt="La Bonanza" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
                         </div>
                     </div>
