@@ -5,6 +5,7 @@ import RitualVuelo from '@/components/RitualVuelo';
 import ExperienciaInmersiva from '@/components/ExperienciaInmersiva';
 import PlanVuelo from '@/components/PlanVuelo';
 import SteamPlatform from '@/components/SteamPlatform';
+import HorizontalGallery from '@/components/HorizontalGallery';
 import Manifiesto from '@/components/Manifiesto';
 import ImpactEngineGoldenMaster from '@/components/ImpactEngineGoldenMaster';
 import AlliesSection from '@/components/AlliesSection';
@@ -20,6 +21,7 @@ export default function Home() {
       <PlanVuelo />
       <ExperienciaInmersiva />
       <SteamPlatform />
+      <HorizontalGallery />
       <Manifiesto />
       <ImpactEngineGoldenMaster />
       <AlliesSection />

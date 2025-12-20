@@ -114,25 +114,44 @@ const AlliesSection = () => {
                         Aliados Fly High
                     </div>
 
-                    {/* NUEVOS LOGOS CENTRALES (Strong Plastic & Bonanza) */}
-                    <div className="flex justify-center items-start gap-8 mb-6">
+                    {/* NUEVOS LOGOS CENTRALES (Strong Plastic, RV Fresh, Madobox & Bonanza) */}
+                    <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10 mb-6">
                         {/* Strong Plastic */}
                         <div className="flex flex-col items-center gap-2 group">
-                            <div className="h-20 flex items-center justify-center">
-                                <img src="/img/logo sp Negro.png" alt="Strong Plastic" className="h-20 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="h-16 md:h-20 flex items-center justify-center">
+                                <img src="/img/logo sp Negro.png" alt="Strong Plastic" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
                             </div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador</span>
                         </div>
 
-                        {/* Divider */}
-                        <div className="w-[1px] h-16 bg-slate-200 mt-3"></div>
+                        <div className="w-[1px] h-12 bg-slate-100 hidden md:block"></div>
+
+                        {/* RV Fresh */}
+                        <div className="flex flex-col items-center gap-2 group">
+                            <div className="h-16 md:h-20 flex items-center justify-center">
+                                <img src="/img/logo RV Fresh.png" alt="RV Fresh" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-green-500 transition-colors">Patrocinador</span>
+                        </div>
+
+                        <div className="w-[1px] h-12 bg-slate-100 hidden md:block"></div>
+
+                        {/* Madobox */}
+                        <div className="flex flex-col items-center gap-2 group">
+                            <div className="h-16 md:h-20 flex items-center justify-center">
+                                <img src="/img/Logo Madobox.png" alt="Madobox" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-orange-500 transition-colors">Patrocinador</span>
+                        </div>
+
+                        <div className="w-[1px] h-12 bg-slate-100 hidden md:block"></div>
 
                         {/* Bonanza */}
                         <div className="flex flex-col items-center gap-2 group">
-                            <div className="h-20 flex items-center justify-center">
-                                <img src="/img/bonanza.png" alt="La Bonanza" className="h-12 w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            <div className="h-12 md:h-14 flex items-center justify-center">
+                                <img src="/img/bonanza.png" alt="La Bonanza" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
                             </div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador Oficial</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-rose-500 transition-colors">Patrocinador</span>
                         </div>
                     </div>
                     <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-2">

@@ -15,30 +15,35 @@ const AlliesMarquee = () => {
         { logo: "/img/museo del agua azul png.png", name: "MUSEO DEL AGUA" },
         { logo: "/img/logo huatapera.png", name: "HUATAPERA" },
         { logo: "/img/bonanza.png", name: "LA BONANZA" },
-        { logo: "/img/strong plastic.png", name: "STRONG PLASTIC" },
+        { logo: "/img/logo sp Negro.png", name: "STRONG PLASTIC", customClassName: "h-9 md:h-11" },
+        { logo: "/img/logo RV Fresh.png", name: "RV FRESH", customClassName: "h-9 md:h-11" },
+        { logo: "/img/Logo Madobox.png", name: "MADOBOX", customClassName: "h-9 md:h-11" },
     ];
 
     // Duplicamos la lista para el efecto de loop infinito
     const marqueeList = [...allies, ...allies];
 
     return (
-        <div className="w-full overflow-hidden flex items-center pt-2 opacity-90">
+        <div className="w-full overflow-hidden flex items-center opacity-90 relative">
             {/* Contenedor animado que se mueve a la izquierda */}
             <motion.div
-                className="flex gap-8 items-center whitespace-nowrap"
+                className="flex items-center whitespace-nowrap w-max"
                 animate={{ x: ["0%", "-50%"] }} // Se mueve hasta la mitad (el final de la primera lista)
                 transition={{ ease: "linear", duration: 30, repeat: Infinity }} // Loop infinito suave
             >
                 {marqueeList.map((ally, index) => (
-                    <div key={index} className="flex items-center gap-2 shrink-0 grayscale hover:grayscale-0 transition-all duration-300">
-                        <img src={ally.logo} alt={ally.name} className="h-6 w-auto object-contain brightness-0 invert" />
-                        <span className="text-[10px] font-bold text-white/80 tracking-wider">{ally.name}</span>
+                    <div key={index} className="flex items-center gap-2 shrink-0 grayscale hover:grayscale-0 transition-all duration-300 pr-12">
+                        <img
+                            src={ally.logo}
+                            alt={ally.name}
+                            className={`${ally.customClassName || "h-6"} w-auto object-contain brightness-0 invert`}
+                        />
+                        {!ally.hideLabel && (
+                            <span className="text-[10px] font-bold text-white/80 tracking-widest font-['Inter',sans-serif] uppercase">{ally.name}</span>
+                        )}
                     </div>
                 ))}
             </motion.div>
-            {/* Degradados laterales para suavizar la entrada/salida */}
-            <div className="absolute left-0 inset-y-0 w-4 bg-gradient-to-r from-white/10 to-transparent pointer-events-none rounded-l-[20px]"></div>
-            <div className="absolute right-0 inset-y-0 w-4 bg-gradient-to-l from-white/10 to-transparent pointer-events-none rounded-r-[20px]"></div>
         </div>
     );
 };
@@ -271,7 +276,7 @@ export default function Hero() {
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.5 }}
-                        className="bg-white/10 backdrop-blur-xl border-t border-x border-white/20 rounded-t-[24px] rounded-b-none px-4 pt-4 pb-6 md:pb-4 shadow-2xl flex flex-col gap-4 pointer-events-auto relative overflow-hidden"
+                        className="bg-white/10 backdrop-blur-xl rounded-t-[24px] rounded-b-none px-4 pt-2.5 pb-2.5 flex flex-col items-center justify-center gap-3 pointer-events-auto relative overflow-hidden"
                     >
                         {/* 1. TEXTO TÉCNICO (Fuente Inter, Uppercase, Pequeño) */}
                         <div className="text-center">
@@ -281,18 +286,18 @@ export default function Hero() {
                         </div>
 
                         {/* 2. FILA DE BOTONES */}
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 w-full relative top-[2px]">
                             {/* Botón Padrino (Dominante Blanco) */}
                             <button
                                 onClick={() => document.getElementById('impact-engine')?.scrollIntoView({ behavior: 'smooth' })}
-                                className="flex-1 bg-white text-black font-['Inter',sans-serif] font-bold text-[10px] md:text-xs py-3.5 rounded-[16px] shadow-lg flex items-center justify-center gap-2 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap"
+                                className="flex-1 bg-white text-black font-['Inter',sans-serif] font-bold text-[10px] md:text-xs py-2.5 rounded-[16px] shadow-lg flex items-center justify-center gap-2 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap"
                             >
                                 <Heart size={16} fill="black" className="text-red-500" />
                                 APADRINA UN SUEÑO
                             </button>
 
                             {/* Botón Escuela (Glass Outline) */}
-                            <button className="flex-1 bg-transparent border border-white/30 text-white font-['Inter',sans-serif] font-bold text-xs py-3.5 rounded-[16px] flex items-center justify-center gap-2 hover:bg-white/10 active:scale-95 transition-all">
+                            <button className="flex-1 bg-transparent border border-white/30 text-white font-['Inter',sans-serif] font-bold text-xs py-2.5 rounded-[16px] flex items-center justify-center gap-2 hover:bg-white/10 active:scale-95 transition-all">
                                 <School size={16} />
                                 ESCUELA
                             </button>

@@ -32,3 +32,52 @@
     transform: translateX(-50%);
   }
 }
+
+@keyframes fly-across {
+  0% {
+    transform: translate(-100%, 100%) rotate(-15deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(200%, -100%) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+.animate-fly-across {
+  animation: fly-across 1.5s ease-out forwards;
+}
+
+/* Premium Gallery Animations */
+@keyframes pulse-play {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(217, 70, 239, 0.4);
+  }
+
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(217, 70, 239, 0);
+  }
+}
+
+.animate-pulse-play {
+  animation: pulse-play 2s ease-in-out infinite;
+}
+
+/* Film Grain Overlay */
+.film-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}

@@ -1,315 +1,680 @@
 "use client";
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Play, X, ArrowRight, Quote, Plane, Wind, MapPin } from 'lucide-react';
+import React, { useRef, useState, useEffect, useLayoutEffect, memo } from 'react';
+import { Play, X, MapPin, ChevronUp, ChevronDown, Wind, ArrowRight, Plane } from 'lucide-react';
 
-/*
-  MASTERPIECE REFACTOR: "HISTORIAS EN VUELO"
-  ------------------------------------------
-  AWWWARDS SUBMISSION - SITE OF THE MONTH
-  
-  ARCHITECTURE: 3-LAYER Z-AXIS PARALLAX
-  1. BACKGROUND LAYER (Speed 0.2x): Grain + "HISTORIAS"
-  2. CANVAS LAYER (Speed 0.5x): Kinetic Typography (Quotes)
-  3. FOREGROUND LAYER (Speed 1.0x): Media Cards (Drifting)
-  
-  PHYSICS:
-  - Damping: 0.06 (Heavy/Premium)
-  - Drift: Subtle rotation based on velocity (illusion of floating)
-*/
+// --- STYLES: HEARTBEAT & CURSOR ---
+// Kept exactly as original
+const CURSOR_CSS = `
+  .custom-cursor {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    display: none;
+  }
+  @media (hover: hover) {
+    .custom-cursor { display: block; }
+  }
+`;
 
-// --- CONTENT DATA ---
-const QUOTES = [
+// --- DATA: NOMINATION MURAL (SOTD SPEC) ---
+// Exact sequence and content
+const GALLERY_COLUMNS = [
     {
-        id: 'q1',
-        text: "¡Había una alegría que se sentía en todo el patio! Los niños hacían todo lo que les pedíamos porque se morían de ganas de que ya les tocara volar.",
-        author: "Mtra. Lucina",
-        role: "Directora General",
-        offset: "left-[150vw] md:left-[60vw] top-[15vh]", // Canvas Coordinate
+        id: 'col-intro',
+        type: 'intro',
+        items: [
+            {
+                id: 1,
+                name: "SANTI",
+                location: "Volcán Paricutín",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-little-boy-wearing-a-superhero-cape-standing-in-a-field-28499-large.mp4",
+                thumbUrl: "/img/Portada Altamirano Uruapan.jpg",
+                type: "media-tall",
+                rotation: "rotate-[-1deg]",
+                serial: "FLP-001 // 2025"
+            }
+        ]
     },
     {
-        id: 'q2',
-        text: "Verlos tan concentrados siguiendo el vuelo en tiempo real nos sorprendió; tienen una chispa increíble y solo necesitaban ver algo diferente.",
-        author: "Mtra. Xatziri",
-        role: "Docente Primaria",
-        offset: "left-[350vw] md:left-[140vw] top-[10vh]", // Canvas Coordinate
+        id: 'col-text-1',
+        type: 'text-canvas',
+        items: [
+            {
+                id: 'q1',
+                type: 'kinetic-quote',
+                quote: "¡Había una alegría que se sentía en todo el patio!",
+                author: "Mtra. Lucina",
+                school: "Esc. Ignacio Manuel Altamirano",
+                offset: "self-start mt-20"
+            }
+        ]
     },
     {
-        id: 'q3',
-        text: "Es algo de verdad maravilloso; ver cómo lo que parecía imposible hoy es una herramienta real para que los niños imaginen su futuro.",
-        author: "Mtra. Karina",
-        role: "Coordinadora",
-        offset: "left-[550vw] md:left-[220vw] top-[20vh]", // Canvas Coordinate
+        id: 'col-media-mix-1',
+        type: 'media-stack',
+        items: [
+            {
+                id: 2,
+                name: "XIMENA",
+                location: "Fábrica San Pedro",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-a-green-jungle-3486-large.mp4",
+                thumbUrl: "/img/Portada 2 niños.jpg",
+                type: "media-box",
+                rotation: "rotate-[1deg]",
+                offset: "self-end",
+                serial: "FLP-002 // 2025"
+            },
+            {
+                id: 8,
+                name: "CAMILA",
+                location: "El Mirador",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-airplane-taking-off-in-the-sunset-103-large.mp4",
+                thumbUrl: "/img/Patio altamirano.png",
+                type: "media-box",
+                rotation: "rotate-[-1deg]",
+                offset: "self-start -ml-12",
+                serial: "FLP-008 // 2025"
+            }
+        ]
+    },
+    {
+        id: 'col-text-2',
+        type: 'text-canvas',
+        items: [
+            {
+                id: 'q2',
+                type: 'kinetic-quote',
+                quote: "Nos dimos cuenta de que tienen una chispa increíble.",
+                author: "Mtra. Xatziri",
+                school: "Esc. Ignacio Manuel Altamirano",
+                offset: "self-center scale-110"
+            }
+        ]
+    },
+    {
+        id: 'col-media-wide',
+        type: 'media-stack',
+        items: [
+            {
+                id: 3,
+                name: "MATEO",
+                location: "Parque Nacional",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-drone-flying-over-a-rural-area-in-the-mountains-43958-large.mp4",
+                thumbUrl: "/img/Estoy viendo la fabrica.png",
+                type: "media-wide",
+                rotation: "rotate-[1deg]",
+                offset: "self-center",
+                serial: "FLP-003 // 2025",
+                overlayText: "¡estoy viendo la fábrica de san pedro!"
+            }
+        ]
+    },
+    {
+        id: 'col-text-3',
+        type: 'text-canvas',
+        items: [
+            {
+                id: 'q3',
+                type: 'kinetic-quote',
+                quote: "Lo que parecía imposible, hoy es una herramienta real.",
+                author: "Mtra. Karina",
+                school: "Esc. Ignacio Manuel Altamirano",
+                offset: "self-end mb-32"
+            }
+        ]
+    },
+    {
+        id: 'col-final-mix',
+        type: 'media-stack',
+        items: [
+            {
+                id: 4,
+                name: "VALERIA",
+                location: "Centro Histórico",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-girl-playing-with-a-paper-plane-in-the-sun-33066-large.mp4",
+                thumbUrl: "https://images.unsplash.com/photo-1549603590-779831519d18?w=600&h=800&fit=crop",
+                type: "media-tall",
+                rotation: "rotate-[-1deg]",
+                offset: "self-start",
+                serial: "FLP-004 // 2025"
+            },
+            {
+                id: 5,
+                name: "DIEGO",
+                location: "La Tzararacua",
+                videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-boy-looking-at-the-sky-scenery-4384-large.mp4",
+                thumbUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=600&fit=crop",
+                type: "media-wide",
+                rotation: "rotate-[1deg]",
+                offset: "self-end -ml-20",
+                serial: "FLP-005 // 2025"
+            }
+        ]
     }
 ];
 
-const MEDIA = [
-    {
-        id: 'santi',
-        type: 'video',
-        title: "SANTI",
-        location: "Volcán Paricutín",
-        src: "https://assets.mixkit.co/videos/preview/mixkit-little-boy-wearing-a-superhero-cape-standing-in-a-field-28499-large.mp4",
-        thumb: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=600&h=800&fit=crop",
-        aspect: 'vertical',
-        offset: "left-[90vw] md:left-[35vw] top-[5vh]", // Forground Coordinate
-        rotation: 2 // Initial tilt
-    },
-    {
-        id: 'mateo',
-        type: 'image',
-        title: "MATEO",
-        location: "Parque Nacional",
-        src: "https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=800&h=600&fit=crop",
-        aspect: 'horizontal',
-        offset: "left-[280vw] md:left-[110vw] top-[30vh]",
-        rotation: -2
-    },
-    {
-        id: 'valeria',
-        type: 'video',
-        title: "VALERIA",
-        location: "Centro Histórico",
-        src: "https://assets.mixkit.co/videos/preview/mixkit-girl-playing-with-a-paper-plane-in-the-sun-33066-large.mp4",
-        thumb: "https://images.unsplash.com/photo-1627916574483-c5a47672224d?w=600&h=800&fit=crop",
-        aspect: 'vertical',
-        offset: "left-[480vw] md:left-[190vw] top-[10vh]",
-        rotation: 3
-    },
-    {
-        id: 'diego',
-        type: 'image',
-        title: "DIEGO",
-        location: "La Tzararacua",
-        src: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=600&fit=crop",
-        aspect: 'vertical',
-        offset: "left-[680vw] md:left-[270vw] top-[25vh]",
-        rotation: -1
-    }
+const MEDIA_ITEMS = GALLERY_COLUMNS.flatMap(col => col.items).filter(item => item.type && item.type.startsWith('media'));
+
+const SPONSOR_LOGOS = [
+    { src: "/img/logo sp Negro.png", x: 20, y: 15, rot: -2, w: "w-40 md:w-80" },
+    { src: "/img/bonanza.png", x: 45, y: 65, rot: 3, w: "w-36 md:w-72" },
+    { src: "/img/logo RV Fresh.png", x: 70, y: 30, rot: 2, w: "w-32 md:w-64" },
+    { src: "/img/Logo Madobox.png", x: 75, y: 75, rot: -1, w: "w-40 md:w-76" }
 ];
 
-// --- PHYSICS CONSTANTS ---
-const PHYSICS_DAMPING = 0.06;
+// --- UTILS ---
 const lerp = (start, end, factor) => start + (end - start) * factor;
 
-// --- SUB-COMPONENTS ---
+const getStyles = (type) => {
+    switch (type) {
+        case 'media-tall': return 'w-[40vh] h-[75vh] md:w-[50vh] md:h-[80vh]';
+        case 'media-box': return 'w-[35vh] h-[35vh] md:w-[45vh] md:h-[45vh]';
+        case 'media-wide': return 'w-[50vh] h-[30vh] md:w-[70vh] md:h-[40vh]';
+        case 'kinetic-quote': return 'w-[80vw] md:w-[60vh]';
+        default: return '';
+    }
+};
 
-const FilmGrain = () => (
-    <svg className="film-grain w-full h-full pointer-events-none fixed inset-0 z-50 opacity-[0.04] mix-blend-overlay">
+// --- COMPONENT: FILM GRAIN ---
+const FilmGrain = memo(() => (
+    <svg className="film-grain w-full h-full pointer-events-none fixed inset-0 z-[100] opacity-[0.04]">
         <filter id="noise">
             <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" stitchTiles="stitch" />
             <feColorMatrix type="saturate" values="0" />
         </filter>
         <rect width="100%" height="100%" filter="url(#noise)" />
     </svg>
-);
+));
 
-const PlayButton = () => (
-    <div className="relative flex items-center justify-center w-20 h-20 md:w-24 md:h-24">
-        {/* Heartbeat only visible on touch/hover to keep UI clean but accessible */}
-        <div className="absolute inset-0 rounded-full border border-white/40 animate-ping opacity-60 md:hidden" />
-        <div className="relative z-10 w-full h-full bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex items-center justify-center transition-transform duration-500 hover:scale-110">
-            <Play fill="white" size={32} className="ml-1" />
+// --- COMPONENT: SPONSOR WATERMARK LAYER (Layer -1) ---
+// Using Refs for performant independent parallax
+const SponsorWatermarkLayer = memo(({ progressRef, maxTranslate }) => {
+    const containerRef = useRef(null);
+    const logoRefs = useRef([]);
+
+    useLayoutEffect(() => {
+        const update = () => {
+            if (!containerRef.current) return;
+            const progress = progressRef.current;
+            const maxT = maxTranslate.current;
+
+            // Parallax factor: 0.07x (Slow-Gliding Physics)
+            const baseTranslate = progress * maxT * 0.07;
+            containerRef.current.style.transform = `translate3d(-${baseTranslate}px, 0, 0)`;
+
+            // Individual Logo Updates (Madobox drift)
+            logoRefs.current.forEach((el, idx) => {
+                if (!el) return;
+                const config = SPONSOR_LOGOS[idx];
+                const extraDrift = idx === 3 ? (progress * maxT * 0.007) : 0;
+                el.style.transform = `translate3d(-${extraDrift}px, 0, 0) rotate(${config.rot}deg)`;
+            });
+        };
+
+        const raf = () => {
+            update();
+            requestAnimationFrame(raf);
+        };
+        const handle = requestAnimationFrame(raf);
+        return () => cancelAnimationFrame(handle);
+    }, [progressRef, maxTranslate]);
+
+    return (
+        <div
+            ref={containerRef}
+            className="absolute inset-0 pointer-events-none select-none z-[-1] will-change-transform"
+            style={{ width: '500vw' }}
+        >
+            {SPONSOR_LOGOS.map((logo, idx) => (
+                <div
+                    key={idx}
+                    ref={el => logoRefs.current[idx] = el}
+                    className="absolute grayscale opacity-[0.14] will-change-transform"
+                    style={{
+                        left: `${logo.x}vw`,
+                        top: `${logo.y}%`,
+                        transform: `rotate(${logo.rot}deg)`
+                    }}
+                >
+                    <img
+                        src={logo.src}
+                        alt="Sponsor Watermark"
+                        className={`${logo.w} h-auto object-contain filter`}
+                        loading="lazy"
+                    />
+                </div>
+            ))}
         </div>
-    </div>
-);
+    );
+});
 
-// --- MAIN COMPONENT ---
+// --- COMPONENT: TOPOGRAPHIC BACKGROUND ---
+const TopographicBackground = memo(({ progressRef }) => {
+    const line1Ref = useRef(null);
+    const line2Ref = useRef(null);
+    const circleRef = useRef(null);
+
+    useLayoutEffect(() => {
+        const update = () => {
+            const progress = progressRef.current;
+            const p = progress * 0.2; // 0.2 scale factor
+
+            if (line1Ref.current) line1Ref.current.style.transform = `translateX(${p * -200}px) rotate(-12deg)`;
+            if (line2Ref.current) line2Ref.current.style.transform = `translateX(${p * -300}px) rotate(6deg)`;
+            if (circleRef.current) circleRef.current.style.transform = `translateX(${p * -100}px)`;
+        };
+
+        const raf = () => {
+            update();
+            requestAnimationFrame(raf);
+        };
+        const handle = requestAnimationFrame(raf);
+        return () => cancelAnimationFrame(handle);
+    }, [progressRef]);
+
+    return (
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-20 overflow-hidden">
+            <div ref={line1Ref} className="absolute top-[20%] left-0 w-[200vw] h-[1px] bg-slate-300 transform -rotate-12 will-change-transform" />
+            <div ref={line2Ref} className="absolute bottom-[30%] left-0 w-[200vw] h-[1px] bg-slate-300 transform rotate-6 will-change-transform" />
+            <div ref={circleRef} className="absolute top-[50%] left-[50%] w-[50vh] h-[50vh] rounded-full border border-slate-200/50 will-change-transform" />
+        </div>
+    );
+});
+
+// --- COMPONENT: CUSTOM CURSOR (Magnetic Logic) ---
+const CustomCursor = memo(({ hoverData }) => {
+    const cursorRef = useRef(null);
+    const pos = useRef({ x: 0, y: 0 });
+    const targetPos = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            targetPos.current = { x: e.clientX, y: e.clientY };
+        };
+        window.addEventListener('mousemove', handleMouseMove, { passive: true });
+
+        const animate = () => {
+            pos.current.x = lerp(pos.current.x, targetPos.current.x, 0.15);
+            pos.current.y = lerp(pos.current.y, targetPos.current.y, 0.15);
+
+            if (cursorRef.current) {
+                let x = pos.current.x;
+                let y = pos.current.y;
+
+                if (hoverData.isHovering && hoverData.center) {
+                    const dx = hoverData.center.x - pos.current.x;
+                    const dy = hoverData.center.y - pos.current.y;
+                    x += dx * 0.35; // Pull strength
+                    y += dy * 0.35;
+                }
+
+                cursorRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            }
+            requestAnimationFrame(animate);
+        };
+        const raf = requestAnimationFrame(animate);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            cancelAnimationFrame(raf);
+        };
+    }, [hoverData]);
+
+    return (
+        <div
+            ref={cursorRef}
+            className={`custom-cursor flex items-center justify-center transition-all duration-500 ease-out border-white/20 will-change-transform
+                ${hoverData.isHovering
+                    ? 'w-32 h-32 bg-white/10 backdrop-blur-md border-[1px] -ml-16 -mt-16 rounded-full opacity-100 scale-100'
+                    : 'w-0 h-0 opacity-0'}`}
+        >
+            {hoverData.isHovering && (
+                <span className="text-[10px] font-black text-white tracking-widest text-center uppercase animate-in fade-in zoom-in duration-300">
+                    VER EN<br />FLY PLAY
+                </span>
+            )}
+        </div>
+    );
+});
+
+// --- COMPONENT: MURAL MEDIA ITEM (Optimized) ---
+const MuralMedia = memo(({ item, onOpen, handleMediaHover, progressRef }) => {
+    const elRef = useRef(null);
+
+    useLayoutEffect(() => {
+        const update = () => {
+            if (!elRef.current) return;
+            // Media items Parallax: Standard speed 50px multiplier
+            const progress = progressRef.current;
+            elRef.current.style.transform = `translate3d(-${progress * 50}px, 0, 0) ${item.rotation}`;
+        };
+
+        const raf = () => {
+            update();
+            requestAnimationFrame(raf);
+        };
+        const handle = requestAnimationFrame(raf);
+        return () => cancelAnimationFrame(handle);
+    }, [progressRef, item.rotation]);
+
+    return (
+        <div
+            ref={elRef}
+            className={`relative group cursor-none overflow-visible rounded-[2rem] md:rounded-[3rem] 
+                ${getStyles(item.type)} ${item.offset} z-10 will-change-transform
+                bg-white shadow-2xl transition-all duration-700 cubic-bezier(0.19, 1, 0.22, 1)
+                hover:shadow-fuchsia-200/50 hover:scale-[1.02]`}
+            onClick={() => onOpen(item.id)}
+            onMouseEnter={(e) => handleMediaHover(e, true)}
+            onMouseLeave={(e) => handleMediaHover(e, false)}
+        >
+            <div className="absolute inset-0 overflow-hidden rounded-[2rem] md:rounded-[3rem]">
+                <img src={item.thumbUrl} className="w-full h-full object-cover opacity-95 transition-transform duration-1000 group-hover:scale-110" alt={item.name} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+            </div>
+
+            {item.overlayText && (
+                <div className="absolute inset-x-8 bottom-10 z-20 pointer-events-none">
+                    <p className="font-black text-white text-xl md:text-3xl leading-[0.9] tracking-tighter uppercase drop-shadow-2xl opacity-90 group-hover:scale-105 transition-transform duration-700 origin-left" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                        {item.overlayText}
+                    </p>
+                </div>
+            )}
+
+            <div className="absolute -top-6 left-2 font-mono text-[8px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500 tracking-tighter uppercase whitespace-nowrap">
+                {item.serial} // LATERAL: {item.location}
+            </div>
+
+            {/* MINIMALIST PLAYHEAD (Breathing) */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div className="relative flex flex-col items-center animate-pulse duration-[3000ms]">
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                        <Play size={24} fill="white" className="text-white ml-1 opacity-90" />
+                    </div>
+                    <span className="text-[9px] font-medium text-white/60 uppercase tracking-[0.2em] mt-2">
+                        VER HISTORIA
+                    </span>
+                </div>
+            </div>
+
+            <div className="absolute bottom-8 right-8 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-all group-hover:translate-x-1">
+                <span className="text-[10px] text-white font-black uppercase tracking-widest hidden md:block drop-shadow-lg">Fly Play</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 shadow-[0_0_10px_rgba(232,33,184,0.8)]" />
+            </div>
+        </div>
+    );
+});
+
+// --- COMPONENT: KINETIC QUOTE (Optimized) ---
+const KineticQuote = memo(({ item, progressRef }) => {
+    const elRef = useRef(null);
+
+    useLayoutEffect(() => {
+        const update = () => {
+            if (!elRef.current) return;
+            // Quote transform: moves opposite direction
+            const progress = progressRef.current;
+            elRef.current.style.transform = `translate3d(${progress * 150}px, 0, 0)`;
+        };
+        const raf = () => {
+            update();
+            requestAnimationFrame(raf);
+        };
+        const handle = requestAnimationFrame(raf);
+        return () => cancelAnimationFrame(handle);
+    }, [progressRef]);
+
+    return (
+        <div
+            ref={elRef}
+            className={`relative z-40 flex flex-col ${item.offset} transition-opacity duration-1000 ease-out pointer-events-none will-change-transform`}
+        >
+            <div className="relative animate-in slide-in-from-bottom-8 duration-1000 fade-in">
+                <span className="text-[10rem] text-slate-200 absolute -top-16 -left-12 font-serif -z-10 opacity-50 select-none">“</span>
+                <p
+                    className="font-black text-slate-900 leading-[0.9] tracking-tight max-w-[85vw] md:max-w-[45vw]"
+                    style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 'clamp(2.5rem, 8vw, 6rem)' }}
+                >
+                    {item.quote}
+                </p>
+            </div>
+            <div className="mt-8 flex items-center gap-4">
+                <div className="h-[2px] w-12 bg-fuchsia-500" />
+                <div className="flex flex-col">
+                    <h4 className="font-bold text-slate-900 text-sm md:text-lg uppercase tracking-wider" style={{ fontFamily: 'Montserrat, sans-serif' }}>{item.author}</h4>
+                    <span className="text-slate-400 text-xs font-medium">{item.school}</span>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+// --- COMPONENT: FLY PLAYER ---
+const FlyPlayer = ({ isOpen, onClose, initialId }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [showPlane, setShowPlane] = useState(false);
+
+    useEffect(() => {
+        if (initialId) {
+            const idx = MEDIA_ITEMS.findIndex(t => t.id === initialId);
+            if (idx !== -1) setCurrentIndex(idx);
+        }
+    }, [initialId]);
+
+    if (!isOpen) return null;
+    const current = MEDIA_ITEMS[currentIndex];
+    const triggerPlane = () => { setShowPlane(true); setTimeout(() => setShowPlane(false), 2000); };
+    const next = () => currentIndex < MEDIA_ITEMS.length - 1 && setCurrentIndex(p => p + 1);
+    const prev = () => currentIndex > 0 && setCurrentIndex(p => p - 1);
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-slate-950/98 backdrop-blur-3xl flex items-center justify-center animate-in fade-in duration-500">
+            <div className="relative w-full h-[100dvh] md:w-[90vw] md:h-[90vh] md:max-w-6xl md:rounded-[3rem] overflow-hidden bg-black shadow-2xl md:border-[1px] md:border-white/10 flex flex-col md:flex-row">
+                <div className="w-full md:w-2/3 h-2/3 md:h-full relative bg-slate-900 border-b md:border-b-0 md:border-r border-white/5">
+                    <video key={current.id} src={current.videoUrl} className="w-full h-full object-cover" autoPlay loop playsInline muted={false} />
+                    <button onClick={onClose} className="absolute top-6 right-6 z-20 md:hidden bg-black/50 p-2 rounded-full text-white hover:bg-black/70 transition-colors"><X size={24} /></button>
+                </div>
+                <div className="w-full md:w-1/3 h-1/3 md:h-full bg-slate-900 text-white p-8 md:p-12 flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Wind size={200} /></div>
+                    <div className="space-y-6 relative z-10">
+                        <div className="flex justify-between items-start">
+                            <div className="animate-in slide-in-from-left-4 duration-500 delay-150">
+                                <h2 className="text-4xl md:text-6xl font-black font-sans tracking-tighter leading-[0.9] mb-2">{current.name}</h2>
+                                <div className="flex items-center gap-2 text-fuchsia-400">
+                                    <MapPin size={14} />
+                                    <span className="text-xs font-bold uppercase tracking-widest">{current.location}</span>
+                                </div>
+                            </div>
+                            <button onClick={onClose} className="hidden md:block bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all hover:scale-110"><X size={20} /></button>
+                        </div>
+                    </div>
+                    <div className="space-y-4 relative z-10">
+                        <div className="flex items-center gap-3">
+                            <button className="flex-1 bg-white text-slate-900 py-4 rounded-full font-bold text-sm hover:bg-slate-100 transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">Apadrinar Vuelo</button>
+                            <button onClick={triggerPlane} className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all hover:scale-110 active:scale-95"><Plane size={20} /></button>
+                        </div>
+                        <div className="flex items-center justify-between pt-6 border-t border-white/10 font-mono text-xs">
+                            <span className="text-slate-500">0{currentIndex + 1} / 0{MEDIA_ITEMS.length}</span>
+                            <div className="flex gap-4">
+                                <button onClick={prev} disabled={currentIndex === 0} className="hover:text-fuchsia-400 disabled:opacity-20 transition-colors"><ChevronUp size={24} /></button>
+                                <button onClick={next} disabled={currentIndex === MEDIA_ITEMS.length - 1} className="hover:text-fuchsia-400 disabled:opacity-20 transition-colors"><ChevronDown size={24} /></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- CORE COMPONENT: MURAL ---
 const HorizontalGallery = ({ onOpen }) => {
     const containerRef = useRef(null);
-    const [targetProgress, setTargetProgress] = useState(0);
-    const [currentProgress, setCurrentProgress] = useState(0);
-    const [maxTranslate, setMaxTranslate] = useState(0);
-    const requestRef = useRef(null);
+    const trackRef = useRef(null);
 
-    // Initial Resize Logic
+    // --- 60 FPS REFACTOR: REFS instead of State for Animation ---
+    const targetProgress = useRef(0);
+    const currentProgress = useRef(0);
+    const maxTranslate = useRef(0);
+    // isMobile as Ref to avoid re-renders (checked in events)
+    const isMobile = useRef(false);
+
+    // Interaction State can remain (Hover)
+    const [hoverData, setHoverData] = useState({ isHovering: false, center: null });
+
     useLayoutEffect(() => {
         const handleResize = () => {
-            // Estimate total travel distance based on content spread
-            // Foreground moves fastest (1.0x), so it defines the max range.
-            // Approx 350vw (Desktop) / 800vw (Mobile)
-            const isMobile = window.innerWidth < 768;
-            setMaxTranslate(isMobile ? window.innerWidth * 8 : window.innerWidth * 3.5);
+            isMobile.current = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            if (trackRef.current && trackRef.current.parentElement) {
+                const totalWidth = trackRef.current.scrollWidth;
+                const visibleWidth = trackRef.current.parentElement.clientWidth;
+                maxTranslate.current = Math.max(0, totalWidth - visibleWidth);
+            }
         };
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Scroll Listener
     useEffect(() => {
         const handleScroll = () => {
             if (!containerRef.current) return;
             const { top, height } = containerRef.current.getBoundingClientRect();
+            // Calculate progress based on scroll position relative to container
             const maxScroll = height - window.innerHeight;
-            // Calculate 0-1 progress
-            let p = -top / maxScroll;
-            setTargetProgress(Math.max(0, Math.min(1, p)));
+            // Clamp 0 to 1
+            targetProgress.current = Math.max(0, Math.min(1, -top / maxScroll));
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Physics Loop
     useLayoutEffect(() => {
         const animate = () => {
-            setCurrentProgress(prev => {
-                const diff = targetProgress - prev;
-                if (Math.abs(diff) < 0.00001) return targetProgress;
-                return lerp(prev, targetProgress, PHYSICS_DAMPING);
-            });
-            requestRef.current = requestAnimationFrame(animate);
+            // Lerp inertia (0.06 factor)
+            currentProgress.current = lerp(currentProgress.current, targetProgress.current, 0.06);
+
+            // Snap if close enough
+            if (Math.abs(targetProgress.current - currentProgress.current) < 0.0001) {
+                currentProgress.current = targetProgress.current;
+            }
+
+            // Update MAIN CONTAINER
+            if (trackRef.current) {
+                trackRef.current.style.transform = `translate3d(-${currentProgress.current * maxTranslate.current}px, 0, 0)`;
+            }
+
+            requestAnimationFrame(animate);
         };
-        requestRef.current = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(requestRef.current);
-    }, [targetProgress]);
+        const raf = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(raf);
+    }, []);
+
+    const handleMediaHover = (e, isEnter) => {
+        if (isMobile.current) return;
+        if (isEnter) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setHoverData({
+                isHovering: true,
+                center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+            });
+        } else {
+            setHoverData({ isHovering: false, center: null });
+        }
+    };
 
     return (
-        <section ref={containerRef} className="relative h-[600vh] bg-[#F8F9FA] text-[#0F172A] selection:bg-fuchsia-200 overflow-visible">
-            {/* INJECT MONTSERRAT */}
-            <style jsx global>{`
-                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;900&display=swap');
-            `}</style>
-
+        <div ref={containerRef} className="relative h-[540vh] bg-[#F5F5F7] text-slate-800 selection:bg-fuchsia-200 overflow-visible transform-gpu">
+            <style dangerouslySetInnerHTML={{ __html: CURSOR_CSS }} />
             <FilmGrain />
+            <CustomCursor hoverData={hoverData} />
 
-            {/* STICKY VIEWPORT */}
-            <div className="sticky top-0 h-screen w-full overflow-hidden flex items-center">
+            <div className="sticky top-0 h-[100vh] w-full overflow-hidden">
+                <TopographicBackground progressRef={currentProgress} />
 
-                {/* --- LAYER 0: BACKGROUND (0.2x Speed) --- */}
-                <div
-                    className="absolute inset-x-0 h-full flex items-center justify-center pointer-events-none select-none z-0"
-                    style={{ transform: `translateX(-${currentProgress * maxTranslate * 0.2}px)` }}
-                >
-                    <h1
-                        className="text-[25vw] md:text-[20vw] leading-none text-transparent stroke-text opacity-[0.03] whitespace-nowrap pl-[10vw]"
-                        style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 900, WebkitTextStroke: '2px #0f172a' }}
-                    >
-                        HISTORIAS EN VUELO
+                {/* SPONSOR WATERMARK LAYER */}
+                <SponsorWatermarkLayer
+                    progressRef={currentProgress}
+                    maxTranslate={maxTranslate}
+                />
+
+                {/* WATERMARK BACKGROUND */}
+                <div className="absolute top-8 left-8 md:top-12 md:left-12 z-0 opacity-10 pointer-events-none select-none">
+                    <h1 className="text-[12vw] font-black leading-none text-slate-900 tracking-tighter" style={{ fontFamily: 'Anton, sans-serif' }}>
+                        HISTORIAS
                     </h1>
                 </div>
 
-                {/* --- LAYER 1: CANVAS - TEXT (0.5x Speed) --- */}
-                {/* Z-INDEX: 10 (Behind Media, but floating) */}
-                <div
-                    className="absolute top-0 left-0 h-full w-full pointer-events-none z-10 will-change-transform"
-                    style={{ transform: `translateX(-${currentProgress * maxTranslate * 0.5}px)` }}
-                >
-                    {/* TITLE BLOCK */}
-                    <div className="absolute top-[20vh] left-[5vw] md:left-[10vw]">
-                        <div className="w-20 h-2 bg-fuchsia-600 mb-6" />
-                        <h2 className="text-[12vw] md:text-[5vw] leading-[0.8] tracking-tighter" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 900 }}>
-                            VOCES <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-blue-600">DEL VIENTO</span>
-                        </h2>
-                        <p className="mt-8 max-w-md text-slate-500 font-medium text-lg leading-relaxed">
-                            Una colección editorial de momentos que cambiaron la perspectiva de una generación.
-                        </p>
-                    </div>
-
-                    {/* QUOTES */}
-                    {QUOTES.map((q) => (
-                        <div key={q.id} className={`absolute ${q.offset} w-[90vw] md:w-[45vw] opacity-0 transition-opacity duration-1000`}
-                            style={{ opacity: currentProgress > 0.05 ? 1 : 0 }}
-                        >
-                            <Quote size={80} className="text-slate-200 mb-4 opacity-50" fill="currentColor" strokeWidth={0} />
-                            <p
-                                className="text-[#0F172A] relative"
-                                style={{
-                                    fontFamily: 'Montserrat, sans-serif',
-                                    fontWeight: 900,
-                                    // FLUID TYPOGRAPHY CLAMP
-                                    fontSize: 'clamp(2rem, 3.5vw, 4rem)',
-                                    lineHeight: '1.0',
-                                    letterSpacing: '-0.02em'
-                                }}
-                            >
-                                {q.text}
+                <div className="w-full h-full relative flex items-center">
+                    <div
+                        ref={trackRef}
+                        className="flex items-center gap-[5vw] md:gap-[10vw] will-change-transform pl-[5vw] md:pl-[12vw] pr-[100vw]"
+                    // Transform is handled by RAF, no style prop here to cause hydration mismatch
+                    >
+                        {/* INTRO */}
+                        <div className="flex-shrink-0 w-[80vw] md:w-[30vw] flex flex-col justify-center z-30 px-6 md:px-0">
+                            <div className="w-12 h-1 bg-fuchsia-600 mb-8" />
+                            <h2 className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tight mb-8" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                                Voces del<br />Viento
+                            </h2>
+                            <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-sm">
+                                Pequeñas historias. Grandes alturas. Un solo propósito.
                             </p>
-                            <div className="mt-8 flex items-center gap-3">
-                                <div className="h-[1px] w-12 bg-slate-400" />
-                                <div>
-                                    <h4 className="text-sm font-bold uppercase tracking-widest text-[#0F172A]">{q.author}</h4>
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{q.role}</span>
+                        </div>
+
+                        {GALLERY_COLUMNS.map((col) => (
+                            <div key={col.id} className="flex flex-col flex-shrink-0 h-full justify-center gap-[6vh]">
+                                {col.items.map((item) => {
+
+                                    // KINETIC QUOTES
+                                    if (item.type === 'kinetic-quote') {
+                                        return (
+                                            <KineticQuote
+                                                key={item.id}
+                                                item={item}
+                                                progressRef={currentProgress}
+                                            />
+                                        );
+                                    }
+
+                                    // MEDIA CARDS
+                                    return (
+                                        <MuralMedia
+                                            key={item.id}
+                                            item={item}
+                                            onOpen={onOpen}
+                                            handleMediaHover={handleMediaHover}
+                                            progressRef={currentProgress}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+
+                        {/* CTA */}
+                        <div className="flex-shrink-0 w-screen h-full flex items-center justify-center">
+                            <div className="text-center group cursor-pointer transition-transform duration-500 hover:scale-105">
+                                <div className="w-32 h-32 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-12 shadow-2xl group-hover:shadow-fuchsia-500/30 transition-all hover:bg-fuchsia-600">
+                                    <ArrowRight size={48} className="transition-transform group-hover:translate-x-2" />
                                 </div>
+                                <h3 className="text-6xl md:text-9xl font-black text-slate-900 leading-none mb-6 tracking-tighter" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                                    Es tu<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-blue-600">Turno.</span>
+                                </h3>
+                                <p className="text-slate-500 font-bold text-xs md:text-sm tracking-[0.3em] uppercase opacity-60 group-hover:opacity-100 transition-opacity">INICIA TU PROPIA HISTORIA HOY</p>
                             </div>
                         </div>
-                    ))}
 
-                    {/* CTA */}
-                    <div className="absolute top-[30vh] left-[750vw] md:left-[350vw] w-[90vw] md:w-[40vw] flex flex-col items-center text-center">
-                        <h3 className="text-[10vw] md:text-[6vw] font-black leading-none mb-6" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 900 }}>
-                            TU TURNO <br /> DE VOLAR
-                        </h3>
-                        <div className="w-24 h-24 rounded-full border-2 border-[#0F172A] flex items-center justify-center">
-                            <ArrowRight size={40} className="-rotate-45" />
-                        </div>
                     </div>
                 </div>
-
-                {/* --- LAYER 2: FOREGROUND - MEDIA (1.0x Speed) --- */}
-                {/* Z-INDEX: 20 (Overlaps Text) */}
-                <div
-                    className="absolute top-0 left-0 h-full w-full z-20 will-change-transform"
-                    style={{ transform: `translateX(-${currentProgress * maxTranslate}px)` }}
-                >
-                    {MEDIA.map((m) => (
-                        <div
-                            key={m.id}
-                            className={`
-                                group absolute overflow-hidden shadow-2xl cursor-pointer bg-slate-200
-                                transform transition-transform duration-700
-                                ${m.offset}
-                                ${m.aspect === 'vertical' ? 'w-[85vw] h-[60vh] md:w-[28vw] md:h-[65vh] rounded-[2rem] md:rounded-[4rem]' : 'w-[85vw] h-[40vh] md:w-[40vw] md:h-[50vh] rounded-[2rem] md:rounded-[3rem]'}
-                            `}
-                            // DRIFT EFFECT: Rotate + Hover Lift
-                            style={{
-                                transform: `rotate(${m.rotation}deg) translateY(${currentProgress * 50}px)`, // Parallax Y-axis drift
-                            }}
-                            onClick={() => m.type === 'video' && onOpen(m.id)}
-                        >
-                            <div className="absolute inset-0 bg-slate-900/10 z-[5]" />
-                            <img src={m.thumb || m.src} className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-110" alt={m.title} />
-
-                            {/* Play Button */}
-                            {m.type === 'video' && (
-                                <div className="absolute inset-0 flex items-center justify-center z-30">
-                                    <PlayButton />
-                                </div>
-                            )}
-
-                            {/* Caption */}
-                            <div className="absolute bottom-6 left-8 z-30 text-white">
-                                <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-1 opacity-80">{m.location}</span>
-                                <h3 className="text-3xl font-black italic tracking-tighter" style={{ fontFamily: 'Montserrat, sans-serif' }}>{m.title}</h3>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-            </div>
-        </section>
-    );
-};
-
-// --- FLY PLAYER (Modal) ---
-const FlyPlayer = ({ isOpen, onClose, initialId }) => {
-    const item = MEDIA.find(i => i.id === initialId);
-    if (!isOpen || !item) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300">
-            <button onClick={onClose} className="absolute top-6 right-6 p-4 bg-white/10 rounded-full hover:bg-white/20 text-white z-50">
-                <X size={24} />
-            </button>
-            <div className="w-full h-full md:w-[90vw] md:h-[90vh] bg-black relative border border-white/10 overflow-hidden md:rounded-[2rem]">
-                <video src={item.src} className="w-full h-full object-contain" autoPlay controls />
             </div>
         </div>
     );
 };
 
-// --- EXPORT WRAPPER ---
+// --- WRAPPER ---
 export default function HorizontalGalleryWrapper() {
     const [playerOpen, setPlayerOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
@@ -320,9 +685,9 @@ export default function HorizontalGalleryWrapper() {
     };
 
     return (
-        <>
+        <div className="font-sans text-slate-900 bg-white selection:bg-fuchsia-200">
             <HorizontalGallery onOpen={openPlayer} />
             <FlyPlayer isOpen={playerOpen} onClose={() => setPlayerOpen(false)} initialId={selectedId} />
-        </>
+        </div>
     );
 }
