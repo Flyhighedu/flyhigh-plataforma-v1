@@ -1,9 +1,8 @@
 "use client";
-import React, { useRef, useState, useEffect, useLayoutEffect, memo } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, memo, forwardRef } from 'react';
 import { Play, X, MapPin, ChevronUp, ChevronDown, Wind, ArrowRight, Plane } from 'lucide-react';
 
 // --- STYLES: HEARTBEAT & CURSOR ---
-// Kept exactly as original
 const CURSOR_CSS = `
   .custom-cursor {
     pointer-events: none;
@@ -19,7 +18,6 @@ const CURSOR_CSS = `
 `;
 
 // --- DATA: NOMINATION MURAL (SOTD SPEC) ---
-// Exact sequence and content
 const GALLERY_COLUMNS = [
     {
         id: 'col-intro',
@@ -157,6 +155,10 @@ const GALLERY_COLUMNS = [
 
 const MEDIA_ITEMS = GALLERY_COLUMNS.flatMap(col => col.items).filter(item => item.type && item.type.startsWith('media'));
 
+// Pre-calculate flat map for loop efficiency
+const ALL_ITEMS_MAP = {};
+GALLERY_COLUMNS.forEach(col => col.items.forEach(item => ALL_ITEMS_MAP[item.id] = item));
+
 const SPONSOR_LOGOS = [
     { src: "/img/logo sp Negro.png", x: 20, y: 15, rot: -2, w: "w-40 md:w-80" },
     { src: "/img/bonanza.png", x: 45, y: 65, rot: 3, w: "w-36 md:w-72" },
@@ -188,49 +190,20 @@ const FilmGrain = memo(() => (
     </svg>
 ));
 
-// --- COMPONENT: SPONSOR WATERMARK LAYER (Layer -1) ---
-// Using Refs for performant independent parallax
-const SponsorWatermarkLayer = memo(({ progressRef, maxTranslate }) => {
-    const containerRef = useRef(null);
-    const logoRefs = useRef([]);
-
-    useLayoutEffect(() => {
-        const update = () => {
-            if (!containerRef.current) return;
-            const progress = progressRef.current;
-            const maxT = maxTranslate.current;
-
-            // Parallax factor: 0.07x (Slow-Gliding Physics)
-            const baseTranslate = progress * maxT * 0.07;
-            containerRef.current.style.transform = `translate3d(-${baseTranslate}px, 0, 0)`;
-
-            // Individual Logo Updates (Madobox drift)
-            logoRefs.current.forEach((el, idx) => {
-                if (!el) return;
-                const config = SPONSOR_LOGOS[idx];
-                const extraDrift = idx === 3 ? (progress * maxT * 0.007) : 0;
-                el.style.transform = `translate3d(-${extraDrift}px, 0, 0) rotate(${config.rot}deg)`;
-            });
-        };
-
-        const raf = () => {
-            update();
-            requestAnimationFrame(raf);
-        };
-        const handle = requestAnimationFrame(raf);
-        return () => cancelAnimationFrame(handle);
-    }, [progressRef, maxTranslate]);
+// --- COMPONENT: SPONSOR WATERMARK LAYER (ForwardRef) ---
+const SponsorWatermarkLayer = memo(forwardRef((props, ref) => {
+    const { logosRef } = ref || {};
 
     return (
         <div
-            ref={containerRef}
+            ref={ref?.container}
             className="absolute inset-0 pointer-events-none select-none z-[-1] will-change-transform"
             style={{ width: '500vw' }}
         >
             {SPONSOR_LOGOS.map((logo, idx) => (
                 <div
                     key={idx}
-                    ref={el => logoRefs.current[idx] = el}
+                    ref={el => { if (logosRef && logosRef.current) logosRef.current[idx] = el; }}
                     className="absolute grayscale opacity-[0.14] will-change-transform"
                     style={{
                         left: `${logo.x}vw`,
@@ -248,42 +221,23 @@ const SponsorWatermarkLayer = memo(({ progressRef, maxTranslate }) => {
             ))}
         </div>
     );
-});
+}));
+SponsorWatermarkLayer.displayName = 'SponsorWatermarkLayer';
 
-// --- COMPONENT: TOPOGRAPHIC BACKGROUND ---
-const TopographicBackground = memo(({ progressRef }) => {
-    const line1Ref = useRef(null);
-    const line2Ref = useRef(null);
-    const circleRef = useRef(null);
-
-    useLayoutEffect(() => {
-        const update = () => {
-            const progress = progressRef.current;
-            const p = progress * 0.2; // 0.2 scale factor
-
-            if (line1Ref.current) line1Ref.current.style.transform = `translateX(${p * -200}px) rotate(-12deg)`;
-            if (line2Ref.current) line2Ref.current.style.transform = `translateX(${p * -300}px) rotate(6deg)`;
-            if (circleRef.current) circleRef.current.style.transform = `translateX(${p * -100}px)`;
-        };
-
-        const raf = () => {
-            update();
-            requestAnimationFrame(raf);
-        };
-        const handle = requestAnimationFrame(raf);
-        return () => cancelAnimationFrame(handle);
-    }, [progressRef]);
-
+// --- COMPONENT: TOPOGRAPHIC BACKGROUND (ForwardRef) ---
+const TopographicBackground = memo(forwardRef((props, ref) => {
+    const { line1, line2, circle } = ref || {};
     return (
         <div className="absolute inset-0 z-0 pointer-events-none opacity-20 overflow-hidden">
-            <div ref={line1Ref} className="absolute top-[20%] left-0 w-[200vw] h-[1px] bg-slate-300 transform -rotate-12 will-change-transform" />
-            <div ref={line2Ref} className="absolute bottom-[30%] left-0 w-[200vw] h-[1px] bg-slate-300 transform rotate-6 will-change-transform" />
-            <div ref={circleRef} className="absolute top-[50%] left-[50%] w-[50vh] h-[50vh] rounded-full border border-slate-200/50 will-change-transform" />
+            <div ref={line1} className="absolute top-[20%] left-0 w-[200vw] h-[1px] bg-slate-300 transform -rotate-12 will-change-transform" />
+            <div ref={line2} className="absolute bottom-[30%] left-0 w-[200vw] h-[1px] bg-slate-300 transform rotate-6 will-change-transform" />
+            <div ref={circle} className="absolute top-[50%] left-[50%] w-[50vh] h-[50vh] rounded-full border border-slate-200/50 will-change-transform" />
         </div>
     );
-});
+}));
+TopographicBackground.displayName = 'TopographicBackground';
 
-// --- COMPONENT: CUSTOM CURSOR (Magnetic Logic) ---
+// --- COMPONENT: CUSTOM CURSOR ---
 const CustomCursor = memo(({ hoverData }) => {
     const cursorRef = useRef(null);
     const pos = useRef({ x: 0, y: 0 });
@@ -298,24 +252,20 @@ const CustomCursor = memo(({ hoverData }) => {
         const animate = () => {
             pos.current.x = lerp(pos.current.x, targetPos.current.x, 0.15);
             pos.current.y = lerp(pos.current.y, targetPos.current.y, 0.15);
-
             if (cursorRef.current) {
                 let x = pos.current.x;
                 let y = pos.current.y;
-
                 if (hoverData.isHovering && hoverData.center) {
                     const dx = hoverData.center.x - pos.current.x;
                     const dy = hoverData.center.y - pos.current.y;
-                    x += dx * 0.35; // Pull strength
+                    x += dx * 0.35;
                     y += dy * 0.35;
                 }
-
                 cursorRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
             }
             requestAnimationFrame(animate);
         };
         const raf = requestAnimationFrame(animate);
-
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             cancelAnimationFrame(raf);
@@ -339,29 +289,11 @@ const CustomCursor = memo(({ hoverData }) => {
     );
 });
 
-// --- COMPONENT: MURAL MEDIA ITEM (Optimized) ---
-const MuralMedia = memo(({ item, onOpen, handleMediaHover, progressRef }) => {
-    const elRef = useRef(null);
-
-    useLayoutEffect(() => {
-        const update = () => {
-            if (!elRef.current) return;
-            // Media items Parallax: Standard speed 50px multiplier
-            const progress = progressRef.current;
-            elRef.current.style.transform = `translate3d(-${progress * 50}px, 0, 0) ${item.rotation}`;
-        };
-
-        const raf = () => {
-            update();
-            requestAnimationFrame(raf);
-        };
-        const handle = requestAnimationFrame(raf);
-        return () => cancelAnimationFrame(handle);
-    }, [progressRef, item.rotation]);
-
+// --- COMPONENT: MURAL MEDIA ITEM (ForwardRef) ---
+const MuralMedia = memo(forwardRef(({ item, onOpen, handleMediaHover }, ref) => {
     return (
         <div
-            ref={elRef}
+            ref={ref}
             className={`relative group cursor-none overflow-visible rounded-[2rem] md:rounded-[3rem] 
                 ${getStyles(item.type)} ${item.offset} z-10 will-change-transform
                 bg-white shadow-2xl transition-all duration-700 cubic-bezier(0.19, 1, 0.22, 1)
@@ -374,7 +306,6 @@ const MuralMedia = memo(({ item, onOpen, handleMediaHover, progressRef }) => {
                 <img src={item.thumbUrl} className="w-full h-full object-cover opacity-95 transition-transform duration-1000 group-hover:scale-110" alt={item.name} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
             </div>
-
             {item.overlayText && (
                 <div className="absolute inset-x-8 bottom-10 z-20 pointer-events-none">
                     <p className="font-black text-white text-xl md:text-3xl leading-[0.9] tracking-tighter uppercase drop-shadow-2xl opacity-90 group-hover:scale-105 transition-transform duration-700 origin-left" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -382,12 +313,9 @@ const MuralMedia = memo(({ item, onOpen, handleMediaHover, progressRef }) => {
                     </p>
                 </div>
             )}
-
             <div className="absolute -top-6 left-2 font-mono text-[8px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500 tracking-tighter uppercase whitespace-nowrap">
                 {item.serial} // LATERAL: {item.location}
             </div>
-
-            {/* MINIMALIST PLAYHEAD (Breathing) */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className="relative flex flex-col items-center animate-pulse duration-[3000ms]">
                     <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
@@ -398,37 +326,20 @@ const MuralMedia = memo(({ item, onOpen, handleMediaHover, progressRef }) => {
                     </span>
                 </div>
             </div>
-
             <div className="absolute bottom-8 right-8 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-all group-hover:translate-x-1">
                 <span className="text-[10px] text-white font-black uppercase tracking-widest hidden md:block drop-shadow-lg">Fly Play</span>
                 <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 shadow-[0_0_10px_rgba(232,33,184,0.8)]" />
             </div>
         </div>
     );
-});
+}));
+MuralMedia.displayName = 'MuralMedia';
 
-// --- COMPONENT: KINETIC QUOTE (Optimized) ---
-const KineticQuote = memo(({ item, progressRef }) => {
-    const elRef = useRef(null);
-
-    useLayoutEffect(() => {
-        const update = () => {
-            if (!elRef.current) return;
-            // Quote transform: moves opposite direction
-            const progress = progressRef.current;
-            elRef.current.style.transform = `translate3d(${progress * 150}px, 0, 0)`;
-        };
-        const raf = () => {
-            update();
-            requestAnimationFrame(raf);
-        };
-        const handle = requestAnimationFrame(raf);
-        return () => cancelAnimationFrame(handle);
-    }, [progressRef]);
-
+// --- COMPONENT: KINETIC QUOTE (ForwardRef) ---
+const KineticQuote = memo(forwardRef(({ item }, ref) => {
     return (
         <div
-            ref={elRef}
+            ref={ref}
             className={`relative z-40 flex flex-col ${item.offset} transition-opacity duration-1000 ease-out pointer-events-none will-change-transform`}
         >
             <div className="relative animate-in slide-in-from-bottom-8 duration-1000 fade-in">
@@ -449,9 +360,10 @@ const KineticQuote = memo(({ item, progressRef }) => {
             </div>
         </div>
     );
-});
+}));
+KineticQuote.displayName = 'KineticQuote';
 
-// --- COMPONENT: FLY PLAYER ---
+// --- COMPONENT: FLY PLAYER (No Changes) ---
 const FlyPlayer = ({ isOpen, onClose, initialId }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [showPlane, setShowPlane] = useState(false);
@@ -509,19 +421,26 @@ const FlyPlayer = ({ isOpen, onClose, initialId }) => {
     );
 };
 
-// --- CORE COMPONENT: MURAL ---
+// --- CORE COMPONENT: MURAL (Central Controller) ---
 const HorizontalGallery = ({ onOpen }) => {
     const containerRef = useRef(null);
     const trackRef = useRef(null);
+    const itemsRef = useRef({}); // Store refs to ALL moving items: { [id]: DOMNode }
+    const sponsorContainerRef = useRef(null);
+    const sponsorLogosRef = useRef([]);
+    const bgRefs = {
+        line1: useRef(null),
+        line2: useRef(null),
+        circle: useRef(null)
+    };
 
-    // --- 60 FPS REFACTOR: REFS instead of State for Animation ---
+    // Animation Refs
     const targetProgress = useRef(0);
     const currentProgress = useRef(0);
     const maxTranslate = useRef(0);
-    // isMobile as Ref to avoid re-renders (checked in events)
     const isMobile = useRef(false);
 
-    // Interaction State can remain (Hover)
+    // Interaction
     const [hoverData, setHoverData] = useState({ isHovering: false, center: null });
 
     useLayoutEffect(() => {
@@ -542,9 +461,7 @@ const HorizontalGallery = ({ onOpen }) => {
         const handleScroll = () => {
             if (!containerRef.current) return;
             const { top, height } = containerRef.current.getBoundingClientRect();
-            // Calculate progress based on scroll position relative to container
             const maxScroll = height - window.innerHeight;
-            // Clamp 0 to 1
             targetProgress.current = Math.max(0, Math.min(1, -top / maxScroll));
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
@@ -553,25 +470,57 @@ const HorizontalGallery = ({ onOpen }) => {
     }, []);
 
     useLayoutEffect(() => {
+        // --- CENTRALIZED ANIMATION LOOP ---
         const animate = () => {
-            // Lerp inertia (0.06 factor)
+            // 1. Calculate Progress
             currentProgress.current = lerp(currentProgress.current, targetProgress.current, 0.06);
-
-            // Snap if close enough
             if (Math.abs(targetProgress.current - currentProgress.current) < 0.0001) {
                 currentProgress.current = targetProgress.current;
             }
+            const progress = currentProgress.current;
+            const maxT = maxTranslate.current;
 
-            // Update MAIN CONTAINER
+            // 2. Update TRACK
             if (trackRef.current) {
-                trackRef.current.style.transform = `translate3d(-${currentProgress.current * maxTranslate.current}px, 0, 0)`;
+                trackRef.current.style.transform = `translate3d(-${progress * maxT}px, 0, 0)`;
             }
+
+            // 3. Update SPONSORS (Layer -1)
+            if (sponsorContainerRef.current) {
+                sponsorContainerRef.current.style.transform = `translate3d(-${progress * maxT * 0.07}px, 0, 0)`;
+                sponsorLogosRef.current.forEach((el, idx) => {
+                    if (!el) return;
+                    const config = SPONSOR_LOGOS[idx];
+                    const extraDrift = idx === 3 ? (progress * maxT * 0.007) : 0;
+                    el.style.transform = `translate3d(-${extraDrift}px, 0, 0) rotate(${config.rot}deg)`;
+                });
+            }
+
+            // 4. Update TOPOGRAPHIC BG
+            const pBg = progress * 0.2;
+            if (bgRefs.line1.current) bgRefs.line1.current.style.transform = `translateX(${pBg * -200}px) rotate(-12deg)`;
+            if (bgRefs.line2.current) bgRefs.line2.current.style.transform = `translateX(${pBg * -300}px) rotate(6deg)`;
+            if (bgRefs.circle.current) bgRefs.circle.current.style.transform = `translateX(${pBg * -100}px)`;
+
+            // 5. Update MEDIA & QUOTES (Iterate Registered items)
+            // Using ALL_ITEMS_MAP from global data to know config
+            Object.keys(itemsRef.current).forEach(id => {
+                const node = itemsRef.current[id];
+                const itemData = ALL_ITEMS_MAP[id];
+                if (!node || !itemData) return;
+
+                if (itemData.type === 'kinetic-quote') {
+                    node.style.transform = `translate3d(${progress * 150}px, 0, 0)`;
+                } else if (itemData.type.startsWith('media')) {
+                    node.style.transform = `translate3d(-${progress * 50}px, 0, 0) ${itemData.rotation}`;
+                }
+            });
 
             requestAnimationFrame(animate);
         };
         const raf = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(raf);
-    }, []);
+    }, []); // Run ONCE. Refs provide the fresh data.
 
     const handleMediaHover = (e, isEnter) => {
         if (isMobile.current) return;
@@ -593,12 +542,11 @@ const HorizontalGallery = ({ onOpen }) => {
             <CustomCursor hoverData={hoverData} />
 
             <div className="sticky top-0 h-[100vh] w-full overflow-hidden">
-                <TopographicBackground progressRef={currentProgress} />
+                <TopographicBackground ref={bgRefs} />
 
                 {/* SPONSOR WATERMARK LAYER */}
                 <SponsorWatermarkLayer
-                    progressRef={currentProgress}
-                    maxTranslate={maxTranslate}
+                    ref={{ container: sponsorContainerRef, logosRef: sponsorLogosRef }}
                 />
 
                 {/* WATERMARK BACKGROUND */}
@@ -612,7 +560,6 @@ const HorizontalGallery = ({ onOpen }) => {
                     <div
                         ref={trackRef}
                         className="flex items-center gap-[5vw] md:gap-[10vw] will-change-transform pl-[5vw] md:pl-[12vw] pr-[100vw]"
-                    // Transform is handled by RAF, no style prop here to cause hydration mismatch
                     >
                         {/* INTRO */}
                         <div className="flex-shrink-0 w-[80vw] md:w-[30vw] flex flex-col justify-center z-30 px-6 md:px-0">
@@ -628,26 +575,22 @@ const HorizontalGallery = ({ onOpen }) => {
                         {GALLERY_COLUMNS.map((col) => (
                             <div key={col.id} className="flex flex-col flex-shrink-0 h-full justify-center gap-[6vh]">
                                 {col.items.map((item) => {
-
-                                    // KINETIC QUOTES
                                     if (item.type === 'kinetic-quote') {
                                         return (
                                             <KineticQuote
                                                 key={item.id}
                                                 item={item}
-                                                progressRef={currentProgress}
+                                                ref={el => { if (el) itemsRef.current[item.id] = el }}
                                             />
                                         );
                                     }
-
-                                    // MEDIA CARDS
                                     return (
                                         <MuralMedia
                                             key={item.id}
                                             item={item}
                                             onOpen={onOpen}
                                             handleMediaHover={handleMediaHover}
-                                            progressRef={currentProgress}
+                                            ref={el => { if (el) itemsRef.current[item.id] = el }}
                                         />
                                     );
                                 })}
