@@ -11,6 +11,8 @@ const CURSOR_CSS = `
     left: 0;
     z-index: 9999;
     display: none;
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
   }
   @media (hover: hover) {
     .custom-cursor { display: block; }
@@ -193,7 +195,6 @@ const FilmGrain = memo(() => (
 // --- COMPONENT: SPONSOR WATERMARK LAYER (ForwardRef) ---
 const SponsorWatermarkLayer = memo(forwardRef((props, ref) => {
     const { logosRef } = ref || {};
-
     return (
         <div
             ref={ref?.container}
@@ -237,32 +238,54 @@ const TopographicBackground = memo(forwardRef((props, ref) => {
 }));
 TopographicBackground.displayName = 'TopographicBackground';
 
-// --- COMPONENT: CUSTOM CURSOR ---
-const CustomCursor = memo(({ hoverData }) => {
+// --- COMPONENT: CUSTOM CURSOR (Zero-Rerender Logic) ---
+const CustomCursor = memo(forwardRef((props, ref) => {
     const cursorRef = useRef(null);
     const pos = useRef({ x: 0, y: 0 });
     const targetPos = useRef({ x: 0, y: 0 });
+    const contentRef = useRef(null);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const handleMouseMove = (e) => {
             targetPos.current = { x: e.clientX, y: e.clientY };
         };
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
         const animate = () => {
+            if (!cursorRef.current || !contentRef.current || !ref.current) return;
+
+            const state = ref.current; // cursorStateRef from parent
+
             pos.current.x = lerp(pos.current.x, targetPos.current.x, 0.15);
             pos.current.y = lerp(pos.current.y, targetPos.current.y, 0.15);
-            if (cursorRef.current) {
-                let x = pos.current.x;
-                let y = pos.current.y;
-                if (hoverData.isHovering && hoverData.center) {
-                    const dx = hoverData.center.x - pos.current.x;
-                    const dy = hoverData.center.y - pos.current.y;
-                    x += dx * 0.35;
-                    y += dy * 0.35;
-                }
-                cursorRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+
+            let x = pos.current.x;
+            let y = pos.current.y;
+
+            if (state.isHovering && state.center) {
+                const dx = state.center.x - pos.current.x;
+                const dy = state.center.y - pos.current.y;
+                x += dx * 0.35;
+                y += dy * 0.35;
+
+                // Manual styles to avoid React re-renders for cursor visual state
+                cursorRef.current.style.width = '128px'; // 32 * 4
+                cursorRef.current.style.height = '128px';
+                cursorRef.current.style.marginLeft = '-64px';
+                cursorRef.current.style.marginTop = '-64px';
+                cursorRef.current.style.opacity = '1';
+                cursorRef.current.style.boxShadow = '0 0 40px rgba(255,255,255,0.1)';
+
+                contentRef.current.style.display = 'block';
+                contentRef.current.style.opacity = '1';
+            } else {
+                cursorRef.current.style.width = '0px';
+                cursorRef.current.style.height = '0px';
+                cursorRef.current.style.opacity = '0';
+                contentRef.current.style.display = 'none';
             }
+
+            cursorRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
             requestAnimationFrame(animate);
         };
         const raf = requestAnimationFrame(animate);
@@ -270,24 +293,20 @@ const CustomCursor = memo(({ hoverData }) => {
             window.removeEventListener('mousemove', handleMouseMove);
             cancelAnimationFrame(raf);
         };
-    }, [hoverData]);
+    }, [ref]);
 
     return (
         <div
             ref={cursorRef}
-            className={`custom-cursor flex items-center justify-center transition-all duration-500 ease-out border-white/20 will-change-transform
-                ${hoverData.isHovering
-                    ? 'w-32 h-32 bg-white/10 backdrop-blur-md border-[1px] -ml-16 -mt-16 rounded-full opacity-100 scale-100'
-                    : 'w-0 h-0 opacity-0'}`}
+            className="custom-cursor flex items-center justify-center transition-all duration-500 ease-out border-white/20 bg-white/10 backdrop-blur-md border-[1px] rounded-full opacity-0 overflow-hidden"
         >
-            {hoverData.isHovering && (
-                <span className="text-[10px] font-black text-white tracking-widest text-center uppercase animate-in fade-in zoom-in duration-300">
-                    VER EN<br />FLY PLAY
-                </span>
-            )}
+            <div ref={contentRef} style={{ display: 'none' }} className="text-[10px] font-black text-white tracking-widest text-center uppercase animate-in fade-in zoom-in duration-300">
+                VER EN<br />FLY PLAY
+            </div>
         </div>
     );
-});
+}));
+CustomCursor.displayName = 'CustomCursor';
 
 // --- COMPONENT: MURAL MEDIA ITEM (ForwardRef) ---
 const MuralMedia = memo(forwardRef(({ item, onOpen, handleMediaHover }, ref) => {
@@ -301,8 +320,9 @@ const MuralMedia = memo(forwardRef(({ item, onOpen, handleMediaHover }, ref) => 
             onClick={() => onOpen(item.id)}
             onMouseEnter={(e) => handleMediaHover(e, true)}
             onMouseLeave={(e) => handleMediaHover(e, false)}
+            style={{ backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}
         >
-            <div className="absolute inset-0 overflow-hidden rounded-[2rem] md:rounded-[3rem]">
+            <div className="absolute inset-0 overflow-hidden rounded-[2rem] md:rounded-[3rem] pointer-events-none">
                 <img src={item.thumbUrl} className="w-full h-full object-cover opacity-95 transition-transform duration-1000 group-hover:scale-110" alt={item.name} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
             </div>
@@ -341,6 +361,7 @@ const KineticQuote = memo(forwardRef(({ item }, ref) => {
         <div
             ref={ref}
             className={`relative z-40 flex flex-col ${item.offset} transition-opacity duration-1000 ease-out pointer-events-none will-change-transform`}
+            style={{ backfaceVisibility: 'hidden' }}
         >
             <div className="relative animate-in slide-in-from-bottom-8 duration-1000 fade-in">
                 <span className="text-[10rem] text-slate-200 absolute -top-16 -left-12 font-serif -z-10 opacity-50 select-none">“</span>
@@ -384,9 +405,9 @@ const FlyPlayer = ({ isOpen, onClose, initialId }) => {
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950/98 backdrop-blur-3xl flex items-center justify-center animate-in fade-in duration-500">
             <div className="relative w-full h-[100dvh] md:w-[90vw] md:h-[90vh] md:max-w-6xl md:rounded-[3rem] overflow-hidden bg-black shadow-2xl md:border-[1px] md:border-white/10 flex flex-col md:flex-row">
-                <div className="w-full md:w-2/3 h-2/3 md:h-full relative bg-slate-900 border-b md:border-b-0 md:border-r border-white/5">
-                    <video key={current.id} src={current.videoUrl} className="w-full h-full object-cover" autoPlay loop playsInline muted={false} />
-                    <button onClick={onClose} className="absolute top-6 right-6 z-20 md:hidden bg-black/50 p-2 rounded-full text-white hover:bg-black/70 transition-colors"><X size={24} /></button>
+                <div className="w-full md:w-2/3 h-2/3 md:h-full relative bg-slate-900 border-b border-white/5 md:border-b-0 md:border-r">
+                    <video key={current.id} src={current.videoUrl} className="w-full h-full object-cover" autoPlay loop playsInline />
+                    <button onClick={onClose} className="absolute top-6 right-6 z-20 md:hidden bg-black/50 p-2 rounded-full text-white"><X size={24} /></button>
                 </div>
                 <div className="w-full md:w-1/3 h-1/3 md:h-full bg-slate-900 text-white p-8 md:p-12 flex flex-col justify-between relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Wind size={200} /></div>
@@ -394,24 +415,21 @@ const FlyPlayer = ({ isOpen, onClose, initialId }) => {
                         <div className="flex justify-between items-start">
                             <div className="animate-in slide-in-from-left-4 duration-500 delay-150">
                                 <h2 className="text-4xl md:text-6xl font-black font-sans tracking-tighter leading-[0.9] mb-2">{current.name}</h2>
-                                <div className="flex items-center gap-2 text-fuchsia-400">
-                                    <MapPin size={14} />
-                                    <span className="text-xs font-bold uppercase tracking-widest">{current.location}</span>
-                                </div>
+                                <div className="flex items-center gap-2 text-fuchsia-400"><MapPin size={14} /><span className="text-xs font-bold uppercase tracking-widest">{current.location}</span></div>
                             </div>
                             <button onClick={onClose} className="hidden md:block bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all hover:scale-110"><X size={20} /></button>
                         </div>
                     </div>
                     <div className="space-y-4 relative z-10">
                         <div className="flex items-center gap-3">
-                            <button className="flex-1 bg-white text-slate-900 py-4 rounded-full font-bold text-sm hover:bg-slate-100 transition-all hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">Apadrinar Vuelo</button>
-                            <button onClick={triggerPlane} className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all hover:scale-110 active:scale-95"><Plane size={20} /></button>
+                            <button className="flex-1 bg-white text-slate-900 py-4 rounded-full font-bold text-sm hover:bg-slate-100 transition-all">Apadrinar Vuelo</button>
+                            <button onClick={triggerPlane} className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all active:scale-95"><Plane size={20} /></button>
                         </div>
                         <div className="flex items-center justify-between pt-6 border-t border-white/10 font-mono text-xs">
                             <span className="text-slate-500">0{currentIndex + 1} / 0{MEDIA_ITEMS.length}</span>
                             <div className="flex gap-4">
-                                <button onClick={prev} disabled={currentIndex === 0} className="hover:text-fuchsia-400 disabled:opacity-20 transition-colors"><ChevronUp size={24} /></button>
-                                <button onClick={next} disabled={currentIndex === MEDIA_ITEMS.length - 1} className="hover:text-fuchsia-400 disabled:opacity-20 transition-colors"><ChevronDown size={24} /></button>
+                                <button onClick={prev} disabled={currentIndex === 0} className="hover:text-fuchsia-400 disabled:opacity-20"><ChevronUp size={24} /></button>
+                                <button onClick={next} disabled={currentIndex === MEDIA_ITEMS.length - 1} className="hover:text-fuchsia-400 disabled:opacity-20"><ChevronDown size={24} /></button>
                             </div>
                         </div>
                     </div>
@@ -425,7 +443,7 @@ const FlyPlayer = ({ isOpen, onClose, initialId }) => {
 const HorizontalGallery = ({ onOpen }) => {
     const containerRef = useRef(null);
     const trackRef = useRef(null);
-    const itemsRef = useRef({}); // Store refs to ALL moving items: { [id]: DOMNode }
+    const itemsRef = useRef({});
     const sponsorContainerRef = useRef(null);
     const sponsorLogosRef = useRef([]);
     const bgRefs = {
@@ -440,8 +458,8 @@ const HorizontalGallery = ({ onOpen }) => {
     const maxTranslate = useRef(0);
     const isMobile = useRef(false);
 
-    // Interaction
-    const [hoverData, setHoverData] = useState({ isHovering: false, center: null });
+    // Interaction Ref (Zero-Rerender)
+    const cursorStateRef = useRef({ isHovering: false, center: null });
 
     useLayoutEffect(() => {
         const handleResize = () => {
@@ -503,7 +521,6 @@ const HorizontalGallery = ({ onOpen }) => {
             if (bgRefs.circle.current) bgRefs.circle.current.style.transform = `translateX(${pBg * -100}px)`;
 
             // 5. Update MEDIA & QUOTES (Iterate Registered items)
-            // Using ALL_ITEMS_MAP from global data to know config
             Object.keys(itemsRef.current).forEach(id => {
                 const node = itemsRef.current[id];
                 const itemData = ALL_ITEMS_MAP[id];
@@ -520,18 +537,18 @@ const HorizontalGallery = ({ onOpen }) => {
         };
         const raf = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(raf);
-    }, []); // Run ONCE. Refs provide the fresh data.
+    }, []);
 
     const handleMediaHover = (e, isEnter) => {
         if (isMobile.current) return;
         if (isEnter) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setHoverData({
+            cursorStateRef.current = {
                 isHovering: true,
                 center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-            });
+            };
         } else {
-            setHoverData({ isHovering: false, center: null });
+            cursorStateRef.current = { isHovering: false, center: null };
         }
     };
 
@@ -539,65 +556,36 @@ const HorizontalGallery = ({ onOpen }) => {
         <div ref={containerRef} className="relative h-[540vh] bg-[#F5F5F7] text-slate-800 selection:bg-fuchsia-200 overflow-visible transform-gpu">
             <style dangerouslySetInnerHTML={{ __html: CURSOR_CSS }} />
             <FilmGrain />
-            <CustomCursor hoverData={hoverData} />
+            <CustomCursor ref={cursorStateRef} />
 
             <div className="sticky top-0 h-[100vh] w-full overflow-hidden">
                 <TopographicBackground ref={bgRefs} />
+                <SponsorWatermarkLayer ref={{ container: sponsorContainerRef, logosRef: sponsorLogosRef }} />
 
-                {/* SPONSOR WATERMARK LAYER */}
-                <SponsorWatermarkLayer
-                    ref={{ container: sponsorContainerRef, logosRef: sponsorLogosRef }}
-                />
-
-                {/* WATERMARK BACKGROUND */}
                 <div className="absolute top-8 left-8 md:top-12 md:left-12 z-0 opacity-10 pointer-events-none select-none">
-                    <h1 className="text-[12vw] font-black leading-none text-slate-900 tracking-tighter" style={{ fontFamily: 'Anton, sans-serif' }}>
-                        HISTORIAS
-                    </h1>
+                    <h1 className="text-[12vw] font-black leading-none text-slate-900 tracking-tighter" style={{ fontFamily: 'Anton, sans-serif' }}>HISTORIAS</h1>
                 </div>
 
                 <div className="w-full h-full relative flex items-center">
-                    <div
-                        ref={trackRef}
-                        className="flex items-center gap-[5vw] md:gap-[10vw] will-change-transform pl-[5vw] md:pl-[12vw] pr-[100vw]"
-                    >
-                        {/* INTRO */}
+                    <div ref={trackRef} className="flex items-center gap-[5vw] md:gap-[10vw] will-change-transform pl-[5vw] md:pl-[12vw] pr-[100vw]" style={{ backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}>
+
                         <div className="flex-shrink-0 w-[80vw] md:w-[30vw] flex flex-col justify-center z-30 px-6 md:px-0">
                             <div className="w-12 h-1 bg-fuchsia-600 mb-8" />
-                            <h2 className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tight mb-8" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-                                Voces del<br />Viento
-                            </h2>
-                            <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-sm">
-                                Pequeñas historias. Grandes alturas. Un solo propósito.
-                            </p>
+                            <h2 className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tight mb-8" style={{ fontFamily: 'Montserrat, sans-serif' }}>Voces del<br />Viento</h2>
+                            <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-sm">Pequeñas historias. Grandes alturas. Un solo propósito.</p>
                         </div>
 
                         {GALLERY_COLUMNS.map((col) => (
                             <div key={col.id} className="flex flex-col flex-shrink-0 h-full justify-center gap-[6vh]">
                                 {col.items.map((item) => {
                                     if (item.type === 'kinetic-quote') {
-                                        return (
-                                            <KineticQuote
-                                                key={item.id}
-                                                item={item}
-                                                ref={el => { if (el) itemsRef.current[item.id] = el }}
-                                            />
-                                        );
+                                        return <KineticQuote key={item.id} item={item} ref={el => { if (el) itemsRef.current[item.id] = el }} />;
                                     }
-                                    return (
-                                        <MuralMedia
-                                            key={item.id}
-                                            item={item}
-                                            onOpen={onOpen}
-                                            handleMediaHover={handleMediaHover}
-                                            ref={el => { if (el) itemsRef.current[item.id] = el }}
-                                        />
-                                    );
+                                    return <MuralMedia key={item.id} item={item} onOpen={onOpen} handleMediaHover={handleMediaHover} ref={el => { if (el) itemsRef.current[item.id] = el }} />;
                                 })}
                             </div>
                         ))}
 
-                        {/* CTA */}
                         <div className="flex-shrink-0 w-screen h-full flex items-center justify-center">
                             <div className="text-center group cursor-pointer transition-transform duration-500 hover:scale-105">
                                 <div className="w-32 h-32 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-12 shadow-2xl group-hover:shadow-fuchsia-500/30 transition-all hover:bg-fuchsia-600">
