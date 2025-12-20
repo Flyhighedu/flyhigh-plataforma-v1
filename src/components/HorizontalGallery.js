@@ -13,6 +13,7 @@ const CURSOR_CSS = `
     display: none;
     backface-visibility: hidden;
     transform-style: preserve-3d;
+    will-change: transform;
   }
   @media (hover: hover) {
     .custom-cursor { display: block; }
@@ -183,7 +184,7 @@ const getStyles = (type) => {
 
 // --- COMPONENT: FILM GRAIN ---
 const FilmGrain = memo(() => (
-    <svg className="film-grain w-full h-full pointer-events-none fixed inset-0 z-[100] opacity-[0.04]">
+    <svg className="film-grain w-full h-full pointer-events-none fixed inset-0 z-[100] opacity-[0.04]" style={{ willChange: 'opacity', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
         <filter id="noise">
             <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" stitchTiles="stitch" />
             <feColorMatrix type="saturate" values="0" />
@@ -199,7 +200,7 @@ const SponsorWatermarkLayer = memo(forwardRef((props, ref) => {
         <div
             ref={ref?.container}
             className="absolute inset-0 pointer-events-none select-none z-[-1] will-change-transform"
-            style={{ width: '500vw' }}
+            style={{ width: '500vw', backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}
         >
             {SPONSOR_LOGOS.map((logo, idx) => (
                 <div
@@ -209,7 +210,8 @@ const SponsorWatermarkLayer = memo(forwardRef((props, ref) => {
                     style={{
                         left: `${logo.x}vw`,
                         top: `${logo.y}%`,
-                        transform: `rotate(${logo.rot}deg)`
+                        transform: `rotate(${logo.rot}deg) translate3d(0,0,0)`,
+                        backfaceVisibility: 'hidden'
                     }}
                 >
                     <img
@@ -229,10 +231,10 @@ SponsorWatermarkLayer.displayName = 'SponsorWatermarkLayer';
 const TopographicBackground = memo(forwardRef((props, ref) => {
     const { line1, line2, circle } = ref || {};
     return (
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-20 overflow-hidden">
-            <div ref={line1} className="absolute top-[20%] left-0 w-[200vw] h-[1px] bg-slate-300 transform -rotate-12 will-change-transform" />
-            <div ref={line2} className="absolute bottom-[30%] left-0 w-[200vw] h-[1px] bg-slate-300 transform rotate-6 will-change-transform" />
-            <div ref={circle} className="absolute top-[50%] left-[50%] w-[50vh] h-[50vh] rounded-full border border-slate-200/50 will-change-transform" />
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-20 overflow-hidden" style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
+            <div ref={line1} className="absolute top-[20%] left-0 w-[200vw] h-[1px] bg-slate-300 transform -rotate-12 will-change-transform" style={{ backfaceVisibility: 'hidden' }} />
+            <div ref={line2} className="absolute bottom-[30%] left-0 w-[200vw] h-[1px] bg-slate-300 transform rotate-6 will-change-transform" style={{ backfaceVisibility: 'hidden' }} />
+            <div ref={circle} className="absolute top-[50%] left-[50%] w-[50vh] h-[50vh] rounded-full border border-slate-200/50 will-change-transform" style={{ backfaceVisibility: 'hidden' }} />
         </div>
     );
 }));
@@ -300,7 +302,11 @@ const CustomCursor = memo(forwardRef((props, ref) => {
             ref={cursorRef}
             className="custom-cursor flex items-center justify-center transition-all duration-500 ease-out border-white/20 bg-white/10 backdrop-blur-md border-[1px] rounded-full opacity-0 overflow-hidden"
         >
-            <div ref={contentRef} style={{ display: 'none' }} className="text-[10px] font-black text-white tracking-widest text-center uppercase animate-in fade-in zoom-in duration-300">
+            <div
+                ref={contentRef}
+                style={{ display: 'none', WebkitFontSmoothing: 'antialiased', backfaceVisibility: 'hidden' }}
+                className="text-[10px] font-black text-white tracking-widest text-center uppercase animate-in fade-in zoom-in duration-300 antialiased"
+            >
                 VER EN<br />FLY PLAY
             </div>
         </div>
@@ -322,32 +328,40 @@ const MuralMedia = memo(forwardRef(({ item, onOpen, handleMediaHover }, ref) => 
             onMouseLeave={(e) => handleMediaHover(e, false)}
             style={{ backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}
         >
-            <div className="absolute inset-0 overflow-hidden rounded-[2rem] md:rounded-[3rem] pointer-events-none">
-                <img src={item.thumbUrl} className="w-full h-full object-cover opacity-95 transition-transform duration-1000 group-hover:scale-110" alt={item.name} />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+            <div className="absolute inset-0 overflow-hidden rounded-[2rem] md:rounded-[3rem] pointer-events-none" style={{ backfaceVisibility: 'hidden' }}>
+                <img
+                    src={item.thumbUrl}
+                    className="w-full h-full object-cover opacity-95 transition-transform duration-1000 group-hover:scale-110"
+                    alt={item.name}
+                    style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" style={{ backfaceVisibility: 'hidden' }} />
             </div>
             {item.overlayText && (
-                <div className="absolute inset-x-8 bottom-10 z-20 pointer-events-none">
-                    <p className="font-black text-white text-xl md:text-3xl leading-[0.9] tracking-tighter uppercase drop-shadow-2xl opacity-90 group-hover:scale-105 transition-transform duration-700 origin-left" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                <div className="absolute inset-x-8 bottom-10 z-20 pointer-events-none" style={{ backfaceVisibility: 'hidden' }}>
+                    <p
+                        className="font-black text-white text-xl md:text-3xl leading-[0.9] tracking-tighter uppercase drop-shadow-2xl opacity-90 group-hover:scale-105 transition-transform duration-700 origin-left antialiased"
+                        style={{ fontFamily: 'Montserrat, sans-serif', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)', willChange: 'transform' }}
+                    >
                         {item.overlayText}
                     </p>
                 </div>
             )}
-            <div className="absolute -top-6 left-2 font-mono text-[8px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500 tracking-tighter uppercase whitespace-nowrap">
+            <div className="absolute -top-6 left-2 font-mono text-[8px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500 tracking-tighter uppercase whitespace-nowrap antialiased" style={{ backfaceVisibility: 'hidden' }}>
                 {item.serial} // LATERAL: {item.location}
             </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ backfaceVisibility: 'hidden' }}>
                 <div className="relative flex flex-col items-center animate-pulse duration-[3000ms]">
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform" style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
                         <Play size={24} fill="white" className="text-white ml-1 opacity-90" />
                     </div>
-                    <span className="text-[9px] font-medium text-white/60 uppercase tracking-[0.2em] mt-2">
+                    <span className="text-[9px] font-medium text-white/60 uppercase tracking-[0.2em] mt-2 antialiased" style={{ backfaceVisibility: 'hidden' }}>
                         VER HISTORIA
                     </span>
                 </div>
             </div>
-            <div className="absolute bottom-8 right-8 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-all group-hover:translate-x-1">
-                <span className="text-[10px] text-white font-black uppercase tracking-widest hidden md:block drop-shadow-lg">Fly Play</span>
+            <div className="absolute bottom-8 right-8 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-all group-hover:translate-x-1" style={{ backfaceVisibility: 'hidden' }}>
+                <span className="text-[10px] text-white font-black uppercase tracking-widest hidden md:block drop-shadow-lg antialiased" style={{ backfaceVisibility: 'hidden' }}>Fly Play</span>
                 <div className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 shadow-[0_0_10px_rgba(232,33,184,0.8)]" />
             </div>
         </div>
@@ -361,22 +375,22 @@ const KineticQuote = memo(forwardRef(({ item }, ref) => {
         <div
             ref={ref}
             className={`relative z-40 flex flex-col ${item.offset} transition-opacity duration-1000 ease-out pointer-events-none will-change-transform`}
-            style={{ backfaceVisibility: 'hidden' }}
+            style={{ backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}
         >
-            <div className="relative animate-in slide-in-from-bottom-8 duration-1000 fade-in">
-                <span className="text-[10rem] text-slate-200 absolute -top-16 -left-12 font-serif -z-10 opacity-50 select-none">“</span>
+            <div className="relative animate-in slide-in-from-bottom-8 duration-1000 fade-in" style={{ backfaceVisibility: 'hidden' }}>
+                <span className="text-[10rem] text-slate-200 absolute -top-16 -left-12 font-serif -z-10 opacity-50 select-none" style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>“</span>
                 <p
-                    className="font-black text-slate-900 leading-[0.9] tracking-tight max-w-[85vw] md:max-w-[45vw]"
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 'clamp(2.5rem, 8vw, 6rem)' }}
+                    className="font-black text-slate-900 leading-[0.9] tracking-tight max-w-[85vw] md:max-w-[45vw] antialiased"
+                    style={{ fontFamily: 'Montserrat, sans-serif', fontSize: 'clamp(2.5rem, 8vw, 6rem)', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)', willChange: 'transform', WebkitFontSmoothing: 'antialiased' }}
                 >
                     {item.quote}
                 </p>
             </div>
-            <div className="mt-8 flex items-center gap-4">
+            <div className="mt-8 flex items-center gap-4" style={{ backfaceVisibility: 'hidden' }}>
                 <div className="h-[2px] w-12 bg-fuchsia-500" />
                 <div className="flex flex-col">
-                    <h4 className="font-bold text-slate-900 text-sm md:text-lg uppercase tracking-wider" style={{ fontFamily: 'Montserrat, sans-serif' }}>{item.author}</h4>
-                    <span className="text-slate-400 text-xs font-medium">{item.school}</span>
+                    <h4 className="font-bold text-slate-900 text-sm md:text-lg uppercase tracking-wider antialiased" style={{ fontFamily: 'Montserrat, sans-serif', backfaceVisibility: 'hidden' }}>{item.author}</h4>
+                    <span className="text-slate-400 text-xs font-medium antialiased" style={{ backfaceVisibility: 'hidden' }}>{item.school}</span>
                 </div>
             </div>
         </div>
@@ -562,17 +576,27 @@ const HorizontalGallery = ({ onOpen }) => {
                 <TopographicBackground ref={bgRefs} />
                 <SponsorWatermarkLayer ref={{ container: sponsorContainerRef, logosRef: sponsorLogosRef }} />
 
-                <div className="absolute top-8 left-8 md:top-12 md:left-12 z-0 opacity-10 pointer-events-none select-none">
-                    <h1 className="text-[12vw] font-black leading-none text-slate-900 tracking-tighter" style={{ fontFamily: 'Anton, sans-serif' }}>HISTORIAS</h1>
+                <div className="absolute top-8 left-8 md:top-12 md:left-12 z-0 opacity-10 pointer-events-none select-none" style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
+                    <h1 className="text-[12vw] font-black leading-none text-slate-900 tracking-tighter antialiased" style={{ fontFamily: 'Anton, sans-serif', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)', willChange: 'transform' }}>HISTORIAS</h1>
                 </div>
 
                 <div className="w-full h-full relative flex items-center">
                     <div ref={trackRef} className="flex items-center gap-[5vw] md:gap-[10vw] will-change-transform pl-[5vw] md:pl-[12vw] pr-[100vw]" style={{ backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}>
 
-                        <div className="flex-shrink-0 w-[80vw] md:w-[30vw] flex flex-col justify-center z-30 px-6 md:px-0">
-                            <div className="w-12 h-1 bg-fuchsia-600 mb-8" />
-                            <h2 className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tight mb-8" style={{ fontFamily: 'Montserrat, sans-serif' }}>Voces del<br />Viento</h2>
-                            <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-sm">Pequeñas historias. Grandes alturas. Un solo propósito.</p>
+                        <div className="flex-shrink-0 w-[80vw] md:w-[30vw] flex flex-col justify-center z-30 px-6 md:px-0" style={{ backfaceVisibility: 'hidden' }}>
+                            <div className="w-12 h-1 bg-fuchsia-600 mb-8" style={{ backfaceVisibility: 'hidden' }} />
+                            <h2
+                                className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tight mb-8 antialiased"
+                                style={{ fontFamily: 'Montserrat, sans-serif', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)', willChange: 'transform' }}
+                            >
+                                Voces del<br />Viento
+                            </h2>
+                            <p
+                                className="text-slate-500 font-medium text-lg leading-relaxed max-w-sm antialiased"
+                                style={{ backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)', willChange: 'transform' }}
+                            >
+                                Pequeñas historias. Grandes alturas. Un solo propósito.
+                            </p>
                         </div>
 
                         {GALLERY_COLUMNS.map((col) => (
@@ -587,14 +611,12 @@ const HorizontalGallery = ({ onOpen }) => {
                         ))}
 
                         <div className="flex-shrink-0 w-screen h-full flex items-center justify-center">
-                            <div className="text-center group cursor-pointer transition-transform duration-500 hover:scale-105">
-                                <div className="w-32 h-32 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-12 shadow-2xl group-hover:shadow-fuchsia-500/30 transition-all hover:bg-fuchsia-600">
-                                    <ArrowRight size={48} className="transition-transform group-hover:translate-x-2" />
-                                </div>
-                                <h3 className="text-6xl md:text-9xl font-black text-slate-900 leading-none mb-6 tracking-tighter" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                            <div className="text-center group cursor-pointer transition-transform duration-500 hover:scale-105" style={{ backfaceVisibility: 'hidden' }}>
+                                <div className="w-32 h-32 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-12 shadow-2xl group-hover:shadow-fuchsia-500/30 transition-all hover:bg-fuchsia-600"><ArrowRight size={48} className="transition-transform group-hover:translate-x-2" /></div>
+                                <h3 className="text-6xl md:text-9xl font-black text-slate-900 leading-none mb-6 tracking-tighter antialiased" style={{ fontFamily: 'Montserrat, sans-serif', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
                                     Es tu<br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-blue-600">Turno.</span>
                                 </h3>
-                                <p className="text-slate-500 font-bold text-xs md:text-sm tracking-[0.3em] uppercase opacity-60 group-hover:opacity-100 transition-opacity">INICIA TU PROPIA HISTORIA HOY</p>
+                                <p className="text-slate-500 font-bold text-xs md:text-sm tracking-[0.3em] uppercase opacity-60 group-hover:opacity-100 transition-opacity antialiased" style={{ backfaceVisibility: 'hidden' }}>INICIA TU PROPIA HISTORIA HOY</p>
                             </div>
                         </div>
 
