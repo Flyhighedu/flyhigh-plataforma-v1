@@ -1,8 +1,11 @@
 "use client";
 import React, { useRef, useState, useEffect, useLayoutEffect, memo, forwardRef } from 'react';
-import { Play, X, MapPin, ChevronUp, ChevronDown, Wind, ArrowRight, Plane } from 'lucide-react';
+import {
+    Play, X, MapPin, ChevronUp, ChevronDown, Wind, ArrowRight, Plane
+} from 'lucide-react';
+import MobileGallery from './MobileGallery';
 
-// --- STYLES: HEARTBEAT & CURSOR ---
+// --- STYLES: HEARTBEAT & CURSOR (Desktop Only mostly) ---
 const CURSOR_CSS = `
   .custom-cursor {
     pointer-events: none;
@@ -18,10 +21,13 @@ const CURSOR_CSS = `
   @media (hover: hover) {
     .custom-cursor { display: block; }
   }
+  .stroke-text { -webkit-text-stroke: 1px #e2e8f0; color: transparent; }
+  @keyframes subtle-zoom { from { transform: scale(1.1); } to { transform: scale(1); } }
+  .animate-subtle-zoom { animation: subtle-zoom 20s infinite alternate ease-in-out; }
 `;
 
-// --- DATA: NOMINATION MURAL (SOTD SPEC) ---
-const GALLERY_COLUMNS = [
+// --- DATA: MAIN GALLERY (Shared Source) ---
+export const GALLERY_COLUMNS = [
     {
         id: 'col-intro',
         type: 'intro',
@@ -68,7 +74,7 @@ const GALLERY_COLUMNS = [
                 serial: "FLP-002 // 2025"
             },
             {
-                id: 8,
+                id: 8, // Non-sequential ID preserved from original
                 name: "CAMILA",
                 location: "El Mirador",
                 videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-airplane-taking-off-in-the-sunset-103-large.mp4",
@@ -156,9 +162,12 @@ const GALLERY_COLUMNS = [
     }
 ];
 
-const MEDIA_ITEMS = GALLERY_COLUMNS.flatMap(col => col.items).filter(item => item.type && item.type.startsWith('media'));
+export const MEDIA_ITEMS = GALLERY_COLUMNS.flatMap(col => col.items).filter(item => item.type && item.type.startsWith('media'));
 
-// Pre-calculate flat map for loop efficiency
+// Mobile data removed
+
+
+// Pre-calculate flat map for loop efficiency (Desktop)
 const ALL_ITEMS_MAP = {};
 GALLERY_COLUMNS.forEach(col => col.items.forEach(item => ALL_ITEMS_MAP[item.id] = item));
 
@@ -192,6 +201,12 @@ const FilmGrain = memo(() => (
         <rect width="100%" height="100%" filter="url(#noise)" />
     </svg>
 ));
+
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  DESKTOP COMPONENTS (ORIGINAL LOGIC)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
 
 // --- COMPONENT: SPONSOR WATERMARK LAYER (ForwardRef) ---
 const SponsorWatermarkLayer = memo(forwardRef((props, ref) => {
@@ -453,8 +468,8 @@ const FlyPlayer = ({ isOpen, onClose, initialId }) => {
     );
 };
 
-// --- CORE COMPONENT: MURAL (Central Controller) ---
-const HorizontalGallery = ({ onOpen }) => {
+// --- DESKTOP GALLERY CONTROLLER ---
+const DesktopGallery = ({ onOpen }) => {
     const containerRef = useRef(null);
     const trackRef = useRef(null);
     const itemsRef = useRef({});
@@ -627,7 +642,13 @@ const HorizontalGallery = ({ onOpen }) => {
     );
 };
 
-// --- WRAPPER ---
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  MOBILE COMPONENTS (MAGNETIC GRID)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+
+// --- MAIN COMPONENT EXPORT ---
 export default function HorizontalGalleryWrapper() {
     const [playerOpen, setPlayerOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
@@ -639,8 +660,23 @@ export default function HorizontalGalleryWrapper() {
 
     return (
         <div className="font-sans text-slate-900 bg-white selection:bg-fuchsia-200">
-            <HorizontalGallery onOpen={openPlayer} />
-            <FlyPlayer isOpen={playerOpen} onClose={() => setPlayerOpen(false)} initialId={selectedId} />
+            {/* 
+              Desktop Only Section: 
+              Visible only on lg (1024px) and above.
+            */}
+            <div className="hidden lg:block">
+                <DesktopGallery onOpen={openPlayer} />
+                <FlyPlayer isOpen={playerOpen} onClose={() => setPlayerOpen(false)} initialId={selectedId} />
+            </div>
+
+            {/* 
+              Future Mobile Section: 
+              Insert here the code for the new mobile replacement.
+              It should have 'block lg:hidden'.
+            */}
+            <div className="block lg:hidden">
+                <MobileGallery onOpen={openPlayer} />
+            </div>
         </div>
     );
 }
