@@ -40,12 +40,17 @@ const testimonials = [
 
 const SingleCloud = memo(({ cloud, progress, opacity, blur }) => {
     const y = useTransform(progress, [0, 1], ["0%", `${cloud.speed * 200}%`]);
+    // Optimizamos el blur: si es muy alto, usamos opacidad en su lugar para reducir Painter cost
+    // O limitamos el máximo de blur
+    const optimizedBlur = Math.min(blur, 20);
+
     return (
         <motion.div
             style={{
                 top: cloud.top, left: cloud.left, scale: cloud.scale, opacity,
-                filter: `blur(${blur}px)`, y,
-                willChange: 'transform, opacity',
+                filter: optimizedBlur > 0 ? `blur(${optimizedBlur}px)` : 'none',
+                y,
+                willChange: 'transform',
                 transform: 'translateZ(0)'
             }}
             className="absolute"
@@ -76,50 +81,111 @@ const CloudLayer = memo(({ progress, count, depth, size, opacity, blur }) => {
 });
 CloudLayer.displayName = 'CloudLayer';
 
-const WindParticles = memo(({ velocity }) => {
-    const particles = useMemo(() => Array.from({ length: 15 }).map((_, i) => ({
-        id: i,
-        top: `${Math.random() * 100}%`,
-        left: `${Math.random() * 100}%`,
-        width: Math.random() * 2 + 1,
-        height: Math.random() * 100 + 50
-    })), []);
+const AtmosphericCanvas = memo(({ progress, velocity, type = 'stardust' }) => {
+    const canvasRef = useRef(null);
+    const particles = useMemo(() => {
+        const count = type === 'stardust' ? 30 : 12;
+        return Array.from({ length: count }).map(() => ({
+            x: Math.random() * 100,
+            y: Math.random() * 200 - 50,
+            size: type === 'stardust' ? Math.random() * 2 + 1 : Math.random() * 1.5 + 0.5,
+            speed: Math.random() * 0.5 + 0.2,
+            drift: Math.random() * 40 - 20,
+            opacity: Math.random() * 0.5 + 0.3,
+            length: type === 'wind' ? Math.random() * 100 + 50 : 0
+        }));
+    }, [type]);
 
-    const opacity = useTransform(velocity, [-500, 0, 500], [0.4, 0, 0.4]);
-    const scaleY = useTransform(velocity, [-1000, 0, 1000], [2, 1, 2]);
+    const animate = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d', { alpha: true });
+        if (!ctx) return;
+
+        const p = progress.get();
+        const v = velocity.get();
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const vFactor = Math.abs(v) / 1000;
+        const globalAlpha = type === 'wind' ? Math.min(0.6, vFactor) : 0.4 + vFactor * 0.4;
+
+        ctx.globalAlpha = globalAlpha;
+        ctx.fillStyle = "white";
+
+        particles.forEach(part => {
+            const currentY = ((part.y + (p * part.speed * 400)) % 240 - 70) * (height / 100);
+            const currentX = (part.x + (p * part.drift)) * (width / 100);
+
+            if (type === 'stardust') {
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, part.size, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (type === 'wind' && vFactor > 0.1) {
+                const stretch = 1 + vFactor * 2;
+                ctx.save();
+                ctx.translate(currentX, currentY);
+                ctx.scale(1, stretch);
+                ctx.globalAlpha = Math.min(0.3, vFactor * 0.5);
+                ctx.fillRect(-part.size / 2, -part.length / 2, part.size, part.length);
+                ctx.restore();
+            }
+        });
+    }, [particles, progress, type, velocity]);
+
+    useEffect(() => {
+        let raf;
+        const loop = () => {
+            animate();
+            raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, [animate]);
 
     return (
-        <motion.div style={{ opacity }} className="absolute inset-0 z-10 pointer-events-none">
-            {particles.map(p => (
-                <motion.div
-                    key={p.id}
-                    style={{
-                        top: p.top,
-                        left: p.left,
-                        width: p.width,
-                        height: p.height,
-                        scaleY,
-                        willChange: 'transform, opacity'
-                    }}
-                    className="absolute bg-white/40 rounded-full blur-sm"
-                />
-            ))}
+        <canvas
+            ref={canvasRef}
+            className="absolute inset-0 pointer-events-none z-[5]"
+            style={{ width: '100%', height: '100%', willChange: 'transform' }}
+            width={400} // Resolución interna baja para performance extrema
+            height={800}
+        />
+    );
+});
+AtmosphericCanvas.displayName = 'AtmosphericCanvas';
+
+const SunHalo = memo(({ progress }) => {
+    const haloOpacity = useTransform(progress, [0, 0.5, 1], [0.3, 0.6, 0.2]);
+    const haloScale = useTransform(progress, [0, 1], [1, 1.5]);
+    const haloY = useTransform(progress, [0, 1], ["20%", "-20%"]);
+
+    return (
+        <motion.div
+            style={{ opacity: haloOpacity, scale: haloScale, y: haloY, willChange: 'transform' }}
+            className="absolute top-[-10%] left-[-10%] w-[120%] aspect-square rounded-full pointer-events-none z-0 transform-gpu"
+        >
+            <div className="absolute inset-0 bg-gradient-radial from-amber-200/30 via-orange-400/5 to-transparent blur-[80px]" />
+            <div className="absolute inset-0 bg-gradient-radial from-white/10 via-transparent to-transparent blur-[40px] translate-x-[-10%] translate-y-[-10%]" />
         </motion.div>
     );
 });
-WindParticles.displayName = 'WindParticles';
+SunHalo.displayName = 'SunHalo';
 
 const SingleFauna = memo(({ element, index, progress }) => {
-    const y = useTransform(progress, [0, 1], ["-20%", `${element.speed * 300}%`]);
-    const x = useTransform(progress, [0, 1], ["0%", index % 2 === 0 ? "100%" : "-100%"]);
+    const y = useTransform(progress, [0, 1], ["-20%", `${element.speed * 400}%`]);
+    const x = useTransform(progress, [0, 1], ["0%", index % 2 === 0 ? "150%" : "-150%"]);
+    const rotate = useTransform(progress, [0, 1], [0, index % 2 === 0 ? 45 : -45]);
     const Icon = element.type;
     return (
         <motion.div
             style={{
-                top: element.top, left: element.left, scale: element.scale, opacity: element.opacity || 0.4, y, x,
+                top: element.top, left: element.left, scale: element.scale, opacity: element.opacity || 0.4, y, x, rotate,
                 willChange: 'transform, opacity'
             }}
-            className="absolute text-white"
+            className="absolute text-white/40 z-[2]"
         >
             <Icon size={48} />
         </motion.div>
@@ -129,13 +195,14 @@ SingleFauna.displayName = 'SingleFauna';
 
 const CelestialFauna = ({ progress }) => {
     const elements = useMemo(() => [
-        { type: Plane, top: "10%", left: "40%", speed: 5.0, scale: 0.3, opacity: 0.2 },
-        { type: Plane, top: "25%", left: "10%", speed: 6.2, scale: 0.2, opacity: 0.15 },
-        { type: Plane, top: "60%", left: "80%", speed: 4.5, scale: 0.25, opacity: 0.25 }
+        { type: Plane, top: "15%", left: "30%", speed: 6.0, scale: 0.25, opacity: 0.15 },
+        { type: Plane, top: "45%", left: "70%", speed: 4.2, scale: 0.3, opacity: 0.12 },
+        { type: Bird, top: "65%", left: "10%", speed: 8.5, scale: 0.15, opacity: 0.1 },
+        { type: Bird, top: "85%", left: "80%", speed: 7.2, scale: 0.12, opacity: 0.08 }
     ], []);
 
     return (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[2]">
             {elements.map((e, i) => (
                 <SingleFauna key={i} element={e} index={i} progress={progress} />
             ))}
@@ -144,32 +211,38 @@ const CelestialFauna = ({ progress }) => {
 };
 
 const CelestialAscentBackground = ({ progress, velocity }) => {
-    const skyGradient = useTransform(progress, [0, 0.5, 1], [
-        "linear-gradient(to bottom, #38bdf8, #bae6fd)",
-        "linear-gradient(to bottom, #3A86FF, #38bdf8)",
-        "linear-gradient(to bottom, #1E1B4B, #4338CA)"
+    const skyGradient = useTransform(progress, [0, 0.4, 0.7, 1], [
+        "linear-gradient(to bottom, #7dd3fc, #bae6fd, #ffffff)", // Mañana
+        "linear-gradient(to bottom, #38bdf8, #7dd3fc, #bae6fd)", // Ascenso medio
+        "linear-gradient(to bottom, #0284c7, #38bdf8, #7dd3fc)", // Altura alta
+        "linear-gradient(to bottom, #0c4a6e, #0284c7, #38bdf8)"  // Espacio cercano
     ]);
 
     return (
-        <motion.div style={{ background: skyGradient }} className="absolute inset-0 z-0 overflow-hidden pointer-events-none will-change-transform">
-            {/* Capa 1: Cirros (Lejanos) */}
-            <CloudLayer progress={progress} count={6} depth={0.4} size={0.5} opacity={0.3} blur={40} />
+        <motion.div style={{ background: skyGradient }} className="absolute inset-0 z-0 overflow-hidden pointer-events-none transform-gpu contain-paint">
+            {/* Atmósfera en un solo Canvas (Optimización Extrema) */}
+            <AtmosphericCanvas progress={progress} velocity={velocity} type="stardust" />
+            <AtmosphericCanvas progress={progress} velocity={velocity} type="wind" />
 
-            {/* Capa 2: Aves y Aviones */}
+            {/* CAPA 1: Horizonte Nublado (Muy Lejano) */}
+            <CloudLayer progress={progress} count={6} depth={0.2} size={0.4} opacity={0.3} blur={20} />
+
+            {/* CAPA 2: Cirros Estratificados (Lejanos) */}
+            <CloudLayer progress={progress} count={4} depth={0.5} size={0.8} opacity={0.4} blur={10} />
+
+            {/* CAPA 3: Elementos de Vida (Aves/Aviones) */}
             <CelestialFauna progress={progress} />
 
-            {/* Capa 3: Cúmulos (Medios) */}
-            <CloudLayer progress={progress} count={8} depth={1.2} size={1.2} opacity={0.4} blur={20} />
+            {/* CAPA 4: Cúmulos Cinematográficos (Medios) */}
+            <CloudLayer progress={progress} count={8} depth={1.2} size={1.8} opacity={0.5} blur={5} />
 
-            {/* Capa 4: Viento (Partículas de velocidad) */}
-            <WindParticles velocity={velocity} />
+            {/* CAPA 5: Fly-by Clouds (Ultra Cercanos) */}
+            <CloudLayer progress={progress} count={3} depth={3.5} size={4.5} opacity={0.3} blur={0} />
 
-            {/* Capa 5: Nubes Cercanas (Efecto Fly-by) */}
-            <CloudLayer progress={progress} count={4} depth={2.5} size={2.5} opacity={0.2} blur={10} />
-
+            {/* CAPA 6: Niebla Volumétrica Inferior (Ground Haze) */}
             <motion.div
-                style={{ opacity: useTransform(velocity, [-500, 0, 500], [0.2, 0, 0.2]) }}
-                className="absolute inset-0 bg-white/10 blur-3xl pointer-events-none"
+                style={{ opacity: useTransform(progress, [0, 0.2], [0.6, 0]) }}
+                className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-white via-white/50 to-transparent z-[10]"
             />
         </motion.div>
     );
@@ -180,8 +253,8 @@ const SingleDot = memo(({ index, progress, totalPoints }) => {
     const active = useTransform(progress, [target - 0.1, target, target + 0.1], [0.2, 1, 0.2]);
     const scale = useTransform(active, [0.2, 1], [1, 1.6]);
     return (
-        <motion.div style={{ opacity: active, scale, willChange: 'transform, opacity' }} className="relative pointer-events-none">
-            <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)]" />
+        <motion.div style={{ opacity: active, scale, willChange: 'transform' }} className="relative pointer-events-none transform-gpu">
+            <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
         </motion.div>
     );
 });
@@ -234,7 +307,13 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
             }}
             className="absolute w-[80vw] max-w-[340px] aspect-[9/16] bg-slate-900 rounded-[40px] shadow-2xl overflow-hidden border border-white/10"
         >
-            <img src={testimonial.image} className="absolute inset-0 w-full h-full object-cover" alt="Card" />
+            <img
+                src={testimonial.image}
+                className="absolute inset-0 w-full h-full object-cover"
+                alt="Card"
+                loading="lazy"
+                decoding="async"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
             <div className="absolute inset-0 p-8 flex flex-col justify-between">
                 <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[9px] font-black text-white w-fit tracking-widest uppercase italic uppercase tracking-[0.2em]">Nivel {testimonial.id}</div>
@@ -484,12 +563,6 @@ export default function MobileGallery({ onOpen }) {
                 {isMounted && <CelestialAscentBackground progress={springProgress} velocity={velocity} />}
                 <NavigationDots progress={springProgress} count={totalPoints} />
 
-                {/* Separador Orgánico */}
-                <div className="absolute top-0 left-0 right-0 w-full overflow-hidden leading-[0] z-20 pointer-events-none">
-                    <svg className="relative block w-[calc(100%+1.3px)] h-[80px]" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                        <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#38bdf8"></path>
-                    </svg>
-                </div>
 
                 <div className="absolute inset-0 flex flex-col pt-24 pointer-events-none">
 
