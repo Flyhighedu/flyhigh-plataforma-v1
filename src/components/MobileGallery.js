@@ -262,7 +262,7 @@ const MobileFlyPlayer = ({ isOpen, onClose, testimonial, onNext, onPrev, hasNext
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 z-[100] bg-black overflow-hidden flex flex-col pointer-events-auto"
+            className="fixed inset-0 z-[200] bg-black overflow-hidden flex flex-col pointer-events-auto"
         >
             <div className="relative flex-1 flex flex-col">
                 {/* Gestural Navigation Layer */}
@@ -477,128 +477,131 @@ export default function MobileGallery({ onOpen }) {
     }, [isLocked, activeIndex, handleMove]);
 
     return (
-        <section ref={containerRef} className="relative w-full h-[500vh] -mt-20 pt-20 z-[75]">
-            <div
-                ref={stickyRef}
-                className="sticky top-0 h-[100dvh] w-full overflow-hidden bg-white"
-            >
+        <>
+            <section ref={containerRef} className="relative w-full h-[500vh] -mt-20 pt-20 z-[75]">
+                <div
+                    ref={stickyRef}
+                    className="sticky top-0 h-[100dvh] w-full overflow-hidden bg-white"
+                >
 
-                {/* NUEVO MOTOR CELESTIAL ASCENT */}
-                {isMounted && <CelestialAscentBackground progress={springProgress} />}
-                <NavigationDots progress={springProgress} count={totalPoints} />
+                    {/* NUEVO MOTOR CELESTIAL ASCENT */}
+                    {isMounted && <CelestialAscentBackground progress={springProgress} />}
+                    <NavigationDots progress={springProgress} count={totalPoints} />
 
 
-                <div className="absolute inset-0 flex flex-col pt-24 pointer-events-none">
+                    <div className="absolute inset-0 flex flex-col pt-24 pointer-events-none">
 
-                    {/* INTRO - PORTADA ÉPICA */}
+                        {/* INTRO - PORTADA ÉPICA */}
+                        <motion.div
+                            style={{
+                                opacity: useTransform(springProgress, [0, 0.15], [1, 0]),
+                                y: useTransform(springProgress, [0, 0.15], [0, -100]),
+                                scale: useTransform(springProgress, [0, 0.15], [1, 0.85]),
+                            }}
+                            className="relative z-30 px-6 text-center will-change-transform flex flex-col items-center justify-center min-h-[65vh]"
+                        >
+                            {/* Badge con GLOW */}
+                            <motion.div
+                                animate={{
+                                    scale: [1, 1.03, 1],
+                                    boxShadow: ['0 0 20px rgba(14,165,233,0.3)', '0 0 35px rgba(14,165,233,0.5)', '0 0 20px rgba(14,165,233,0.3)']
+                                }}
+                                transition={{ repeat: Infinity, duration: 3 }}
+                                className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-cyan-500 mb-6"
+                            >
+                                <Sparkles size={14} className="text-white" />
+                                <span className="text-[10px] font-black text-white tracking-[0.25em] uppercase">Voces del Viento</span>
+                            </motion.div>
+
+                            {/* Título */}
+                            <h2 className="text-[2.5rem] font-black text-slate-900 tracking-tight leading-[1.1] font-[Montserrat] mb-1">
+                                El día que
+                            </h2>
+                            <motion.div
+                                animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
+                                transition={{ repeat: Infinity, duration: 6 }}
+                                className="text-[4rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 tracking-tighter leading-[0.9] font-[Montserrat] italic mb-5"
+                                style={{ backgroundSize: '200% 200%' }}
+                            >
+                                VOLARON
+                            </motion.div>
+
+                            {/* Subtítulo */}
+                            <p className="text-slate-500 text-base max-w-[280px] leading-relaxed">
+                                Ojos que vieron el mundo <span className="text-sky-600 font-semibold">desde arriba</span> por primera vez.
+                            </p>
+
+                            {/* Estadísticas - GLASSMORPHISM CARD */}
+                            <motion.div
+                                animate={{ scale: [1, 1.01, 1] }}
+                                transition={{ repeat: Infinity, duration: 4 }}
+                                className="mt-8 flex items-center gap-6 bg-white/70 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/50 shadow-xl shadow-sky-500/10"
+                            >
+                                <div className="text-center">
+                                    <div className="text-3xl font-black text-slate-900 tabular-nums">1,247</div>
+                                    <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Niños</div>
+                                </div>
+                                <div className="w-px h-8 bg-slate-200" />
+                                <div className="text-center">
+                                    <div className="text-3xl font-black text-cyan-500">∞</div>
+                                    <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Sueños</div>
+                                </div>
+                            </motion.div>
+
+                            {/* Scroll indicator - AVIÓN DE PAPEL */}
+                            <motion.div
+                                animate={{ y: [0, 10, 0] }}
+                                transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                                className="mt-10 flex flex-col items-center gap-2"
+                            >
+                                <motion.div
+                                    animate={{ rotate: [0, 5, 0, -5, 0] }}
+                                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                                >
+                                    <Plane size={24} className="text-sky-500 rotate-90" />
+                                </motion.div>
+                                <span className="text-[8px] font-semibold text-slate-400 tracking-widest uppercase">Desliza</span>
+                            </motion.div>
+                        </motion.div>
+
+                        {/* ARTICULATED CARDS (Virtual Motion) */}
+                        <div className="absolute inset-0 flex items-center justify-center p-6">
+                            {testimonials.map((t, i) => (
+                                <TestimonialCard key={t.id} testimonial={t} index={i} progress={springProgress} velocity={velocity} onOpen={openPlayer} totalCards={testimonials.length} />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* CTA FINAL ARMÓNICO */}
                     <motion.div
                         style={{
-                            opacity: useTransform(springProgress, [0, 0.15], [1, 0]),
-                            y: useTransform(springProgress, [0, 0.15], [0, -100]),
-                            scale: useTransform(springProgress, [0, 0.15], [1, 0.85]),
+                            opacity: useTransform(springProgress, [0.85, 1], [0, 1]),
+                            y: useTransform(springProgress, [0.85, 1], [40, 0])
                         }}
-                        className="relative z-30 px-6 text-center will-change-transform flex flex-col items-center justify-center min-h-[65vh]"
+                        className="absolute bottom-16 inset-x-0 z-50 flex flex-col items-center justify-center px-8 pointer-events-none"
                     >
-                        {/* Badge con GLOW */}
-                        <motion.div
-                            animate={{
-                                scale: [1, 1.03, 1],
-                                boxShadow: ['0 0 20px rgba(14,165,233,0.3)', '0 0 35px rgba(14,165,233,0.5)', '0 0 20px rgba(14,165,233,0.3)']
-                            }}
-                            transition={{ repeat: Infinity, duration: 3 }}
-                            className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-gradient-to-r from-sky-500 to-cyan-500 mb-6"
-                        >
-                            <Sparkles size={14} className="text-white" />
-                            <span className="text-[10px] font-black text-white tracking-[0.25em] uppercase">Voces del Viento</span>
-                        </motion.div>
-
-                        {/* Título */}
-                        <h2 className="text-[2.5rem] font-black text-slate-900 tracking-tight leading-[1.1] font-[Montserrat] mb-1">
-                            El día que
-                        </h2>
-                        <motion.div
-                            animate={{ backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }}
-                            transition={{ repeat: Infinity, duration: 6 }}
-                            className="text-[4rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 tracking-tighter leading-[0.9] font-[Montserrat] italic mb-5"
-                            style={{ backgroundSize: '200% 200%' }}
-                        >
-                            VOLARON
-                        </motion.div>
-
-                        {/* Subtítulo */}
-                        <p className="text-slate-500 text-base max-w-[280px] leading-relaxed">
-                            Ojos que vieron el mundo <span className="text-sky-600 font-semibold">desde arriba</span> por primera vez.
-                        </p>
-
-                        {/* Estadísticas - GLASSMORPHISM CARD */}
-                        <motion.div
-                            animate={{ scale: [1, 1.01, 1] }}
-                            transition={{ repeat: Infinity, duration: 4 }}
-                            className="mt-8 flex items-center gap-6 bg-white/70 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/50 shadow-xl shadow-sky-500/10"
-                        >
-                            <div className="text-center">
-                                <div className="text-3xl font-black text-slate-900 tabular-nums">1,247</div>
-                                <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Niños</div>
-                            </div>
-                            <div className="w-px h-8 bg-slate-200" />
-                            <div className="text-center">
-                                <div className="text-3xl font-black text-cyan-500">∞</div>
-                                <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Sueños</div>
-                            </div>
-                        </motion.div>
-
-                        {/* Scroll indicator - AVIÓN DE PAPEL */}
-                        <motion.div
-                            animate={{ y: [0, 10, 0] }}
-                            transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-                            className="mt-10 flex flex-col items-center gap-2"
-                        >
-                            <motion.div
-                                animate={{ rotate: [0, 5, 0, -5, 0] }}
-                                transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                        <div className="pointer-events-auto text-center w-full max-w-[320px]">
+                            <motion.button
+                                onClick={() => openPlayer(0)}
+                                whileTap={{ scale: 0.95 }}
+                                className="group w-full bg-white text-slate-950 rounded-[24px] py-4 px-6 flex items-center justify-between shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all border border-slate-100"
                             >
-                                <Plane size={24} className="text-sky-500 rotate-90" />
-                            </motion.div>
-                            <span className="text-[8px] font-semibold text-slate-400 tracking-widest uppercase">Desliza</span>
-                        </motion.div>
+                                <div className="text-left font-black leading-none">
+                                    <span className="block text-lg uppercase tracking-tight mb-0.5">VER MEJORES MOMENTOS</span>
+                                    <span className="text-[8px] text-slate-400 uppercase tracking-widest italic font-bold">En Fly Play</span>
+                                </div>
+                                <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center group-hover:rotate-[360deg] transition-transform duration-1000">
+                                    <Play size={18} className="text-white fill-white" />
+                                </div>
+                            </motion.button>
+                            <p className="mt-4 text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] animate-pulse">Desliza para finalizar</p>
+                        </div>
                     </motion.div>
-
-                    {/* ARTICULATED CARDS (Virtual Motion) */}
-                    <div className="absolute inset-0 flex items-center justify-center p-6">
-                        {testimonials.map((t, i) => (
-                            <TestimonialCard key={t.id} testimonial={t} index={i} progress={springProgress} velocity={velocity} onOpen={openPlayer} totalCards={testimonials.length} />
-                        ))}
-                    </div>
                 </div>
 
-                {/* CTA FINAL ARMÓNICO */}
-                <motion.div
-                    style={{
-                        opacity: useTransform(springProgress, [0.85, 1], [0, 1]),
-                        y: useTransform(springProgress, [0.85, 1], [40, 0])
-                    }}
-                    className="absolute bottom-16 inset-x-0 z-50 flex flex-col items-center justify-center px-8 pointer-events-none"
-                >
-                    <div className="pointer-events-auto text-center w-full max-w-[320px]">
-                        <motion.button
-                            onClick={() => openPlayer(0)}
-                            whileTap={{ scale: 0.95 }}
-                            className="group w-full bg-white text-slate-950 rounded-[24px] py-4 px-6 flex items-center justify-between shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all border border-slate-100"
-                        >
-                            <div className="text-left font-black leading-none">
-                                <span className="block text-lg uppercase tracking-tight mb-0.5">VER MEJORES MOMENTOS</span>
-                                <span className="text-[8px] text-slate-400 uppercase tracking-widest italic font-bold">En Fly Play</span>
-                            </div>
-                            <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center group-hover:rotate-[360deg] transition-transform duration-1000">
-                                <Play size={18} className="text-white fill-white" />
-                            </div>
-                        </motion.button>
-                        <p className="mt-4 text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] animate-pulse">Desliza para finalizar</p>
-                    </div>
-                </motion.div>
-            </div>
+            </section>
 
-            {/* PLAYER OVERLAY */}
+            {/* PLAYER OVERLAY - Fuera de la sección para z-index global */}
             <AnimatePresence>
                 {playerOpen && (
                     <MobileFlyPlayer
@@ -612,7 +615,6 @@ export default function MobileGallery({ onOpen }) {
                     />
                 )}
             </AnimatePresence>
-
-        </section>
+        </>
     );
 }
