@@ -127,7 +127,16 @@ const UnifiedSkyEngine = memo(({ progress }) => {
 
     useEffect(() => {
         let raf;
-        const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+        let frameCount = 0;
+        const loop = () => {
+            // Throttling: Dibujar solo cada 2 frames (~30 FPS para background)
+            // Libera thread para UI a 60 FPS
+            if (frameCount % 2 === 0) {
+                draw();
+            }
+            frameCount++;
+            raf = requestAnimationFrame(loop);
+        };
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
     }, [draw]);
@@ -136,9 +145,9 @@ const UnifiedSkyEngine = memo(({ progress }) => {
         <canvas
             ref={canvasRef}
             className="absolute inset-0 pointer-events-none z-[5]"
-            width={window.innerWidth * 0.5}
-            height={window.innerHeight * 0.5}
-            style={{ width: '100%', height: '100%', willChange: 'transform' }}
+            width={typeof window !== 'undefined' ? window.innerWidth * 0.5 : 100}
+            height={typeof window !== 'undefined' ? window.innerHeight * 0.5 : 100}
+            style={{ width: '100%', height: '100%', willChange: 'transform, opacity' }}
         />
     );
 });
@@ -219,7 +228,8 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
     const scaleRange = isLast ? [centerPoint - 0.1, centerPoint, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
     const scaleValues = isLast ? [0.88, 1, 0.98] : [0.88, 1, 0.88];
 
-    const yRange = isLast ? [centerPoint - 0.1, centerPoint, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
+    // Sync: Termina en 0.90 (centerPoint + 0.15) para coincidir con CTA
+    const yRange = isLast ? [centerPoint - 0.1, centerPoint, centerPoint + 0.15] : [centerPoint - 0.1, centerPoint, centerPoint + 0.15];
     const yValues = isLast ? [120, 0, -130] : [120, 0, -120];
 
     const opacity = useTransform(progress, opacityRange, opacityValues);
@@ -243,7 +253,7 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
             style={{
                 opacity, scale, y, rotateX, zIndex,
                 pointerEvents: pointerEnabled ? 'auto' : 'none',
-                willChange: 'transform, opacity',
+                willChange: 'transform, opacity', // GPU Hint explícito
                 boxShadow: useTransform(shadowOpacity, v => `0 30px 60px rgba(0,0,0,${v}), 0 0 0 1px rgba(255,255,255,0.1), 0 -10px 40px rgba(14,165,233,${v * 0.3})`)
             }}
             className="absolute w-[72vw] max-w-[320px] aspect-[9/16] bg-slate-900 rounded-[32px] overflow-hidden"
@@ -786,10 +796,10 @@ export default function MobileGallery({ onOpen }) {
                 {/* CTA FINAL - SIMPLE BAR */}
                 <motion.div
                     style={{
-                        // Sync con salida de última tarjeta (0.75 -> 1.0)
-                        // Empieza a aparecer justo cuando la tarjeta empieza a subir
-                        opacity: useTransform(springProgress, [0.75, 0.95], [0, 1]),
-                        y: useTransform(springProgress, [0.75, 0.95], [50, 0])
+                        // Sync Total con Tarjeta (0.75 -> 0.90)
+                        // Ambos inician y terminan exactamente al mismo tiempo
+                        opacity: useTransform(springProgress, [0.75, 0.90], [0, 1]),
+                        y: useTransform(springProgress, [0.75, 0.90], [50, 0])
                     }}
                     className="absolute bottom-14 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
                 >
