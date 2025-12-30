@@ -217,10 +217,10 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
     const opacityValues = isLast ? [0, 1, 1, 1] : [0, 1, 0];
 
     const scaleRange = isLast ? [centerPoint - 0.1, centerPoint, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
-    const scaleValues = isLast ? [0.88, 1, 0.85] : [0.88, 1, 0.88];
+    const scaleValues = isLast ? [0.88, 1, 0.98] : [0.88, 1, 0.88];
 
     const yRange = isLast ? [centerPoint - 0.1, centerPoint, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
-    const yValues = isLast ? [120, 0, -80] : [120, 0, -120];
+    const yValues = isLast ? [120, 0, -130] : [120, 0, -120];
 
     const opacity = useTransform(progress, opacityRange, opacityValues);
     const scale = useTransform(progress, scaleRange, scaleValues);
@@ -414,11 +414,11 @@ const ElasticChar = memo(({ char, index, totalIndex, progress, smoothVelocity, t
     // Delta de 0.003 asegura una ola rápida pero perceptible
     const start = 0.04 + (totalIndex * 0.003);
 
-    // Trayectoria O(1) - Sin Spring individual (Performance Opt)
-    // Usamos el spring global 'progress' para manejar la física
+    // Trayectoria O(1) - Trajectory Locking (Zero-Drift)
+    // Se satura rápido (0.15) y se queda fijo en -130px para siempre
     const y = useTransform(progress,
-        [start, start + 0.15, start + 0.25],
-        [0, 150, 50]
+        [start, start + 0.08, start + 0.15],
+        [0, -60, -130]
     );
 
     // Opacidad / Color individual (Scroll Physics)
@@ -642,8 +642,8 @@ export default function MobileGallery({ onOpen }) {
                     <NavigationDots progress={springProgress} count={totalPoints} />
 
                     {/* CONTENEDOR MAESTRO DE PORTADA (Flex Stack Vertical) */}
-                    {/* Centrado perfecto en viewport, sin absolutos */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6 pb-20">
+                    {/* Reajuste: Alineación superior (Top-Aligned) para aprovechar espacio vertical */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-start pointer-events-none px-6 pt-32 pb-20">
 
                         {/* 1. Badge Superior */}
                         <motion.div
@@ -775,7 +775,8 @@ export default function MobileGallery({ onOpen }) {
 
 
                     {/* ARTICULATED CARDS (Virtual Motion) */}
-                    <div className="absolute inset-0 flex items-center justify-center p-6 z-30">
+                    {/* Bajamos MÁS las tarjetas (pt-52) para abrir el 'Header-Card Gap' */}
+                    <div className="absolute inset-0 flex items-center justify-center p-6 pt-52 z-30">
                         {testimonials.map((t, i) => (
                             <TestimonialCard key={t.id} testimonial={t} index={i} progress={springProgress} velocity={velocity} onOpen={openPlayer} totalCards={testimonials.length} />
                         ))}
@@ -790,7 +791,7 @@ export default function MobileGallery({ onOpen }) {
                         opacity: useTransform(springProgress, [0.75, 0.95], [0, 1]),
                         y: useTransform(springProgress, [0.75, 0.95], [50, 0])
                     }}
-                    className="absolute bottom-10 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
+                    className="absolute bottom-14 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
                 >
                     <motion.button
                         onClick={() => openPlayer(0)}
