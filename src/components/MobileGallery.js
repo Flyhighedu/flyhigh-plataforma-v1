@@ -199,7 +199,7 @@ NavigationDot.displayName = 'NavigationDot';
 
 const NavigationDots = memo(({ progress, count }) => {
     return (
-        <div className="absolute left-5 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-4">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-5 p-2 rounded-full bg-white/5 backdrop-blur-md border border-white/10 shadow-sm">
             {Array.from({ length: count }).map((_, i) => (
                 <NavigationDot key={i} index={i} progress={progress} totalPoints={count} />
             ))}
@@ -244,9 +244,9 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
                 opacity, scale, y, rotateX, zIndex,
                 pointerEvents: pointerEnabled ? 'auto' : 'none',
                 willChange: 'transform, opacity',
-                boxShadow: useTransform(shadowOpacity, v => `0 30px 60px rgba(0,0,0,${v}), 0 0 0 1px rgba(255,255,255,0.1)`)
+                boxShadow: useTransform(shadowOpacity, v => `0 30px 60px rgba(0,0,0,${v}), 0 0 0 1px rgba(255,255,255,0.1), 0 -10px 40px rgba(14,165,233,${v * 0.3})`)
             }}
-            className="absolute w-[80vw] max-w-[340px] aspect-[9/16] bg-slate-900 rounded-[32px] overflow-hidden"
+            className="absolute w-[72vw] max-w-[320px] aspect-[9/16] bg-slate-900 rounded-[32px] overflow-hidden"
         >
             {/* Borde luminoso animado */}
             <div className="absolute inset-0 rounded-[32px] p-[1px] bg-gradient-to-b from-white/30 via-white/5 to-white/20 pointer-events-none" />
@@ -260,11 +260,16 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
-            <div className="absolute inset-0 p-7 flex flex-col justify-between">
-                {/* Badge Premium con glow - Eliminado Nivel por UX refinement */}
-                <div className="flex items-center justify-end">
-                    <div className="text-white/20 font-mono text-[8px] tracking-tight">{testimonial.serial.split(' // ')[0]}</div>
-                </div>
+            {/* Serial Code Vertical - Estética Editorial */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 rotate-90 origin-right transition-opacity duration-500 pointer-events-none pr-10 z-20">
+                <span className="text-white/10 font-mono text-[7px] tracking-[0.4em] uppercase whitespace-nowrap">
+                    {testimonial.serial}
+                </span>
+            </div>
+
+            <div className="absolute inset-0 p-10 flex flex-col justify-between">
+                {/* Header de tarjeta limpio para Editorial Harmony */}
+                <div className="flex items-center justify-end" />
 
                 {/* Botón Play con pulse */}
                 <motion.button
@@ -280,16 +285,16 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
                     <Play className="fill-white text-white ml-1 w-6 h-6 relative z-10" />
                 </motion.button>
 
-                {/* Info inferior */}
-                <div className="space-y-3">
-                    <h3 className="text-xl font-black text-white leading-tight italic drop-shadow-lg">"{testimonial.quote}"</h3>
-                    <div className="flex items-center gap-3 border-t border-white/10 pt-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center font-black text-white shadow-lg text-sm">
+                {/* Info inferior - Refinamiento Editorial */}
+                <div className="space-y-4">
+                    <h3 className="text-xl font-black text-white leading-snug tracking-tight italic drop-shadow-md">"{testimonial.quote}"</h3>
+                    <div className="flex items-center gap-4 border-t border-white/5 pt-4">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center font-black text-white shadow-xl text-sm border border-white/20">
                             {testimonial.author.charAt(6)}
                         </div>
-                        <div>
-                            <p className="text-[10px] font-black text-white uppercase tracking-wider leading-none mb-0.5">{testimonial.author}</p>
-                            <p className="text-[8px] font-medium text-white/50 uppercase tracking-widest leading-none">{testimonial.school}</p>
+                        <div className="space-y-0.5">
+                            <p className="text-[11px] font-black text-white uppercase tracking-[0.1em] leading-none">{testimonial.author}</p>
+                            <p className="text-[9px] font-serif italic text-white/40 lowercase tracking-wider leading-none">{testimonial.school}</p>
                         </div>
                     </div>
                 </div>
@@ -402,6 +407,71 @@ const MobileFlyPlayer = ({ isOpen, onClose, testimonial, onNext, onPrev, hasNext
     );
 };
 
+// --- COMPONENTES DE ANIMACIÓN (TOON PHYSICS) ---
+
+const ElasticChar = memo(({ char, index, totalIndex, progress, smoothVelocity, toonSkew, toonTracking }) => {
+    // Staggered Start: Cada letra empieza un poco después que la anterior
+    // Delta de 0.003 asegura una ola rápida pero perceptible
+    const start = 0.04 + (totalIndex * 0.003);
+
+    // Trayectoria O(1) - Sin Spring individual (Performance Opt)
+    // Usamos el spring global 'progress' para manejar la física
+    const y = useTransform(progress,
+        [start, start + 0.15, start + 0.25],
+        [0, 150, 50]
+    );
+
+    // Opacidad / Color individual (Scroll Physics)
+    const color = useTransform(progress, [start, start + 0.1], ['#0ea5e9', '#ffffff']);
+    const shadowOpacity = useTransform(progress, [start, start + 0.1], [0, 0.5]);
+
+    // GPU Optimization: Usamos textShadow en lugar de filter: drop-shadow
+    // Evita la creación de texturas offscreen costosas
+    const textShadow = useTransform(shadowOpacity, v =>
+        `0 ${20 * v}px ${40 * v}px rgba(0,0,0,${v})`
+    );
+
+    // Opacidad base para desaparición final (Scroll Physics)
+    const opacity = useTransform(progress,
+        [0, start + 0.08, 0.9, 0.98],
+        [1, 0.6, 0.6, 0],
+        { clamp: true }
+    );
+
+    // Variantes de Entrada (Falling Sky Intro)
+    const entranceVariants = {
+        hidden: { y: -150, opacity: 0, rotateX: 90 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            rotateX: 0,
+            transition: { type: "spring", damping: 12, stiffness: 200 }
+        }
+    };
+
+    return (
+        // WRAPPER: Maneja la entrada "Caída del Cielo"
+        <motion.span variants={entranceVariants} style={{ display: 'inline-block', transformStyle: 'preserve-3d' }}>
+            {/* CORE: Maneja las Físicas de Scroll (Jelly/Morph) */}
+            <motion.span
+                style={{
+                    display: 'inline-block',
+                    y,
+                    skewX: toonSkew,
+                    letterSpacing: toonTracking,
+                    color,
+                    textShadow,
+                    opacity
+                }}
+                className="will-change-transform"
+            >
+                {char === ' ' ? '\u00A0' : char}
+            </motion.span>
+        </motion.span>
+    );
+});
+ElasticChar.displayName = 'ElasticChar';
+
 export default function MobileGallery({ onOpen }) {
     const containerRef = useRef(null);
     const stickyRef = useRef(null);
@@ -436,6 +506,28 @@ export default function MobileGallery({ onOpen }) {
 
     // Tilt dinámico basado en la velocidad del scroll
     const tiltX = useTransform(velocity, [-3000, 0, 3000], [15, 0, -15]);
+
+    // --- HYPER-TOON PHYSICS ENGINE V2 ---
+    // Configuración "Jelly" (Pudín): Alto stiffness, muy bajo damping para vibración
+    const jellyConfig = { stiffness: 700, damping: 12, mass: 0.5 };
+    const smoothVelocity = useSpring(velocity, jellyConfig);
+
+    // 1. Deformación Extrema (Smear Frame)
+    const toonScaleY = useTransform(smoothVelocity, [-3000, 0, 3000], [1.6, 1, 1.6]);
+    const toonScaleX = useTransform(smoothVelocity, [-3000, 0, 3000], [0.6, 1, 0.6]);
+
+    // 2. Rotación Pendular (Swing)
+    // El título se "cuelga" de la inercia
+    const leanRotate = useTransform(smoothVelocity, [-3000, 3000], [15, -15]);
+
+    // 3. Elastic Lag (Posición Y con rebote propio)
+    // YA NO SE USA GLOBALMENTE - Se movió a ElasticChar para el efecto Stagger
+
+    // 4. Morphing Text (Deformación Estructural de Letras)
+    // Shear Stress: Inclinación violenta por velocidad ("Viento")
+    const toonSkew = useTransform(smoothVelocity, [-3000, 3000], [-25, 25]);
+    // Kern-Breathing: Compresión aerodinámica en movimiento
+    const toonTracking = useTransform(smoothVelocity, [-3000, 0, 3000], ["-0.05em", "0.05em", "-0.05em"]);
 
     const totalPoints = testimonials.length + 2; // Intro + Cards + Outro
     const snapPoints = useMemo(() => Array.from({ length: totalPoints }).map((_, i) => i / (totalPoints - 1)), [totalPoints]);
@@ -549,164 +641,173 @@ export default function MobileGallery({ onOpen }) {
                     {isMounted && <CelestialAscentBackground progress={springProgress} />}
                     <NavigationDots progress={springProgress} count={totalPoints} />
 
+                    {/* CONTENEDOR MAESTRO DE PORTADA (Flex Stack Vertical) */}
+                    {/* Centrado perfecto en viewport, sin absolutos */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6 pb-20">
 
-                    <div className="absolute inset-0 flex flex-col pt-24 pointer-events-none">
-
-                        {/* INTRO - PORTADA con ANIMACIÓN DE DESPEGUE */}
+                        {/* 1. Badge Superior */}
                         <motion.div
-                            style={{
-                                opacity: useTransform(springProgress, [0, 0.08], [1, 0]),
-                                y: useTransform(springProgress, [0, 0.08], [0, -40]),
-                                scale: useTransform(springProgress, [0, 0.08], [1, 0.95]),
-                            }}
-                            className="relative z-30 px-6 text-center will-change-transform flex flex-col items-center justify-center min-h-[65vh]"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={introAnimated ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.8 }}
+                            style={{ opacity: useTransform(springProgress, [0, 0.05], [1, 0]) }}
+                            transition={{ delay: 0.3, duration: 0.5, type: "spring", stiffness: 200, damping: 15 }}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500 shadow-lg shadow-violet-500/30 mb-8"
                         >
-                            {/* Badge - Fase 1: 300ms */}
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={introAnimated ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.8 }}
-                                transition={{ delay: 0.3, duration: 0.5, type: "spring", stiffness: 200, damping: 15 }}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-500 shadow-lg shadow-violet-500/30 mb-8"
-                            >
-                                <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                                <span className="text-[10px] font-bold text-white tracking-widest uppercase">Fly Play</span>
-                            </motion.div>
-
-                            {/* Título Migrante - Esta parte se queda aquí para el layout inicial pero se desvanece */}
-                            {/* Para que la migración sea fluida, usaremos un clon fuera de este contenedor */}
-
-                            <div className="text-center mb-8">
-                                {/* Intro - Fase 2: 500ms - Cae desde arriba */}
-                                <motion.p
-                                    initial={{ opacity: 0, y: -20 }}
-                                    animate={introAnimated ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
-                                    transition={{ delay: 0.5, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                                    className="text-slate-400 text-sm font-semibold tracking-wide uppercase mb-4"
-                                >
-                                    Los mejores momentos de
-                                </motion.p>
-
-                                <div className="h-16" /> {/* Placeholder para el espacio del título */}
-                            </div>
-
-                            {/* Estadísticas - Fase 3: 1000ms */}
-
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={introAnimated ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                                transition={{ delay: 1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                                className="flex flex-col bg-white/80 backdrop-blur-sm rounded-2xl border border-white/60 shadow-lg overflow-hidden"
-                            >
-                                <div className="flex items-center justify-center gap-4 px-5 py-3">
-                                    <div className="text-center">
-                                        <div className="text-2xl font-black text-slate-900 tabular-nums">510</div>
-                                        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">niños</div>
-                                    </div>
-                                    <div className="w-px h-6 bg-slate-200" />
-                                    <div className="text-center">
-                                        <div className="text-2xl font-black text-violet-500">∞</div>
-                                        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Emociones</div>
-                                    </div>
-                                </div>
-
-                                {/* Apartado Delgado Inferior */}
-                                <div className="w-full bg-sky-500/5 border-t border-sky-500/10 px-5 py-1.5 text-center">
-                                    <p className="text-[9px] font-bold text-sky-600/40 uppercase tracking-[0.15em]">
-                                        Aún faltan <span className="text-sky-500 font-black">29,490</span> niños
-                                    </p>
-                                </div>
-                            </motion.div>
-
-
-                            {/* Scroll indicator - Fase 3: 1300ms */}
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={introAnimated ? { opacity: 1 } : { opacity: 0 }}
-                                transition={{ delay: 1.3, duration: 0.5 }}
-                                className="mt-10 flex flex-col items-center gap-1"
-                            >
-                                <motion.div
-                                    animate={introAnimated ? { y: [0, 6, 0] } : {}}
-                                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 1.8 }}
-                                >
-                                    <ChevronDown size={20} className="text-slate-400" />
-                                </motion.div>
-                                <span className="text-[8px] font-semibold text-slate-400 tracking-widest uppercase">Desliza</span>
-                            </motion.div>
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                            <span className="text-[10px] font-bold text-white tracking-widest uppercase">Fly Play</span>
                         </motion.div>
 
-                        {/* TÍTULO MIGRANTE (Sticky Header) */}
-                        <div className="absolute inset-x-0 top-[36vh] z-[100] flex flex-col items-center pointer-events-none px-6" style={{ perspective: '1200px' }}>
+                        {/* 2. Texto Introductorio */}
+                        <motion.p
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={introAnimated ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
+                            style={{ opacity: useTransform(springProgress, [0, 0.05], [1, 0]) }}
+                            transition={{ delay: 0.5, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            className="text-slate-400 text-sm font-semibold tracking-wide uppercase mb-6"
+                        >
+                            Los mejores momentos de
+                        </motion.p>
+
+                        {/* 3. TÍTULO PRINCIPAL (En Flujo Natural) */}
+                        <div className="relative z-10 mb-10" style={{ perspective: '1200px' }}>
                             <motion.h2
+                                variants={{
+                                    hidden: { opacity: 1 },
+                                    visible: {
+                                        opacity: 1,
+                                        transition: { staggerChildren: 0.04, delayChildren: 0.2 }
+                                    }
+                                }}
+                                initial="hidden"
+                                animate={introAnimated ? "visible" : "hidden"}
                                 style={{
-                                    y: useTransform(springProgress, [0.04, 0.25, 0.9], [0, -175, -175], { clamp: true }),
-                                    translateY: floatY, // Oscilación constante
-                                    scale: useTransform(springProgress, [0.04, 0.25], [1, 0.72], { clamp: true }),
-                                    rotateX: tiltX,    // Inercia 3D al scroll
-                                    rotateZ: floatRotate, // Balanceo suave
-                                    opacity: useTransform(springProgress, [0.9, 0.98], [1, 0], { clamp: true })
+                                    // Transformaciones globales del contenedor (Rotate, Tilt)
+                                    scale: useTransform(springProgress, [0, 0.04, 0.25], [1, 1.1, 1]),
+                                    rotateX: tiltX,
+                                    rotateZ: leanRotate, // El balanceo sigue siendo global
+
+                                    // La deformación estructural global también aplica para coherencia
+                                    scaleY: toonScaleY,
+                                    scaleX: toonScaleX,
                                 }}
-                                initial={{ opacity: 0, y: 60, scale: 0.9 }}
-                                animate={introAnimated ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 60, scale: 0.9 }}
-                                transition={{
-                                    opacity: { delay: 0.7, duration: 0.7 },
-                                    y: { delay: 0.7, duration: 0.7, type: "spring", stiffness: 120, damping: 14 },
-                                    scale: { delay: 0.7, duration: 0.7, type: "spring", stiffness: 120, damping: 14 }
-                                }}
-                                className="font-[Montserrat] tracking-tight leading-[0.95] text-center will-change-transform"
+                                className="font-[Montserrat] text-[2.4rem] font-black tracking-[0.05em] uppercase leading-[1.05] text-center flex flex-col items-center"
                             >
-                                <motion.span
-                                    style={{
-                                        backgroundSize: '200% 200%',
-                                        filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.8)) drop-shadow(0 10px 30px rgba(14,165,233,0.4)) drop-shadow(0 0 40px rgba(255,255,255,0.2))',
-                                        color: useTransform(springProgress, [0.12, 0.25], ["rgba(255,255,255,0)", "rgba(255,255,255,1)"], { clamp: true }),
-                                        textShadow: '0 0 10px rgba(255,255,255,0.5)'
-                                    }}
-                                    animate={introAnimated ? { backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] } : {}}
-                                    transition={{ repeat: Infinity, duration: 6, delay: 1.5 }}
-                                    className="text-[2.5rem] font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-500 via-cyan-400 to-sky-500 tracking-tight"
-                                >
-                                    ¡EL DÍA QUE VOLARON!
-                                </motion.span>
+                                {/* LÍNEA 1: ¡EL DÍA QUE */}
+                                <div className="flex justify-center">
+                                    {Array.from("¡EL DÍA QUE").map((char, i) => (
+                                        <ElasticChar
+                                            key={`l1-${i}`}
+                                            char={char}
+                                            index={i}
+                                            totalIndex={i} // Índice corrido para el stagger
+                                            progress={springProgress}
+                                            smoothVelocity={smoothVelocity}
+                                            toonSkew={toonSkew}
+                                            toonTracking={toonTracking}
+                                        />
+                                    ))}
+                                </div>
+                                {/* LÍNEA 2: VOLARON! */}
+                                <div className="flex justify-center">
+                                    {Array.from("VOLARON!").map((char, i) => (
+                                        <ElasticChar
+                                            key={`l2-${i}`}
+                                            char={char}
+                                            index={i}
+                                            totalIndex={i + 12} // Offset para que siga la ola después de la primera línea
+                                            progress={springProgress}
+                                            smoothVelocity={smoothVelocity}
+                                            toonSkew={toonSkew}
+                                            toonTracking={toonTracking}
+                                        />
+                                    ))}
+                                </div>
                             </motion.h2>
                         </div>
 
-                        {/* ARTICULATED CARDS (Virtual Motion) */}
-                        <div className="absolute inset-0 flex items-center justify-center p-6">
-                            {testimonials.map((t, i) => (
-                                <TestimonialCard key={t.id} testimonial={t} index={i} progress={springProgress} velocity={velocity} onOpen={openPlayer} totalCards={testimonials.length} />
-                            ))}
-                        </div>
+                        {/* 4. Tarjeta de Estadísticas (Empujada naturalmente) */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={introAnimated ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                            transition={{ delay: 1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            // Desvanecimiento al scrollear para limpiar la vista
+                            style={{
+                                opacity: useTransform(springProgress, [0, 0.05], [1, 0])
+                            }}
+                            className="flex flex-col bg-white/80 backdrop-blur-sm rounded-2xl border border-white/60 shadow-lg overflow-hidden relative z-20"
+                        >
+                            <div className="flex items-center justify-center gap-4 px-5 py-3">
+                                <div className="text-center">
+                                    <div className="text-2xl font-black text-slate-900 tabular-nums">510</div>
+                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">niños</div>
+                                </div>
+                                <div className="w-px h-6 bg-slate-200" />
+                                <div className="text-center">
+                                    <div className="text-2xl font-black text-violet-500">∞</div>
+                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Emociones</div>
+                                </div>
+                            </div>
+                            <div className="w-full bg-sky-500/5 border-t border-sky-500/10 px-5 py-1.5 text-center">
+                                <p className="text-[9px] font-bold text-sky-600/40 uppercase tracking-[0.15em]">
+                                    Aún faltan <span className="text-sky-500 font-black">29,490</span> niños
+                                </p>
+                            </div>
+                        </motion.div>
+
+                        {/* 5. Scroll Indicator */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={introAnimated ? { opacity: 1 } : { opacity: 0 }}
+                            transition={{ delay: 1.3, duration: 0.5 }}
+                            style={{ opacity: useTransform(springProgress, [0, 0.05], [1, 0]) }}
+                            className="mt-10 flex flex-col items-center gap-1"
+                        >
+                            <motion.div
+                                animate={introAnimated ? { y: [0, 6, 0] } : {}}
+                                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 1.8 }}
+                            >
+                                <ChevronDown size={20} className="text-slate-400" />
+                            </motion.div>
+                            <span className="text-[8px] font-semibold text-slate-400 tracking-widest uppercase">Desliza</span>
+                        </motion.div>
+
                     </div>
 
-                    {/* CTA FINAL - SIMPLE BAR */}
-                    <motion.div
-                        style={{
-                            opacity: useTransform(springProgress, [0.88, 1], [0, 1]),
-                            y: useTransform(springProgress, [0.88, 1], [30, 0])
-                        }}
-                        className="absolute bottom-10 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
-                    >
-                        <motion.button
-                            onClick={() => openPlayer(0)}
-                            whileTap={{ scale: 0.97 }}
-                            className="pointer-events-auto w-full max-w-[320px] p-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-between shadow-[0_15px_40px_rgba(139,92,246,0.35)]"
-                        >
-                            <div>
-                                <p className="text-white text-lg font-black tracking-tight">Ver Mejores Momentos</p>
-                                <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wider">Fly Play</p>
-                            </div>
-                            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg">
-                                <Play size={22} className="text-violet-600 fill-violet-600 ml-0.5" />
-                            </div>
-                        </motion.button>
-                    </motion.div>
+
+                    {/* ARTICULATED CARDS (Virtual Motion) */}
+                    <div className="absolute inset-0 flex items-center justify-center p-6 z-30">
+                        {testimonials.map((t, i) => (
+                            <TestimonialCard key={t.id} testimonial={t} index={i} progress={springProgress} velocity={velocity} onOpen={openPlayer} totalCards={testimonials.length} />
+                        ))}
+                    </div>
                 </div>
 
-            </section>
+                {/* CTA FINAL - SIMPLE BAR */}
+                <motion.div
+                    style={{
+                        opacity: useTransform(springProgress, [0.88, 1], [0, 1]),
+                        y: useTransform(springProgress, [0.88, 1], [30, 0])
+                    }}
+                    className="absolute bottom-10 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
+                >
+                    <motion.button
+                        onClick={() => openPlayer(0)}
+                        whileTap={{ scale: 0.97 }}
+                        className="pointer-events-auto w-full max-w-[320px] p-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-between shadow-[0_15px_40px_rgba(139,92,246,0.35)]"
+                    >
+                        <div>
+                            <p className="text-white text-lg font-black tracking-tight">Ver Mejores Momentos</p>
+                            <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wider">Fly Play</p>
+                        </div>
+                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg">
+                            <Play size={22} className="text-violet-600 fill-violet-600 ml-0.5" />
+                        </div>
+                    </motion.button>
+                </motion.div>
+            </section >
 
             {/* PLAYER OVERLAY - Fuera de la sección para z-index global */}
-            <AnimatePresence>
+            < AnimatePresence >
                 {playerOpen && (
                     <MobileFlyPlayer
                         isOpen={playerOpen}
@@ -717,8 +818,9 @@ export default function MobileGallery({ onOpen }) {
                         hasNext={selectedIdx < testimonials.length - 1}
                         hasPrev={selectedIdx > 0}
                     />
-                )}
-            </AnimatePresence>
+                )
+                }
+            </AnimatePresence >
         </>
     );
 }
