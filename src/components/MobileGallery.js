@@ -785,8 +785,10 @@ export default function MobileGallery({ onOpen }) {
                 {/* CTA FINAL - SIMPLE BAR */}
                 <motion.div
                     style={{
-                        opacity: useTransform(springProgress, [0.88, 1], [0, 1]),
-                        y: useTransform(springProgress, [0.88, 1], [30, 0])
+                        // Sync con salida de última tarjeta (0.75 -> 1.0)
+                        // Empieza a aparecer justo cuando la tarjeta empieza a subir
+                        opacity: useTransform(springProgress, [0.75, 0.95], [0, 1]),
+                        y: useTransform(springProgress, [0.75, 0.95], [50, 0])
                     }}
                     className="absolute bottom-10 inset-x-0 z-50 flex flex-col items-center justify-center px-6 pointer-events-none"
                 >
