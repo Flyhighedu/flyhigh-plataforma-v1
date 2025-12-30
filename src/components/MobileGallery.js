@@ -157,11 +157,11 @@ UnifiedSkyEngine.displayName = 'UnifiedSkyEngine';
 const CelestialAscentBackground = ({ progress }) => {
     // Cielo con más color desde el inicio para ver las nubes
     const skyGradient = useTransform(progress, [0, 0.08, 0.4, 0.7, 1], [
-        "linear-gradient(to bottom, #e0f2fe, #bae6fd, #e0f2fe)",       // INICIO: Azul suave visible
-        "linear-gradient(to bottom, #bae6fd, #7dd3fc, #e0f2fe)",      // Cielo emergiendo
-        "linear-gradient(to bottom, #38bdf8, #7dd3fc, #bae6fd)",      // Ascenso medio
-        "linear-gradient(to bottom, #0284c7, #38bdf8, #7dd3fc)",      // Altura alta
-        "linear-gradient(to bottom, #0c4a6e, #0284c7, #38bdf8)"       // Espacio cercano
+        "linear-gradient(to bottom, #bae6fd, #7dd3fc, #bae6fd)",       // INICIO: Azul más intenso (+10%)
+        "linear-gradient(to bottom, #7dd3fc, #38bdf8, #bae6fd)",      // Cielo vibrante
+        "linear-gradient(to bottom, #0ea5e9, #38bdf8, #7dd3fc)",      // Ascenso profundo
+        "linear-gradient(to bottom, #0284c7, #0ea5e9, #38bdf8)",      // Altura saturada
+        "linear-gradient(to bottom, #082f49, #0284c7, #0ea5e9)"       // Espacio profundo
     ]);
 
     return (
@@ -442,8 +442,9 @@ const ElasticChar = memo(({ char, index, totalIndex, progress, smoothVelocity, t
     );
 
     // Opacidad base para desaparición final (Scroll Physics)
+    // Sync de Salida: Desaparece junto con la llegada de la última tarjeta (0.75 -> 0.90)
     const opacity = useTransform(progress,
-        [0, start + 0.08, 0.9, 0.98],
+        [0, start + 0.08, 0.75, 0.90],
         [1, 0.6, 0.6, 0],
         { clamp: true }
     );
