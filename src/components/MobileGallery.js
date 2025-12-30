@@ -693,7 +693,7 @@ export default function MobileGallery({ onOpen }) {
                                 className="font-[Montserrat] text-[2.4rem] font-black tracking-[0.05em] uppercase leading-[1.05] text-center flex flex-col items-center"
                             >
                                 {/* LÍNEA 1: ¡EL DÍA QUE */}
-                                <div className="flex justify-center">
+                                <span className="flex justify-center w-full">
                                     {Array.from("¡EL DÍA QUE").map((char, i) => (
                                         <ElasticChar
                                             key={`l1-${i}`}
@@ -706,9 +706,9 @@ export default function MobileGallery({ onOpen }) {
                                             toonTracking={toonTracking}
                                         />
                                     ))}
-                                </div>
+                                </span>
                                 {/* LÍNEA 2: VOLARON! */}
-                                <div className="flex justify-center">
+                                <span className="flex justify-center w-full">
                                     {Array.from("VOLARON!").map((char, i) => (
                                         <ElasticChar
                                             key={`l2-${i}`}
@@ -721,7 +721,7 @@ export default function MobileGallery({ onOpen }) {
                                             toonTracking={toonTracking}
                                         />
                                     ))}
-                                </div>
+                                </span>
                             </motion.h2>
                         </div>
 

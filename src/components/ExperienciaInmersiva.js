@@ -270,6 +270,7 @@ export default function ExperienciaInmersiva() {
                         <button
                             key={index}
                             onClick={() => scrollToIndex(index)}
+                            suppressHydrationWarning // Ignora atributos inyectados por extensiones (fdprocessedid)
                             className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${index === activeIndex ? 'bg-purple-600 w-8' : 'bg-slate-300 hover:bg-slate-400'
                                 }`}
                             aria-label={`Go to slide ${index + 1}`}
