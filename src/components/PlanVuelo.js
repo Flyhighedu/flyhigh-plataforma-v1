@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
+import { useVideoImmortality } from '../hooks/useVideoImmortality';
 import { MapPin, PlayCircle, ArrowDown } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -18,6 +19,14 @@ export default function PlanVuelo() {
     const headerRef = useRef(null);
 
     const [isVideoPlaying, setIsVideoPlaying] = useState(false); // State to manage fade-in
+
+    // Video Immortality Engine Integration
+    const { isPlaying: isHookPlaying, isBlocked, forcePlay } = useVideoImmortality(videoRef);
+
+    // Sync hook state with local fade-in state
+    useEffect(() => {
+        if (isHookPlaying) setIsVideoPlaying(true);
+    }, [isHookPlaying]);
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -226,26 +235,33 @@ export default function PlanVuelo() {
                                             ref={videoRef}
                                             className={`w-full h-full object-cover transition-opacity duration-700 ${isVideoPlaying ? 'opacity-90' : 'opacity-0'}`}
                                             poster="/img/poster-visor.jpg"
-                                            preload="metadata"
+                                            preload="metadata" // Low level optimization
                                             muted
                                             loop
                                             playsInline
-                                            autoPlay
-                                            onPlaying={() => setIsVideoPlaying(true)}
-                                            onLoadedData={() => {
-                                                // Si ya está listo, intentar reproducir si está en vista (el observer maneja lo de 'en vista')
-                                                // Pero aquí marcamos ready state si quisiéramos.
-                                            }}
+                                            webkit-playsinline="true" // iOS 
                                             style={{ transform: 'translateZ(0)' }}
                                         >
                                             <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
                                         </video>
 
-                                        {/* Poster Manual Fallback (Asegura que se vea algo si el video falla) */}
+                                        {/* Poster Manual Fallback */}
                                         <div
                                             className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${isVideoPlaying ? 'opacity-0' : 'opacity-100'} pointer-events-none`}
                                             style={{ backgroundImage: 'url(/img/poster-visor.jpg)' }}
                                         />
+
+                                        {/* UI Rescue Button (Solo visibles si bloqueado por políticas) */}
+                                        {isBlocked && (
+                                            <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm transition-all duration-300">
+                                                <button
+                                                    onClick={forcePlay}
+                                                    className="bg-[#00F0FF] text-slate-900 px-4 py-2 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(0,240,255,0.6)] animate-pulse hover:scale-105 transition-transform"
+                                                >
+                                                    Iniciar Vuelo
+                                                </button>
+                                            </div>
+                                        )}
 
                                         {/* Screen Glare / Reflection */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none mix-blend-overlay"></div>
