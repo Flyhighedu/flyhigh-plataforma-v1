@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
+import { MapPin, PlayCircle, ArrowDown, Play } from 'lucide-react';
 import { useVideoImmortality } from '../hooks/useVideoImmortality';
-import { MapPin, PlayCircle, ArrowDown } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -18,15 +18,38 @@ export default function PlanVuelo() {
     const curtainRef = useRef(null);
     const headerRef = useRef(null);
 
-    const [isVideoPlaying, setIsVideoPlaying] = useState(false); // State to manage fade-in
+    const [isHeaderVisible, setIsHeaderVisible] = useState(false); // Estado para animar header
 
-    // Video Immortality Engine Integration
-    const { isPlaying: isHookPlaying, isBlocked, forcePlay } = useVideoImmortality(videoRef);
+    // Hook de Inmortalidad: Gestiona toda la complejidad de reproducción
+    // Usamos un ref simple para isInView por ahora, o podríamos usar un observer real si quisiéramos ser muy precisos.
+    // Para simplificar, asumiremos que si el componente monta, queremos intentar reproducir (el hook maneja pausa si sale de pantalla si le pasamos inView).
+    // Implementaremos un observer básico para pasarle al hook.
+    const [isInView, setIsInView] = useState(false);
 
-    // Sync hook state with local fade-in state
+    // NOTA: videoRef se llena manualmente en el ref del wrapper div más abajo
+    const { isPlaying, isError, attemptPlay } = useVideoImmortality(videoRef, isInView);
+
+    // Efecto para sincronizar opacity del video RAW (HTML) con el estado de React
     useEffect(() => {
-        if (isHookPlaying) setIsVideoPlaying(true);
-    }, [isHookPlaying]);
+        const video = videoRef.current;
+        if (video) {
+            if (isPlaying) {
+                video.classList.remove('opacity-0');
+                video.classList.add('opacity-90');
+            } else {
+                // No ocultamos inmediatamente para evitar parpadeo si es un re-buffer
+            }
+        }
+    }, [isPlaying]);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => setIsInView(entry.isIntersecting),
+            { threshold: 0.1 }
+        );
+        if (visorRef.current) observer.observe(visorRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -231,34 +254,57 @@ export default function PlanVuelo() {
                                         className="absolute inset-x-[3%] inset-y-[10%] bg-slate-900 overflow-hidden shadow-inner"
                                         style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                     >
-                                        <video
-                                            ref={videoRef}
-                                            className={`w-full h-full object-cover transition-opacity duration-700 ${isVideoPlaying ? 'opacity-90' : 'opacity-0'}`}
-                                            poster="/img/poster-visor.jpg"
-                                            preload="metadata" // Low level optimization
-                                            muted
-                                            loop
-                                            playsInline
-                                            webkit-playsinline="true" // iOS 
-                                            style={{ transform: 'translateZ(0)' }}
-                                        >
-                                            <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
-                                        </video>
-
-                                        {/* Poster Manual Fallback */}
                                         <div
-                                            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${isVideoPlaying ? 'opacity-0' : 'opacity-100'} pointer-events-none`}
-                                            style={{ backgroundImage: 'url(/img/poster-visor.jpg)' }}
+                                            className="w-full h-full"
+                                            ref={(el) => {
+                                                // MANUAL REF BINDING for Nuclear Option
+                                                if (el) {
+                                                    const videoElement = el.querySelector('video');
+                                                    if (videoElement) {
+                                                        videoRef.current = videoElement;
+                                                    }
+                                                }
+                                            }}
+                                            dangerouslySetInnerHTML={{
+                                                __html: `
+                                                <video
+                                                    class="w-full h-full object-cover transition-opacity duration-700 opacity-0"
+                                                    src="/videos/TeaserWeb.mp4"
+                                                    poster="/img/poster-visor.jpg"
+                                                    preload="auto"
+                                                    autoplay
+                                                    loop
+                                                    muted
+                                                    playsinline
+                                                    webkit-playsinline
+                                                    style="transform: translateZ(0); display: block;"
+                                                ></video>
+                                                `
+                                            }}
                                         />
 
-                                        {/* UI Rescue Button (Solo visibles si bloqueado por políticas) */}
-                                        {isBlocked && (
-                                            <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm transition-all duration-300">
+                                        {/* Poster Manual Fallback (Overlay gestionado por React) */}
+                                        <div
+                                            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${isPlaying ? 'opacity-0' : 'opacity-100'} pointer-events-none`}
+                                            style={{ backgroundImage: 'url(/img/poster-visor.jpg)', transform: 'translateZ(0)' }}
+                                        />
+
+                                        {/* BOTÓN DE RESCATE (Solo si isError es true - Autoplay bloqueado) */}
+                                        {isError && !isPlaying && (
+                                            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] transition-all duration-300">
                                                 <button
-                                                    onClick={forcePlay}
-                                                    className="bg-[#00F0FF] text-slate-900 px-4 py-2 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(0,240,255,0.6)] animate-pulse hover:scale-105 transition-transform"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        attemptPlay();
+                                                    }}
+                                                    className="group flex flex-col items-center gap-2 cursor-pointer transform hover:scale-105 transition-transform"
                                                 >
-                                                    Iniciar Vuelo
+                                                    <div className="w-12 h-12 rounded-full bg-white/20 border border-white/50 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(0,240,255,0.4)]">
+                                                        <Play className="w-5 h-5 text-white fill-white ml-1" />
+                                                    </div>
+                                                    <span className="text-[10px] font-['Share_Tech_Mono'] uppercase tracking-[0.2em] text-white font-bold drop-shadow-md">
+                                                        Iniciar Vuelo
+                                                    </span>
                                                 </button>
                                             </div>
                                         )}

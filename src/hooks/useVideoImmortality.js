@@ -1,109 +1,97 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export const useVideoImmortality = (videoRef) => {
+/**
+ * Hook "Video Immortality"
+ * Garantiza que un video se reproduzca o se maneje su fallo elegantemente.
+ *
+ * @param {Object} videoRef - Referencia al elemento de video
+ * @param {boolean} isInView - Si el elemento está visible (IntersectionObserver)
+ * @returns {Object} { isPlaying, isError, attemptPlay }
+ */
+export function useVideoImmortality(videoRef, isInView) {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [isBlocked, setIsBlocked] = useState(false); // Play blocked by policy (Low Power Mode)
-    const [isStalled, setIsStalled] = useState(false); // Network stall
-    const retryCount = useRef(0);
-    const MAX_RETRIES = 3;
+    const [isError, setIsError] = useState(false);
+    const attemptRef = useRef(0);
 
-    // Intentar reproducir de forma segura
+    // Función "Fuerza Bruta" para intentar reproducir
     const attemptPlay = useCallback(async () => {
         const video = videoRef.current;
         if (!video) return;
 
         try {
-            // Reset flags
-            setIsBlocked(false);
+            // Resetear estado de error si reintentamos
+            if (video.error) {
+                console.log("Re-cargando video debido a error previo...");
+                video.load();
+            }
 
+            // Promesa de Play
             await video.play();
             setIsPlaying(true);
-            setIsStalled(false);
-            // console.log("Video Immortality: Play Success");
+            setIsError(false);
+            // console.log("Video playing successfully");
         } catch (error) {
-            console.warn("Video Immortality: Play Failed", error.name);
+            console.warn("Fallo de Autoplay (Intento " + attemptRef.current + "):", error.name);
+            setIsPlaying(false);
 
-            if (error.name === 'NotAllowedError') {
-                // Bloqueado por política (Low Power Mode o falta de interacción)
-                setIsBlocked(true);
-            } else if (error.name === 'AbortError') {
-                // Interrumpido por otro load
-            } else {
-                // Otro error (búfer, formato)
-                setIsStalled(true);
+            // Si es NotAllowedError (Política de Audio/Batería), no podemos hacer nada automático más que esperar interacción.
+            // Si es AbortError (interrumpido por scroll), reintentamos suavemente.
+            if (error.name !== 'NotAllowedError') {
+                setIsError(true);
             }
         }
     }, [videoRef]);
 
-    // Recuperación de red (Network Wake-Up)
-    const wakeUpNetwork = useCallback(() => {
-        const video = videoRef.current;
-        if (!video || retryCount.current >= MAX_RETRIES) return;
-
-        console.log("Video Immortality: Waking up network...");
-        const currentTime = video.currentTime;
-        // Truco: Reasignar src fuerza al navegador a reiniciar el buffer
-        const currentSrc = video.currentSrc || video.src;
-        video.src = currentSrc;
-        video.load();
-        video.currentTime = currentTime;
-        retryCount.current++;
-        attemptPlay();
-    }, [attemptPlay, videoRef]);
-
+    // Efecto: Reaccionar a Visibilidad y Estado
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        // Auto-Play al montar (Intento inicial)
-        attemptPlay();
-
-        // Listeners de estado
-        const handlePlaying = () => setIsPlaying(true);
-        const handlePause = () => setIsPlaying(false);
-        const handleStalled = () => {
-            console.warn("Video Immortality: Stalled detected");
-            setIsStalled(true);
-            // Intentar revivir si lleva mucho tiempo
-            setTimeout(() => {
-                if (video.networkState === 2) { // NETWORK_LOADING
-                    // Esperar un poco mas
-                } else {
-                    wakeUpNetwork();
-                }
-            }, 2000);
-        };
-
-        video.addEventListener('playing', handlePlaying);
-        video.addEventListener('pause', handlePause);
-        video.addEventListener('stalled', handleStalled);
-        video.addEventListener('waiting', handleStalled);
-
-        // Global Interaction Unlock (Capa 2)
-        // Si estamos bloqueados, cualquier toque en la pantalla debería intentar desbloquear
-        const handleGlobalInteraction = () => {
-            if (isBlocked || !isPlaying) {
+        if (isInView) {
+            // Si entra en vista y no está sonando, intentar.
+            if (!isPlaying) {
                 attemptPlay();
             }
+        } else {
+            // Si sale de vista, pausar (Standard behavior)
+            video.pause();
+            setIsPlaying(false);
+        }
+    }, [isInView, attemptPlay, isPlaying, videoRef]);
+
+    // Efecto: Watchdog para "Stalling" (Red lenta)
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handleWaiting = () => {
+            // console.log("Video stalled/waiting...");
+            // Si se queda esperando mucho, podríamos forzar un reinicio de src simple
         };
 
-        window.addEventListener('touchstart', handleGlobalInteraction, { passive: true });
-        window.addEventListener('click', handleGlobalInteraction, { passive: true });
+        const handlePlaying = () => setIsPlaying(true);
+        const handlePause = () => setIsPlaying(false);
+
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('pause', handlePause);
+
+        // "Wake Up" para iOS Low Power Mode (A veces suspende la carga)
+        if (isInView && video.paused && !isError) {
+            const checkInterval = setInterval(() => {
+                if (video.paused && video.readyState > 2) {
+                    attemptPlay();
+                }
+            }, 2000);
+            return () => clearInterval(checkInterval);
+        }
 
         return () => {
+            video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('pause', handlePause);
-            video.removeEventListener('stalled', handleStalled);
-            video.removeEventListener('waiting', handleStalled);
-            window.removeEventListener('touchstart', handleGlobalInteraction);
-            window.removeEventListener('click', handleGlobalInteraction);
         };
-    }, [videoRef, attemptPlay, isBlocked, isPlaying, wakeUpNetwork]);
+    }, [isInView, isError, attemptPlay, videoRef]);
 
-    return {
-        isPlaying,
-        isBlocked,
-        isStalled,
-        forcePlay: attemptPlay // Método expuesto para el botón de rescate
-    };
-};
+    return { isPlaying, isError, attemptPlay };
+}
