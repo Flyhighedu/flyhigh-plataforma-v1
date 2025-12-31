@@ -12,7 +12,8 @@ const testimonials = [
         image: "/img/Portada Altamirano Uruapan.jpg",
         videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-little-boy-wearing-a-superhero-cape-standing-in-a-field-28499-large.mp4",
         location: "Volcán Paricutín",
-        serial: "FLP-001 // 2025"
+        serial: "FLP-001 // 2025",
+        priority: true // Optimization hint
     },
     {
         id: "02",
@@ -62,28 +63,50 @@ const UnifiedSkyEngine = memo(({ progress }) => {
 
     useEffect(() => {
         const buffer = document.createElement('canvas');
-        buffer.width = 160;
-        buffer.height = 100;
+        buffer.width = 200;  // Mayor resolución para más detalle
+        buffer.height = 120;
         const bctx = buffer.getContext('2d');
 
-        // Dibujamos una forma de nube más definida con múltiples círculos
+        // Función mejorada para dibujar nubes más definidas
+        // Función mejorada para dibujar nubes más definidas con optimización de enteros
         const drawpuffy = (x, y, r, opacity) => {
-            const g = bctx.createRadialGradient(x, y, 0, x, y, r);
+            // Optimización: Redondear coordenadas para evitar sub-pixel rendering costoso
+            const ix = (x + 0.5) << 0;
+            const iy = (y + 0.5) << 0;
+            const ir = (r + 0.5) << 0;
+
+            const g = bctx.createRadialGradient(ix, iy, 0, ix, iy, ir);
+            // Centro más sólido, bordes más definidos
             g.addColorStop(0, `rgba(255, 255, 255, ${opacity})`);
-            g.addColorStop(0.7, `rgba(255, 255, 255, ${opacity * 0.4})`);
+            g.addColorStop(0.3, `rgba(255, 255, 255, ${opacity * 0.9})`);
+            g.addColorStop(0.6, `rgba(255, 255, 255, ${opacity * 0.5})`);
+            g.addColorStop(0.85, `rgba(255, 255, 255, ${opacity * 0.15})`);
             g.addColorStop(1, 'rgba(255, 255, 255, 0)');
             bctx.fillStyle = g;
             bctx.beginPath();
-            bctx.arc(x, y, r, 0, Math.PI * 2);
+            bctx.arc(ix, iy, ir, 0, Math.PI * 2);
             bctx.fill();
         };
 
-        // Componemos la nube: Centro principal y bultos laterales
-        drawpuffy(80, 50, 45, 0.8);  // Centro
-        drawpuffy(45, 55, 30, 0.6);  // Izquierda
-        drawpuffy(115, 55, 30, 0.6); // Derecha
-        drawpuffy(65, 35, 25, 0.5);  // Arriba Izq
-        drawpuffy(95, 35, 25, 0.5);  // Arriba Der
+        // Nube más compleja y definida con más bultos
+        // Capa base (más grande y suave)
+        drawpuffy(100, 60, 55, 0.7);
+
+        // Cuerpo principal (más denso)
+        drawpuffy(100, 55, 40, 0.95);
+        drawpuffy(60, 65, 35, 0.85);
+        drawpuffy(140, 65, 35, 0.85);
+
+        // Bultos superiores (definición)
+        drawpuffy(75, 40, 28, 0.8);
+        drawpuffy(125, 40, 28, 0.8);
+        drawpuffy(100, 35, 25, 0.75);
+
+        // Detalles pequeños (textura)
+        drawpuffy(45, 70, 20, 0.6);
+        drawpuffy(155, 70, 20, 0.6);
+        drawpuffy(85, 30, 15, 0.5);
+        drawpuffy(115, 30, 15, 0.5);
 
         bufferRef.current = buffer;
     }, []);
@@ -115,8 +138,12 @@ const UnifiedSkyEngine = memo(({ progress }) => {
             const scale = c.scale * (width / 400);
             ctx.globalAlpha = c.opacity * Math.max(0.6, Math.min(1, (1.2 - p) * 3));
 
+            // Optimización: Dibujo con enteros
+            const drawX = (c.x * (width / 100)) << 0;
+            const drawY = currentY << 0;
+
             ctx.save();
-            ctx.translate(c.x * (width / 100), currentY);
+            ctx.translate(drawX, drawY);
             ctx.rotate(c.rotate);
             ctx.scale(scale, scale);
             ctx.drawImage(bufferRef.current, -80, -50);
@@ -156,12 +183,13 @@ UnifiedSkyEngine.displayName = 'UnifiedSkyEngine';
 
 const CelestialAscentBackground = ({ progress }) => {
     // Cielo con más color desde el inicio para ver las nubes
+    // Cielo mejorado: Tonos más ricos y "mágicos" (Azure -> Stratosphere)
     const skyGradient = useTransform(progress, [0, 0.08, 0.4, 0.7, 1], [
-        "linear-gradient(to bottom, #bae6fd, #7dd3fc, #bae6fd)",       // INICIO: Azul más intenso (+10%)
-        "linear-gradient(to bottom, #7dd3fc, #38bdf8, #bae6fd)",      // Cielo vibrante
-        "linear-gradient(to bottom, #0ea5e9, #38bdf8, #7dd3fc)",      // Ascenso profundo
-        "linear-gradient(to bottom, #0284c7, #0ea5e9, #38bdf8)",      // Altura saturada
-        "linear-gradient(to bottom, #082f49, #0284c7, #0ea5e9)"       // Espacio profundo
+        "linear-gradient(to bottom, #7dd3fc, #bfdbfe, #eff6ff)",       // INICIO: Día claro y brillante (Sky-300 -> Blue-200 -> Blue-50)
+        "linear-gradient(to bottom, #38bdf8, #93c5fd, #bfdbfe)",      // Ascenso: Azul vivo (Sky-400 -> Blue-300)
+        "linear-gradient(to bottom, #0ea5e9, #60a5fa, #93c5fd)",      // Altura: Azul profundo (Sky-500 -> Blue-400)
+        "linear-gradient(to bottom, #0284c7, #3b82f6, #60a5fa)",      // Estratósfera: Azul intenso (Sky-600 -> Blue-500)
+        "linear-gradient(to bottom, #0c4a6e, #1d4ed8, #2563eb)"       // Espacio: Navy profundo a Azul Real (Sky-900 -> Blue-700)
     ]);
 
     return (
@@ -199,8 +227,8 @@ const NavigationDot = memo(({ index, progress, totalPoints }) => {
 
     return (
         <motion.div
-            style={{ scale: springScale, opacity: springOpacity }}
-            className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.6)] will-change-transform"
+            style={{ scale: springScale, opacity: springOpacity, willChange: 'transform' }}
+            className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.6)]"
         />
     );
 });
@@ -217,9 +245,52 @@ const NavigationDots = memo(({ progress, count }) => {
 });
 NavigationDots.displayName = 'NavigationDots';
 
+import { useAnimation } from 'framer-motion';
+
+// Icono Sun que faltaba
+const Sun = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+        <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.166 5.106a.75.75 0 001.06 1.06l1.591-1.591a.75.75 0 00-1.061-1.06l-1.59 1.591z" />
+    </svg>
+);
+
+const PLAYFUL_THEMES = [
+    {
+        id: 'energy',
+        gradient: 'from-amber-400 to-orange-500',
+        solidBg: 'bg-orange-500', // Solid Color for Wave
+        waveFill: '#f97316', // tailwind orange-500 hex
+        shadowColor: 'rgba(249, 115, 22, 0.25)',
+        iconColor: 'text-orange-600',
+        accentBg: 'bg-orange-50',
+        doodle: <Sun className="w-20 h-20 text-white/20 rotate-12" />
+    },
+    {
+        id: 'curiosity',
+        gradient: 'from-cyan-400 to-blue-500',
+        solidBg: 'bg-cyan-500', // Solid Color for Wave
+        waveFill: '#06b6d4', // tailwind cyan-500 hex
+        shadowColor: 'rgba(6, 182, 212, 0.25)',
+        iconColor: 'text-cyan-600',
+        accentBg: 'bg-cyan-50',
+        doodle: <Cloud className="w-20 h-20 text-white/20 -rotate-6" />
+    },
+    {
+        id: 'magic',
+        gradient: 'from-fuchsia-400 to-purple-500',
+        solidBg: 'bg-purple-500', // Solid Color for Wave
+        waveFill: '#a855f7', // tailwind purple-500 hex
+        shadowColor: 'rgba(168, 85, 247, 0.25)',
+        iconColor: 'text-purple-600',
+        accentBg: 'bg-purple-50',
+        doodle: <Sparkles className="w-20 h-20 text-white/20 rotate-45" />
+    }
+];
+
 const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, totalCards }) => {
     const isLast = index === totalCards - 1;
     const centerPoint = (index + 1) / (totalCards + 2 - 1);
+    const theme = PLAYFUL_THEMES[index % PLAYFUL_THEMES.length];
 
     // Configuración especial para la última tarjeta
     const opacityRange = isLast ? [centerPoint - 0.1, centerPoint, 0.95, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
@@ -228,7 +299,7 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
     const scaleRange = isLast ? [centerPoint - 0.1, centerPoint, 1] : [centerPoint - 0.1, centerPoint, centerPoint + 0.1];
     const scaleValues = isLast ? [0.88, 1, 0.98] : [0.88, 1, 0.88];
 
-    // Sync: Termina en 0.90 (centerPoint + 0.15) para coincidir con CTA
+    // Sync: Termina en 0.90
     const yRange = isLast ? [centerPoint - 0.1, centerPoint, centerPoint + 0.15] : [centerPoint - 0.1, centerPoint, centerPoint + 0.15];
     const yValues = isLast ? [120, 0, -130] : [120, 0, -120];
 
@@ -236,78 +307,95 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
     const scale = useTransform(progress, scaleRange, scaleValues);
     const y = useTransform(progress, yRange, yValues);
 
-    // Sombra dinámica basada en posición
-    const shadowOpacity = useTransform(opacity, [0, 0.5, 1], [0, 0.2, 0.4]);
     const zIndex = useTransform(opacity, [0, 0.5, 1], [0, 5, 10]);
-
-    const rotateX = useTransform(velocity, [-500, 500], [-8, 8]);
+    const rotateX = useTransform(velocity, [-500, 500], [-5, 5]); // Menos rotación para que se vea más sólido
+    const rotate = useTransform(velocity, [-500, 500], [-2, 2]); // Leve rotación Z para juego
 
     const [pointerEnabled, setPointerEnabled] = useState(false);
+
+    // Animación "Push" Caricaturesca
+    const buttonControls = useAnimation();
+    const hasAnimatedRef = useRef(false);
+
     useMotionValueEvent(opacity, "change", (v) => {
+        // Habilitar puntero
         if (v > 0.8 && !pointerEnabled) setPointerEnabled(true);
         else if (v <= 0.8 && pointerEnabled) setPointerEnabled(false);
+
+        // Disparar animación Push 1 segundo después de entrar
+        if (v > 0.5 && !hasAnimatedRef.current) {
+            hasAnimatedRef.current = true;
+            setTimeout(() => {
+                buttonControls.start({
+                    scale: [1, 0.8, 1.15, 0.9, 1.05, 1],
+                    transition: { duration: 0.8, ease: "anticipate" } // Caricature bounce
+                });
+            }, 1000);
+        }
     });
 
     return (
         <motion.div
             style={{
-                opacity, scale, y, rotateX, zIndex,
+                opacity, scale, y, rotateX, rotateZ: rotate, zIndex,
                 pointerEvents: pointerEnabled ? 'auto' : 'none',
-                willChange: 'transform, opacity', // GPU Hint explícito
-                boxShadow: useTransform(shadowOpacity, v => `0 30px 60px rgba(0,0,0,${v}), 0 0 0 1px rgba(255,255,255,0.1), 0 -10px 40px rgba(14,165,233,${v * 0.3})`)
+                willChange: 'transform, opacity',
+                filter: `drop-shadow(0 20px 30px ${theme.shadowColor})` // Sombra de color suave
             }}
-            className="absolute w-[72vw] max-w-[320px] aspect-[9/16] bg-slate-900 rounded-[32px] overflow-hidden"
+            className="absolute w-[76vw] max-w-[340px] aspect-[9/15] bg-white rounded-[40px] p-2" // P-2 crea el borde blanco grueso
         >
-            {/* Borde luminoso animado */}
-            <div className="absolute inset-0 rounded-[32px] p-[1px] bg-gradient-to-b from-white/30 via-white/5 to-white/20 pointer-events-none" />
+            <div className="relative w-full h-full rounded-[32px] overflow-hidden bg-slate-100 flex flex-col">
 
-            <img
-                src={testimonial.image}
-                className="absolute inset-0 w-full h-full object-cover"
-                alt="Card"
-                loading="lazy"
-                decoding="async"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-
-            {/* Serial Code Vertical - Estética Editorial */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 rotate-90 origin-right transition-opacity duration-500 pointer-events-none pr-10 z-20">
-                <span className="text-white/10 font-mono text-[7px] tracking-[0.4em] uppercase whitespace-nowrap">
-                    {testimonial.serial}
-                </span>
-            </div>
-
-            <div className="absolute inset-0 p-10 flex flex-col justify-between">
-                {/* Header de tarjeta limpio para Editorial Harmony */}
-                <div className="flex items-center justify-end" />
-
-                {/* Botón Play con pulse */}
-                <motion.button
-                    onClick={() => onOpen(index)}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center mx-auto shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative"
-                >
-                    <motion.div
-                        animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        className="absolute inset-0 rounded-full bg-white/20"
+                {/* 1. IMAGEN (Parte Superior Flexible) */}
+                <div className="relative flex-1 w-full overflow-hidden">
+                    <img
+                        src={testimonial.image}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        alt="Card"
+                        loading={index === 0 ? "eager" : "lazy"}
+                        fetchPriority={index === 0 ? "high" : "auto"}
+                        decoding="async"
                     />
-                    <Play className="fill-white text-white ml-1 w-6 h-6 relative z-10" />
-                </motion.button>
 
-                {/* Info inferior - Refinamiento Editorial */}
-                <div className="space-y-4">
-                    <h3 className="text-xl font-black text-white leading-snug tracking-tight italic drop-shadow-md">"{testimonial.quote}"</h3>
-                    <div className="flex items-center gap-4 border-t border-white/5 pt-4">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center font-black text-white shadow-xl text-sm border border-white/20">
-                            {testimonial.author.charAt(6)}
-                        </div>
-                        <div className="space-y-0.5">
-                            <p className="text-[11px] font-black text-white uppercase tracking-[0.1em] leading-none">{testimonial.author}</p>
-                            <p className="text-[9px] font-serif italic text-white/40 lowercase tracking-wider leading-none">{testimonial.school}</p>
-                        </div>
+                    {/* Serial Label */}
+                    <div className="absolute top-4 left-4 px-2 py-1 bg-black/20 backdrop-blur-sm rounded-md border border-white/10">
+                        <span className="font-mono text-[8px] font-bold text-white/60 tracking-widest">{testimonial.serial.split('//')[0]}</span>
                     </div>
                 </div>
+
+                {/* 2. OLA DE COLOR (Footer Sólido) */}
+                <div className="relative z-10">
+                    {/* Wave SVG Conector - Sube -1px para evitar gap */}
+                    <div className="absolute bottom-full left-0 right-0 h-8 md:h-12 w-full overflow-hidden leading-[0]">
+                        <svg viewBox="0 0 500 150" preserveAspectRatio="none" className="w-full h-full block">
+                            <path d="M0.00,49.98 C149.99,150.00 349.20,-49.98 500.00,49.98 L500.00,150.00 L0.00,150.00 Z" fill={theme.waveFill}></path>
+                        </svg>
+                    </div>
+
+                    {/* Bloque Sólido */}
+                    <div className={`${theme.solidBg} px-6 pb-6 pt-2 text-center flex flex-col items-center`}>
+                        <h3 className="text-[1.1rem] font-black text-white leading-tight tracking-tight drop-shadow-sm mb-4">
+                            "{testimonial.quote}"
+                        </h3>
+
+                        {/* Botón Píldora "Ver Momento" */}
+                        <motion.button
+                            animate={buttonControls}
+                            onClick={() => onOpen(index)}
+                            whileTap={{ scale: 0.95 }}
+                            style={{ willChange: 'transform' }}
+                            className="bg-white px-5 py-2.5 rounded-full flex items-center gap-2 shadow-lg group active:shadow-sm transition-all"
+                        >
+                            <span className={`text-[10px] font-black uppercase tracking-wider ${theme.iconColor}`}>
+                                Ver Momento
+                            </span>
+                            <div className={`w-5 h-5 rounded-full ${theme.solidBg} flex items-center justify-center`}>
+                                <Play size={10} className="text-white fill-white ml-0.5" />
+                            </div>
+                        </motion.button>
+                    </div>
+                </div>
+
             </div>
         </motion.div>
     );
@@ -359,7 +447,7 @@ const MobileFlyPlayer = ({ isOpen, onClose, testimonial, onNext, onPrev, hasNext
                         </div>
                         <span className="text-[10px] font-black text-white tracking-[0.3em] uppercase italic drop-shadow-lg">Fly Play</span>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto active:scale-90 transition-transform">
+                    <button onClick={onClose} style={{ willChange: 'transform' }} className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto active:scale-90 transition-transform">
                         <X size={20} />
                     </button>
                 </div>
@@ -367,13 +455,13 @@ const MobileFlyPlayer = ({ isOpen, onClose, testimonial, onNext, onPrev, hasNext
                 {/* Right Side Actions (Tiktok Style) */}
                 <div className="absolute right-4 bottom-32 flex flex-col gap-8 z-20 items-center pointer-events-none">
                     <button className="flex flex-col items-center pointer-events-auto group">
-                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
+                        <div style={{ willChange: 'transform' }} className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
                             <Sparkles size={22} className="fill-white/20" />
                         </div>
                         <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Meta</span>
                     </button>
                     <button className="flex flex-col items-center pointer-events-auto group">
-                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
+                        <div style={{ willChange: 'transform' }} className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
                             <Plane size={22} className="fill-white/20" />
                         </div>
                         <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Vuelo</span>
