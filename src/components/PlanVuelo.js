@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
-import { MapPin, PlayCircle, ArrowDown, Play } from 'lucide-react';
-import { useVideoImmortality } from '../hooks/useVideoImmortality';
+import { MapPin, PlayCircle, ArrowDown } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -12,44 +11,11 @@ export default function PlanVuelo() {
     const sectionRef = useRef(null);
     const visorRef = useRef(null);
     const videoRef = useRef(null); // Reference for the video element
-
-    // Referencias UI
     const buttonRef = useRef(null);
     const curtainRef = useRef(null);
     const headerRef = useRef(null);
 
-    const [isHeaderVisible, setIsHeaderVisible] = useState(false); // Estado para animar header
-
-    // Hook de Inmortalidad: Gestiona toda la complejidad de reproducción
-    // Usamos un ref simple para isInView por ahora, o podríamos usar un observer real si quisiéramos ser muy precisos.
-    // Para simplificar, asumiremos que si el componente monta, queremos intentar reproducir (el hook maneja pausa si sale de pantalla si le pasamos inView).
-    // Implementaremos un observer básico para pasarle al hook.
-    const [isInView, setIsInView] = useState(false);
-
-    // NOTA: videoRef se llena manualmente en el ref del wrapper div más abajo
-    const { isPlaying, isError, attemptPlay } = useVideoImmortality(videoRef, isInView);
-
-    // Efecto para sincronizar opacity del video RAW (HTML) con el estado de React
-    useEffect(() => {
-        const video = videoRef.current;
-        if (video) {
-            if (isPlaying) {
-                video.classList.remove('opacity-0');
-                video.classList.add('opacity-90');
-            } else {
-                // No ocultamos inmediatamente para evitar parpadeo si es un re-buffer
-            }
-        }
-    }, [isPlaying]);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => setIsInView(entry.isIntersecting),
-            { threshold: 0.1 }
-        );
-        if (visorRef.current) observer.observe(visorRef.current);
-        return () => observer.disconnect();
-    }, []);
+    const [shouldLoad, setShouldLoad] = useState(false); // Lazy load state
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -113,45 +79,48 @@ export default function PlanVuelo() {
         return () => ctx.revert();
     }, []);
 
-    // OPTIMIZACIÓN ROBUSTA: Observer simplificado solo para Playback (Pause cuando no se ve)
+    // OPTIMIZACIÓN AGRESIVA: IntersectionObserver para Lazy Load y Playback
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        // Intentar reproducir inmediatamente si es posible (AutoPlay nativo a veces falla si no está en viewport)
-        // El observer se encargará de gestionar esto.
-
-        const playbackObserver = new IntersectionObserver(
+        // 1. Observer para Lazy Load (Preload cuando se acerca)
+        const loadObserver = new IntersectionObserver(
             (entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        // Entra en pantalla -> Intentar reproducir con manejo de promesa
-                        const playPromise = video.play();
-                        if (playPromise !== undefined) {
-                            playPromise
-                                .then(() => {
-                                    // Reproducción comenzó exitosamente
-                                })
-                                .catch(error => {
-                                    console.warn("Autoplay preventivo:", error);
-                                    // Si falla autoplay, mostramos controles o dejamos el poster (fallback natural)
-                                });
-                        }
+                        setShouldLoad(true); // Cambia preload="none" a "metadata"
+                        loadObserver.disconnect(); // Ya no necesitamos observar
+                    }
+                });
+            },
+            { rootMargin: "200px" } // 200px antes de llegar
+        );
+
+        // 2. Observer para Playback (Play solo cuando es visible)
+        const playbackObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && shouldLoad) {
+                        // Entra en pantalla -> Play
+                        video.play().catch(() => { });
                     } else {
-                        // Sale de pantalla -> Pausar para ahorrar recursos
+                        // Sale de pantalla -> Pause (Libera decodificador)
                         video.pause();
                     }
                 });
             },
-            { threshold: 0.1 } // 10% visible
+            { threshold: 0.1 } // Al menos 10% visible
         );
 
+        loadObserver.observe(visorRef.current);
         playbackObserver.observe(visorRef.current);
 
         return () => {
+            loadObserver.disconnect();
             playbackObserver.disconnect();
         };
-    }, []);
+    }, [shouldLoad]);
 
     return (
         <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
@@ -254,60 +223,18 @@ export default function PlanVuelo() {
                                         className="absolute inset-x-[3%] inset-y-[10%] bg-slate-900 overflow-hidden shadow-inner"
                                         style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                     >
-                                        <div
-                                            className="w-full h-full"
-                                            ref={(el) => {
-                                                // MANUAL REF BINDING for Nuclear Option
-                                                if (el) {
-                                                    const videoElement = el.querySelector('video');
-                                                    if (videoElement) {
-                                                        videoRef.current = videoElement;
-                                                    }
-                                                }
-                                            }}
-                                            dangerouslySetInnerHTML={{
-                                                __html: `
-                                                <video
-                                                    class="w-full h-full object-cover transition-opacity duration-700 opacity-0"
-                                                    src="/videos/TeaserWeb.mp4"
-                                                    poster="/img/poster-visor.jpg"
-                                                    preload="auto"
-                                                    autoplay
-                                                    loop
-                                                    muted
-                                                    playsinline
-                                                    webkit-playsinline
-                                                    style="transform: translateZ(0); display: block;"
-                                                ></video>
-                                                `
-                                            }}
-                                        />
-
-                                        {/* Poster Manual Fallback (Overlay gestionado por React) */}
-                                        <div
-                                            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${isPlaying ? 'opacity-0' : 'opacity-100'} pointer-events-none`}
-                                            style={{ backgroundImage: 'url(/img/poster-visor.jpg)', transform: 'translateZ(0)' }}
-                                        />
-
-                                        {/* BOTÓN DE RESCATE (Solo si isError es true - Autoplay bloqueado) */}
-                                        {isError && !isPlaying && (
-                                            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] transition-all duration-300">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        attemptPlay();
-                                                    }}
-                                                    className="group flex flex-col items-center gap-2 cursor-pointer transform hover:scale-105 transition-transform"
-                                                >
-                                                    <div className="w-12 h-12 rounded-full bg-white/20 border border-white/50 backdrop-blur-md flex items-center justify-center shadow-[0_0_20px_rgba(0,240,255,0.4)]">
-                                                        <Play className="w-5 h-5 text-white fill-white ml-1" />
-                                                    </div>
-                                                    <span className="text-[10px] font-['Share_Tech_Mono'] uppercase tracking-[0.2em] text-white font-bold drop-shadow-md">
-                                                        Iniciar Vuelo
-                                                    </span>
-                                                </button>
-                                            </div>
-                                        )}
+                                        <video
+                                            ref={videoRef}
+                                            className="w-full h-full object-cover opacity-90"
+                                            poster="/img/poster-visor.jpg" // Supervivencia: Imagen si falla carga
+                                            preload={shouldLoad ? "metadata" : "none"} // Lazy Load
+                                            muted
+                                            loop
+                                            playsInline
+                                            style={{ transform: 'translateZ(0)' }} // Hardware Acceleration
+                                        >
+                                            <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
+                                        </video>
 
                                         {/* Screen Glare / Reflection */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none mix-blend-overlay"></div>
