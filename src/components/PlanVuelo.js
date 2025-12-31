@@ -11,11 +11,13 @@ export default function PlanVuelo() {
     const sectionRef = useRef(null);
     const visorRef = useRef(null);
     const videoRef = useRef(null); // Reference for the video element
+
+    // Referencias UI
     const buttonRef = useRef(null);
     const curtainRef = useRef(null);
     const headerRef = useRef(null);
 
-    const [shouldLoad, setShouldLoad] = useState(false); // Lazy load state
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false); // State to manage fade-in
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -79,48 +81,45 @@ export default function PlanVuelo() {
         return () => ctx.revert();
     }, []);
 
-    // OPTIMIZACIÓN AGRESIVA: IntersectionObserver para Lazy Load y Playback
+    // OPTIMIZACIÓN ROBUSTA: Observer simplificado solo para Playback (Pause cuando no se ve)
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        // 1. Observer para Lazy Load (Preload cuando se acerca)
-        const loadObserver = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        setShouldLoad(true); // Cambia preload="none" a "metadata"
-                        loadObserver.disconnect(); // Ya no necesitamos observar
-                    }
-                });
-            },
-            { rootMargin: "200px" } // 200px antes de llegar
-        );
+        // Intentar reproducir inmediatamente si es posible (AutoPlay nativo a veces falla si no está en viewport)
+        // El observer se encargará de gestionar esto.
 
-        // 2. Observer para Playback (Play solo cuando es visible)
         const playbackObserver = new IntersectionObserver(
             (entries) => {
                 entries.forEach(entry => {
-                    if (entry.isIntersecting && shouldLoad) {
-                        // Entra en pantalla -> Play
-                        video.play().catch(() => { });
+                    if (entry.isIntersecting) {
+                        // Entra en pantalla -> Intentar reproducir con manejo de promesa
+                        const playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise
+                                .then(() => {
+                                    // Reproducción comenzó exitosamente
+                                })
+                                .catch(error => {
+                                    console.warn("Autoplay preventivo:", error);
+                                    // Si falla autoplay, mostramos controles o dejamos el poster (fallback natural)
+                                });
+                        }
                     } else {
-                        // Sale de pantalla -> Pause (Libera decodificador)
+                        // Sale de pantalla -> Pausar para ahorrar recursos
                         video.pause();
                     }
                 });
             },
-            { threshold: 0.1 } // Al menos 10% visible
+            { threshold: 0.1 } // 10% visible
         );
 
-        loadObserver.observe(visorRef.current);
         playbackObserver.observe(visorRef.current);
 
         return () => {
-            loadObserver.disconnect();
             playbackObserver.disconnect();
         };
-    }, [shouldLoad]);
+    }, []);
 
     return (
         <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
@@ -225,16 +224,28 @@ export default function PlanVuelo() {
                                     >
                                         <video
                                             ref={videoRef}
-                                            className="w-full h-full object-cover opacity-90"
-                                            poster="/img/poster-visor.jpg" // Supervivencia: Imagen si falla carga
-                                            preload={shouldLoad ? "metadata" : "none"} // Lazy Load
+                                            className={`w-full h-full object-cover transition-opacity duration-700 ${isVideoPlaying ? 'opacity-90' : 'opacity-0'}`}
+                                            poster="/img/poster-visor.jpg"
+                                            preload="metadata"
                                             muted
                                             loop
                                             playsInline
-                                            style={{ transform: 'translateZ(0)' }} // Hardware Acceleration
+                                            autoPlay
+                                            onPlaying={() => setIsVideoPlaying(true)}
+                                            onLoadedData={() => {
+                                                // Si ya está listo, intentar reproducir si está en vista (el observer maneja lo de 'en vista')
+                                                // Pero aquí marcamos ready state si quisiéramos.
+                                            }}
+                                            style={{ transform: 'translateZ(0)' }}
                                         >
                                             <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
                                         </video>
+
+                                        {/* Poster Manual Fallback (Asegura que se vea algo si el video falla) */}
+                                        <div
+                                            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${isVideoPlaying ? 'opacity-0' : 'opacity-100'} pointer-events-none`}
+                                            style={{ backgroundImage: 'url(/img/poster-visor.jpg)' }}
+                                        />
 
                                         {/* Screen Glare / Reflection */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none mix-blend-overlay"></div>
