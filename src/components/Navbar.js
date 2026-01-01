@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import { Rocket, Heart, Menu, X, School, GraduationCap, HeartHandshake, Building2 } from 'lucide-react';
 
 import { useImpact } from '../context/ImpactContext';
@@ -85,12 +86,14 @@ export default function Navbar() {
           <div className="w-[1px] h-4 bg-gray-200"></div>
 
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <img
-              src="/img/logoFH.png"
-              alt="Fly High Logo"
-              className="h-8 w-auto object-contain"
-            />
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Link href="/">
+              <img
+                src="/img/logoFH.png"
+                alt="Fly High Logo"
+                className="h-8 w-auto object-contain"
+              />
+            </Link>
           </div>
         </motion.div>
 
