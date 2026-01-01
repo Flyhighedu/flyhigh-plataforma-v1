@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Inter, Syne } from 'next/font/google';
+import { Inter, Syne, Montserrat } from 'next/font/google';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -15,6 +15,7 @@ import FloatingButton from '@/components/Patrocinadores/FloatingButton';
 // Configure fonts
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const syne = Syne({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-syne' });
+const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat' });
 
 export default function Page() {
     const [isPortalOpen, setIsPortalOpen] = useState(false);
@@ -67,12 +68,15 @@ export default function Page() {
     };
 
     return (
-        <main className={`${inter.variable} ${syne.variable} font-sans bg-white text-[#1A1A1A] overflow-x-hidden min-h-screen relative selection:bg-blue-100 selection:text-blue-900`}>
+        <main className={`${inter.variable} ${syne.variable} ${montserrat.variable} font-sans bg-white text-[#1A1A1A] overflow-x-hidden min-h-screen relative selection:bg-blue-100 selection:text-blue-900`}>
 
             <style jsx global>{`
                 /* Utilizado para los títulos display */
                 .font-syne { font-family: var(--font-syne), sans-serif; }
                 
+                /* Default font override for this page */
+                body, .font-sans { font-family: var(--font-montserrat), sans-serif; }
+
                 /* Clase base para animaciones de entrada */
                 .reveal-node { 
                     opacity: 0; 

@@ -213,13 +213,6 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                         <span className="text-white md:text-black" style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.4)" }}>NOMBRE.</span>
                     </h1>
 
-                    {/* Subtítulo - RESTRICTED WIDTH */}
-                    <div className="max-w-md mt-36 mb-0 reveal-element">
-                        <p className="text-gray-500 text-lg font-normal leading-relaxed tracking-tight text-center">
-                            Las <strong className="font-semibold text-gray-700">empresas</strong> que decidieron apostar por <strong className="font-semibold text-gray-700">nuestra infancia</strong> para que toda una generación comience a <strong className="font-semibold" style={{ background: "linear-gradient(90deg, #0055FF, #00AAFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>conquistar el cielo</strong>.
-                        </p>
-                    </div>
-
                 </div>
             </div>
 
@@ -232,7 +225,15 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
             </div>
 
             {/* Smart Sponsor Button (Harmonious Glass Design - Larger Logos V2) */}
-            <div className="absolute bottom-12 md:bottom-24 left-4 md:left-12 z-50 reveal-element w-[calc(100%-2rem)] md:w-auto max-w-[420px]">
+            <div className="absolute bottom-20 md:bottom-36 left-4 md:left-12 z-50 reveal-element w-[calc(100%-2rem)] md:w-auto max-w-[420px] flex flex-col gap-2 items-center">
+
+                {/* Subtítulo - MOVED HERE FOR ANCHORING */}
+                <div className="max-w-md">
+                    <p className="text-gray-500 text-sm md:text-base font-medium leading-relaxed tracking-tight text-center">
+                        Las <strong className="font-semibold text-gray-700">empresas</strong> que decidieron apostar por <strong className="font-semibold text-gray-700">nuestra infancia</strong> para que toda una generación comience a <strong className="font-semibold" style={{ background: "linear-gradient(90deg, #0055FF, #00AAFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>conquistar el cielo</strong>.
+                    </p>
+                </div>
+
                 <button
                     onClick={onScrollToSponsors}
                     className="group relative bg-white/70 backdrop-blur-xl rounded-full shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 ring-1 ring-white/50 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_25px_50px_rgba(0,0,0,0.18)] active:scale-[0.98] cursor-pointer focus:outline-none flex items-center h-16 pl-1 pr-1 w-full md:w-auto"
