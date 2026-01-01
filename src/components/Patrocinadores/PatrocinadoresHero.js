@@ -72,7 +72,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                     align-items: flex-start; /* Alinear arriba */
                     justify-content: center; /* CENTRAR horizontalmente */
                     position: relative;
-                    padding-top: 80px; /* Tagline más cerca del header */
+                    padding-top: 50px; /* Tagline más cerca del header */
                     padding-bottom: 80px;
                 }
 
@@ -101,7 +101,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                 .window-destiny {
                     position: absolute;
                     right: -5%; /* Movido más a la derecha para no chocar con el texto */
-                    top: 30%;
+                    top: 27%;
                     transform: translateY(-50%);
                     width: 35vw;
                     height: 70vh;
@@ -161,7 +161,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                         width: 45vw;
                         height: 50vh;
                         right: 2%; 
-                        top: 25%;
+                        top: 22%;
                     }
                     .hero-title {
                         font-size: 4rem;
@@ -173,7 +173,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                         width: 90vw;
                         height: 35vh; /* Reduced height to avoid crowding */
                         right: 5vw; 
-                        top: 25%; /* Pushed down slightly to clear title */
+                        top: 22%; /* Pushed down slightly to clear title */
                         opacity: 0.4;
                     }
                     .hero-title {
@@ -213,7 +213,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
             </div>
 
             {/* Coordenadas */}
-            <div className="absolute bottom-12 left-10 hidden lg:block reveal-element">
+            <div className="absolute bottom-20 left-10 hidden lg:block reveal-element">
                 <div className="flex flex-col space-y-2">
                     <span className="text-[9px] font-black tracking-widest text-gray-300">ESTÁNDAR DE ÉLITE</span>
                     <span className="text-[9px] font-black tracking-widest text-gray-200 uppercase">Uruapan, Michoacán</span>
@@ -221,7 +221,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
             </div>
 
             {/* Smart Sponsor Button (Harmonious Glass Design - Larger Logos V2) */}
-            <div className="absolute bottom-20 md:bottom-36 left-4 md:left-12 z-50 reveal-element w-[calc(100%-2rem)] md:w-auto max-w-[420px] flex flex-col gap-2 items-center">
+            <div className="absolute bottom-28 md:bottom-44 left-4 md:left-12 z-50 reveal-element w-[calc(100%-2rem)] md:w-auto max-w-[420px] flex flex-col gap-2 items-center">
 
                 {/* Subtítulo - MOVED HERE FOR ANCHORING */}
                 <div className="max-w-md">
