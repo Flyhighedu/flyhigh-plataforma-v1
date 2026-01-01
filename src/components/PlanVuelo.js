@@ -15,7 +15,7 @@ export default function PlanVuelo() {
     const curtainRef = useRef(null);
     const headerRef = useRef(null);
 
-    const [shouldLoad, setShouldLoad] = useState(false); // Lazy load state
+    const [isPlaying, setIsPlaying] = useState(false); // State to control poster visibility
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -79,48 +79,44 @@ export default function PlanVuelo() {
         return () => ctx.revert();
     }, []);
 
-    // OPTIMIZACIÓN AGRESIVA: IntersectionObserver para Lazy Load y Playback
+    // OPTIMIZACIÓN ROBUSTA: Observer de Visibilidad + Fallback
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        // 1. Observer para Lazy Load (Preload cuando se acerca)
-        const loadObserver = new IntersectionObserver(
+        const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        setShouldLoad(true); // Cambia preload="none" a "metadata"
-                        loadObserver.disconnect(); // Ya no necesitamos observar
-                    }
-                });
-            },
-            { rootMargin: "200px" } // 200px antes de llegar
-        );
-
-        // 2. Observer para Playback (Play solo cuando es visible)
-        const playbackObserver = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting && shouldLoad) {
-                        // Entra en pantalla -> Play
-                        video.play().catch(() => { });
+                        // Intentar reproducir de forma robusta
+                        const playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.log("Auto-play prevented (low power mode or buffer req):", error);
+                                // Fallback: El poster seguirá visible, no hay pantalla negra.
+                            });
+                        }
                     } else {
-                        // Sale de pantalla -> Pause (Libera decodificador)
                         video.pause();
                     }
                 });
             },
-            { threshold: 0.1 } // Al menos 10% visible
+            { threshold: 0.1 } // 10% visible
         );
 
-        loadObserver.observe(visorRef.current);
-        playbackObserver.observe(visorRef.current);
+        observer.observe(visorRef.current);
+
+        // Watchdog para asegurar que si se traba, lo notemos
+        const handlePlaying = () => setIsPlaying(true);
+        const handleWaiting = () => setIsPlaying(false); // Mostrar poster si bufferea (opcional, pero seguro)
+
+        // Mejor estrategia: Solo ocultar poster cuando REALMENTE avance.
+        // Lo manejamos en onTimeUpdate en el JSX.
 
         return () => {
-            loadObserver.disconnect();
-            playbackObserver.disconnect();
+            observer.disconnect();
         };
-    }, [shouldLoad]);
+    }, []);
 
     return (
         <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
@@ -223,15 +219,28 @@ export default function PlanVuelo() {
                                         className="absolute inset-x-[3%] inset-y-[10%] bg-slate-900 overflow-hidden shadow-inner"
                                         style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                     >
+                                        {/* Fallback Poster Image (Always visible until video moves) */}
+                                        <img
+                                            src="/img/poster-visor.jpg"
+                                            className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-700 ${isPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                            alt="Visor Poster"
+                                        />
+
                                         <video
                                             ref={videoRef}
-                                            className="w-full h-full object-cover opacity-90"
-                                            poster="/img/poster-visor.jpg" // Supervivencia: Imagen si falla carga
-                                            preload={shouldLoad ? "metadata" : "none"} // Lazy Load
+                                            className="w-full h-full object-cover opacity-90 relative z-10"
+                                            preload="metadata" // Balance entre rendimiento y velocidad
                                             muted
                                             loop
                                             playsInline
-                                            style={{ transform: 'translateZ(0)' }} // Hardware Acceleration
+                                            {...{ 'webkit-playsinline': 'true' }} // Legacy iOS support forced as spread to avoid React warnings if any
+                                            suppressHydrationWarning={true} // Prevent browser extension attribute mismatch issues
+                                            onTimeUpdate={(e) => {
+                                                if (e.target.currentTime > 0.1 && !isPlaying) {
+                                                    setIsPlaying(true);
+                                                }
+                                            }}
+                                            style={{ transform: 'translateZ(0)' }}
                                         >
                                             <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
                                         </video>

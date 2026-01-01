@@ -1,0 +1,281 @@
+
+> web@0.1.0 lint
+> eslint
+
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\app\layout.js
+  15:17  warning  Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\app\maestros\page.js
+  40:13  warning  Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\AlliesSection.js
+  122:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  132:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  142:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  152:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  177:41  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Escuelas\EscuelasMission.js
+  19:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Escuelas\EscuelasWizard.js
+  213:142  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  213:164  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\ExperienciaInmersiva.js
+  86:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Hero.js
+  36:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\HorizontalGallery.js
+  195:19  error    Component definition is missing display name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react/display-name
+  216:18  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+  214 |     return (
+  215 |         <div
+> 216 |             ref={ref?.container}
+      |                  ^^^^^^^^^^^^^^ Cannot access ref value during render
+  217 |             className="absolute inset-0 pointer-events-none select-none z-[-1] will-change-transform"
+  218 |             style={{ width: '500vw', backfaceVisibility: 'hidden', transformStyle: 'preserve-3d' }}
+  219 |         >                                                                                                                                                                                                                                                                                            react-hooks/refs
+  232:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @next/next/no-img-element
+  347:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @next/next/no-img-element
+  366:30  error    Comments inside children section of tag should be placed inside braces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       react/jsx-no-comment-textnodes
+  424:29  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  422 |         if (initialId) {
+  423 |             const idx = MEDIA_ITEMS.findIndex(t => t.id === initialId);
+> 424 |             if (idx !== -1) setCurrentIndex(idx);
+      |                             ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  425 |         }
+  426 |     }, [initialId]);
+  427 |  react-hooks/set-state-in-effect
+  569:8   warning  React Hook useLayoutEffect has missing dependencies: 'bgRefs.circle', 'bgRefs.line1', and 'bgRefs.line2'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\ImpactEngineGoldenMaster.js
+   47:43   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  45 | const ConfettiPiece = ({ delay }) => {
+  46 |     const colors = ['bg-cyan-400', 'bg-fuchsia-500', 'bg-yellow-400', 'bg-white'];
+> 47 |     const randomColor = colors[Math.floor(Math.random() * colors.length)];
+     |                                           ^^^^^^^^^^^^^ Cannot call impure function
+  48 |     const randomLeft = Math.random() * 100;
+  49 |
+  50 |     return (                                                                                                                                                                                                                                                                                                                       react-hooks/purity
+   48:24   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  46 |     const colors = ['bg-cyan-400', 'bg-fuchsia-500', 'bg-yellow-400', 'bg-white'];
+  47 |     const randomColor = colors[Math.floor(Math.random() * colors.length)];
+> 48 |     const randomLeft = Math.random() * 100;
+     |                        ^^^^^^^^^^^^^ Cannot call impure function
+  49 |
+  50 |     return (
+  51 |         <div                                                                                                                                                                                                                                                                                                                                                                    react-hooks/purity
+   57:42   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  55 |                 animation: `fall 3s linear ${delay}ms infinite`, // Simulación de caída con CSS keyframes asumidos o inline
+  56 |                 opacity: 0.8,
+> 57 |                 transform: `translateY(${Math.random() * 50}px) rotate(${Math.random() * 360}deg)`
+     |                                          ^^^^^^^^^^^^^ Cannot call impure function
+  58 |             }}
+  59 |         />
+  60 |     );                                                                                                                                                                                                                                                                                        react-hooks/purity
+   57:74   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  55 |                 animation: `fall 3s linear ${delay}ms infinite`, // Simulación de caída con CSS keyframes asumidos o inline
+  56 |                 opacity: 0.8,
+> 57 |                 transform: `translateY(${Math.random() * 50}px) rotate(${Math.random() * 360}deg)`
+     |                                                                          ^^^^^^^^^^^^^ Cannot call impure function
+  58 |             }}
+  59 |         />
+  60 |     );                                                                                                                                                                                                                                                        react-hooks/purity
+  249:52   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  247 |                         </div>
+  248 |                         <div className="text-xs font-mono text-slate-300 bg-slate-50 px-3 py-1 rounded">
+> 249 |                             ID: SECURE-{Math.floor(Math.random() * 10000)}
+      |                                                    ^^^^^^^^^^^^^ Cannot call impure function
+  250 |                         </div>
+  251 |                     </div>
+  252 |                 )}                                                                                                                                                                                                                                                                     react-hooks/purity
+  293:113  error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  291 |                                 </div>
+  292 |                                 <div className="bg-yellow-50/50 p-3 flex justify-between items-center">
+> 293 |                                     <span className="text-[10px] text-slate-400 font-mono">REF: FLY-{Math.floor(Math.random() * 9999)}</span>
+      |                                                                                                                 ^^^^^^^^^^^^^ Cannot call impure function
+  294 |                                     <CheckCircle2 size={16} className="text-green-500" />
+  295 |                                 </div>
+  296 |                             </div>                                       react-hooks/purity
+  327:8    warning  React Hook useEffect has missing dependencies: 'id' and 'onComplete'. Either include them or remove the dependency array. If 'onComplete' changes too often, find the parent component that defines it and wrap that definition in useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+  330:42   error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  328 |     const icons = { heart: <Heart className="fill-current" />, plane: <Plane className="fill-current" />, star: <Sparkles className="fill-current" /> };
+  329 |     const colors = ['text-cyan-400', 'text-fuchsia-500', 'text-amber-400'];
+> 330 |     const colorClass = colors[Math.floor(Math.random() * colors.length)];
+      |                                          ^^^^^^^^^^^^^ Cannot call impure function
+  331 |     return (<div className={`absolute pointer-events-none transition-all duration-700 ease-out ${colorClass}`} style={{ left: `${x}%`, bottom: '60%', ...style }}> <div className="w-5 h-5">{icons[type]}</div> </div>);
+  332 | };
+  333 |                                    react-hooks/purity
+  552:9    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  550 |
+  551 |     useEffect(() => {
+> 552 |         setIsPillAnimating(true);
+      |         ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  553 |         const timer = setTimeout(() => setIsPillAnimating(false), 150);
+  554 |         return () => clearTimeout(timer);
+  555 |     }, [impactCount]);  react-hooks/set-state-in-effect
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Maestros\MaestrosHeader.js
+  78:31  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  79:31  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+  80:31  error  Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Maestros\MaestrosHero.js
+  72:13  warning  Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font  @next/next/no-page-custom-font
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Manifiesto.js
+   9:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  18:25  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  18:79  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\MobileGallery.js
+  351:21   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @next/next/no-img-element
+  378:29   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  378:49   error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  480:101  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  480:135  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  586:9    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  584 |
+  585 |     useEffect(() => {
+> 586 |         setIsMounted(true);
+      |         ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  587 |     }, []);
+  588 |
+  589 |     const openPlayer = (idx) => {                                                                                                                                                                                                                                                                                                                                                             react-hooks/set-state-in-effect
+  657:36   error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `playerOpen`, but the source dependencies were [activeIndex, masterProgress]. Inferred different dependency than source.
+
+  655 |     }, [playerOpen]);
+  656 |
+> 657 |     const handleMove = useCallback((direction, velocityValue = 0) => {
+      |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 658 |         if (isAnimating.current || !containerRef.current || playerOpen) return;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 659 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 683 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 684 |     }, [activeIndex, masterProgress]);
+      | ^^^^^^ Could not preserve existing manual memoization
+  685 |
+  686 |     useEffect(() => {
+  687 |         const el = stickyRef.current;  react-hooks/preserve-manual-memoization
+  684:8    warning  React Hook useCallback has missing dependencies: 'playerOpen', 'snapPoints', and 'totalPoints'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+  729:8    warning  React Hook useEffect has a missing dependency: 'totalPoints'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Navbar.js
+  18:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  16 |
+  17 |   useEffect(() => {
+> 18 |     setIsPulsing(true);
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  19 |     const timer = setTimeout(() => setIsPulsing(false), 200);
+  20 |     return () => clearTimeout(timer);
+  21 |   }, [totalImpact]);  react-hooks/set-state-in-effect
+  89:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Patrocinadores\PatrocinadoresAllies.js
+  47:21   error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  47:125  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Patrocinadores\PatrocinadoresHero.js
+  252:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\PlanVuelo.js
+  223:41  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\SteamPlatform.js
+  73:151  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  73:164  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\jd9\Documents\NewFlyHigh\web\src\components\Trailer.js
+   91:17  error    Error: Cannot access variable before it is declared
+
+`checkScroll` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  89 |             if (!isPaused && !isDragging) {
+  90 |                 container.scrollLeft += speed;
+> 91 |                 checkScroll();
+     |                 ^^^^^^^^^^^ `checkScroll` accessed before it is declared
+  92 |                 animationFrameId = requestAnimationFrame(animate);
+  93 |             }
+  94 |         };
+
+   98 |     }, [isPaused, isDragging]);
+   99 |
+> 100 |     const checkScroll = () => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 101 |         const container = scrollRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 102 |         if (!container) return;
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 111 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 112 |     };
+      | ^^^^^^^ `checkScroll` is declared here
+  113 |
+  114 |     const handleMouseDown = (e) => {
+  115 |         setIsDragging(true);  react-hooks/immutability
+  150:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @next/next/no-img-element
+
+✖ 54 problems (31 errors, 23 warnings)
+

@@ -57,7 +57,7 @@ export default function Navbar() {
     { name: "Escuelas", href: "#escuelas", icon: School },
     { name: "Maestros", href: "#maestros", icon: GraduationCap },
     { name: "Padrinos", href: "#padrinos", icon: HeartHandshake },
-    { name: "Patrocinadores", href: "https://flyhighedu.com.mx/sponsors-landing.html", icon: Building2 },
+    { name: "Patrocinadores", href: "/patrocinadores", icon: Building2 },
   ];
 
   return (
