@@ -55,7 +55,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
     const infiniteLogos = [...logos, ...logos, ...logos, ...logos, ...logos, ...logos];
 
     return (
-        <main ref={containerRef} className="hero-container px-6 md:px-16 lg:px-24 overflow-hidden bg-white text-black relative">
+        <section ref={containerRef} className="hero-container px-6 md:px-16 lg:px-24 overflow-hidden bg-white text-black relative">
             <style jsx>{`
                 :global(:root) {
                     --steam-blue: #0055FF;
@@ -200,7 +200,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                 <div className="max-w-4xl mx-auto">
 
                     {/* Título Principal */}
-                    <h1 className="hero-title font-syne font-black mt-20 mb-0 reveal-element">
+                    <h1 className="hero-title font-syne font-black pt-20 mb-0 reveal-element">
                         EL<br />
                         CIELO<br />
                         DE<br />
@@ -232,7 +232,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
 
                 <button
                     onClick={onScrollToSponsors}
-                    className="group relative bg-white/70 backdrop-blur-xl rounded-full shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 ring-1 ring-white/50 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_25px_50px_rgba(0,0,0,0.18)] active:scale-[0.98] cursor-pointer focus:outline-none flex items-center h-16 pl-1 pr-1 w-full md:w-auto"
+                    className="group relative bg-white/70 backdrop-blur-xl rounded-full shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 ring-1 ring-white/50 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_25px_50px_rgba(0,0,0,0.18)] active:scale-[0.98] cursor:pointer focus:outline-none flex items-center h-16 pl-1 pr-1 w-full md:w-auto"
                 >
                     {/* Badge: CTA (Magnetic Blue) */}
                     <div className="flex-shrink-0 px-4 md:px-5 h-full flex items-center justify-center relative z-20">
@@ -271,6 +271,6 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                 </button>
             </div>
 
-        </main>
+        </section>
     );
 }
