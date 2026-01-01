@@ -80,13 +80,14 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
 
                 /* Contenedor del Hero - Responsive Height */
                 .hero-container {
-                    min-height: 100vh; /* Estabilidad en scroll móvil */
+                    height: 100vh;
+                    height: 100svh; /* Modern mobile viewport fix */
                     display: flex;
                     align-items: flex-start; /* Alinear arriba */
                     justify-content: center; /* CENTRAR horizontalmente */
                     position: relative;
                     padding-top: 80px; /* Tagline más cerca del header */
-                    padding-bottom: 80px;
+                    /* Removed padding-bottom to ensure button stays on screen */
                 }
 
                 /* Título de Impacto */
