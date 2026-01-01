@@ -155,17 +155,31 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                     transform: translateY(30px);
                 }
 
+                /* Tablet Landscape & Small Laptops */
+                @media (min-width: 769px) and (max-width: 1024px) {
+                    .window-destiny {
+                        width: 45vw;
+                        height: 50vh;
+                        right: 2%; 
+                        top: 25%;
+                    }
+                    .hero-title {
+                        font-size: 4rem;
+                    }
+                }
+
                 @media (max-width: 768px) {
                     .window-destiny {
-                        width: 80vw;
-                        height: 40vh;
-                        right: 5vw; /* Centrado más a la derecha */
-                        top: 20%; /* Más arriba */
+                        width: 90vw;
+                        height: 35vh; /* Reduced height to avoid crowding */
+                        right: 5vw; 
+                        top: 25%; /* Pushed down slightly to clear title */
                         opacity: 0.4;
                     }
                     .hero-title {
-                        font-size: 2.5rem; /* FIX: Reducido de 3.5rem */
+                        font-size: clamp(2.5rem, 10vw, 4rem); /* More responsive mobile type */
                         text-align: left;
+                        line-height: 0.9;
                     }
                 }
             `}</style>
