@@ -26,7 +26,16 @@ export default function Page() {
         if ('scrollRestoration' in window.history) {
             window.history.scrollRestoration = 'manual';
         }
-        window.scrollTo(0, 0);
+
+        // Timeout para asegurar que se ejecute después del renderizado inicial del navegador
+        setTimeout(() => {
+            window.scrollTo(0, 0);
+        }, 10);
+
+        // Segundo intento de seguridad
+        setTimeout(() => {
+            window.scrollTo(0, 0);
+        }, 100);
 
         gsap.registerPlugin(ScrollTrigger);
 
