@@ -28,14 +28,18 @@ export default function Page() {
         }
 
         // Timeout para asegurar que se ejecute después del renderizado inicial del navegador
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-        }, 10);
-
-        // Segundo intento de seguridad
-        setTimeout(() => {
-            window.scrollTo(0, 0);
-        }, 100);
+        // Usamos requestAnimationFrame recursivo para "martillar" la posición 0 durante la carga inicial
+        let frameCount = 0;
+        const forceScrollTop = () => {
+            if (frameCount < 15) { // Intentar durante ~250ms
+                window.scrollTo(0, 0);
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+                frameCount++;
+                requestAnimationFrame(forceScrollTop);
+            }
+        };
+        requestAnimationFrame(forceScrollTop);
 
         gsap.registerPlugin(ScrollTrigger);
 
@@ -90,7 +94,13 @@ export default function Page() {
                 .font-syne { font-family: var(--font-syne), sans-serif; }
                 
                 /* Default font override for this page */
-                body, .font-sans { font-family: var(--font-montserrat), sans-serif; }
+                body, .font-sans { 
+                    font-family: var(--font-montserrat), sans-serif; 
+                    overscroll-behavior-y: none; /* EVITA EL REBOTE "ELÁSTICO" HACIA ARRIBA */
+                }
+
+                /* Asegurar que html tampoco tenga rebote */
+                html { overscroll-behavior-y: none; }
 
                 /* Clase base para animaciones de entrada */
                 .reveal-node { 
