@@ -115,7 +115,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 .window-destiny {
                     position: absolute;
                     right: -5%; /* Movido más a la derecha para no chocar con el texto */
-                    top: 30%;
+                    top: 25%; /* SUBIDO: De 30% a 25% */
                     transform: translateY(-50%);
                     width: 35vw;
                     height: 70vh;
@@ -175,7 +175,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                         width: 45vw;
                         height: 50vh;
                         right: 2%; 
-                        top: 25%;
+                        top: 20%; /* SUBIDO: De 25% a 20% */
                     }
                     .hero-title {
                         font-size: 4rem;
@@ -187,7 +187,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                         width: 90vw;
                         height: 35vh; /* Reduced height to avoid crowding */
                         right: 5vw; 
-                        top: 25%; /* Pushed down slightly to clear title */
+                        top: 20%; /* SUBIDO: De 25% a 20% */
                         opacity: 0.4;
                     }
                     .hero-title {
