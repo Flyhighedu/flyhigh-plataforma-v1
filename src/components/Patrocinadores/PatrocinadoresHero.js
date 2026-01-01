@@ -3,9 +3,11 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import FloatingButton from './FloatingButton';
 
-export default function PatrocinadoresHero({ onScrollToSponsors }) {
+export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal }) {
     const containerRef = useRef(null);
+    const fabRef = useRef(null);
 
     useLayoutEffect(() => {
         gsap.registerPlugin(ScrollTrigger);
@@ -35,8 +37,19 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                     duration: 1.5
                 }, "-=1.5");
 
-            // Efecto Parallax ELIMINADO por solicitud del usuario (elementos estáticos)
-            // gsap.fromTo("#mask-window", ...) removed
+            // Animación de Salida del Botón Flotante (Sincronizada con Scroll)
+            gsap.to(fabRef.current, {
+                scrollTrigger: {
+                    trigger: containerRef.current,
+                    start: "top top", // Empieza al iniciar scroll
+                    end: "20% top", // Termina rápido (en el primer 20% del scroll)
+                    scrub: 1,
+                },
+                x: 100,
+                y: 300, // Traslación agresiva hacia abajo para esconder el corte plano
+                opacity: 0,
+                ease: "power1.in"
+            });
 
             // NOTA: La animación del marquee ahora es 100% CSS para evitar conflictos con React/GSAP re-renders.
         }, containerRef);
@@ -269,6 +282,14 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                         </div>
                     </div>
                 </button>
+            </div>
+
+            {/* Botón Flotante (True Quarter-Circle Corner) */}
+            <div ref={fabRef} className="absolute -bottom-[2px] -right-[2px] z-[60]">
+                <FloatingButton
+                    onClick={onOpenPortal}
+                    className="w-20 h-20 md:w-28 md:h-28" // Proporciones corregidas (más discreto)
+                />
             </div>
 
         </section>

@@ -4,13 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { Inter, Syne, Montserrat } from 'next/font/google';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { AnimatePresence } from 'framer-motion';
 
 import Navbar from '@/components/Navbar';
 import PatrocinadoresHero from '@/components/Patrocinadores/PatrocinadoresHero';
 import SponsorsGrid from '@/components/Patrocinadores/SponsorsGrid';
 import PatrocinadoresAllies from '@/components/Patrocinadores/PatrocinadoresAllies';
 import PortalOverlay from '@/components/Patrocinadores/PortalOverlay';
-import FloatingButton from '@/components/Patrocinadores/FloatingButton';
 
 // Configure fonts
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -114,13 +114,17 @@ export default function Page() {
             <Navbar />
 
             {/* Sections */}
-            <PatrocinadoresHero onScrollToSponsors={scrollToSponsors} />
+            <PatrocinadoresHero onScrollToSponsors={scrollToSponsors} onOpenPortal={togglePortals} />
             <SponsorsGrid />
             <PatrocinadoresAllies />
 
+
             {/* Interactive Elements */}
-            <FloatingButton onClick={togglePortals} />
-            <PortalOverlay isOpen={isPortalOpen} onClose={() => setIsPortalOpen(false)} />
+            <AnimatePresence mode="wait">
+                {isPortalOpen && (
+                    <PortalOverlay key="portal-overlay" onClose={() => setIsPortalOpen(false)} />
+                )}
+            </AnimatePresence>
 
         </main>
     );
