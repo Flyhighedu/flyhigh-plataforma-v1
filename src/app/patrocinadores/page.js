@@ -22,6 +22,12 @@ export default function Page() {
 
     // Initial Animation Setup
     useEffect(() => {
+        // Corrección: Forzar scroll al inicio AL CARGAR para evitar espacios en blanco por restauración
+        if ('scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+        }
+        window.scrollTo(0, 0);
+
         gsap.registerPlugin(ScrollTrigger);
 
         // Select all elements with .reveal-node class
