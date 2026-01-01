@@ -35,25 +35,8 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                     duration: 1.5
                 }, "-=1.5");
 
-            // Efecto Parallax Suave para la ventana al hacer scroll
-            // SIN yPercent - CSS maneja el translateY(-50%)
-            gsap.fromTo("#mask-window",
-                { y: 0, rotation: 0 }, // Estado inicial explícito
-                {
-                    scrollTrigger: {
-                        trigger: containerRef.current,
-                        start: "top top",
-                        end: "bottom top",
-                        scrub: true,
-                        onLeaveBack: () => {
-                            // Resetear al estado inicial cuando vuelves arriba
-                            gsap.set("#mask-window", { y: 0, rotation: 0 });
-                        }
-                    },
-                    y: -100,
-                    rotation: 5
-                }
-            );
+            // Efecto Parallax ELIMINADO por solicitud del usuario (elementos estáticos)
+            // gsap.fromTo("#mask-window", ...) removed
 
             // NOTA: La animación del marquee ahora es 100% CSS para evitar conflictos con React/GSAP re-renders.
         }, containerRef);
