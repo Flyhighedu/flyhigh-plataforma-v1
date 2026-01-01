@@ -67,8 +67,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
 
                 /* Contenedor del Hero - Responsive Height */
                 .hero-container {
-                    min-height: 100vh; /* Fallback */
-                    min-height: 100dvh; /* Mobile Moderno */
+                    min-height: 100vh; /* Estabilidad en scroll móvil */
                     display: flex;
                     align-items: flex-start; /* Alinear arriba */
                     justify-content: center; /* CENTRAR horizontalmente */
@@ -250,7 +249,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors }) {
                                     key={i}
                                     src={ally.logo}
                                     alt={ally.name}
-                                    className={`${ally.name === "LA BONANZA" ? 'h-7 md:h-9' : 'h-10 md:h-12'} w-auto object-contain opacity-90 transition-all duration-300`}
+                                    className={`${ally.name === "LA BONANZA" ? 'h-10 md:h-12' : 'h-14 md:h-16'} w-auto object-contain opacity-90 transition-all duration-300`}
                                 />
                             ))}
                         </div>
