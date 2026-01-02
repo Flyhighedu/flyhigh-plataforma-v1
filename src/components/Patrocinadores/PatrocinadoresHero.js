@@ -245,41 +245,33 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 </div>
 
                 <button
-                    onClick={onScrollToSponsors}
-                    className="group relative bg-white/70 backdrop-blur-xl rounded-full shadow-[0_15px_35px_rgba(0,0,0,0.15)] border border-white/60 ring-1 ring-white/50 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_25px_50px_rgba(0,0,0,0.18)] active:scale-[0.98] cursor:pointer focus:outline-none flex items-center h-16 pl-1 pr-1 w-full md:w-auto"
+                    onClick={() => setTimeout(onScrollToSponsors, 200)}
+                    className="group relative flex items-center h-14 w-full md:w-auto rounded-full overflow-hidden shadow-[0_10px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_30px_rgba(0,102,255,0.2)] hover:-translate-y-0.5 active:scale-[0.95] active:translate-y-1 active:shadow-none transition-all duration-200 ease-out active:duration-75"
                 >
-                    {/* Badge: CTA (Magnetic Blue) */}
-                    <div className="flex-shrink-0 px-4 md:px-5 h-full flex items-center justify-center relative z-20">
-                        <div className="flex items-center space-x-3">
-                            <span className="font-syne font-bold text-[11px] md:text-[12px] tracking-widest text-slate-800 group-hover:text-blue-700 transition-colors whitespace-nowrap">CONÓCELOS</span>
-
-                            {/* Arrow Down (Minimalist) */}
-                            <div className="flex items-center justify-center text-blue-600 group-hover:translate-y-1 transition-transform duration-300">
-                                <svg className="w-6 h-6 drop-shadow-sm animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
-                        </div>
+                    {/* SECCIÓN 1: La Acción (Azul Sólido) - "The Kinetic Split" */}
+                    <div className="relative h-full px-8 flex items-center justify-center bg-[#0066FF] z-20 shadow-[inset_0_-4px_0_rgba(0,0,0,0.2)] group-active:shadow-[inset_0_0_0_rgba(0,0,0,0.2)] transition-all duration-200 group-active:duration-75">
+                        <span className="font-syne font-black text-[11px] tracking-widest text-white whitespace-nowrap">CONÓCELOS</span>
                     </div>
 
-                    {/* Divider */}
-                    <div className="h-8 w-px bg-gray-300/50 flex-shrink-0 mx-1"></div>
 
-                    {/* Body: Micro-Marquee (Selectively Larger) */}
-                    <div className="relative flex-1 h-full flex items-center overflow-hidden min-w-0 md:min-w-[280px]">
-                        {/* Máscaras de suavidad Light */}
-                        <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white/80 to-transparent z-10 pointer-events-none"></div>
-                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent z-10 pointer-events-none"></div>
+                    <div className="relative h-full flex-1 flex items-center bg-white px-2 min-w-0">
 
-                        <div className="marquee-track pl-2">
-                            {infiniteLogos.map((ally, i) => (
-                                <img
-                                    key={i}
-                                    src={ally.logo}
-                                    alt={ally.name}
-                                    className={`${ally.name === "LA BONANZA" ? 'h-10 md:h-12' : 'h-14 md:h-16'} w-auto object-contain opacity-90 transition-all duration-300`}
-                                />
-                            ))}
+                        {/* Body: Micro-Marquee (Clean White) */}
+                        <div className="relative flex-1 h-full flex items-center overflow-hidden min-w-0 md:min-w-[280px]">
+                            {/* Máscaras de suavidad Light */}
+                            <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white/80 to-transparent z-10 pointer-events-none"></div>
+                            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent z-10 pointer-events-none"></div>
+
+                            <div className="marquee-track pl-2">
+                                {infiniteLogos.map((ally, i) => (
+                                    <img
+                                        key={i}
+                                        src={ally.logo}
+                                        alt={ally.name}
+                                        className={`${ally.name === "LA BONANZA" ? 'h-10 md:h-12' : 'h-14 md:h-16'} w-auto object-contain opacity-90 transition-all duration-300`}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </button>
