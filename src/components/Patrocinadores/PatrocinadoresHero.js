@@ -115,10 +115,10 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 .window-destiny {
                     position: absolute;
                     right: -5%; /* Movido más a la derecha para no chocar con el texto */
-                    top: 25%; /* SUBIDO: De 30% a 25% */
+                    top: 19%; /* SUBIDO: De 22% a 19% */
                     transform: translateY(-50%);
                     width: 35vw;
-                    height: 70vh;
+                    height: 80vh;
                     border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; 
                     overflow: hidden;
                     z-index: 5; /* Reducido para estar DETRÁS del título (z-index: 20) */
@@ -173,9 +173,9 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 @media (min-width: 769px) and (max-width: 1024px) {
                     .window-destiny {
                         width: 45vw;
-                        height: 50vh;
-                        right: 2%; 
-                        top: 20%; /* SUBIDO: De 25% a 20% */
+                        height: 60vh;
+                        right: 2%;  
+                        top: 15%; /* SUBIDO: De 18% a 15% */
                     }
                     .hero-title {
                         font-size: 4rem;
@@ -185,9 +185,9 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 @media (max-width: 768px) {
                     .window-destiny {
                         width: 90vw;
-                        height: 35vh; /* Reduced height to avoid crowding */
+                        height: 45vh; /* Reduced height to avoid crowding */
                         right: 5vw; 
-                        top: 20%; /* SUBIDO: De 25% a 20% */
+                        top: 15%; /* SUBIDO: De 18% a 15% */
                         opacity: 0.4;
                     }
                     .hero-title {
@@ -202,7 +202,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
             <div className="window-destiny reveal-element" id="mask-window">
                 <video
                     className="w-full h-full object-cover"
-                    src="/videos/Videoportada.mp4"
+                    src="/videos/video niño hero patrocinadores.mp4"
                     autoPlay
                     muted
                     loop
@@ -214,13 +214,13 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                 <div className="max-w-4xl mx-auto">
 
                     {/* Título Principal */}
-                    <h1 className="hero-title font-syne font-black pt-20 mb-0 reveal-element">
+                    <h1 className="hero-title font-syne font-black pt-20 mb-0 reveal-element text-white" style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.4)" }}>
                         EL<br />
                         CIELO<br />
                         DE<br />
                         URUAPAN<br />
                         TIENE<br />
-                        <span className="text-white md:text-black" style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.4)" }}>NOMBRE.</span>
+                        <span className="text-black" style={{ textShadow: "none" }}>NOMBRE.</span>
                     </h1>
 
                 </div>
