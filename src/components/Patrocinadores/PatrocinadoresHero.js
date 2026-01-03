@@ -220,7 +220,12 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
                         DE<br />
                         URUAPAN<br />
                         TIENE<br />
-                        <span className="text-black" style={{ textShadow: "none" }}>NOMBRE.</span>
+                        <span className="font-black" style={{
+                            background: "linear-gradient(90deg, #0033CC, #0077CC)",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent",
+                            textShadow: "none"
+                        }}>NOMBRE.</span>
                     </h1>
 
                 </div>
