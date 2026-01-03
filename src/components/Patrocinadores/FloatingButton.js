@@ -4,12 +4,26 @@ import { motion } from 'framer-motion';
 export default function FloatingButton({ onClick, className = "fixed bottom-0 right-0" }) {
     const [isHovered, setIsHovered] = useState(false);
     const [gifKey, setGifKey] = useState(0);
+    const [isHeartbeating, setIsHeartbeating] = useState(false);
 
-    // Replay GIF every 4 seconds
+    // Orchestrated Animation Cycle: 10s Total (Strict No-Overlap)
+    // 0s - 5s: GIF Plays (Heartbeat OFF). Ample time for GIF to finish.
+    // 5s - 10s: Heartbeat Plays (GIF Static).
     useEffect(() => {
-        const interval = setInterval(() => {
+        const runCycle = () => {
+            // Phase 1: Play GIF, Stop Heartbeat
             setGifKey(prev => prev + 1);
-        }, 4000);
+            setIsHeartbeating(false);
+
+            // Phase 2: Play Heartbeat (after 5s)
+            setTimeout(() => {
+                setIsHeartbeating(true);
+            }, 5000);
+        };
+
+        runCycle(); // Initial run
+        const interval = setInterval(runCycle, 10000); // Loop every 10s
+
         return () => clearInterval(interval);
     }, []);
 
@@ -24,27 +38,44 @@ export default function FloatingButton({ onClick, className = "fixed bottom-0 ri
                 className="absolute inset-0 bg-black rounded-tl-[100%] blur-xl translate-x-2 translate-y-2 pointer-events-none"
             />
 
-            {/* 2. Botón Físico "True Quarter" */}
+            {/* 2. Botón Físico "True Quarter" - THE LIVING BUTTON */}
             <motion.button
                 onClick={onClick}
                 onHoverStart={() => setIsHovered(true)}
                 onHoverEnd={() => setIsHovered(false)}
-                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                initial={{ x: 100, y: 100 }} // Enter from corner
-                animate={{ x: 0, y: 0 }}
-                transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 20
+                initial={{ x: 100, y: 100 }}
+                animate={{
+                    x: 0,
+                    y: 0,
+                    scale: isHovered ? 1.05 : (isHeartbeating ? [1, 1.08, 1] : 1)
                 }}
-                className="relative w-full h-full bg-[#0066FF] rounded-tl-[100%] overflow-hidden shadow-[inset_10px_10px_20px_rgba(255,255,255,0.3),inset_-10px_-10px_20px_rgba(0,0,0,0.2)]"
+                transition={{
+                    x: { type: "spring", stiffness: 300, damping: 20 },
+                    y: { type: "spring", stiffness: 300, damping: 20 },
+                    scale: {
+                        duration: 2.5,
+                        ease: "easeInOut",
+                        times: [0, 0.5, 1]
+                    }
+                }}
+                style={{
+                    boxShadow: "inset 2px 2px 4px rgba(255, 255, 255, 0.4), inset 4px 4px 15px rgba(255, 255, 255, 0.2), inset -4px -4px 10px rgba(0, 0, 0, 0.1), 0px 10px 20px rgba(0, 0, 0, 0.3)"
+                }}
+                className="relative w-full h-full bg-[#0066FF] rounded-tl-[100%] overflow-hidden"
             >
-                {/* Icono Animado Centrado Geométricamente */}
+                {/* Icono Animado Centrado Geométricamente - THE WINK */}
                 <motion.div
                     animate={{
-                        scale: isHovered ? 1.1 : 1,
-                        rotate: isHovered ? -5 : 0
+                        scale: isHovered ? 1.15 : 1,
+                        rotate: isHovered ? -5 : (isHeartbeating ? [0, -10, 0] : 0)
+                    }}
+                    transition={{
+                        rotate: {
+                            duration: 2.5,
+                            ease: "easeInOut",
+                            times: [0, 0.5, 1]
+                        }
                     }}
                     className="absolute bottom-[42%] right-[42%] translate-x-1/2 translate-y-1/2 drop-shadow-md"
                 >

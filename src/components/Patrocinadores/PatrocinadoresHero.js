@@ -258,9 +258,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
 
                         {/* Body: Micro-Marquee (Clean White) */}
                         <div className="relative flex-1 h-full flex items-center overflow-hidden min-w-0 md:min-w-[280px]">
-                            {/* Máscaras de suavidad Light */}
-                            <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white/80 to-transparent z-10 pointer-events-none"></div>
-                            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent z-10 pointer-events-none"></div>
+                            {/* Máscaras de suavidad ELIMINADAS */}
 
                             <div className="marquee-track pl-2">
                                 {infiniteLogos.map((ally, i) => (
