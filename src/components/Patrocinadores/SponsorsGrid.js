@@ -140,7 +140,7 @@ const TitanLogo = ({ titan, style }) => {
     }, [titan.isVideo]);
 
     return (
-        <div style={style} className="sticky top-0 h-screen bg-white flex flex-col items-center justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100/50 backface-hidden transform-gpu">
+        <div style={style} className="sticky top-0 h-screen bg-white flex flex-col items-center justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100/50">
             <div className="relative w-full max-w-lg px-8 flex flex-col items-center justify-center text-center">
 
                 {/* CONTENEDOR DE MEDIOS: GHOST SWAP SCHEME */}
@@ -210,7 +210,7 @@ const TitanInfo = ({ titan, style }) => {
                 ...style,
                 background: titan.gradient || titan.color
             }}
-            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate backface-hidden transform-gpu z-10"
+            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate z-10"
         >
 
             {/* 1. FONDO CON TEXTO GIGANTE Y DETALLES DE LUZ */}
@@ -360,8 +360,8 @@ export default function SponsorsGrid() {
                         <React.Fragment key={titan.id}>
                             <TitanLogo titan={titan} style={{ zIndex: baseZ }} />
                             <TitanInfo titan={titan} style={{ zIndex: baseZ + 1 }} />
-                            {/* SPACER DE SEGURIDAD PARA EL ÚLTIMO ELEMENTO (Evita glitch con footer) */}
-                            {index === GIANTS.length - 1 && <div className="h-[1px] w-full relative z-[500]" />}
+                            {/* SPACER DE SEGURIDAD (BUFFER ZONE) PARA EL ÚLTIMO ELEMENTO */}
+                            {index === GIANTS.length - 1 && <div className="h-[50vh] w-full relative z-0 pointer-events-none" />}
                         </React.Fragment>
                     );
                 })}
