@@ -117,30 +117,44 @@ const TitanLogo = ({ titan, style }) => {
     React.useEffect(() => {
         if (!titan.isVideo) return;
 
+        // 1. GLOBAL TOUCH UNLOCK (La Llave Maestra)
+        // Algunos navegadores requieren interacción del usuario para desbloquear audio/video.
+        // Escuchamos el PRIMER toque en cualquier parte y enviamos orden de play.
+        const unlockHandler = () => {
+            if (videoRef.current && videoRef.current.paused) {
+                videoRef.current.play().catch(e => console.log("Unlock attempt processed:", e));
+            }
+        };
+        window.addEventListener('touchstart', unlockHandler, { once: true });
+        window.addEventListener('click', unlockHandler, { once: true });
+
+        // 2. OBSERVER (Ahorro de energí­a)
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting && videoRef.current) {
-                    // FORCE PLAY: Intentar reproducir cuando es visible
                     const playPromise = videoRef.current.play();
                     if (playPromise !== undefined) {
                         playPromise.catch(error => {
-                            console.log("Autoplay prevenido por navegador (Low Power Mode o sin interacción).");
-                            // Aquí el fallback de imagen (Ghost Swap) nos salva.
+                            // Fallback silencioso, el Ghost Swap maneja lo visual
+                            console.log("Autoplay prevent handled");
                         });
                     }
                 } else if (videoRef.current) {
-                    // AHORRO: Pausar si no se ve
                     videoRef.current.pause();
                 }
             });
-        }, { threshold: 0.1 }); // Sensibilidad alta: al 10% de visibilidad, carga.
+        }, { threshold: 0.1 });
 
         if (videoRef.current) observer.observe(videoRef.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('touchstart', unlockHandler);
+            window.removeEventListener('click', unlockHandler);
+        };
     }, [titan.isVideo]);
 
     return (
-        <div style={style} className="sticky top-0 h-screen bg-white flex flex-col items-center justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100/50">
+        <div style={style} className="sticky top-0 h-screen bg-white flex flex-col items-center justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100/50 transform-gpu backface-hidden">
             <div className="relative w-full max-w-lg px-8 flex flex-col items-center justify-center text-center">
 
                 {/* CONTENEDOR DE MEDIOS: GHOST SWAP SCHEME */}
@@ -203,6 +217,7 @@ const TitanLogo = ({ titan, style }) => {
 };
 
 // --- COMPONENTE 2: LA CARTA DEL TELÓN (TITAN INFO - POP EDITORIAL POLISHED) ---
+// --- COMPONENTE 2: LA CARTA DEL TELÓN (TITAN INFO - POP EDITORIAL POLISHED) ---
 const TitanInfo = ({ titan, style }) => {
     return (
         <div
@@ -210,7 +225,7 @@ const TitanInfo = ({ titan, style }) => {
                 ...style,
                 background: titan.gradient || titan.color
             }}
-            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate will-change-transform backface-hidden"
+            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate transform-gpu backface-hidden"
         >
 
             {/* 1. FONDO CON TEXTO GIGANTE Y DETALLES DE LUZ */}
@@ -243,7 +258,6 @@ const TitanInfo = ({ titan, style }) => {
             {/* 2. CONTENIDO PRINCIPAL (Scrollable interno si es necesario y SAFE ZONE) */}
             <div className="relative z-10 w-full h-full px-5 pt-28 pb-6 md:p-16 lg:p-24 flex flex-col justify-start md:justify-center">
 
-                {/* HEADER: STICKERS FLOTANTES (Safe Zone aplicada con pt-28) */}
                 {/* HEADER: STICKERS FLOTANTES (Safe Zone aplicada con pt-28) */}
                 <div className="flex flex-wrap items-center w-full mb-4 md:mb-12 shrink-0 gap-4 relative z-20">
                     <motion.div
