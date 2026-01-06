@@ -210,7 +210,7 @@ const TitanInfo = ({ titan, style }) => {
                 ...style,
                 background: titan.gradient || titan.color
             }}
-            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate z-10"
+            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate z-10 transform-gpu"
         >
 
             {/* 1. FONDO CON TEXTO GIGANTE Y DETALLES DE LUZ */}
@@ -359,7 +359,7 @@ export default function SponsorsGrid() {
                     return (
                         <React.Fragment key={titan.id}>
                             <TitanLogo titan={titan} style={{ zIndex: baseZ }} />
-                            <TitanInfo titan={titan} style={{ zIndex: baseZ + 1 }} />
+                            <TitanInfo titan={titan} style={{ zIndex: baseZ + 10 }} />
                             {/* SPACER DE SEGURIDAD (BUFFER ZONE) PARA EL ÚLTIMO ELEMENTO */}
                             {index === GIANTS.length - 1 && <div className="h-[50vh] w-full relative z-0 pointer-events-none" />}
                         </React.Fragment>
