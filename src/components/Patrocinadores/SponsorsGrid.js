@@ -163,13 +163,18 @@ const TitanInfo = ({ titan, style }) => {
                 ...style,
                 background: titan.gradient || titan.color
             }}
-            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans"
+            className="sticky top-0 h-screen w-full shadow-[0_-50px_100px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col font-sans isolate will-change-transform backface-hidden"
         >
 
             {/* 1. FONDO CON TEXTO GIGANTE Y DETALLES DE LUZ */}
             <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-                {/* Radial leve para dar volumen */}
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10 blur-[120px] rounded-full mix-blend-overlay" />
+                {/* Radial leve para dar volumen (Optimizado: Gradiente simple, sin Blur costoso) */}
+                <div
+                    className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full pointer-events-none opacity-20"
+                    style={{
+                        background: 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)'
+                    }}
+                />
 
                 {/* TIPOGRAFÍA GIGANTE OUTLINED (Ajustada para no molestar) */}
                 <motion.h2
@@ -216,7 +221,7 @@ const TitanInfo = ({ titan, style }) => {
                         transition={{ type: "spring", bounce: 0.4, duration: 1.2 }}
                         src={titan.whiteLogo}
                         alt={`${titan.name} Logo`}
-                        className="absolute top-20 right-4 md:top-16 md:right-16 w-32 md:w-64 lg:w-96 h-auto object-contain brightness-0 invert drop-shadow-2xl pointer-events-none z-0 opacity-50 mix-blend-overlay md:opacity-100 md:mix-blend-normal"
+                        className="absolute top-20 right-4 md:top-16 md:right-16 w-32 md:w-64 lg:w-96 h-auto object-contain brightness-0 invert drop-shadow-lg pointer-events-none z-0 opacity-10"
                     />
                 )}
 
