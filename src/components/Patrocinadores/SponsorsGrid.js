@@ -118,6 +118,7 @@ const TitanLogo = ({ titan, style }) => {
                     <motion.video
                         initial={{ scale: 0.9, opacity: 0 }}
                         whileInView={{ scale: 1, opacity: 1 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                         src={titan.logoPath}
                         autoPlay
@@ -130,6 +131,7 @@ const TitanLogo = ({ titan, style }) => {
                     <motion.img
                         initial={{ scale: 0.9, opacity: 0 }}
                         whileInView={{ scale: 1, opacity: 1 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                         src={titan.logoPath}
                         alt={`${titan.name} Logo`}
@@ -210,6 +212,7 @@ const TitanInfo = ({ titan, style }) => {
                     <motion.img
                         initial={{ opacity: 0, scale: 0.5, y: -20, rotate: 10 }}
                         whileInView={{ opacity: 0.8, scale: 1, y: 0, rotate: 0 }}
+                        viewport={{ once: true }}
                         transition={{ type: "spring", bounce: 0.4, duration: 1.2 }}
                         src={titan.whiteLogo}
                         alt={`${titan.name} Logo`}
@@ -245,6 +248,7 @@ const TitanInfo = ({ titan, style }) => {
                                 <motion.img
                                     initial={{ opacity: 0, scale: 0.8, y: 20 }}
                                     whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                                    viewport={{ once: true }}
                                     transition={{ duration: 0.6, delay: 0.2 }}
                                     src={titan.productImage}
                                     alt="Producto Destacado"
