@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Plane, Users, MapPin, FileText, Camera, Radio,
-    Target, TrendingUp, School, Calendar, ExternalLink,
+    Target, TrendingUp, School, Calendar, ExternalLink, Clock,
     Loader2, AlertCircle, Eye, Heart, Lock, X, ChevronRight, Mail, KeyRound, ArrowRight
 } from 'lucide-react';
 
@@ -116,13 +116,16 @@ const ImpactMeter = ({ ninosVolados, isLoading }) => {
     const [displayCount, setDisplayCount] = useState(0);
     const porcentaje = Math.min((ninosVolados / META_NINOS) * 100, 100);
 
+    const containerRef = useRef(null);
+    const isInView = useInView(containerRef, { once: true, margin: "-100px" });
+
     // Animación de contador
     useEffect(() => {
-        if (isLoading) return;
+        if (isLoading || !isInView) return;
 
         let start = 0;
         const end = ninosVolados;
-        const duration = 2000;
+        const duration = 2500; // Slower for more impact
         const increment = end / (duration / 16);
 
         const timer = setInterval(() => {
@@ -136,15 +139,16 @@ const ImpactMeter = ({ ninosVolados, isLoading }) => {
         }, 16);
 
         return () => clearInterval(timer);
-    }, [ninosVolados, isLoading]);
+    }, [ninosVolados, isLoading, isInView]);
 
     return (
         <section className="w-full py-16 px-4 bg-white">
             <div className="max-w-4xl mx-auto">
                 <motion.div
+                    ref={containerRef}
                     initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
+                    animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
                     className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[2rem] p-8 md:p-12 shadow-2xl relative overflow-hidden"
                 >
                     {/* Glow decorativo */}
@@ -211,13 +215,15 @@ const ImpactMeter = ({ ninosVolados, isLoading }) => {
 // --- COMPONENTE: Contador de Becas con estética premium (Tarjeta) ---
 const BecasImpactCounter = ({ ninosPatrocinados, isLoading }) => {
     const [displayCount, setDisplayCount] = useState(0);
+    const containerRef = useRef(null);
+    const isInView = useInView(containerRef, { once: true, margin: "-50px" });
 
     useEffect(() => {
-        if (isLoading) return;
+        if (isLoading || !isInView) return;
 
         let start = 0;
         const end = ninosPatrocinados;
-        const duration = 2000;
+        const duration = 2200;
         const increment = end / (duration / 16);
 
         const timer = setInterval(() => {
@@ -231,33 +237,58 @@ const BecasImpactCounter = ({ ninosPatrocinados, isLoading }) => {
         }, 16);
 
         return () => clearInterval(timer);
-    }, [ninosPatrocinados, isLoading]);
+    }, [ninosPatrocinados, isLoading, isInView]);
 
     return (
-        <section className="py-6 px-4">
+        <section className="py-8 px-4">
             <div className="max-w-4xl mx-auto">
-                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex items-center justify-between">
-                    <div>
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">
-                            Niños Becados
-                        </h3>
-                        <div className="flex items-baseline gap-2">
-                            {isLoading ? (
-                                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                            ) : (
-                                <span className="text-5xl md:text-6xl font-bold text-slate-800 tracking-tight font-sans">
-                                    {displayCount.toLocaleString()}
-                                </span>
-                            )}
-                            <span className="text-sm font-medium text-slate-400">total</span>
+                <motion.div
+                    ref={containerRef}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+                    transition={{ duration: 0.6 }}
+                    className="relative bg-white rounded-3xl p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden hover:shadow-[0_30px_60px_-15px_rgba(0,102,255,0.15)] transition-all duration-300 group"
+                >
+                    {/* Background Pattern */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+
+                    <div className="relative z-10 flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">
+                                    Impacto Real
+                                </h3>
+                            </div>
+
+                            <div className="flex items-baseline gap-3">
+                                {isLoading ? (
+                                    <Loader2 className="w-12 h-12 animate-spin text-cyan-500" />
+                                ) : (
+                                    <span className="text-6xl md:text-7xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-blue-800 to-cyan-600">
+                                        {displayCount.toLocaleString()}
+                                    </span>
+                                )}
+                                <div className="flex flex-col">
+                                    <span className="text-xl font-bold text-slate-700 leading-none">Niños</span>
+                                    <span className="text-xs font-medium text-slate-400 uppercase tracking-widest">Becados Total</span>
+                                </div>
+                            </div>
+
+                            <p className="mt-4 text-sm text-slate-500 font-medium max-w-md">
+                                Historias cambiadas, futuros reescritos y sueños que comienzan a volar.
+                            </p>
+                        </div>
+
+                        {/* Animated Icon Container */}
+                        <div className="relative group-hover:scale-110 transition-transform duration-300 ease-out">
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-300 blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
+                            <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30 text-white">
+                                <Users size={36} strokeWidth={1.5} />
+                            </div>
                         </div>
                     </div>
-
-                    {/* Icono decorativo estilo dashboard */}
-                    <div className="h-12 w-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400">
-                        <Users size={24} />
-                    </div>
-                </div>
+                </motion.div>
             </div>
         </section>
     );
@@ -372,6 +403,79 @@ const SchoolsMap = ({ flights }) => {
                         ))}
                     </div>
                 )}
+            </div>
+        </section>
+    );
+};
+
+// --- COMPONENTE: Próximas Misiones (Glassmorphism) ---
+const NextMissions = ({ missions }) => {
+    // Filtrar solo las pendientes o futuras si se desea, aunque el prompt dice "Solo muestra ... que NO hayan sido borradas" (que ya lo hace el backend query si usamos soft delete, o si es hard delete ya no existen).
+    // Asumiremos que el backend devuelve todo lo que existe.
+    // Opcional: filtrar por fecha > hoy? Prompt no especifica.
+
+    if (!missions || missions.length === 0) return null;
+
+    return (
+        <section className="w-full py-12 px-4 bg-slate-50/50">
+            <div className="max-w-5xl mx-auto">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-sm">
+                        <Calendar className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                            Próximas Misiones
+                        </h2>
+                        <p className="text-slate-500 text-sm font-medium">Cronograma de visitas programadas</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {missions.map((mission, index) => (
+                        <motion.div
+                            key={mission.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: index * 0.1 }}
+                            className="group relative bg-white rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 border border-white overflow-hidden hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300"
+                        >
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <School size={80} className="text-amber-500" />
+                            </div>
+
+                            <div className="relative z-10">
+                                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border ${mission.estatus === 'completado' ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                    {mission.estatus === 'completado' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                                    {mission.estatus === 'completado' ? 'Realizada' : 'Programada'}
+                                </div>
+
+                                <h3 className={`text-xl font-bold mb-2 line-clamp-2 ${mission.estatus === 'completado' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                                    {mission.nombre_escuela}
+                                </h3>
+
+                                <div className="space-y-3 mt-4">
+                                    <div className="flex items-start gap-3 text-slate-500">
+                                        <MapPin size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                                        <span className="text-sm font-medium">{mission.colonia}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-slate-500">
+                                        <Calendar size={18} className="text-amber-500 shrink-0" />
+                                        <span className="text-sm font-bold text-slate-700">
+                                            {new Date(mission.fecha_programada + 'T12:00:00').toLocaleDateString('es-MX', {
+                                                weekday: 'long',
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric'
+                                            })}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
             </div>
         </section>
     );
@@ -567,9 +671,10 @@ const TransparencyTable = ({ flights, isLoading }) => {
 };
 
 // --- PÁGINA PRINCIPAL ---
-export default function DashboardPage() {
+export default function DashboardPage({ previewMode = false }) {
     const [impactData, setImpactData] = useState({ ninosVolados: 0, vueloEnVivo: false, ninosPatrocinados: 0 });
     const [flights, setFlights] = useState([]);
+    const [nextMissions, setNextMissions] = useState([]); // <--- New State
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sponsorName, setSponsorName] = useState(null);
@@ -581,6 +686,59 @@ export default function DashboardPage() {
     // Verificar autenticación y leer datos del patrocinador
     useEffect(() => {
         const checkSession = async () => {
+            // BYPASS: Preview Mode from Props
+            if (previewMode) {
+                setSponsorUser({
+                    nombre: 'Vista Previa Admin',
+                    email: 'admin@flyhighedu.org',
+                    id: 'admin-preview',
+                    aportacion_total: 1500000,
+                    role: 'admin_preview'
+                });
+                setSponsorName('Admin');
+                setIsAuthenticated(true);
+                setCheckingAuth(false);
+                return;
+            }
+
+            // BYPASS: Vista Previa desde Admin
+            // BYPASS: Vista Previa desde Admin
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('preview') === 'admin_bypass') {
+                const sponsorId = params.get('id');
+                if (sponsorId) {
+                    try {
+                        const { data, error } = await supabaseNew
+                            .from('patrocinadores')
+                            .select('*')
+                            .eq('id', sponsorId)
+                            .single();
+
+                        if (data && !error) {
+                            setSponsorUser(data);
+                            setSponsorName(data.nombre);
+                            setIsAuthenticated(true);
+                            setCheckingAuth(false);
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('Error fetching preview sponsor:', err);
+                    }
+                }
+
+                setSponsorUser({
+                    nombre: 'Vista Previa Admin',
+                    email: 'admin@flyhighedu.org',
+                    id: 'admin-preview',
+                    aportacion_total: 1500000, // Valor ejemplo para visualizar
+                    role: 'admin_preview'
+                });
+                setSponsorName('Admin');
+                setIsAuthenticated(true);
+                setCheckingAuth(false);
+                return;
+            }
+
             try {
                 const sessionData = sessionStorage.getItem('flyHighSponsor') || sessionStorage.getItem('sponsorUser');
 
@@ -625,6 +783,19 @@ export default function DashboardPage() {
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
     const [loginLoading, setLoginLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
+
+    // --- EFECTO: PRELLENADO DE LOGIN (VISTA PREVIA) ---
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('action') === 'test_login') {
+            const email = params.get('email');
+            const password = params.get('password');
+            if (email && password) {
+                setLoginForm({ email, password });
+                setShowLoginModal(true);
+            }
+        }
+    }, []);
 
     // --- HANDLER LOGIN ---
     const handleSponsorLogin = async (e) => {
@@ -720,12 +891,25 @@ export default function DashboardPage() {
 
                 if (vuelosError) throw vuelosError;
 
+                // Fetch próximos vuelos/misiones
+                const { data: missionsData, error: missionsError } = await supabaseNew
+                    .from('proximas_escuelas')
+                    .select('*')
+                    .order('fecha_programada', { ascending: true }); // Mostrar los más cercanos primero
+
+                if (!missionsError) {
+                    setNextMissions(missionsData || []);
+                } else {
+                    console.warn('Dashboard: Error fetching next missions:', missionsError);
+                }
+
                 setFlights(vuelosData || []);
 
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
                 setError(err.message);
             } finally {
+                // Force State Refresh
                 setIsLoading(false);
             }
         };
@@ -918,20 +1102,24 @@ export default function DashboardPage() {
             {/* Tarjeta Privada */}
             <SponsorPrivateCard sponsor={sponsorUser} />
 
-            <ImpactMeter
-                ninosVolados={impactData.ninosVolados}
-                isLoading={isLoading}
-            />
-
-            {/* Sección de Estadísticas de Becas */}
+            {/* Sección de Estadísticas de Becas (Impacto Real) */}
             <BecasImpactCounter
                 ninosPatrocinados={impactData.ninosPatrocinados}
                 isLoading={isLoading}
             />
 
+            {/* Registro de Vuelos (Mapa y Tabla) */}
             <SchoolsMap flights={flights} />
-
             <TransparencyTable flights={flights} isLoading={isLoading} />
+
+            {/* Impacto Acumulado */}
+            <ImpactMeter
+                ninosVolados={impactData.ninosVolados}
+                isLoading={isLoading}
+            />
+
+            {/* Próximas Misiones */}
+            <NextMissions missions={nextMissions} />
 
             {/* Footer simple */}
             <footer className="py-8 px-4 bg-slate-50 border-t border-slate-100">

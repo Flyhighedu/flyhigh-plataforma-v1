@@ -5,8 +5,9 @@ import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     School, MapPin, FileText, Camera, Lock, KeyRound, ShieldCheck,
-    Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X
+    Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar
 } from 'lucide-react';
+import DashboardPage from '../dashboard/page';
 
 // Contraseña fija (en producción, usar autenticación real)
 const ADMIN_PASSWORD = 'Flyhigh2026';
@@ -23,7 +24,9 @@ export default function AdminPage() {
     const [loginLoading, setLoginLoading] = useState(false);
 
     // --- ESTADO DE TABS ---
-    const [activeTab, setActiveTab] = useState('vuelos'); // 'vuelos' | 'patrocinadores'
+    const [activeTab, setActiveTab] = useState('vuelos'); // 'vuelos' | 'patrocinadores' | 'cronograma'
+    // New state for embedded dashboard preview
+    const [showDashboardPreview, setShowDashboardPreview] = useState(false);
 
     // --- ESTADO DEL FORMULARIO DE VUELO ---
     const [flightForm, setFlightForm] = useState({
@@ -35,6 +38,21 @@ export default function AdminPage() {
     const [fotoFile, setFotoFile] = useState(null);
     const [flightLoading, setFlightLoading] = useState(false);
     const [flightMessage, setFlightMessage] = useState({ type: '', text: '' });
+    const [editingFlightId, setEditingFlightId] = useState(null);
+
+    const [flightsList, setFlightsList] = useState([]);
+    const [fetchingFlights, setFetchingFlights] = useState(false);
+
+    // --- ESTADO DE CRONOGRAMA (Próximas Escuelas) ---
+    const [nextSchools, setNextSchools] = useState([]);
+    const [nextSchoolForm, setNextSchoolForm] = useState({
+        nombre_escuela: '',
+        colonia: '',
+        fecha_programada: ''
+    });
+    const [nextSchoolLoading, setNextSchoolLoading] = useState(false); // <--- Added this line
+    const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
+    const [editingSchoolId, setEditingSchoolId] = useState(null);
 
     // --- ESTADO DEL PANEL DE IMPACTO ---
     const [impactData, setImpactData] = useState({
@@ -78,6 +96,8 @@ export default function AdminPage() {
     useEffect(() => {
         if (!isAuthenticated) return;
 
+        fetchFlightsList(); // Cargar lista de vuelos
+
         const fetchImpactData = async () => {
             try {
                 const { data, error } = await supabaseNew
@@ -105,12 +125,37 @@ export default function AdminPage() {
         fetchImpactData();
     }, [isAuthenticated]);
 
-    // Cargar patrocinadores al montar
+    // Cargar patrocinadores y cronograma al montar
     useEffect(() => {
         if (!isAuthenticated) return;
         fetchSponsors();
         fetchBecasData();
+        fetchNextSchools();
     }, [isAuthenticated]);
+
+    // Fetch próximas escuelas
+    const fetchNextSchools = async () => {
+        setFetchingNextSchools(true);
+        try {
+            const { data, error } = await supabaseNew
+                .from('proximas_escuelas')
+                .select('*')
+                .order('fecha_programada', { ascending: true });
+
+            if (error) {
+                if (error.code === '42P01') {
+                    console.warn('Tabla proximas_escuelas no existe.');
+                    return;
+                }
+                throw error;
+            }
+            setNextSchools(data || []);
+        } catch (err) {
+            console.error('Error fetching next schools:', err);
+        } finally {
+            setFetchingNextSchools(false);
+        }
+    };
 
     // Cargar datos de becas
     // Cargar datos de becas
@@ -145,6 +190,23 @@ export default function AdminPage() {
             console.error('Error fetching becas data:', err);
         } finally {
             setFetchingBecas(false);
+        }
+    };
+
+    const fetchFlightsList = async () => {
+        setFetchingFlights(true);
+        try {
+            const { data, error } = await supabaseNew
+                .from('historial_vuelos')
+                .select('*')
+                .order('fecha', { ascending: false });
+
+            if (error) throw error;
+            setFlightsList(data || []);
+        } catch (err) {
+            console.error('Error fetching flights:', err);
+        } finally {
+            setFetchingFlights(false);
         }
     };
 
@@ -223,6 +285,7 @@ export default function AdminPage() {
             let fotoUrl = null;
             const timestamp = Date.now();
 
+            // Subir Acta si hay nuevo archivo
             if (actaFile) {
                 const actaPath = `acta_${timestamp}_${actaFile.name}`;
                 const { error: actaError } = await supabaseNew.storage
@@ -237,6 +300,7 @@ export default function AdminPage() {
                 actaUrl = actaPublicUrl.publicUrl;
             }
 
+            // Subir Foto si hay nuevo archivo
             if (fotoFile) {
                 const fotoPath = `foto_${timestamp}_${fotoFile.name}`;
                 const { error: fotoError } = await supabaseNew.storage
@@ -251,29 +315,94 @@ export default function AdminPage() {
                 fotoUrl = fotoPublicUrl.publicUrl;
             }
 
-            const { error: insertError } = await supabaseNew
-                .from('historial_vuelos')
-                .insert({
+            if (editingFlightId) {
+                // UPDATE
+                const updates = {
                     nombre_escuela: flightForm.nombreEscuela,
                     ninos_sesion: parseInt(flightForm.ninosSesion) || 0,
                     colonia: flightForm.colonia,
-                    acta_url: actaUrl,
-                    foto_url: fotoUrl,
-                    fecha: new Date().toISOString()
-                });
+                };
+                if (actaUrl) updates.acta_url = actaUrl;
+                if (fotoUrl) updates.foto_url = fotoUrl;
 
-            if (insertError) throw new Error(`Error guardando vuelo: ${insertError.message}`);
+                const { error: updateError } = await supabaseNew
+                    .from('historial_vuelos')
+                    .update(updates)
+                    .eq('id', editingFlightId);
 
-            setFlightMessage({ type: 'success', text: '¡Vuelo registrado exitosamente!' });
+                if (updateError) throw updateError;
+
+                setFlightMessage({ type: 'success', text: 'Vuelo actualizado con éxito' });
+                setEditingFlightId(null);
+            } else {
+                // INSERT
+                const { error: insertError } = await supabaseNew
+                    .from('historial_vuelos')
+                    .insert({
+                        nombre_escuela: flightForm.nombreEscuela,
+                        ninos_sesion: parseInt(flightForm.ninosSesion) || 0,
+                        colonia: flightForm.colonia,
+                        acta_url: actaUrl,
+                        foto_url: fotoUrl,
+                        fecha: new Date().toISOString()
+                    });
+
+                if (insertError) throw insertError;
+                setFlightMessage({ type: 'success', text: 'Vuelo registrado con éxito' });
+            }
+
+            // Reset form
             setFlightForm({ nombreEscuela: '', ninosSesion: '', colonia: '' });
             setActaFile(null);
             setFotoFile(null);
+            // Refresh list if it exists (need to implement fetchFlightsList)
+            if (typeof fetchFlightsList === 'function') fetchFlightsList();
 
         } catch (err) {
-            console.error(err);
+            console.error('Error saving flight:', err);
             setFlightMessage({ type: 'error', text: err.message });
         } finally {
             setFlightLoading(false);
+        }
+    };
+
+    const handleEditFlight = (flight) => {
+        setFlightForm({
+            nombreEscuela: flight.nombre_escuela,
+            ninosSesion: flight.ninos_sesion,
+            colonia: flight.colonia
+        });
+        setEditingFlightId(flight.id);
+        setFlightMessage({ type: 'info', text: 'Editando vuelo. Sube archivos solo si deseas cambiarlos.' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCancelEditFlight = () => {
+        setFlightForm({ nombreEscuela: '', ninosSesion: '', colonia: '' });
+        setEditingFlightId(null);
+        setFlightMessage({ type: '', text: '' });
+        setActaFile(null);
+        setFotoFile(null);
+    };
+
+    const handleDeleteFlight = async (id) => {
+        if (!confirm('¿Estás seguro de eliminar este vuelo? Esta acción no se puede deshacer.')) return;
+
+        // Optimistic UI
+        const originalList = [...flightsList];
+        setFlightsList(prev => prev.filter(f => f.id !== id));
+
+        try {
+            const { error } = await supabaseNew
+                .from('historial_vuelos')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error deleting flight:', err);
+            alert('Error al eliminar vuelo');
+            setFlightsList(originalList); // Rollback
         }
     };
 
@@ -284,6 +413,110 @@ export default function AdminPage() {
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
+    };
+
+    const handleNextSchoolSubmit = async (e) => {
+        e.preventDefault();
+        setNextSchoolLoading(true);
+        try {
+            const schoolData = {
+                nombre_escuela: nextSchoolForm.nombre_escuela,
+                colonia: nextSchoolForm.colonia,
+                fecha_programada: nextSchoolForm.fecha_programada,
+            };
+
+            if (editingSchoolId) {
+                // UPDATE (Editar)
+                const { data, error } = await supabaseNew
+                    .from('proximas_escuelas')
+                    .update(schoolData)
+                    .eq('id', editingSchoolId)
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                setNextSchools(prev => prev.map(s => s.id === editingSchoolId ? data : s));
+                setEditingSchoolId(null);
+                alert('Misión actualizada exitosamente');
+            } else {
+                // INSERT (Crear)
+                const { data, error } = await supabaseNew
+                    .from('proximas_escuelas')
+                    .insert({ ...schoolData, estatus: 'pendiente' })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                setNextSchools(prev => [...prev, data]);
+                alert('Escuela programada exitosamente');
+            }
+
+            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '' });
+        } catch (err) {
+            console.error('Error saving next school:', err);
+            alert('Error al guardar escuela');
+        } finally {
+            setNextSchoolLoading(false);
+        }
+    };
+
+    const handleEditNextSchool = (school) => {
+        setNextSchoolForm({
+            nombre_escuela: school.nombre_escuela,
+            colonia: school.colonia,
+            fecha_programada: school.fecha_programada
+        });
+        setEditingSchoolId(school.id);
+        // Scroll to form if needed? Not strictly necessary but good UX.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCancelNextSchoolEdit = () => {
+        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '' });
+        setEditingSchoolId(null);
+    };
+
+    const handleCompleteNextSchool = async (id, currentStatus) => {
+        // Optimistic UI Update
+        const newStatus = currentStatus === 'completado' ? 'pendiente' : 'completado';
+        setNextSchools(prev => prev.map(s => s.id === id ? { ...s, estatus: newStatus } : s));
+
+        try {
+            const { error } = await supabaseNew
+                .from('proximas_escuelas')
+                .update({ estatus: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error updating status:', err);
+            // Revert optimistic update
+            setNextSchools(prev => prev.map(s => s.id === id ? { ...s, estatus: currentStatus } : s));
+        }
+    };
+
+    const handleDeleteNextSchool = async (id) => {
+        if (!confirm('¿Estás seguro de eliminar este registro permanentemente?')) return;
+
+        // Optimistic UI Update
+        const previousSchools = [...nextSchools];
+        setNextSchools(prev => prev.filter(s => s.id !== id));
+
+        try {
+            const { error } = await supabaseNew
+                .from('proximas_escuelas')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error deleting school:', err);
+            // Revert
+            setNextSchools(previousSchools);
+            alert('Error al eliminar');
+        }
     };
 
     const handleImpactSubmit = async (e) => {
@@ -510,24 +743,41 @@ export default function AdminPage() {
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans p-4 md:p-8">
             {/* HEADER */}
-            <header className="max-w-5xl mx-auto mb-8 text-center">
-                <div className="inline-flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <Plane className="w-6 h-6 text-white" />
-                    </div>
-                    <h1 className="text-2xl md:text-4xl font-black tracking-tight">
-                        Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Administración</span>
-                    </h1>
+            <header className="max-w-5xl mx-auto mb-8 relative">
+                {/* Logout Button - Mobile & Desktop */}
+                <div className="flex justify-end mb-4 md:absolute md:top-0 md:right-0 md:mb-0">
+                    <button
+                        onClick={() => {
+                            sessionStorage.removeItem('flyHighAdminAuth');
+                            setIsAuthenticated(false);
+                            setPassword('');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-sm font-bold"
+                    >
+                        <Lock size={16} /> Cerrar Sesión
+                    </button>
                 </div>
-                <p className="text-slate-400 text-sm md:text-base">Gestiona los vuelos, patrocinadores e impacto de Fly High Edu</p>
+
+                <div className="text-center">
+                    <div className="inline-flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                            <Plane className="w-6 h-6 text-white" />
+                        </div>
+                        <h1 className="text-2xl md:text-4xl font-black tracking-tight">
+                            Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Administración</span>
+                        </h1>
+                    </div>
+                    <p className="text-slate-400 text-sm md:text-base">Gestiona los vuelos, patrocinadores e impacto de Fly High Edu</p>
+                </div>
             </header>
 
             {/* TABS */}
+            {/* TABS */}
             <div className="max-w-5xl mx-auto mb-8">
-                <div className="flex gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-2">
+                <div className="flex flex-wrap gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-2">
                     <button
                         onClick={() => setActiveTab('vuelos')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'vuelos'
+                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'vuelos'
                             ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg'
                             : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
@@ -537,13 +787,23 @@ export default function AdminPage() {
                     </button>
                     <button
                         onClick={() => setActiveTab('patrocinadores')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'patrocinadores'
+                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'patrocinadores'
                             ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg'
                             : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }`}
                     >
                         <Building2 size={18} />
                         Patrocinadores
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('cronograma')}
+                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'cronograma'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                    >
+                        <Calendar size={18} />
+                        Cronograma
                     </button>
                 </div>
             </div>
@@ -648,14 +908,27 @@ export default function AdminPage() {
                             <button
                                 type="submit"
                                 disabled={flightLoading}
-                                className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingFlightId
+                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
+                                    : 'bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 text-white'
+                                    }`}
                             >
                                 {flightLoading ? (
-                                    <><Loader2 size={18} className="animate-spin" /> Guardando...</>
+                                    <><Loader2 size={18} className="animate-spin" /> {editingFlightId ? 'Actualizando...' : 'Guardando...'} </>
                                 ) : (
-                                    <><Plane size={18} /> Guardar Vuelo</>
+                                    <>{editingFlightId ? <RefreshCw size={18} /> : <Plane size={18} />} {editingFlightId ? 'Actualizar Vuelo' : 'Guardar Vuelo'}</>
                                 )}
                             </button>
+
+                            {editingFlightId && (
+                                <button
+                                    type="button"
+                                    onClick={handleCancelEditFlight}
+                                    className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <X size={18} /> Cancelar Edición
+                                </button>
+                            )}
                         </form>
                     </section>
 
@@ -733,6 +1006,88 @@ export default function AdminPage() {
                                     )}
                                 </button>
                             </form>
+                        )}
+                    </section>
+
+                    {/* --- TARJETA: LISTA DE VUELOS --- */}
+                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl lg:col-span-2">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-bold">Historial de Vuelos</h2>
+                                    <p className="text-slate-400 text-xs">{flightsList.length} registros encontrados</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={fetchFlightsList}
+                                className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                            >
+                                <RefreshCw size={18} className="text-slate-400" />
+                            </button>
+                        </div>
+
+                        {fetchingFlights ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 size={32} className="animate-spin text-slate-400" />
+                            </div>
+                        ) : flightsList.length === 0 ? (
+                            <div className="text-center py-12 text-slate-400">
+                                <Plane size={48} className="mx-auto mb-4 opacity-30" />
+                                <p>No hay vuelos registrados aún.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {flightsList.map((flight) => (
+                                    <div key={flight.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 hover:bg-slate-800/50 transition-all flex flex-col justify-between group">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded-full border border-cyan-400/20">
+                                                    {new Date(flight.fecha).toLocaleDateString()}
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => handleEditFlight(flight)}
+                                                        className="p-1.5 text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <Pencil size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteFlight(flight.id)}
+                                                        className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <h3 className="font-bold text-white mb-1 line-clamp-1" title={flight.nombre_escuela}>
+                                                {flight.nombre_escuela}
+                                            </h3>
+                                            <p className="text-xs text-slate-400 flex items-center gap-1 mb-3">
+                                                <MapPin size={12} /> {flight.colonia}
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-1 text-slate-300">
+                                                <Users size={12} /> <span className="font-bold">{flight.ninos_sesion}</span> niños
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {flight.acta_url && (
+                                                    <a href={flight.acta_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Acta</a>
+                                                )}
+                                                {flight.foto_url && (
+                                                    <a href={flight.foto_url} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Foto</a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </section>
                 </div>
@@ -975,7 +1330,14 @@ export default function AdminPage() {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col gap-2">
+                                        <div className="flex flex-row md:flex-col gap-2 justify-end mt-4 md:mt-0">
+                                            <button
+                                                onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
+                                                className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded-xl hover:bg-violet-500/20 transition-colors"
+                                                title="Probar Login y Ver Dashboard"
+                                            >
+                                                <Eye size={16} /> <span className="text-xs font-bold">Test</span>
+                                            </button>
                                             <button
                                                 onClick={() => handleEditSponsor(sponsor)}
                                                 className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
@@ -987,6 +1349,212 @@ export default function AdminPage() {
                                                 onClick={() => handleDeleteSponsor(sponsor.id)}
                                                 className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
                                                 title="Eliminar patrocinador"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* --- VISTA PREVIA EMBEBIDA --- */}
+                    <div className="pt-8 border-t border-white/10 mt-8">
+                        <div className="flex justify-center mb-8">
+                            <button
+                                onClick={() => setShowDashboardPreview(!showDashboardPreview)}
+                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition-all transform hover:scale-105 ${showDashboardPreview
+                                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                    : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-violet-500/30'
+                                    }`}
+                            >
+                                {showDashboardPreview ? <EyeOff size={24} /> : <Eye size={24} />}
+                                {showDashboardPreview ? 'Ocultar Vista Previa' : 'Vista Previa del Dashboard'}
+                            </button>
+                        </div>
+
+                        {showDashboardPreview && (
+                            <div className="w-full bg-white rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-700/50 relative">
+                                <div className="bg-slate-900 text-white text-center py-2 text-xs font-mono uppercase tracking-widest border-b border-white/10">
+                                    Modo Vista Previa (Simulación)
+                                </div>
+                                <div className="h-[800px] overflow-y-auto isolate navbar-static-force">
+                                    <DashboardPage previewMode={true} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* CONTENIDO CRONOGRAMA */}
+            {activeTab === 'cronograma' && (
+                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                    {/* --- TARJETA: PROGRAMAR ESCUELA --- */}
+                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                <Calendar className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg md:text-xl font-bold">Programar Misión</h2>
+                                <p className="text-slate-400 text-xs">Agendar próxima visita a escuela</p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
+                            <div>
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                    <School size={14} /> Nombre de la Escuela
+                                </label>
+                                <input
+                                    type="text"
+                                    value={nextSchoolForm.nombre_escuela}
+                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, nombre_escuela: e.target.value })}
+                                    required
+                                    placeholder="Ej: Primaria Lázaro Cárdenas"
+                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                    <MapPin size={14} /> Colonia / Ubicación
+                                </label>
+                                <input
+                                    type="text"
+                                    value={nextSchoolForm.colonia}
+                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, colonia: e.target.value })}
+                                    required
+                                    placeholder="Ej: Col. La Charanda"
+                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                    <Calendar size={14} /> Fecha Programada
+                                </label>
+                                <input
+                                    type="date"
+                                    value={nextSchoolForm.fecha_programada}
+                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, fecha_programada: e.target.value })}
+                                    required
+                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={nextSchoolLoading}
+                                className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSchoolId
+                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
+                                    : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
+                                    }`}
+                            >
+                                {nextSchoolLoading ? (
+                                    <><Loader2 size={18} className="animate-spin" /> {editingSchoolId ? 'Actualizando...' : 'Guardando...'} </>
+                                ) : (
+                                    <>{editingSchoolId ? <RefreshCw size={18} /> : <Calendar size={18} />} {editingSchoolId ? 'Actualizar Misión' : 'Agendar Visita'}</>
+                                )}
+                            </button>
+
+                            {editingSchoolId && (
+                                <button
+                                    type="button"
+                                    onClick={handleCancelNextSchoolEdit}
+                                    className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <X size={18} /> Cancelar Edición
+                                </button>
+                            )}
+                        </form>
+                    </section>
+
+                    {/* --- LISTA DE PRÓXIMAS ESCUELAS --- */}
+                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                                    <Plane className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-bold">Lista de Misiones</h2>
+                                    <p className="text-slate-400 text-xs">{nextSchools.length} programadas</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={fetchNextSchools}
+                                className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                            >
+                                <RefreshCw size={18} className="text-slate-400" />
+                            </button>
+                        </div>
+
+                        {fetchingNextSchools ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 size={32} className="animate-spin text-slate-400" />
+                            </div>
+                        ) : nextSchools.length === 0 ? (
+                            <div className="text-center py-12 text-slate-400">
+                                <Calendar size={48} className="mx-auto mb-4 opacity-30" />
+                                <p>No hay misiones programadas</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {nextSchools.map((school) => (
+                                    <div
+                                        key={school.id}
+                                        className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completado'
+                                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                                            : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
+                                            }`}
+                                    >
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className={`font-bold ${school.estatus === 'completado' ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                                                    {school.nombre_escuela}
+                                                </p>
+                                                {school.estatus === 'completado' && (
+                                                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-4 text-xs text-slate-400">
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin size={12} /> {school.colonia}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar size={12} /> {school.fecha_programada}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-end md:self-center">
+                                            <button
+                                                onClick={() => handleEditNextSchool(school)}
+                                                className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
+                                                title="Editar detalles"
+                                            >
+                                                <Pencil size={18} />
+                                            </button>
+
+                                            <button
+                                                onClick={() => handleCompleteNextSchool(school.id, school.estatus)}
+                                                className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completado'
+                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                                                    : 'bg-slate-700/50 text-slate-400 border-slate-600/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30'
+                                                    }`}
+                                                title={school.estatus === 'completado' ? "Marcar como pendiente" : "Marcar como realizada"}
+                                            >
+                                                <CheckCircle size={18} />
+                                            </button>
+
+                                            <button
+                                                onClick={() => handleDeleteNextSchool(school.id)}
+                                                className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
+                                                title="Eliminar misión"
                                             >
                                                 <Trash2 size={18} />
                                             </button>
