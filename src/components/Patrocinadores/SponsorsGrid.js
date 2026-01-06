@@ -168,7 +168,7 @@ const TitanLogo = ({ titan, style }) => {
                         src={titan.whiteLogo}
                         alt={`${titan.name} Static`}
                         className="absolute inset-0 w-full h-full object-contain filter-none z-0"
-                        style={{ opacity: isVideoReady ? 0 : 1, transition: 'opacity 0.5s ease-out', filter: 'invert(1)' }} // Invertimos el blanco para que sea negro/color en fondo blanco
+                        style={{ opacity: isVideoReady ? 0 : 1, transition: 'opacity 0.5s ease-out' }} // Sin filtro, mostramos la imagen original
                     />
 
                     {/* CAPA 2: VIDEO FORCE (Se revela solo cuando reproduce frames reales) */}
