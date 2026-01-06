@@ -283,7 +283,7 @@ export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal })
             {/* Botón Flotante (True Quarter-Circle Corner) */}
             <div ref={fabRef} className="absolute -bottom-[2px] -right-[2px] z-[60]">
                 <FloatingButton
-                    onClick={onOpenPortal}
+                    onClick={() => window.location.href = '/dashboard'}
                     className="w-20 h-20 md:w-28 md:h-28" // Proporciones corregidas (más discreto)
                 />
             </div>

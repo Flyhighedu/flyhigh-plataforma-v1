@@ -13,7 +13,7 @@ const GIANTS = [
         concept: "LA ESTRUCTURA",
         color: "#0047BA", // Azul Strong (Profundo y Técnico)
         description: "Nuestra vida entera ha consistido en dar forma a la materia con una precisión que nos enorgullece, pero entendemos que la estructura más importante de una ciudad no se fabrica solo con moldes de acero. Ponemos toda nuestra experiencia al servicio de este proyecto para compartir la seguridad y la firmeza que nuestra infancia necesita, asegurando que el talento de Uruapan tenga siempre una base sólida sobre la cual crecer.",
-        tagline: "LA ESTRUCTURA DEL MAÑANA",
+        tagline: "PRIMER EMPRESA IMPULSORA",
         icon: <Cpu className="w-6 h-6" />,
         image: "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=1600",
         logoPath: "/videos/logo strong plastic animado.mp4",
@@ -260,17 +260,33 @@ const TitanInfo = ({ titan, style }) => {
 
                 {/* HEADER: STICKERS FLOTANTES (Safe Zone aplicada con pt-28) */}
                 <div className="flex flex-wrap items-center w-full mb-4 md:mb-12 shrink-0 gap-4 relative z-20">
-                    <motion.div
-                        initial={{ scale: 0, rotate: -10 }}
-                        whileInView={{ scale: 1, rotate: -2 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="bg-white text-black px-4 py-2 md:px-6 md:py-3 rounded-full shadow-xl flex items-center gap-2"
-                    >
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: titan.color }} />
-                        <span className="text-[9px] md:text-xs font-bold tracking-widest uppercase" style={{ color: titan.color }}>
-                            {titan.tagline}
-                        </span>
-                    </motion.div>
+                    {/* PILL PERSONALIZADA: Premium dorado para Strong, blanco estándar para otros */}
+                    {(() => {
+                        const isPremium = titan.id === 'strong';
+                        return (
+                            <motion.div
+                                initial={{ scale: 0, rotate: -10 }}
+                                whileInView={{ scale: 1, rotate: -2 }}
+                                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                className={`px-4 py-2 md:px-6 md:py-3 rounded-full shadow-xl flex items-center gap-2 ${isPremium
+                                        ? 'bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-400 border border-yellow-300/50 shadow-amber-400/30'
+                                        : 'bg-white text-black'
+                                    }`}
+                            >
+                                <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: isPremium ? '#78350F' : titan.color }}
+                                />
+                                <span
+                                    className={`text-[9px] md:text-xs font-bold tracking-widest uppercase ${isPremium ? 'text-amber-900' : ''
+                                        }`}
+                                    style={{ color: isPremium ? undefined : titan.color }}
+                                >
+                                    {titan.tagline}
+                                </span>
+                            </motion.div>
+                        );
+                    })()}
                 </div>
 
                 {/* LOGO SATÉLITE GIGANTE (ABSOLUTE) */}

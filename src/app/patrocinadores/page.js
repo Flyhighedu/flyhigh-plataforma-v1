@@ -9,8 +9,9 @@ import { AnimatePresence } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import PatrocinadoresHero from '@/components/Patrocinadores/PatrocinadoresHero';
 import SponsorsGrid from '@/components/Patrocinadores/SponsorsGrid';
-import PatrocinadoresAllies from '@/components/Patrocinadores/PatrocinadoresAllies';
+
 import PortalOverlay from '@/components/Patrocinadores/PortalOverlay';
+import MinimalFooter from '@/components/MinimalFooter';
 
 // Configure fonts
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -116,8 +117,11 @@ export default function Page() {
             {/* Sections */}
             <PatrocinadoresHero onScrollToSponsors={scrollToSponsors} onOpenPortal={togglePortals} />
             <SponsorsGrid />
-            <PatrocinadoresAllies />
 
+
+
+
+            <MinimalFooter />
 
             {/* Interactive Elements */}
             <AnimatePresence mode="wait">
