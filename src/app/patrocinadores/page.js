@@ -87,7 +87,7 @@ export default function Page() {
     };
 
     return (
-        <main className={`${inter.variable} ${syne.variable} ${montserrat.variable} font-sans bg-white text-[#1A1A1A] overflow-x-hidden min-h-screen relative selection:bg-blue-100 selection:text-blue-900`}>
+        <main className={`${inter.variable} ${syne.variable} ${montserrat.variable} font-sans bg-white text-[#1A1A1A] min-h-screen relative selection:bg-blue-100 selection:text-blue-900`}>
 
             <style jsx global>{`
                 /* Utilizado para los títulos display */
