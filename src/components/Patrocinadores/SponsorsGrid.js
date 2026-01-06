@@ -109,39 +109,86 @@ const GIANTS = [
     }
 ];
 
-// --- COMPONENTE 1: LA CARTA DEL LOGO (TITAN LOGO) ---
+// --- COMPONENTE 1: LA CARTA DEL LOGO (TITAN LOGO - GHOST SWAP + VIDEO FORCE) ---
 const TitanLogo = ({ titan, style }) => {
+    const videoRef = React.useRef(null);
+    const [isVideoReady, setIsVideoReady] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!titan.isVideo) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && videoRef.current) {
+                    // FORCE PLAY: Intentar reproducir cuando es visible
+                    const playPromise = videoRef.current.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log("Autoplay prevenido por navegador (Low Power Mode o sin interacción).");
+                            // Aquí el fallback de imagen (Ghost Swap) nos salva.
+                        });
+                    }
+                } else if (videoRef.current) {
+                    // AHORRO: Pausar si no se ve
+                    videoRef.current.pause();
+                }
+            });
+        }, { threshold: 0.1 }); // Sensibilidad alta: al 10% de visibilidad, carga.
+
+        if (videoRef.current) observer.observe(videoRef.current);
+        return () => observer.disconnect();
+    }, [titan.isVideo]);
+
     return (
         <div style={style} className="sticky top-0 h-screen bg-white flex flex-col items-center justify-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100/50">
             <div className="relative w-full max-w-lg px-8 flex flex-col items-center justify-center text-center">
-                {titan.isVideo ? (
-                    <motion.video
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        whileInView={{ scale: 1, opacity: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        src={titan.logoPath}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-auto object-contain max-h-[35vh] mb-12 mix-blend-multiply"
+
+                {/* CONTENEDOR DE MEDIOS: GHOST SWAP SCHEME */}
+                <div className="relative w-full h-auto max-h-[35vh] mb-12 flex items-center justify-center">
+
+                    {/* CAPA 1: SEGURIDAD ESTÁTICA (Siempre visible, carga ultra-rápida) */}
+                    {/* Usamos el whiteLogo pero invertido (negro/color) o la imagen si existe una versión color */}
+                    {/* ASUNCIÓN: Usamos el mismo path del whiteLogo pero quitamos el filtro para mostrar su color real si es PNG transparente, 
+                        o buscamos una alternativa. Si no, usamos el fallback safe. */}
+                    <img
+                        src={titan.whiteLogo}
+                        alt={`${titan.name} Static`}
+                        className="absolute inset-0 w-full h-full object-contain filter-none z-0"
+                        style={{ opacity: isVideoReady ? 0 : 1, transition: 'opacity 0.5s ease-out', filter: 'invert(1)' }} // Invertimos el blanco para que sea negro/color en fondo blanco
                     />
-                ) : (
-                    <motion.img
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        whileInView={{ scale: 1, opacity: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        src={titan.logoPath}
-                        alt={`${titan.name} Logo`}
-                        className="w-full h-auto object-contain max-h-[35vh] mb-12"
-                    />
-                )}
+
+                    {/* CAPA 2: VIDEO FORCE (Se revela solo cuando reproduce frames reales) */}
+                    {titan.isVideo ? (
+                        <video
+                            ref={videoRef}
+                            src={titan.logoPath}
+                            muted
+                            loop
+                            playsInline
+                            preload="auto" // PRELOAD AGRESIVO
+                            onPlaying={() => setIsVideoReady(true)} // LA LLAVE DEL GHOST SWAP
+                            onError={() => setIsVideoReady(false)} // Si falla, nos quedamos con la imagen
+                            className="relative z-10 w-full h-full object-contain mix-blend-multiply"
+                            style={{ opacity: isVideoReady ? 1 : 0, transition: 'opacity 0.5s ease-in' }}
+                        />
+                    ) : (
+                        // Fallback para no-videos (Imágenes estáticas normales)
+                        <motion.img
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            whileInView={{ scale: 1, opacity: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            src={titan.logoPath}
+                            alt={`${titan.name} Logo`}
+                            className="relative z-10 w-full h-auto object-contain"
+                        />
+                    )}
+                </div>
 
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
                     transition={{ delay: 0.3 }}
                     className="flex flex-col items-center gap-4"
                 >
