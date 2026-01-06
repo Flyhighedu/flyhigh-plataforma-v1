@@ -1,13 +1,23 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     School, MapPin, FileText, Camera, Lock, KeyRound, ShieldCheck,
     Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar
 } from 'lucide-react';
-import DashboardPage from '../dashboard/page';
+
+// Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
+const DashboardPage = dynamic(() => import('../dashboard/page'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex items-center justify-center h-[400px] bg-slate-100">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        </div>
+    )
+});
 
 // Contraseña fija (en producción, usar autenticación real)
 const ADMIN_PASSWORD = 'Flyhigh2026';

@@ -18,6 +18,7 @@ const AlliesMarquee = () => {
         { logo: "/img/logo sp Negro.png", name: "STRONG PLASTIC", customClassName: "h-9 md:h-11" },
         { logo: "/img/logo RV Fresh.png", name: "RV FRESH", customClassName: "h-9 md:h-11" },
         { logo: "/img/Logo Madobox.png", name: "MADOBOX", customClassName: "h-9 md:h-11" },
+        { logo: "/img/Logo Global Frut png.png", name: "GLOBAL FRUT", customClassName: "h-9 md:h-11" },
     ];
 
     // Duplicamos la lista para el efecto de loop infinito

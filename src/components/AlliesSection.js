@@ -8,6 +8,7 @@ const AlliesSection = () => {
         { logo: "/img/logo parque.png", name: "PARQUE NACIONAL" },
         { logo: "/img/logo secretaria cultura y turismo.png", name: "SEC. CULTURA" },
         { logo: "/img/museo del agua azul png.png", name: "MUSEO DEL AGUA" },
+        { logo: "/img/Logo Global Frut png.png", name: "GLOBAL FRUT" },
     ];
 
     const schools = Array(10).fill("Escuela Impulsora");
@@ -152,6 +153,16 @@ const AlliesSection = () => {
                                 <img src="/img/bonanza.png" alt="La Bonanza" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-rose-500 transition-colors">Patrocinador</span>
+                        </div>
+
+                        <div className="w-[1px] h-12 bg-slate-100 hidden md:block"></div>
+
+                        {/* Global Frut */}
+                        <div className="flex flex-col items-center gap-2 group">
+                            <div className="h-16 md:h-20 flex items-center justify-center">
+                                <img src="/img/Logo Global Frut png.png" alt="Global Frut" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-emerald-500 transition-colors">Patrocinador</span>
                         </div>
                     </div>
                     <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
