@@ -55,14 +55,14 @@ export default function Navbar() {
   }, []);
 
   const menuItems = [
-    { name: "Escuelas", href: "#escuelas", icon: School },
-    { name: "Maestros", href: "#maestros", icon: GraduationCap },
-    { name: "Padrinos", href: "#padrinos", icon: HeartHandshake },
+    { name: "Escuelas", href: "/escuelas", icon: School },
+    { name: "Maestros", href: "/#maestros", icon: GraduationCap },
+    { name: "Padrinos", href: "/#padrinos", icon: HeartHandshake },
     { name: "Patrocinadores", href: "/patrocinadores", icon: Building2 },
   ];
 
   return (
-    <div className="fixed top-0 left-0 right-0 px-5 pt-4 pb-2 flex justify-between items-center z-[100] pointer-events-none">
+    <div className="fixed top-0 left-0 right-0 px-3 sm:px-5 pt-2 sm:pt-4 pb-2 flex justify-between items-center z-[100] pointer-events-none">
 
       {/* Píldora Izquierda: Menú + Logo */}
       <div className="relative pointer-events-auto">
@@ -74,7 +74,7 @@ export default function Navbar() {
             x: isImpactVisible ? -100 : 0,
             pointerEvents: isImpactVisible ? 'none' : 'auto'
           }}
-          className="bg-white px-3 py-2 rounded-full shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow"
+          className="bg-white px-2 sm:px-3 h-10 sm:h-12 rounded-full shadow-sm border border-gray-100 flex items-center gap-2 sm:gap-3 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
           {/* Hamburger Icon */}
@@ -91,7 +91,7 @@ export default function Navbar() {
               <img
                 src="/img/logoFH.png"
                 alt="Fly High Logo"
-                className="h-8 w-auto object-contain"
+                className="h-7 sm:h-8 w-auto object-contain"
               />
             </Link>
           </div>
@@ -108,7 +108,7 @@ export default function Navbar() {
               className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col py-2"
             >
               {menuItems.map((item, index) => (
-                <a
+                <Link
                   key={index}
                   href={item.href}
                   className="px-4 py-2.5 text-sm font-['Inter',sans-serif] font-medium text-slate-600 hover:bg-gray-50 hover:text-black transition-all flex items-center gap-3 group"
@@ -116,7 +116,7 @@ export default function Navbar() {
                 >
                   <item.icon size={16} className="text-slate-400 group-hover:text-black transition-colors" />
                   {item.name}
-                </a>
+                </Link>
               ))}
             </motion.div>
           )}
@@ -137,7 +137,7 @@ export default function Navbar() {
               : { scale: 1, x: 0 }
           }
           transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-full h-10 min-w-[130px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_16px_rgba(236,72,153,0.3)] transition-shadow duration-300 bg-[#f0f0f0]"
+          className="relative overflow-hidden rounded-full h-10 sm:h-12 min-w-[110px] sm:min-w-[130px] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_16px_rgba(236,72,153,0.3)] transition-shadow duration-300 bg-[#f0f0f0]"
         >
           {/* 1. FONDO BASE (Soft Clay) */}
           <div className="absolute inset-0 bg-slate-100 shadow-[inset_2px_2px_6px_rgba(0,0,0,0.06),inset_-2px_-2px_6px_rgba(255,255,255,0.8)] rounded-full"></div>
@@ -158,7 +158,7 @@ export default function Navbar() {
             <div className={`flex items-center gap-2 ${!isImpactVisible ? 'group-hover:hidden group-hover:opacity-0' : ''} transition-all duration-300`}>
 
               {/* Mobile Switch with Fade */}
-              <div className="md:hidden relative h-8 w-[120px] flex items-center justify-center overflow-hidden">
+              <div className="md:hidden relative h-10 sm:h-12 w-[100px] sm:w-[120px] flex items-center justify-center overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={!isImpactVisible && mobileShowCTA ? "cta" : "counter"}
@@ -166,7 +166,7 @@ export default function Navbar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.3 }}
-                    className="absolute inset-0 flex items-center justify-center font-['Inter',sans-serif] font-bold text-xs text-slate-700 tabular-nums"
+                    className="absolute inset-0 flex items-center justify-center font-['Inter',sans-serif] font-bold text-[10px] sm:text-xs text-slate-700 tabular-nums"
                   >
                     {!isImpactVisible && mobileShowCTA ? "APADRINAR" : (totalImpact === null ? "..." : `${totalImpact.toLocaleString()} / 30k Niños`)}
                   </motion.span>

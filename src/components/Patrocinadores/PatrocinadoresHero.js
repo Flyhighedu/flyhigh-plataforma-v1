@@ -1,293 +1,160 @@
-'use client';
+"use client";
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowDown, HeartHandshake, Plane, LogIn } from 'lucide-react';
 
-import React, { useLayoutEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import FloatingButton from './FloatingButton';
-
+/**
+ * PatrocinadoresHero Component
+ * Auditoría Estructural: Composición equilibrada y rítmica.
+ */
 export default function PatrocinadoresHero({ onScrollToSponsors, onOpenPortal }) {
-    const containerRef = useRef(null);
-    const fabRef = useRef(null);
+    const [logoIndex, setLogoIndex] = useState(0);
 
-    useLayoutEffect(() => {
-        gsap.registerPlugin(ScrollTrigger);
-        const ctx = gsap.context(() => {
-            const tl = gsap.timeline({ defaults: { ease: "expo.out", duration: 1.8 } });
-
-            // Establecer estado inicial SIN tocar yPercent (lo maneja CSS)
-            gsap.set("#mask-window", {
-                scale: 0.8,
-                opacity: 0,
-                x: 100
-            });
-
-            // Animación de la Ventana (hacia estado final)
-            tl.to("#mask-window", {
-                scale: 1,
-                opacity: 1,
-                x: 0,
-                duration: 2,
-                ease: "power4.inOut"
-            })
-                // Animación del Título y Textos
-                .to(".reveal-element", {
-                    opacity: 1,
-                    y: 0,
-                    stagger: 0.15,
-                    duration: 1.5
-                }, "-=1.5");
-
-            // Animación de Salida del Botón Flotante (Sincronizada con Scroll)
-            gsap.to(fabRef.current, {
-                scrollTrigger: {
-                    trigger: containerRef.current,
-                    start: "top top", // Empieza al iniciar scroll
-                    end: "20% top", // Termina rápido (en el primer 20% del scroll)
-                    scrub: 1,
-                },
-                x: 100,
-                y: 300, // Traslación agresiva hacia abajo para esconder el corte plano
-                opacity: 0,
-                ease: "power1.in"
-            });
-
-            // NOTA: La animación del marquee ahora es 100% CSS para evitar conflictos con React/GSAP re-renders.
-        }, containerRef);
-
-        return () => ctx.revert();
-    }, []);
-
-    const logos = [
-        { logo: "/img/logo sp Negro.png", name: "STRONG PLASTIC" },
-        { logo: "/img/bonanza.png", name: "LA BONANZA" },
-        { logo: "/img/Logo Madobox.png", name: "MADOBOX" },
-        { logo: "/img/logo RV Fresh.png", name: "RV FRESH" },
+    const sponsorLogos = [
+        { src: "/img/logo sp Negro.png", alt: "Strong Plastic", isMedium: true },
+        { src: "/img/Logo Madobox.png", alt: "Madobox" },
+        { src: "/img/logo RV Fresh.png", alt: "RV Fresh", isFeatured: true },
+        { src: "/img/Logo Global Frut png.png", alt: "Global Frut", isFeatured: true },
+        { src: "/img/bonanza.png", alt: "Bonanza", isSmall: true }
     ];
 
-    // Multiplicamos la lista de logos para asegurar un scroll infinito fluido sin saltos visuales
-    const infiniteLogos = [...logos, ...logos, ...logos, ...logos, ...logos, ...logos];
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setLogoIndex((prev) => (prev + 1) % sponsorLogos.length);
+        }, 3000);
+        return () => clearInterval(timer);
+    }, [sponsorLogos.length]);
+
+    const scrollToContent = () => {
+        if (onScrollToSponsors) {
+            onScrollToSponsors();
+        }
+    };
 
     return (
-        <section ref={containerRef} className="hero-container px-6 md:px-16 lg:px-24 overflow-hidden bg-white text-black relative">
-            <style jsx>{`
-                :global(:root) {
-                    --steam-blue: #0055FF;
-                    --steam-purple: #7000FF;
-                    --steam-orange: #FF3D00;
-                }
-                
-                .font-syne { font-family: 'Syne', sans-serif; }
-
-                /* Contenedor del Hero - Responsive Height */
-                .hero-container {
-                    height: 100vh;
-                    height: 100svh; /* Modern mobile viewport fix */
-                    display: flex;
-                    align-items: flex-start; /* Alinear arriba */
-                    justify-content: center; /* CENTRAR horizontalmente */
-                    position: relative;
-                    padding-top: 80px; /* Tagline más cerca del header */
-                    /* Removed padding-bottom to ensure button stays on screen */
-                }
-
-                /* Título de Impacto */
-                .hero-title {
-                    font-size: clamp(2rem, 6vw, 4.5rem);
-                    line-height: 0.85;
-                    letter-spacing: -0.05em;
-                    text-transform: uppercase;
-                    position: relative;
-                    z-index: 20;
-                    pointer-events: none;
-                    width: 100%;
-                    white-space: nowrap; 
-                }
-
-                @media (max-width: 640px) {
-                    .hero-title {
-                        font-size: 6vw; /* FIX: Reducido de 10vw para que coincida con desktop */
-                        white-space: normal; 
-                        word-break: keep-all; 
-                    }
-                }
-
-                /* Ventana de Destino */
-                .window-destiny {
-                    position: absolute;
-                    right: -5%; /* Movido más a la derecha para no chocar con el texto */
-                    top: 19%; /* SUBIDO: De 22% a 19% */
-                    transform: translateY(-50%);
-                    width: 35vw;
-                    height: 80vh;
-                    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; 
-                    overflow: hidden;
-                    z-index: 5; /* Reducido para estar DETRÁS del título (z-index: 20) */
-                    background: #000;
-                    box-shadow: 0 50px 100px rgba(0,0,0,0.1);
-                    animation: soapBubble 12s ease-in-out infinite; 
-                    will-change: border-radius;
-                }
-
-                @keyframes soapBubble {
-                    0% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
-                    25% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-                    50% { border-radius: 50% 60% 30% 60% / 40% 70% 30% 60%; }
-                    75% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
-                    100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
-                }
-
-                /* ANIMACIÓN MARQUEE CSS PURO ROBUSTO */
-                @keyframes scroll-infinite {
-                    0% { transform: translateX(0); }
-                    100% { transform: translateX(-50%); } /* Movemos solo 50% porque duplicamos el contenido */
-                }
-                
-                .marquee-track {
-                    display: flex;
-                    align-items: center;
-                    gap: 1.5rem; /* space-x-6 equivalente */
-                    width: max-content; /* Obligatorio para que no se colapse */
-                    animation: scroll-infinite 25s linear infinite;
-                    will-change: transform;
-                }
-                
-                /* ELIMINADO: Pausa suave al hover para mantener movimiento continuo */
-
-                .window-destiny video {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                }
-
-                .window-destiny:hover img {
-                    filter: grayscale(0%);
-                }
-
-                /* Revelado */
-                .reveal-element {
-                    opacity: 0;
-                    transform: translateY(30px);
-                }
-
-                /* Tablet Landscape & Small Laptops */
-                @media (min-width: 769px) and (max-width: 1024px) {
-                    .window-destiny {
-                        width: 45vw;
-                        height: 60vh;
-                        right: 2%;  
-                        top: 15%; /* SUBIDO: De 18% a 15% */
-                    }
-                    .hero-title {
-                        font-size: 4rem;
-                    }
-                }
-
-                @media (max-width: 768px) {
-                    .window-destiny {
-                        width: 90vw;
-                        height: 45vh; /* Reduced height to avoid crowding */
-                        right: 5vw; 
-                        top: 15%; /* SUBIDO: De 18% a 15% */
-                        opacity: 0.4;
-                    }
-                    .hero-title {
-                        font-size: clamp(2.5rem, 10vw, 4rem); /* More responsive mobile type */
-                        text-align: left;
-                        line-height: 0.9;
-                    }
-                }
-            `}</style>
-
-            {/* Ventana de Destino */}
-            <div className="window-destiny reveal-element" id="mask-window">
+        <header className="relative w-full h-[100dvh] overflow-hidden font-sans bg-slate-950">
+            {/* Background Video - Encuadrado para visibilidad facial */}
+            <div className="absolute inset-0 z-0">
                 <video
-                    className="w-full h-full object-cover"
-                    src="/videos/video niño hero patrocinadores.mp4"
+                    className="w-full h-full object-cover scale-[1.1] object-[center_40%]"
+                    src="/videos/video hero niño patrocinadores.mp4"
                     autoPlay
                     muted
                     loop
                     playsInline
                 />
+                {/* Cinematic Overlays */}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/30 to-slate-900/90" />
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 contrast-150 mix-blend-overlay pointer-events-none"></div>
             </div>
 
-            <div className="container mx-auto relative z-20">
-                <div className="max-w-4xl mx-auto">
+            {/* Main Composition Layout */}
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-between pt-12 pb-4 px-6 sm:pt-20 sm:pb-8">
 
-                    {/* Título Principal */}
-                    <h1 className="hero-title font-syne font-black pt-20 mb-0 reveal-element text-white" style={{ textShadow: "2px 2px 8px rgba(0,0,0,0.4)" }}>
-                        EL<br />
-                        CIELO<br />
-                        DE<br />
-                        URUAPAN<br />
-                        TIENE<br />
-                        <span className="font-black" style={{
-                            background: "linear-gradient(90deg, #0033CC, #0077CC)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textShadow: "none"
-                        }}>NOMBRE.</span>
-                    </h1>
+                {/* Upper Content: Header, Title & Subtitle */}
+                <div className="flex flex-col items-center gap-y-6 sm:gap-y-10 max-w-5xl w-full mt-4">
+                    {/* Badge */}
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 1 }}
+                    >
+                        <span className="inline-flex items-center gap-3 text-white/90 drop-shadow-md font-black uppercase tracking-[0.4em] text-xs sm:text-base">
+                            <HeartHandshake size={20} />
+                            Portal Patrocinadores
+                        </span>
+                    </motion.div>
 
+                    {/* Headline */}
+                    <motion.h1
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 1.2, ease: "easeOut" }}
+                        className="text-4xl sm:text-7xl md:text-8xl font-black text-white tracking-tighter uppercase leading-[0.9] drop-shadow-2xl text-center"
+                    >
+                        EL CIELO DE <br className="hidden sm:block" />
+                        URUAPAN TIENE <br className="hidden sm:block" />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">NOMBRE.</span>
+                    </motion.h1>
+
+                    {/* Subtitle */}
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1, delay: 0.4 }}
+                        className="text-sm sm:text-xl text-slate-200 font-medium max-w-xl mx-auto leading-relaxed text-balance drop-shadow-lg text-center opacity-90"
+                    >
+                        Las empresas que decidieron apostar por <span className="text-white font-bold">nuestra infancia</span> para que toda una generación comience a <span className="text-white font-bold italic">conquistar el cielo.</span>
+                    </motion.p>
                 </div>
-            </div>
 
-            {/* Coordenadas */}
-            <div className="absolute bottom-12 left-10 hidden lg:block reveal-element">
-                <div className="flex flex-col space-y-2">
-                    <span className="text-[9px] font-black tracking-widest text-gray-300">ESTÁNDAR DE ÉLITE</span>
-                    <span className="text-[9px] font-black tracking-widest text-gray-200 uppercase">Uruapan, Michoacán</span>
-                </div>
-            </div>
-
-            {/* Smart Sponsor Button (Harmonious Glass Design - Larger Logos V2) */}
-            <div className="absolute bottom-20 md:bottom-36 left-4 md:left-12 z-50 reveal-element w-[calc(100%-2rem)] md:w-auto max-w-[420px] flex flex-col gap-2 items-center">
-
-                {/* Subtítulo - MOVED HERE FOR ANCHORING */}
-                <div className="max-w-md">
-                    <p className="text-gray-500 text-sm md:text-base font-medium leading-relaxed tracking-tight text-center">
-                        Las <strong className="font-semibold text-gray-700">empresas</strong> que decidieron apostar por <strong className="font-semibold text-gray-700">nuestra infancia</strong> para que toda una generación comience a <strong className="font-semibold" style={{ background: "linear-gradient(90deg, #0055FF, #00AAFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>conquistar el cielo</strong>.
-                    </p>
-                </div>
-
-                <button
-                    onClick={() => setTimeout(onScrollToSponsors, 200)}
-                    className="group relative flex items-center h-14 w-full md:w-auto rounded-full overflow-hidden shadow-[0_10px_20px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_30px_rgba(0,102,255,0.2)] hover:-translate-y-0.5 active:scale-[0.95] active:translate-y-1 active:shadow-none transition-all duration-200 ease-out active:duration-75"
-                >
-                    {/* SECCIÓN 1: La Acción (Azul Sólido) - "The Kinetic Split" */}
-                    <div className="relative h-full px-8 flex items-center justify-center bg-[#0066FF] z-20 shadow-[inset_0_-4px_0_rgba(0,0,0,0.2)] group-active:shadow-[inset_0_0_0_rgba(0,0,0,0.2)] transition-all duration-200 group-active:duration-75">
-                        <span className="font-syne font-black text-[11px] tracking-widest text-white whitespace-nowrap">CONÓCELOS</span>
+                {/* Bottom Content: Logos, Buttons & Scroll */}
+                <div className="flex flex-col items-center w-full gap-y-4 sm:gap-y-6">
+                    {/* Logo Carousel - Escalado Selectivo Sutil (+15%) - Pegado Total */}
+                    <div className="h-32 sm:h-56 flex items-center justify-center">
+                        <AnimatePresence mode="wait">
+                            <motion.img
+                                key={logoIndex}
+                                src={sponsorLogos[logoIndex].src}
+                                alt={sponsorLogos[logoIndex].alt}
+                                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 1.1, y: -10 }}
+                                transition={{ duration: 0.6 }}
+                                className={`w-auto object-contain brightness-0 invert opacity-60 transition-all ${sponsorLogos[logoIndex].isSmall ? 'h-16 sm:h-30' :
+                                    sponsorLogos[logoIndex].isMedium ? 'h-21 sm:h-39' :
+                                        sponsorLogos[logoIndex].isFeatured ? 'h-28 sm:h-50' :
+                                            'h-24 sm:h-44'
+                                    }`}
+                            />
+                        </AnimatePresence>
                     </div>
 
-
-                    <div className="relative h-full flex-1 flex items-center bg-white px-2 min-w-0">
-
-                        {/* Body: Micro-Marquee (Clean White) */}
-                        <div className="relative flex-1 h-full flex items-center overflow-hidden min-w-0 md:min-w-[280px]">
-                            {/* Máscaras de suavidad ELIMINADAS */}
-
-                            <div className="marquee-track pl-2">
-                                {infiniteLogos.map((ally, i) => (
-                                    <img
-                                        key={i}
-                                        src={ally.logo}
-                                        alt={ally.name}
-                                        className={`${ally.name === "LA BONANZA" ? 'h-10 md:h-12' : 'h-14 md:h-16'} w-auto object-contain opacity-90 transition-all duration-300`}
-                                    />
-                                ))}
+                    {/* Action Buttons (Smart FAB Style) - Pegado Total */}
+                    <div className="flex flex-col items-center gap-3 w-full px-8 -mt-10 sm:-mt-22">
+                        <motion.button
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6 }}
+                            onClick={() => window.location.href = '/dashboard'}
+                            className="w-64 py-3.5 bg-transparent border border-white/80 text-white rounded-full transition-all active:scale-95 flex items-center justify-center gap-3 hover:bg-white/5"
+                        >
+                            <img
+                                src="/img/login icono saludando.gif"
+                                alt="Login"
+                                className="w-6 h-6 object-contain"
+                            />
+                            <div className="flex flex-col items-start text-left leading-tight">
+                                <span className="font-black text-[10px] uppercase tracking-widest">Iniciar Sesión</span>
+                                <span className="font-medium text-[7px] opacity-60 uppercase tracking-[0.2em] -mt-0.5">Como Patrocinador</span>
                             </div>
-                        </div>
+                        </motion.button>
+
+                        <motion.button
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.7 }}
+                            onClick={scrollToContent}
+                            className="w-64 py-3.5 bg-white text-blue-600 rounded-full font-black text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-2xl flex items-center justify-center gap-2"
+                        >
+                            <Plane size={16} />
+                            CONÓCELOS
+                        </motion.button>
                     </div>
-                </button>
-            </div>
 
-            {/* Botón Flotante (True Quarter-Circle Corner) */}
-            <div ref={fabRef} className="absolute -bottom-[2px] -right-[2px] z-[60]">
-                <FloatingButton
-                    onClick={() => window.location.href = '/dashboard'}
-                    className="w-20 h-20 md:w-28 md:h-28" // Proporciones corregidas (más discreto)
-                />
+                    {/* Footer Nav - Forzando visibilidad */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.8 }}
+                        transition={{ delay: 1 }}
+                        className="flex flex-col items-center gap-1 cursor-pointer hover:opacity-100 transition-opacity pb-2 sm:pb-4 z-30"
+                        onClick={scrollToContent}
+                    >
+                        <span className="text-[9px] font-bold uppercase tracking-[0.4em] mb-1">Desliza</span>
+                        <ArrowDown size={28} className="animate-bounce text-white" />
+                    </motion.div>
+                </div>
             </div>
-
-        </section>
+        </header>
     );
 }

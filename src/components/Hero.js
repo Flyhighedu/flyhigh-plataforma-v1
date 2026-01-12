@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import { Heart, School, Play, Landmark, Building2, HeartHandshake, Globe, Cpu, Wifi, Award, Shield, X, Triangle } from 'lucide-react';
 
 // --- COMPONENTE DE CARRUSEL INFINITO (MARQUEE) ---
@@ -298,10 +299,10 @@ export default function Hero() {
                             </button>
 
                             {/* Botón Escuela (Glass Outline) */}
-                            <button className="flex-1 bg-transparent border border-white/30 text-white font-['Inter',sans-serif] font-bold text-xs py-2.5 rounded-[16px] flex items-center justify-center gap-2 hover:bg-white/10 active:scale-95 transition-all">
+                            <Link href="/escuelas" className="flex-1 bg-transparent border border-white/30 text-white font-['Inter',sans-serif] font-bold text-xs py-2.5 rounded-[16px] flex items-center justify-center gap-2 hover:bg-white/10 active:scale-95 transition-all">
                                 <School size={16} />
                                 ESCUELA
-                            </button>
+                            </Link>
                         </div>
 
                         {/* 3. CARRUSEL INFINITO DE ALIADOS (Marquee) */}

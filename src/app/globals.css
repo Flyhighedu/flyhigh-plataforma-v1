@@ -16,8 +16,51 @@
     display: none;
   }
 
+  .animate-spin-slow {
+    animation: spin-slow 8s linear infinite;
+  }
+
   .perspective-1000 {
     perspective: 1000px;
+  }
+
+  /* Marquee Animations (Hydration-Safe) */
+  .animate-marquee {
+    animation: marquee 50s linear infinite;
+  }
+
+  .animate-infinite-scroll {
+    animation: infinite-scroll 40s linear infinite;
+  }
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes infinite-scroll {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-33.33%);
+    }
+  }
+
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
   }
 }
 
@@ -84,4 +127,11 @@
   z-index: 9999;
   opacity: 0.05;
   mix-blend-mode: overlay;
+}
+
+/* Animated Watermark Strokes */
+@keyframes dash {
+  to {
+    stroke-dashoffset: 1000;
+  }
 }
