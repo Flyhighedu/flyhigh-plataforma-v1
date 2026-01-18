@@ -119,19 +119,10 @@ export default function EscuelasGallery3D() {
     };
 
     return (
-        <section
-            ref={containerRef}
-            className="relative w-full z-20 bg-white overflow-x-hidden"
-            style={{
-                contain: 'layout paint',
-                overscrollBehaviorY: 'none',
-                WebkitOverflowScrolling: 'touch',
-                minHeight: '880px', // Senior iOS Tip: Define fixed height to prevent scroll jumps
-                scrollBehavior: 'auto' // Avoid conflicts with JS-driven animations
-            }}
-        >
+        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'layout paint' }}>
+
             {/* Container */}
-            <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12 overflow-visible">
+            <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
 
                 {/* 3D Masonry Grid */}
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
