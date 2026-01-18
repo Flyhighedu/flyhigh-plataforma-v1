@@ -29,23 +29,29 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
-  // Detect if Impact Section is visible (IntersectionObserver for Ultra-High Performance)
+  // Detect if Impact Section is visible (Scroll Event for Precision)
   useEffect(() => {
-    const section = document.getElementById('impact-engine');
-    if (!section) return;
+    const handleScroll = () => {
+      const section = document.getElementById('impact-engine');
+      if (!section) return;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsImpactVisible(entry.isIntersecting);
-      },
-      {
-        threshold: 0.1, // Trigger when 10% is visible
-        rootMargin: "-20% 0px -20% 0px" // Better precision for active zone
-      }
-    );
+      const rect = section.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
 
-    observer.observe(section);
-    return () => observer.disconnect();
+      // Logic:
+      // Activate when top enters 60% of viewport (rect.top < windowHeight * 0.6)
+      // Deactivate ONLY when bottom leaves viewport completely (rect.bottom < 0)
+
+      // Check if we are "inside" the active zone
+      const isActive = (rect.top < windowHeight * 0.6) && (rect.bottom > 0);
+
+      setIsImpactVisible(isActive);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check on mount
+
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const menuItems = [
