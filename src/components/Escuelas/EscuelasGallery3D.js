@@ -1,22 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { motion, useScroll, useTransform } from 'framer-motion';
 import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
 export default function EscuelasGallery3D() {
-    // Parallax using Framer Motion (Superior for Safari/Mobile)
-    const containerRef = useRef(null);
-    const { scrollYProgress } = useScroll({
-        target: containerRef,
-        offset: ["start end", "end start"]
-    });
-
-    // Parallax movement for the middle column
-    const middleY = useTransform(scrollYProgress, [0, 1], [100, -100]);
-
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
         "/img/EDU Patrocinios.png",
@@ -36,92 +25,76 @@ export default function EscuelasGallery3D() {
     const [schools, setSchools] = useState([]);
     const [animationReady, setAnimationReady] = useState(false);
 
-    // Función de limpieza de nombres
     const sanitizeSchoolName = (name) => {
         if (!name) return "";
         let cleanName = name;
-
-        // 1. Eliminar horarios (ej: 9:00 am, 10:30am, 900 hrs)
         cleanName = cleanName.replace(/\b\d{1,2}(:\d{2})?\s*(am|pm|hrs|horas)?\b/gi, '');
-
-        // 2. Eliminar turnos y palabras clave de irrelevancia
         cleanName = cleanName.replace(/\b(matutino|vespertino|turno|horario)\b/gi, '');
-
-        // 3. Limpiar caracteres extra y espacios
-        cleanName = cleanName.replace(/[-|]/g, ''); // Eliminar guiones o pipes sueltos
+        cleanName = cleanName.replace(/[-|]/g, '');
         return cleanName.replace(/\s+/g, ' ').trim();
     };
 
     useEffect(() => {
         const fetchSchools = async () => {
             try {
-                // 1. Fetch Scheduled/Completed Schools from proximas_escuelas
-                const { data: scheduledData, error: scheduledError } = await supabaseNew
-                    .from('proximas_escuelas')
-                    .select('nombre_escuela');
+                const { data: scheduledData } = await supabaseNew.from('proximas_escuelas').select('nombre_escuela');
+                const { data: extrasData } = await supabaseNew.from('escuelas_extras').select('nombre');
 
-                if (scheduledError) console.error('Error fetching scheduled schools:', scheduledError);
-
-                // 2. Fetch Extra/Historical Schools from escuelas_extras
-                const { data: extrasData, error: extrasError } = await supabaseNew
-                    .from('escuelas_extras')
-                    .select('nombre');
-
-                if (extrasError) console.error('Error fetching extra schools:', extrasError);
-
-                // 3. Combine and Dedup with Sanitation
                 const allNames = new Set();
-
-                // Add scheduled
                 (scheduledData || []).forEach(item => {
                     const clean = sanitizeSchoolName(item.nombre_escuela);
                     if (clean && clean.length > 2) allNames.add(clean);
                 });
-
-                // Add extras
                 (extrasData || []).forEach(item => {
                     const clean = sanitizeSchoolName(item.nombre);
                     if (clean && clean.length > 2) allNames.add(clean);
                 });
 
-                // 4. Update State and trigger animation activation
                 const namesArray = Array.from(allNames);
                 setSchools(namesArray);
-
-                // Forzar un micro-delay para que Safari registre el cambio de DOM antes de animar
                 if (namesArray.length > 0) {
                     setTimeout(() => setAnimationReady(true), 50);
                 }
-
             } catch (err) {
-                console.error("Unexpected error fetching schools:", err);
+                console.error("Error fetching schools:", err);
             }
         };
-
         fetchSchools();
     }, []);
 
-    // Optimized Card Style for GPU Isolation
+    // Extreme Performance Card Style
     const cardStyle = {
-        transform: 'translateZ(0)',
+        willChange: 'transform',
+        WebkitTransform: 'translate3d(0,0,0)',
+        transform: 'translate3d(0,0,0)',
+        isolation: 'isolate',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
-        WebkitPerspective: '1000px',
-        perspective: '1000px'
     };
 
     return (
-        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'layout paint' }}>
+        <section className="relative w-full z-20 overflow-hidden"
+            style={{
+                height: '800px', // Fixed height for parallax section
+                perspective: '1px',
+                overflowX: 'hidden',
+                overflowY: 'auto',
+                contain: 'strict',
+                WebkitOverflowScrolling: 'touch' // Smooth momentum scroll in Safari
+            }}>
 
             {/* Container */}
-            <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
+            <div className="relative h-full w-full flex justify-center pt-12" style={{ transformStyle: 'preserve-3d' }}>
 
                 {/* 3D Masonry Grid */}
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
-                    style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
+                    style={{
+                        transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)',
+                        transformStyle: 'preserve-3d'
+                    }}>
 
-                    {/* Column 1 (Static) - GPU Promoted */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Column 1 (Static Layer) */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl" style={{ transformStyle: 'preserve-3d' }}>
                         {column1.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -131,17 +104,20 @@ export default function EscuelasGallery3D() {
                                     alt="Gallery"
                                     sizes="(max-width: 768px) 33vw, 25vw"
                                     priority
-                                    decoding="async"
+                                    quality={75}
                                 />
                             </div>
                         ))}
                     </div>
 
-                    {/* Column 2 (Parallax Middle) - GPU Accelerated with Framer Motion */}
-                    <motion.div
-                        style={{ y: middleY, ...cardStyle }}
-                        className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
-                    >
+                    {/* Column 2 (CSS Parallax Middle Layer) */}
+                    {/* transform: translateZ(-1px) scale(2) delegates movement to GPU based on perspective */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl"
+                        style={{
+                            transform: 'translateZ(-1px) scale(2)',
+                            transformStyle: 'preserve-3d',
+                            ...cardStyle
+                        }}>
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -151,14 +127,14 @@ export default function EscuelasGallery3D() {
                                     alt="Gallery"
                                     sizes="(max-width: 768px) 33vw, 25vw"
                                     priority
-                                    decoding="async"
+                                    quality={75}
                                 />
                             </div>
                         ))}
-                    </motion.div>
+                    </div>
 
-                    {/* Column 3 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Column 3 (Static Layer) */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl" style={{ transformStyle: 'preserve-3d' }}>
                         {column3.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -167,7 +143,7 @@ export default function EscuelasGallery3D() {
                                     className="object-cover"
                                     alt="Gallery"
                                     sizes="(max-width: 768px) 33vw, 25vw"
-                                    decoding="async"
+                                    quality={75}
                                 />
                             </div>
                         ))}
@@ -175,21 +151,22 @@ export default function EscuelasGallery3D() {
 
                 </div>
 
-                {/* FADE & LOGO SECTION - PRESERVED UNTOUCHED (Marquee Logic) */}
-                <div className="absolute top-[400px] md:top-[550px] left-0 w-full h-[600px] flex flex-col justify-start z-20 pointer-events-none">
+                {/* FADE & MARQUEE SECTION - STAYS FIXED IN VIEW */}
+                <div className="absolute top-[400px] md:top-[550px] left-0 w-full h-[600px] flex flex-col justify-start z-20 pointer-events-none"
+                    style={{ transform: 'translateZ(0)' }}>
 
-                    {/* Hard White Gradient - The "Floor" */}
+                    {/* Hard White Gradient */}
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white via-70% to-transparent"></div>
 
                     {/* Content Layer */}
-                    <div className="relative z-30 w-full pt-32" style={{ perspective: '1000px' }}>
+                    <div className="relative z-30 w-full pt-32" style={{ WebkitPerspective: '1000px', perspective: '1000px' }}>
                         <div className="text-center mb-6">
                             <span className="inline-block text-[10px] md:text-xs font-black tracking-[0.3em] uppercase text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">
                                 Ellos ya volaron
                             </span>
                         </div>
 
-                        {/* HIGH SPEED MARQUEE with Robust Visibility for iPhone */}
+                        {/* MARQUEE - ALREADY WORKING, UNTOUCHED LOGIC */}
                         <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${animationReady ? 'opacity-100' : 'opacity-0'}`}
                             style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}>
                             <div className={`flex whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max ${animationReady ? 'animate-marquee' : ''}`}
@@ -209,12 +186,11 @@ export default function EscuelasGallery3D() {
                                 ))}
                             </div>
 
-                            {/* Side Fades */}
                             <div className="absolute inset-y-0 left-0 w-8 md:w-32 bg-gradient-to-r from-white to-transparent z-40"></div>
                             <div className="absolute inset-y-0 right-0 w-8 md:w-32 bg-gradient-to-l from-white to-transparent z-40"></div>
                         </div>
 
-                        {/* Engagement Label (Refined) */}
+                        {/* Engagement Label */}
                         <div className="mt-8 text-center px-4">
                             <p className="text-xs md:text-sm tracking-[0.2em] text-slate-400 uppercase font-medium">
                                 Únete a las instituciones que están <span className="font-black text-slate-900 opacity-80">redefiniendo el futuro.</span>
