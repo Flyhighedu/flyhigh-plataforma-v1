@@ -7,17 +7,31 @@ export default function EscuelasGallery3D() {
     // Parallax Ref
     const middleColumnRef = useRef(null);
 
-    // Simple scroll parallax effect
+    // Unified parallax effect using relative viewport position
     useEffect(() => {
         const handleScroll = () => {
             if (middleColumnRef.current) {
-                const scrolled = window.scrollY;
-                // Move middle column opposite to scroll direction slightly
-                middleColumnRef.current.style.transform = `translateY(${scrolled * 0.05}px)`;
+                const rect = middleColumnRef.current.parentElement.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+
+                // Calculate position relative to viewport center
+                // 0 when centered, negative when above, positive when below
+                const distanceFromCenter = rect.top + rect.height / 2 - viewportHeight / 2;
+
+                // Apply subtle parallax based on relative position
+                // This ensures it starts "neutral" when centered and moves logically
+                middleColumnRef.current.style.transform = `translateY(${distanceFromCenter * 0.1}px)`;
             }
         };
+
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleScroll); // Handle resize
+        handleScroll(); // Initial calculation
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+        };
     }, []);
 
     const column1 = [
@@ -45,7 +59,7 @@ export default function EscuelasGallery3D() {
     ];
 
     return (
-        <section className="relative w-full bg-white overflow-hidden rounded-b-[40px] md:rounded-b-[80px] shadow-[0_40px_40px_-10px_rgba(0,0,0,0.4)] mb-[-80px] z-20 mt-[-20px] md:mt-[-40px]">
+        <section className="relative w-full overflow-hidden z-20">
 
             {/* Container */}
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
@@ -64,7 +78,7 @@ export default function EscuelasGallery3D() {
                     </div>
 
                     {/* Column 2 (Parallax Middle) - Ref for scroll effect */}
-                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl mt-8 md:mt-12 transition-transform duration-75 ease-out will-change-transform">
+                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl transition-transform duration-75 ease-out will-change-transform">
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
                                 <img src={src} className="w-full h-full object-cover" alt="Gallery" />
@@ -116,8 +130,8 @@ export default function EscuelasGallery3D() {
                         </div>
 
                         {/* Engagement Label (Refined) */}
-                        <div className="mt-4 text-center px-4">
-                            <p className="text-[10px] md:text-xs tracking-[0.2em] text-slate-400 uppercase font-medium">
+                        <div className="mt-8 text-center px-4">
+                            <p className="text-xs md:text-sm tracking-[0.2em] text-slate-400 uppercase font-medium">
                                 Únete a las instituciones que están <span className="font-black text-slate-900 opacity-80">redefiniendo el futuro.</span>
                             </p>
                         </div>

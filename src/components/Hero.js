@@ -188,12 +188,37 @@ export default function Hero() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
                 </div>
 
-                {/* PLAY BUTTON (Centro Geométrico Visual) */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-40 md:pb-32 gap-2">
-                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg animate-pulse group-hover:scale-110 transition-transform">
-                        <Play size={24} fill="white" className="text-white ml-1 opacity-90" />
+                {/* PLAY BUTTON (Posición Baja + "LIVING PRISM" Ultra-Clear) */}
+                {/* AJUSTE: bg-white/5 (Casi invisible, solo textura) para bajar opacidad sin tocar el icono */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20 pt-8 md:pt-16">
+                    <div className="relative w-24 h-24 flex items-center justify-center group pointer-events-auto cursor-pointer" onClick={openModal}>
+
+                        {/* 1. MOTOR DE GRADIENTE (Spinning Turbine) */}
+                        <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#22d3ee,#f472b6,#fb923c,#a3e635,#8b5cf6,#22d3ee)] blur-md opacity-80 group-hover:opacity-100 group-hover:blur-lg transition-all duration-300"
+                        />
+
+                        {/* 2. ANILLO DE CONTENCIÓN (Invisible/Sutil) */}
+                        <div className="absolute inset-[1px] rounded-full bg-white/5 backdrop-blur-sm" />
+
+                        {/* 3. CASCO DE CRISTAL (Pure Transparent Hull) */}
+                        {/* CAMBIO: bg-transparent (Cero tinte blanco) para que sea cristal puro, solo blur y borde */}
+                        <div className="absolute inset-[3px] rounded-full bg-transparent backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-[inset_0_0_15px_rgba(255,255,255,0.1)] transition-transform duration-300 group-hover:scale-95">
+                            {/* Icono PLAY (Blanco Puro - Intacto) */}
+                            <Play size={32} fill="white" className="text-white ml-1 drop-shadow-md opacity-100" />
+                        </div>
                     </div>
-                    <span className="text-[9px] font-medium text-white/60 uppercase tracking-[0.2em] mt-1">Reproducir</span>
+
+                    {/* 3. CTA TEXT (Animación Sutil "Breathing Tracking") */}
+                    <motion.div
+                        animate={{ letterSpacing: ["0.25em", "0.35em", "0.25em"] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                        className="mt-2 text-[11px] font-['Inter',sans-serif] font-bold text-white uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+                    >
+                        Ver Tráiler
+                    </motion.div>
                 </div>
 
                 {/* Interacción Click -> ABRIR MODAL */}
@@ -291,6 +316,7 @@ export default function Hero() {
                         <div className="flex gap-3 w-full relative top-[2px]">
                             {/* Botón Padrino (Dominante Blanco) */}
                             <button
+                                suppressHydrationWarning={true}
                                 onClick={() => document.getElementById('impact-engine')?.scrollIntoView({ behavior: 'smooth' })}
                                 className="flex-1 bg-white text-black font-['Inter',sans-serif] font-bold text-[10px] md:text-xs py-2.5 rounded-[16px] shadow-lg flex items-center justify-center gap-2 hover:bg-gray-50 active:scale-95 transition-all whitespace-nowrap"
                             >

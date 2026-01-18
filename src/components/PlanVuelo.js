@@ -119,7 +119,7 @@ export default function PlanVuelo() {
     }, []);
 
     return (
-        <div ref={sectionRef} className="relative z-50 bg-white w-full snap-start -mt-1">
+        <div ref={sectionRef} className="relative z-10 bg-white w-full snap-start -mt-1">
             {/* White Curtain (Fixed Background) */}
             <div ref={curtainRef} className="fixed inset-0 bg-white z-40 pointer-events-none opacity-0" />
 
@@ -298,7 +298,7 @@ export default function PlanVuelo() {
             </section>
 
             {/* PATCH: Independent White Canvas - Massive patch to ensure no gaps */}
-            <div className="absolute top-[50%] left-0 w-full h-[200vh] z-[-50] pointer-events-none" style={{ backgroundColor: '#FFFFFF' }}></div>
+            <div className="absolute top-[50%] left-0 w-full h-[800vh] z-[-50] pointer-events-none" style={{ backgroundColor: '#FFFFFF' }}></div>
         </div>
     );
 }

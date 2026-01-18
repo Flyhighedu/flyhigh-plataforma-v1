@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Plane, Users, MapPin, FileText, Camera, Radio,
-    Target, TrendingUp, School, Calendar, ExternalLink, Clock,
+    Target, TrendingUp, School, Calendar, ExternalLink, Clock, CheckCircle,
     Loader2, AlertCircle, Eye, Heart, Lock, X, ChevronRight, Mail, KeyRound, ArrowRight
 } from 'lucide-react';
 

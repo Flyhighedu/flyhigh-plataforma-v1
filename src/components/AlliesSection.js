@@ -20,7 +20,7 @@ const AlliesSection = () => {
     ];
 
     return (
-        <section className="relative w-full overflow-hidden font-sans border-t border-slate-100 bg-white">
+        <section className="relative z-[80] w-full overflow-hidden font-sans border-t border-slate-100 bg-white">
 
             {/* CSS LOCAL: ANIMACIONES Y ESTILO CLAY */}
             <style>{`

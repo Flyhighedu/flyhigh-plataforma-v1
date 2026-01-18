@@ -384,14 +384,15 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
                             onClick={() => onOpen(index)}
                             whileTap={{ scale: 0.95 }}
                             style={{ willChange: 'transform' }}
+                            suppressHydrationWarning
                             className="bg-white px-5 py-2.5 rounded-full flex items-center gap-2 shadow-lg group active:shadow-sm transition-all"
                         >
                             <span className={`text-[10px] font-black uppercase tracking-wider ${theme.iconColor}`}>
                                 Ver Momento
                             </span>
-                            <div className={`w-5 h-5 rounded-full ${theme.solidBg} flex items-center justify-center`}>
+                            <span className={`w-5 h-5 rounded-full ${theme.solidBg} flex items-center justify-center`}>
                                 <Play size={10} className="text-white fill-white ml-0.5" />
-                            </div>
+                            </span>
                         </motion.button>
                     </div>
                 </div>

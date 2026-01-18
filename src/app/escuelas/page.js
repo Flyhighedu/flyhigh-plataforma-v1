@@ -22,8 +22,10 @@ export default function EscuelasPage() {
                 {/* Intro Section */}
                 <EscuelasIntro />
 
-                {/* New Framer-style 3D Gallery & Showcase */}
-                <EscuelasGallery3D />
+                {/* New Framer-style 3D Gallery & Showcase - Restored White Card Wrapper */}
+                <section className="relative w-full bg-white rounded-b-[50px] shadow-[0_40px_60px_-15px_rgba(0,0,0,0.3)] z-40 pb-8 mb-0">
+                    <EscuelasGallery3D />
+                </section>
 
 
                 <EscuelasBenefits />

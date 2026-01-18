@@ -563,7 +563,7 @@ export default function FlyHighDonationSection() {
     };
 
     return (
-        <section id="impact-engine" className={`relative w-full min-h-screen flex flex-col items-center justify-center py-20 px-4 overflow-hidden transition-colors duration-1000 ${isLegendary ? 'bg-[#050A18]' : 'bg-slate-50'}`}>
+        <section id="impact-engine" className={`relative z-[80] w-full min-h-screen flex flex-col items-center justify-center py-20 px-4 overflow-hidden transition-colors duration-1000 ${isLegendary ? 'bg-[#050A18]' : 'bg-slate-50'}`}>
 
             {/* FONDO AMBIENTAL */}
             <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${isLegendary ? 'opacity-0' : 'opacity-100'} bg-gradient-to-b from-sky-200 to-slate-50 pointer-events-none`}></div>
