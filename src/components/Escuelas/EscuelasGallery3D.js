@@ -55,7 +55,6 @@ export default function EscuelasGallery3D() {
     ];
 
     const [schools, setSchools] = useState([]);
-    const [isLoaded, setIsLoaded] = useState(false);
 
     // Función de limpieza de nombres
     const sanitizeSchoolName = (name) => {
@@ -192,11 +191,14 @@ export default function EscuelasGallery3D() {
                             </span>
                         </div>
 
-                        {/* HIGH SPEED MARQUEE with Fade In */}
-                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
-                            <div className="flex animate-marquee whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max">
+                        {/* HIGH SPEED MARQUEE with Robust Visibility for iPhone */}
+                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${schools.length > 0 ? 'opacity-100' : 'opacity-0'}`}
+                            style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}>
+                            <div className="flex animate-marquee whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max"
+                                style={{ WebkitTransform: 'translate3d(0,0,0)', transform: 'translate3d(0,0,0)' }}>
                                 {[...schools, ...schools].map((school, idx) => (
-                                    <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0 group">
+                                    <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0 group"
+                                        style={{ WebkitFontSmoothing: 'antialiased', backfaceVisibility: 'hidden' }}>
                                         <School className="w-8 h-8 md:w-10 md:h-10 text-blue-600/40 group-hover:text-blue-600 transition-colors duration-500" />
                                         <h4 className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight uppercase">
                                             {school}

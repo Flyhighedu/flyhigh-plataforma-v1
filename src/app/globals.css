@@ -35,21 +35,81 @@
 
   @keyframes marquee {
     0% {
+      -webkit-transform: translateX(0);
       transform: translateX(0);
     }
 
     100% {
+      -webkit-transform: translateX(-50%);
       transform: translateX(-50%);
     }
   }
 
   @keyframes infinite-scroll {
     from {
+      -webkit-transform: translateX(0);
       transform: translateX(0);
     }
 
     to {
+      -webkit-transform: translateX(-33.33%);
       transform: translateX(-33.33%);
+    }
+  }
+
+  @keyframes fly-across {
+    0% {
+      transform: translate(-100%, 100%) rotate(-15deg);
+      opacity: 0;
+    }
+
+    20% {
+      opacity: 1;
+    }
+
+    100% {
+      transform: translate(200%, -100%) rotate(15deg);
+      opacity: 0;
+    }
+  }
+
+  .animate-fly-across {
+    animation: fly-across 1.5s ease-out forwards;
+  }
+
+  /* Premium Gallery Animations */
+  @keyframes pulse-play {
+
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(217, 70, 239, 0.4);
+    }
+
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 12px rgba(217, 70, 239, 0);
+    }
+  }
+
+  .animate-pulse-play {
+    animation: pulse-play 2s ease-in-out infinite;
+  }
+
+  /* Film Grain Overlay */
+  .film-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+  }
+
+  /* Animated Watermark Strokes */
+  @keyframes dash {
+    to {
+      stroke-dashoffset: 1000;
     }
   }
 
@@ -61,77 +121,5 @@
     to {
       transform: rotate(360deg);
     }
-  }
-}
-
-/* Animation Keyframes if not using arbitrary values for everything, 
-   but we used arbitrary values or standard classes for most.
-   However, 'float' animation was custom in the input. 
-   I used gsap for it in SteamPlatform.js, but maybe good to have as backup or for other elements.
-*/
-
-@keyframes marquee {
-  0% {
-    transform: translateX(0%);
-  }
-
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-@keyframes fly-across {
-  0% {
-    transform: translate(-100%, 100%) rotate(-15deg);
-    opacity: 0;
-  }
-
-  20% {
-    opacity: 1;
-  }
-
-  100% {
-    transform: translate(200%, -100%) rotate(15deg);
-    opacity: 0;
-  }
-}
-
-.animate-fly-across {
-  animation: fly-across 1.5s ease-out forwards;
-}
-
-/* Premium Gallery Animations */
-@keyframes pulse-play {
-
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(217, 70, 239, 0.4);
-  }
-
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 12px rgba(217, 70, 239, 0);
-  }
-}
-
-.animate-pulse-play {
-  animation: pulse-play 2s ease-in-out infinite;
-}
-
-/* Film Grain Overlay */
-.film-grain {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-}
-
-/* Animated Watermark Strokes */
-@keyframes dash {
-  to {
-    stroke-dashoffset: 1000;
   }
 }
