@@ -7,23 +7,23 @@ import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
 export default function EscuelasGallery3D() {
-    // Parallax using Framer Motion (Superior for Safari/Mobile)
+    // 1. Better Scroll Input for iOS Native feel
     const containerRef = useRef(null);
     const { scrollYProgress } = useScroll({
         target: containerRef,
         offset: ["start end", "end start"]
     });
 
-    // Native-Grade Inertial Smoothing
-    const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+    // 2. Spring Physics (The secret for native smoothness)
+    // stiffnes/damping chosen for native Apple-like response
+    const smoothProgress = useSpring(scrollYProgress, {
+        stiffness: 100,
+        damping: 30,
+        restDelta: 0.001
+    });
 
-    // Middle Column Parallax
-    const middleYRange = useTransform(scrollYProgress, [0, 1], [150, -150]);
-    const middleY = useSpring(middleYRange, springConfig);
-
-    // Subtle opposite parallax for side columns to enhance 3D feel
-    const sidesYRange = useTransform(scrollYProgress, [0, 1], [-20, 20]);
-    const sidesY = useSpring(sidesYRange, springConfig);
+    // 3. Optimized Travel (Reduced from 100 to 40 for higher FPS)
+    const middleY = useTransform(smoothProgress, [0, 1], [40, -40]);
 
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
@@ -128,8 +128,8 @@ export default function EscuelasGallery3D() {
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
                     style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
 
-                    {/* Left Column (Inertial Sync) */}
-                    <motion.div style={{ y: sidesY, ...cardStyle }} className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl">
+                    {/* Column 1 (Static) - GPU Promoted */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
                         {column1.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -143,12 +143,12 @@ export default function EscuelasGallery3D() {
                                 />
                             </div>
                         ))}
-                    </motion.div>
+                    </div>
 
-                    {/* Middle Column (Native-Grade Smoothness) */}
+                    {/* Column 2 (Parallax Middle) - Native Smoothness Engineering (iOS 60fps) */}
                     <motion.div
-                        style={{ y: middleY, ...cardStyle }}
-                        className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl"
+                        style={{ y: middleY, ...cardStyle, willChange: 'transform' }}
+                        className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
                     >
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
@@ -165,8 +165,8 @@ export default function EscuelasGallery3D() {
                         ))}
                     </motion.div>
 
-                    {/* Right Column (Inertial Sync) */}
-                    <motion.div style={{ y: sidesY, ...cardStyle }} className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl">
+                    {/* Column 3 (Static) */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
                         {column3.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -179,7 +179,7 @@ export default function EscuelasGallery3D() {
                                 />
                             </div>
                         ))}
-                    </motion.div>
+                    </div>
 
                 </div>
 
