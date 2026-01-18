@@ -17,13 +17,13 @@ export default function EscuelasPage() {
 
             <EscuelasHero />
 
-            {/* Content Container - Optimized Shadow for stability */}
-            <div id="escuelas-content" className="relative z-30 bg-white min-h-screen shadow-[0_-30px_60px_rgba(0,0,0,0.2)]">
+            {/* Content Container - Zero-Jump Flat Structure */}
+            <div id="escuelas-content" className="relative z-30 bg-white min-h-screen">
                 {/* Intro Section */}
                 <EscuelasIntro />
 
-                {/* Optimized Section Wrapper */}
-                <section className="relative w-full bg-white rounded-b-[50px] shadow-[0_20px_40px_-5px_rgba(0,0,0,0.15)] z-40 pb-8 mb-0">
+                {/* Flattened Gallery Section */}
+                <section className="relative w-full bg-white z-40 pb-16">
                     <EscuelasGallery3D />
                 </section>
 

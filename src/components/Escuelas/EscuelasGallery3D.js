@@ -29,9 +29,7 @@ export default function EscuelasGallery3D() {
             }
         };
 
-        // Use a slight delay to ensure dynamic images/fonts are loaded
-        const timer = setTimeout(updateLayout, 500);
-
+        const timer = setTimeout(updateLayout, 800);
         window.addEventListener('resize', updateLayout, { passive: true });
         window.addEventListener('load', updateLayout);
 
@@ -42,7 +40,7 @@ export default function EscuelasGallery3D() {
         };
     }, []);
 
-    // 2. High-Performance Passive Scroll Listener
+    // 2. Ultra-Stable Passive Scroll Listener
     useEffect(() => {
         const onScroll = () => {
             const scrollY = window.pageYOffset;
@@ -58,15 +56,14 @@ export default function EscuelasGallery3D() {
                     const containerMiddle = layout.current.top + (layout.current.height / 2);
                     const viewportMiddle = scrollY + (viewportHeight / 2);
 
-                    // Simple relative calculation (No getBoundingClientRect here!)
-                    const diff = (containerMiddle - viewportMiddle) * -0.15;
+                    // SUPER STABLE FACTOR: Minimum travel to prevent hardware fatigue
+                    const diff = (containerMiddle - viewportMiddle) * -0.08;
 
-                    // Clamp and apply
-                    const y = Math.max(-25, Math.min(25, diff));
+                    // Clamp to just 15px for maximum stability
+                    const y = Math.max(-15, Math.min(15, diff));
 
-                    // Direct DOM update with Zero-Jitter precision
-                    // Enforcing translate3d and using Z-force
-                    middleColumnRef.current.style.transform = `translate3d(0, ${y.toFixed(2)}px, 1px)`;
+                    // FLATTENED TRANSFORM: No nesting rotations, no rounding errors
+                    middleColumnRef.current.style.transform = `translate3d(0, ${y.toFixed(1)}px, 0)`;
 
                     layout.current.ticking = false;
                 });
@@ -74,7 +71,6 @@ export default function EscuelasGallery3D() {
             }
         };
 
-        // PASSIVE is the key for 60fps on Safari
         window.addEventListener('scroll', onScroll, { passive: true });
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
@@ -133,78 +129,73 @@ export default function EscuelasGallery3D() {
         fetchSchools();
     }, []);
 
-    // Base card styling for GPU stability
+    // Base card styling - Extreme Simplification
     const cardStyle = {
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
-        WebkitTransformStyle: 'preserve-3d',
-        transformStyle: 'preserve-3d',
         transform: 'translate3d(0,0,0)'
     };
 
     return (
         <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'paint' }}>
             {/* Container */}
-            <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
-                {/* 3D Masonry Grid */}
-                <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
-                    style={{ transform: 'perspective(1200px) rotateX(10deg) rotateZ(-3deg)' }}>
+            <div className="relative h-[600px] md:h-[800px] w-full flex justify-center pt-8">
 
-                    {/* Column 1 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                {/* 
+                  FLATTENED GRID: Removed rotateX and rotateZ to eliminate Safari jump artifact.
+                  The "look" is now achieved with simple offsets and clean proportions.
+                */}
+                <div className="flex justify-center gap-3 md:gap-6 w-full max-w-[1400px] px-4 md:px-12 origin-center">
+
+                    {/* Column 1 - Static */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 pt-12 md:pt-20">
                         {column1.map((src, i) => (
-                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
+                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100 shadow-lg" style={cardStyle}>
                                 <Image src={src} fill className="object-cover" alt="Gallery" sizes="(max-width: 768px) 33vw, 25vw" priority decoding="async" />
                             </div>
                         ))}
                     </div>
 
-                    {/* Column 2 (Zero-Reflow Parallax) */}
-                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
-                        style={{
-                            willChange: 'transform',
-                            WebkitBackfaceVisibility: 'hidden',
-                            backfaceVisibility: 'hidden',
-                            transformStyle: 'preserve-3d'
-                        }}>
+                    {/* Column 2 - Stable Parallax */}
+                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3" style={{ willChange: 'transform' }}>
                         {column2.map((src, i) => (
-                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
+                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100 shadow-xl" style={cardStyle}>
                                 <Image src={src} fill className="object-cover" alt="Gallery" sizes="(max-width: 768px) 33vw, 25vw" priority decoding="async" />
                             </div>
                         ))}
                     </div>
 
-                    {/* Column 3 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Column 3 - Static */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 pt-6 md:pt-10">
                         {column3.map((src, i) => (
-                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
+                            <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100 shadow-lg" style={cardStyle}>
                                 <Image src={src} fill className="object-cover" alt="Gallery" sizes="(max-width: 768px) 33vw, 25vw" decoding="async" />
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Marquee Section (Preserved) */}
-                <div className="absolute top-[400px] md:top-[550px] left-0 w-full h-[600px] flex flex-col justify-start z-20 pointer-events-none">
-                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white via-70% to-transparent"></div>
-                    <div className="relative z-30 w-full pt-32" style={{ perspective: '1000px' }}>
-                        <div className="text-center mb-6">
+                {/* Marquee Section (Stable Stacking) */}
+                <div className="absolute top-[400px] md:top-[500px] left-0 w-full h-[600px] flex flex-col justify-start z-30 pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-white via-60% to-transparent"></div>
+                    <div className="relative z-30 w-full pt-24 text-center">
+                        <div className="mb-6">
                             <span className="inline-block text-[10px] md:text-xs font-black tracking-[0.3em] uppercase text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">Ellos ya volaron</span>
                         </div>
-                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${animationReady ? 'opacity-100' : 'opacity-0'}`} style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}>
-                            <div className={`flex whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max ${animationReady ? 'animate-marquee' : ''}`} style={{ WebkitTransform: 'translate3d(0,0,0)', transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
+
+                        <div className={`relative w-full overflow-hidden transition-opacity duration-1000 ${animationReady ? 'opacity-100' : 'opacity-0'}`}>
+                            <div className={`flex whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max ${animationReady ? 'animate-marquee' : ''}`} style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}>
                                 {[...schools, ...schools, ...schools].map((school, idx) => (
-                                    <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0 group" style={{ WebkitFontSmoothing: 'antialiased', backfaceVisibility: 'hidden' }}>
-                                        <School className="w-8 h-8 md:w-10 md:h-10 text-blue-600/40 group-hover:text-blue-600 transition-colors duration-500" />
+                                    <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0" style={{ backfaceVisibility: 'hidden' }}>
+                                        <School className="w-8 h-8 md:w-10 md:h-10 text-blue-600/40" />
                                         <h4 className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight uppercase">{school}</h4>
                                     </div>
                                 ))}
                             </div>
-                            <div className="absolute inset-y-0 left-0 w-8 md:w-32 bg-gradient-to-r from-white to-transparent z-40"></div>
-                            <div className="absolute inset-y-0 right-0 w-8 md:w-32 bg-gradient-to-l from-white to-transparent z-40"></div>
                         </div>
-                        <div className="mt-8 text-center px-4">
-                            <p className="text-xs md:text-sm tracking-[0.2em] text-slate-400 uppercase font-medium">Únete a las instituciones que están <span className="font-black text-slate-900 opacity-80">redefiniendo el futuro.</span></p>
+
+                        <div className="mt-8">
+                            <p className="text-[10px] md:text-sm tracking-[0.2em] text-slate-400 uppercase font-medium">Únete a las instituciones que están <span className="font-black text-slate-900 opacity-80">redefiniendo el futuro.</span></p>
                         </div>
                     </div>
                 </div>
