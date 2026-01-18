@@ -14,16 +14,16 @@ export default function EscuelasGallery3D() {
         offset: ["start end", "end start"]
     });
 
-    // 2. Spring Physics (The secret for native smoothness)
-    // stiffnes/damping chosen for native Apple-like response
+    // 2. Anti-Jitter Spring Physics
+    // Lower stiffness and higher damping ratio to "absorb" scroll vibrations
     const smoothProgress = useSpring(scrollYProgress, {
-        stiffness: 100,
-        damping: 30,
+        stiffness: 40,
+        damping: 25,
         restDelta: 0.001
     });
 
-    // 3. Optimized Travel (Reduced from 100 to 40 for higher FPS)
-    const middleY = useTransform(smoothProgress, [0, 1], [40, -40]);
+    // 3. Optimized Travel (Enforce translate3d via motion)
+    const middleY = useTransform(smoothProgress, [0, 1], ["20px", "-20px"]);
 
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
@@ -109,13 +109,13 @@ export default function EscuelasGallery3D() {
         fetchSchools();
     }, []);
 
-    // Optimized Card Style for GPU Isolation
+    // Anti-Jitter Card Foundation
     const cardStyle = {
-        transform: 'translateZ(0)',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
-        WebkitPerspective: '1000px',
-        perspective: '1000px'
+        WebkitTransformStyle: 'preserve-3d',
+        transformStyle: 'preserve-3d',
+        transform: 'translateZ(0)' // Individual layer promotion
     };
 
     return (
@@ -145,9 +145,14 @@ export default function EscuelasGallery3D() {
                         ))}
                     </div>
 
-                    {/* Column 2 (Parallax Middle) - Native Smoothness Engineering (iOS 60fps) */}
+                    {/* Column 2 (Parallax Middle) - Anti-Jitter Engineering */}
                     <motion.div
-                        style={{ y: middleY, ...cardStyle, willChange: 'transform' }}
+                        style={{
+                            y: middleY,
+                            z: 0.1, // Forces translate3d for absolute Z-layer separation
+                            ...cardStyle,
+                            willChange: 'transform'
+                        }}
                         className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
                     >
                         {column2.map((src, i) => (
