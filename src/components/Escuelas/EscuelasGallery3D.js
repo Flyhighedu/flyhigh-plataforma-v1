@@ -10,70 +10,73 @@ export default function EscuelasGallery3D() {
     const containerRef = useRef(null);
     const middleColumnRef = useRef(null);
 
-    // Cached values to avoid layout thrashing
-    const layoutData = useRef({
-        containerTop: 0,
-        containerHeight: 0,
-        currentY: 0,
-        targetY: 0,
-        lerp: 0.12
+    // Cached values to avoid layout thrashing during scroll
+    const layout = useRef({
+        top: 0,
+        height: 0,
+        active: false,
+        lastScrollY: 0,
+        ticking: false
     });
 
-    // Capture initial layout once (and on resize)
+    // Capture initial layout once and on resize
     useEffect(() => {
         const updateLayout = () => {
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
-                // Add scrollY to get absolute coordinate
-                layoutData.current.containerTop = rect.top + window.scrollY;
-                layoutData.current.containerHeight = rect.height;
+                layout.current.top = rect.top + window.scrollY;
+                layout.current.height = rect.height;
             }
         };
 
-        updateLayout();
-        window.addEventListener('resize', updateLayout, { passive: true });
-        window.addEventListener('scroll', updateLayout, { once: true }); // Catch late layout shifts
+        // Use a slight delay to ensure dynamic images/fonts are loaded
+        const timer = setTimeout(updateLayout, 500);
 
-        return () => window.removeEventListener('resize', updateLayout);
+        window.addEventListener('resize', updateLayout, { passive: true });
+        window.addEventListener('load', updateLayout);
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', updateLayout);
+            window.removeEventListener('load', updateLayout);
+        };
     }, []);
 
-    // 2. High-Performance Manual Loop (Zero-Reflow)
+    // 2. High-Performance Passive Scroll Listener
     useEffect(() => {
-        let rafId;
+        const onScroll = () => {
+            const scrollY = window.pageYOffset;
 
-        const updateParallax = () => {
-            if (!middleColumnRef.current) {
-                rafId = requestAnimationFrame(updateParallax);
-                return;
+            if (!layout.current.ticking) {
+                window.requestAnimationFrame(() => {
+                    if (!middleColumnRef.current) {
+                        layout.current.ticking = false;
+                        return;
+                    }
+
+                    const viewportHeight = window.innerHeight;
+                    const containerMiddle = layout.current.top + (layout.current.height / 2);
+                    const viewportMiddle = scrollY + (viewportHeight / 2);
+
+                    // Simple relative calculation (No getBoundingClientRect here!)
+                    const diff = (containerMiddle - viewportMiddle) * -0.15;
+
+                    // Clamp and apply
+                    const y = Math.max(-25, Math.min(25, diff));
+
+                    // Direct DOM update with Zero-Jitter precision
+                    // Enforcing translate3d and using Z-force
+                    middleColumnRef.current.style.transform = `translate3d(0, ${y.toFixed(2)}px, 1px)`;
+
+                    layout.current.ticking = false;
+                });
+                layout.current.ticking = true;
             }
-
-            // USE window.scrollY (FAST) instead of getBoundingClientRect (SLOW)
-            const scrollY = window.scrollY;
-            const viewportHeight = window.innerHeight;
-
-            // Calculate relative offset without triggering layout reflow
-            const containerMiddle = layoutData.current.containerTop + (layoutData.current.containerHeight / 2);
-            const viewportMiddle = scrollY + (viewportHeight / 2);
-
-            // Difference from center of screen (math only)
-            const diff = (containerMiddle - viewportMiddle) * -0.15;
-
-            // Clamp and set target
-            layoutData.current.targetY = Math.max(-25, Math.min(25, diff));
-
-            // Smooth Lerp
-            layoutData.current.currentY += (layoutData.current.targetY - layoutData.current.currentY) * layoutData.current.lerp;
-
-            // Direct DOM update with precision control
-            middleColumnRef.current.style.transform = `translate3d(0, ${layoutData.current.currentY.toFixed(2)}px, 0) translateZ(1px)`;
-
-            rafId = requestAnimationFrame(updateParallax);
         };
 
-        rafId = requestAnimationFrame(updateParallax);
-        return () => {
-            if (rafId) cancelAnimationFrame(rafId);
-        };
+        // PASSIVE is the key for 60fps on Safari
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
     const column1 = [
@@ -140,7 +143,7 @@ export default function EscuelasGallery3D() {
     };
 
     return (
-        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'paint layout style' }}>
+        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'paint' }}>
             {/* Container */}
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
                 {/* 3D Masonry Grid */}
@@ -157,7 +160,13 @@ export default function EscuelasGallery3D() {
                     </div>
 
                     {/* Column 2 (Zero-Reflow Parallax) */}
-                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl" style={{ willChange: 'transform' }}>
+                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
+                        style={{
+                            willChange: 'transform',
+                            WebkitBackfaceVisibility: 'hidden',
+                            backfaceVisibility: 'hidden',
+                            transformStyle: 'preserve-3d'
+                        }}>
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image src={src} fill className="object-cover" alt="Gallery" sizes="(max-width: 768px) 33vw, 25vw" priority decoding="async" />

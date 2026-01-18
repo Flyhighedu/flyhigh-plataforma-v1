@@ -12,18 +12,18 @@ import EscuelasWizard from '@/components/Escuelas/EscuelasWizard';
 
 export default function EscuelasPage() {
     return (
-        <main className="min-h-screen w-full overflow-x-hidden relative">
+        <main className="min-h-screen w-full overflow-x-hidden relative" style={{ isolation: 'isolate' }}>
             <Navbar />
 
             <EscuelasHero />
 
-            {/* Content Container */}
-            <div id="escuelas-content" className="relative z-30 bg-white min-h-screen shadow-[0_-50px_100px_rgba(0,0,0,0.5)]">
+            {/* Content Container - Optimized Shadow for stability */}
+            <div id="escuelas-content" className="relative z-30 bg-white min-h-screen shadow-[0_-30px_60px_rgba(0,0,0,0.2)]">
                 {/* Intro Section */}
                 <EscuelasIntro />
 
-                {/* New Framer-style 3D Gallery & Showcase - Restored White Card Wrapper */}
-                <section className="relative w-full bg-white rounded-b-[50px] shadow-[0_40px_60px_-15px_rgba(0,0,0,0.3)] z-40 pb-8 mb-0">
+                {/* Optimized Section Wrapper */}
+                <section className="relative w-full bg-white rounded-b-[50px] shadow-[0_20px_40px_-5px_rgba(0,0,0,0.15)] z-40 pb-8 mb-0">
                     <EscuelasGallery3D />
                 </section>
 

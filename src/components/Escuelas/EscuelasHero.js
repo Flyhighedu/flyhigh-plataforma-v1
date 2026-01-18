@@ -11,7 +11,7 @@ export default function EscuelasHero() {
     };
 
     return (
-        <header className="sticky top-0 w-full h-screen overflow-hidden font-sans z-0">
+        <header className="sticky top-0 w-full h-[100dvh] overflow-hidden font-sans z-0">
             {/* Background Video */}
             <div className="absolute inset-0 z-0">
                 <video
