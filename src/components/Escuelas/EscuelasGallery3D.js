@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
@@ -8,30 +9,32 @@ export default function EscuelasGallery3D() {
     // Parallax Ref
     const middleColumnRef = useRef(null);
 
-    // Unified parallax effect using relative viewport position
+    // Unified parallax effect with RAF for performance
     useEffect(() => {
+        let rafId;
         const handleScroll = () => {
+            // Basic check to avoid errors if ref is null
             if (middleColumnRef.current) {
-                const rect = middleColumnRef.current.parentElement.getBoundingClientRect();
-                const viewportHeight = window.innerHeight;
+                rafId = requestAnimationFrame(() => {
+                    if (!middleColumnRef.current) return;
+                    const rect = middleColumnRef.current.parentElement.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    const distanceFromCenter = rect.top + rect.height / 2 - viewportHeight / 2;
 
-                // Calculate position relative to viewport center
-                // 0 when centered, negative when above, positive when below
-                const distanceFromCenter = rect.top + rect.height / 2 - viewportHeight / 2;
-
-                // Apply subtle parallax based on relative position
-                // This ensures it starts "neutral" when centered and moves logically
-                middleColumnRef.current.style.transform = `translateY(${distanceFromCenter * 0.1}px)`;
+                    // GPU Accelerated transform using translate3d for z-axis promotion
+                    middleColumnRef.current.style.transform = `translate3d(0, ${distanceFromCenter * 0.1}px, 0)`;
+                });
             }
         };
 
-        window.addEventListener('scroll', handleScroll);
-        window.addEventListener('resize', handleScroll); // Handle resize
-        handleScroll(); // Initial calculation
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('resize', handleScroll, { passive: true });
+        handleScroll();
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
             window.removeEventListener('resize', handleScroll);
+            if (rafId) cancelAnimationFrame(rafId);
         };
     }, []);
 
@@ -52,6 +55,7 @@ export default function EscuelasGallery3D() {
     ];
 
     const [schools, setSchools] = useState([]);
+    const [isLoaded, setIsLoaded] = useState(false);
 
     // Función de limpieza de nombres
     const sanitizeSchoolName = (name) => {
@@ -104,6 +108,9 @@ export default function EscuelasGallery3D() {
                 // 4. Update State (No fallback/mock data)
                 setSchools(Array.from(allNames));
 
+                // Trigger Fade In
+                setTimeout(() => setIsLoaded(true), 100);
+
             } catch (err) {
                 console.error("Unexpected error fetching schools:", err);
             }
@@ -122,29 +129,49 @@ export default function EscuelasGallery3D() {
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
                     style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
 
-                    {/* Column 1 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Column 1 (Static) - Priority LCP */}
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl will-change-transform">
                         {column1.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
-                                <img src={src} className="w-full h-full object-cover" alt="Gallery" />
+                                <Image
+                                    src={src}
+                                    fill
+                                    className="object-cover"
+                                    alt="Gallery"
+                                    sizes="(max-width: 768px) 33vw, 25vw"
+                                    priority
+                                />
                             </div>
                         ))}
                     </div>
 
-                    {/* Column 2 (Parallax Middle) - Ref for scroll effect */}
-                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl transition-transform duration-75 ease-out will-change-transform">
+                    {/* Column 2 (Parallax Middle) - GPU Accelerated */}
+                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl will-change-transform">
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
-                                <img src={src} className="w-full h-full object-cover" alt="Gallery" />
+                                <Image
+                                    src={src}
+                                    fill
+                                    className="object-cover"
+                                    alt="Gallery"
+                                    sizes="(max-width: 768px) 33vw, 25vw"
+                                    priority
+                                />
                             </div>
                         ))}
                     </div>
 
                     {/* Column 3 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl will-change-transform">
                         {column3.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
-                                <img src={src} className="w-full h-full object-cover" alt="Gallery" />
+                                <Image
+                                    src={src}
+                                    fill
+                                    className="object-cover"
+                                    alt="Gallery"
+                                    sizes="(max-width: 768px) 33vw, 25vw"
+                                />
                             </div>
                         ))}
                     </div>
@@ -165,8 +192,8 @@ export default function EscuelasGallery3D() {
                             </span>
                         </div>
 
-                        {/* HIGH SPEED MARQUEE */}
-                        <div className="relative w-full overflow-hidden pointer-events-auto">
+                        {/* HIGH SPEED MARQUEE with Fade In */}
+                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
                             <div className="flex animate-marquee whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max">
                                 {[...schools, ...schools].map((school, idx) => (
                                     <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0 group">
