@@ -6,48 +6,71 @@ import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
 export default function EscuelasGallery3D() {
-    // 1. Zero-Jitter Manual Engine Refs
+    // 1. Zero-Reflow Manual Engine Refs
     const containerRef = useRef(null);
     const middleColumnRef = useRef(null);
-    const scrollData = useRef({
+
+    // Cached values to avoid layout thrashing
+    const layoutData = useRef({
+        containerTop: 0,
+        containerHeight: 0,
         currentY: 0,
         targetY: 0,
-        lerp: 0.1 // Smoothness factor
+        lerp: 0.12
     });
 
-    // 2. High-Performance Manual Loop (Bypass React for Scroll)
+    // Capture initial layout once (and on resize)
+    useEffect(() => {
+        const updateLayout = () => {
+            if (containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                // Add scrollY to get absolute coordinate
+                layoutData.current.containerTop = rect.top + window.scrollY;
+                layoutData.current.containerHeight = rect.height;
+            }
+        };
+
+        updateLayout();
+        window.addEventListener('resize', updateLayout, { passive: true });
+        window.addEventListener('scroll', updateLayout, { once: true }); // Catch late layout shifts
+
+        return () => window.removeEventListener('resize', updateLayout);
+    }, []);
+
+    // 2. High-Performance Manual Loop (Zero-Reflow)
     useEffect(() => {
         let rafId;
 
         const updateParallax = () => {
-            if (!containerRef.current || !middleColumnRef.current) {
+            if (!middleColumnRef.current) {
                 rafId = requestAnimationFrame(updateParallax);
                 return;
             }
 
-            const rect = containerRef.current.getBoundingClientRect();
+            // USE window.scrollY (FAST) instead of getBoundingClientRect (SLOW)
+            const scrollY = window.scrollY;
             const viewportHeight = window.innerHeight;
 
-            // Calculate entry/pivot point
-            const centerPoint = rect.top + rect.height / 2;
-            const screenCenter = viewportHeight / 2;
-            const diff = (centerPoint - screenCenter) * -0.12; // Direction and intensity
+            // Calculate relative offset without triggering layout reflow
+            const containerMiddle = layoutData.current.containerTop + (layoutData.current.containerHeight / 2);
+            const viewportMiddle = scrollY + (viewportHeight / 2);
+
+            // Difference from center of screen (math only)
+            const diff = (containerMiddle - viewportMiddle) * -0.15;
 
             // Clamp and set target
-            scrollData.current.targetY = Math.max(-25, Math.min(25, diff));
+            layoutData.current.targetY = Math.max(-25, Math.min(25, diff));
 
-            // Smooth Lerp (Linear Interpolation)
-            scrollData.current.currentY += (scrollData.current.targetY - scrollData.current.currentY) * scrollData.current.lerp;
+            // Smooth Lerp
+            layoutData.current.currentY += (layoutData.current.targetY - layoutData.current.currentY) * layoutData.current.lerp;
 
-            // Direct DOM update (The secret to Zero-Jitter)
-            // Fixes Safari rounding errors by using toFixed(2)
-            middleColumnRef.current.style.transform = `translate3d(0, ${scrollData.current.currentY.toFixed(2)}px, 0) translateZ(1px)`;
+            // Direct DOM update with precision control
+            middleColumnRef.current.style.transform = `translate3d(0, ${layoutData.current.currentY.toFixed(2)}px, 0) translateZ(1px)`;
 
             rafId = requestAnimationFrame(updateParallax);
         };
 
         rafId = requestAnimationFrame(updateParallax);
-
         return () => {
             if (rafId) cancelAnimationFrame(rafId);
         };
@@ -107,7 +130,7 @@ export default function EscuelasGallery3D() {
         fetchSchools();
     }, []);
 
-    // Base card styling for stability
+    // Base card styling for GPU stability
     const cardStyle = {
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
@@ -117,7 +140,7 @@ export default function EscuelasGallery3D() {
     };
 
     return (
-        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'layout paint' }}>
+        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'paint layout style' }}>
             {/* Container */}
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
                 {/* 3D Masonry Grid */}
@@ -133,7 +156,7 @@ export default function EscuelasGallery3D() {
                         ))}
                     </div>
 
-                    {/* Column 2 (Parallax Middle) - DIRECT DOM ACCESS */}
+                    {/* Column 2 (Zero-Reflow Parallax) */}
                     <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl" style={{ willChange: 'transform' }}>
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
