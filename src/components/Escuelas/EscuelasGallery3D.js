@@ -55,6 +55,7 @@ export default function EscuelasGallery3D() {
     ];
 
     const [schools, setSchools] = useState([]);
+    const [animationReady, setAnimationReady] = useState(false);
 
     // Función de limpieza de nombres
     const sanitizeSchoolName = (name) => {
@@ -104,11 +105,14 @@ export default function EscuelasGallery3D() {
                     if (clean && clean.length > 2) allNames.add(clean);
                 });
 
-                // 4. Update State (No fallback/mock data)
-                setSchools(Array.from(allNames));
+                // 4. Update State and trigger animation activation
+                const namesArray = Array.from(allNames);
+                setSchools(namesArray);
 
-                // Trigger Fade In
-                setTimeout(() => setIsLoaded(true), 100);
+                // Forzar un micro-delay para que Safari registre el cambio de DOM antes de animar
+                if (namesArray.length > 0) {
+                    setTimeout(() => setAnimationReady(true), 50);
+                }
 
             } catch (err) {
                 console.error("Unexpected error fetching schools:", err);
@@ -184,21 +188,37 @@ export default function EscuelasGallery3D() {
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white via-70% to-transparent"></div>
 
                     {/* Content Layer */}
-                    <div className="relative z-30 w-full pt-32">
+                    <div className="relative z-30 w-full pt-32" style={{ perspective: '1000px' }}>
                         <div className="text-center mb-6">
                             <span className="inline-block text-[10px] md:text-xs font-black tracking-[0.3em] uppercase text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">
                                 Ellos ya volaron
                             </span>
                         </div>
 
-                        {/* HIGH SPEED MARQUEE with Robust Visibility for iPhone */}
-                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-1000 ease-out ${schools.length > 0 ? 'opacity-100' : 'opacity-0'}`}
-                            style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}>
-                            <div className="flex animate-marquee whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max"
-                                style={{ WebkitTransform: 'translate3d(0,0,0)', transform: 'translate3d(0,0,0)' }}>
-                                {[...schools, ...schools].map((school, idx) => (
+                        {/* HIGH SPEED MARQUEE with Safari Fixes */}
+                        <div className={`relative w-full overflow-hidden pointer-events-auto transition-opacity duration-700 ease-out ${animationReady ? 'opacity-100' : 'opacity-0'}`}
+                            style={{
+                                WebkitBackfaceVisibility: 'hidden',
+                                backfaceVisibility: 'hidden',
+                                WebkitOverflowScrolling: 'touch'
+                            }}>
+
+                            {/* Inyectamos la clase de animación solo cuando los datos están listos */}
+                            <div className={`flex whitespace-nowrap gap-12 md:gap-24 items-center px-4 w-max ${animationReady ? 'animate-marquee' : ''}`}
+                                style={{
+                                    WebkitTransform: 'translate3d(0,0,0)',
+                                    transform: 'translate3d(0,0,0)',
+                                    willChange: 'transform'
+                                }}>
+
+                                {/* Triplicamos los datos para asegurar que el bucle sea infinito e invisible en cualquier pantalla */}
+                                {[...schools, ...schools, ...schools].map((school, idx) => (
                                     <div key={idx} className="flex items-center gap-4 md:gap-6 shrink-0 group"
-                                        style={{ WebkitFontSmoothing: 'antialiased', backfaceVisibility: 'hidden' }}>
+                                        style={{
+                                            WebkitFontSmoothing: 'antialiased',
+                                            WebkitBackfaceVisibility: 'hidden',
+                                            backfaceVisibility: 'hidden'
+                                        }}>
                                         <School className="w-8 h-8 md:w-10 md:h-10 text-blue-600/40 group-hover:text-blue-600 transition-colors duration-500" />
                                         <h4 className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight uppercase">
                                             {school}
@@ -208,8 +228,8 @@ export default function EscuelasGallery3D() {
                             </div>
 
                             {/* Side Fades */}
-                            <div className="absolute inset-y-0 left-0 w-8 md:w-32 bg-gradient-to-r from-white to-transparent z-40"></div>
-                            <div className="absolute inset-y-0 right-0 w-8 md:w-32 bg-gradient-to-l from-white to-transparent z-40"></div>
+                            <div className="absolute inset-y-0 left-0 w-8 md:w-32 bg-gradient-to-r from-white to-transparent z-40 pointer-events-none"></div>
+                            <div className="absolute inset-y-0 right-0 w-8 md:w-32 bg-gradient-to-l from-white to-transparent z-40 pointer-events-none"></div>
                         </div>
 
                         {/* Engagement Label (Refined) */}
