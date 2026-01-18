@@ -6,7 +6,8 @@ import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     School, MapPin, FileText, Camera, Lock, KeyRound, ShieldCheck,
-    Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar
+    Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar,
+    ChevronDown, ChevronUp
 } from 'lucide-react';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
@@ -63,6 +64,14 @@ export default function AdminPage() {
     const [nextSchoolLoading, setNextSchoolLoading] = useState(false); // <--- Added this line
     const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
     const [editingSchoolId, setEditingSchoolId] = useState(null);
+
+    // --- ESTADO DE ESCUELAS EXTRAS (Históricas/Manuales) ---
+    const [extraSchools, setExtraSchools] = useState([]);
+    const [extraSchoolForm, setExtraSchoolForm] = useState({ nombre: '' });
+    const [extraSchoolLoading, setExtraSchoolLoading] = useState(false);
+    const [fetchingExtraSchools, setFetchingExtraSchools] = useState(false);
+
+    const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
 
     // --- ESTADO DEL PANEL DE IMPACTO ---
     const [impactData, setImpactData] = useState({
@@ -141,7 +150,35 @@ export default function AdminPage() {
         fetchSponsors();
         fetchBecasData();
         fetchNextSchools();
+        fetchSponsors();
+        fetchBecasData();
+        fetchNextSchools();
+        fetchExtraSchools();
     }, [isAuthenticated]);
+
+    // Fetch Escuelas Extras
+    const fetchExtraSchools = async () => {
+        setFetchingExtraSchools(true);
+        try {
+            const { data, error } = await supabaseNew
+                .from('escuelas_extras')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                if (error.code === '42P01') {
+                    console.warn('Tabla escuelas_extras no existe.');
+                    return;
+                }
+                throw error;
+            }
+            setExtraSchools(data || []);
+        } catch (err) {
+            console.error('Error fetching extra schools:', err);
+        } finally {
+            setFetchingExtraSchools(false);
+        }
+    };
 
     // Fetch próximas escuelas
     const fetchNextSchools = async () => {
@@ -657,6 +694,51 @@ export default function AdminPage() {
         }
     };
 
+    // Handlers de Escuelas Extras
+    const handleExtraSchoolSubmit = async (e) => {
+        e.preventDefault();
+        setExtraSchoolLoading(true);
+        try {
+            const { data, error } = await supabaseNew
+                .from('escuelas_extras')
+                .insert({ nombre: extraSchoolForm.nombre })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            setExtraSchools(prev => [data, ...prev]);
+            setExtraSchoolForm({ nombre: '' });
+            alert('Escuela extra agregada exitosamente');
+        } catch (err) {
+            console.error('Error saving extra school:', err);
+            alert('Error al guardar escuela extra');
+        } finally {
+            setExtraSchoolLoading(false);
+        }
+    };
+
+    const handleDeleteExtraSchool = async (id) => {
+        if (!confirm('¿Eliminar esta escuela extra?')) return;
+
+        // Optimistic
+        const prevList = [...extraSchools];
+        setExtraSchools(prev => prev.filter(s => s.id !== id));
+
+        try {
+            const { error } = await supabaseNew
+                .from('escuelas_extras')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error deleting extra school:', err);
+            setExtraSchools(prevList);
+            alert('Error al eliminar');
+        }
+    };
+
     // Handler para actualizar niños patrocinados (Impacto de Becas)
     const handleBecasUpdate = async () => {
         setBecasLoading(true);
@@ -1101,481 +1183,611 @@ export default function AdminPage() {
                         )}
                     </section>
                 </div>
-            )}
 
-            {activeTab === 'patrocinadores' && (
-                <div className="max-w-5xl mx-auto space-y-8">
-                    {/* --- SECCIÓN: IMPACTO DE BECAS --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
-                                <Heart className="w-5 h-5 text-fuchsia-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold">Impacto de Becas</h2>
-                                <p className="text-slate-400 text-xs">Tabla: estadísticas · Columna: niños patrocinados</p>
-                            </div>
-                        </div>
+            )
+            }
 
-                        {fetchingBecas ? (
-                            <div className="flex items-center justify-center py-8">
-                                <Loader2 className="w-6 h-6 animate-spin text-fuchsia-500" />
+            {
+                activeTab === 'patrocinadores' && (
+                    <div className="max-w-5xl mx-auto space-y-8">
+                        {/* --- SECCIÓN: IMPACTO DE BECAS --- */}
+                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
+                                    <Heart className="w-5 h-5 text-fuchsia-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-bold">Impacto de Becas</h2>
+                                    <p className="text-slate-400 text-xs">Tabla: estadísticas · Columna: niños patrocinados</p>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="space-y-4">
+
+                            {fetchingBecas ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-6 h-6 animate-spin text-fuchsia-500" />
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <Users size={14} /> Niños Patrocinados
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={ninosPatrocinados}
+                                            onChange={(e) => setNinosPatrocinados(e.target.value)}
+                                            min="0"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white text-2xl font-bold placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent transition-all"
+                                        />
+                                        <p className="text-slate-500 text-xs mt-2">Este valor se muestra en Homepage y Dashboard de patrocinadores.</p>
+                                    </div>
+
+                                    {becasMessage.text && (
+                                        <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${becasMessage.type === 'success'
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                            }`}>
+                                            {becasMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                            {becasMessage.text}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleBecasUpdate}
+                                        disabled={becasLoading}
+                                        className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-fuchsia-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {becasLoading ? (
+                                            <><Loader2 size={18} className="animate-spin" /> Actualizando...</>
+                                        ) : (
+                                            <><RefreshCw size={18} /> Actualizar Impacto</>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+
+                        {/* --- FORMULARIO DE ALTA DE PATROCINADOR --- */}
+                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
+                                    <Building2 className="w-5 h-5 text-violet-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-bold">Nuevo Patrocinador</h2>
+                                    <p className="text-slate-400 text-xs">Registra una nueva empresa patrocinadora</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSponsorSubmit} className="space-y-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <Building2 size={14} /> Nombre de Empresa
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="nombre"
+                                            value={sponsorForm.nombre}
+                                            onChange={handleSponsorInputChange}
+                                            required
+                                            placeholder="Ej: Empresa ABC"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <Mail size={14} /> Correo Electrónico
+                                        </label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={sponsorForm.email}
+                                            onChange={handleSponsorInputChange}
+                                            required
+                                            placeholder="contacto@empresa.com"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <Lock size={14} /> Contraseña
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="password"
+                                            value={sponsorForm.password}
+                                            onChange={handleSponsorInputChange}
+                                            required
+                                            placeholder="Contraseña de acceso"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Nueva fila para Aportación */}
                                 <div>
                                     <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Users size={14} /> Niños Patrocinados
+                                        <span className="text-emerald-400">💲</span> Aportación Económica ($)
                                     </label>
                                     <input
                                         type="number"
-                                        value={ninosPatrocinados}
-                                        onChange={(e) => setNinosPatrocinados(e.target.value)}
-                                        min="0"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white text-2xl font-bold placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent transition-all"
+                                        name="aportacion"
+                                        value={sponsorForm.aportacion}
+                                        onChange={handleSponsorInputChange}
+                                        placeholder="Ej: 50000"
+                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
                                     />
-                                    <p className="text-slate-500 text-xs mt-2">Este valor se muestra en Homepage y Dashboard de patrocinadores.</p>
+                                    <p className="text-xs text-slate-500 mt-1">Esta cifra será visible solo para este patrocinador.</p>
                                 </div>
 
-                                {becasMessage.text && (
-                                    <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${becasMessage.type === 'success'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                        : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                        }`}>
-                                        {becasMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                        {becasMessage.text}
+                                {sponsorMessage.text && (
+                                    <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${sponsorMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                                        {sponsorMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                        {sponsorMessage.text}
                                     </div>
                                 )}
 
                                 <button
-                                    onClick={handleBecasUpdate}
-                                    disabled={becasLoading}
-                                    className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-fuchsia-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    type="submit"
+                                    disabled={sponsorLoading}
+                                    className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSponsorId
+                                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
+                                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 text-white'
+                                        }`}
                                 >
-                                    {becasLoading ? (
-                                        <><Loader2 size={18} className="animate-spin" /> Actualizando...</>
+                                    {sponsorLoading ? (
+                                        <><Loader2 size={18} className="animate-spin" /> {editingSponsorId ? 'Actualizando...' : 'Guardando...'} </>
                                     ) : (
-                                        <><RefreshCw size={18} /> Actualizar Impacto</>
+                                        <>{editingSponsorId ? <RefreshCw size={18} /> : <Building2 size={18} />} {editingSponsorId ? 'Actualizar Datos' : 'Registrar Patrocinador'}</>
                                     )}
                                 </button>
-                            </div>
-                        )}
-                    </section>
 
-                    {/* --- FORMULARIO DE ALTA DE PATROCINADOR --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                                <Building2 className="w-5 h-5 text-violet-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold">Nuevo Patrocinador</h2>
-                                <p className="text-slate-400 text-xs">Registra una nueva empresa patrocinadora</p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSponsorSubmit} className="space-y-5">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Building2 size={14} /> Nombre de Empresa
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="nombre"
-                                        value={sponsorForm.nombre}
-                                        onChange={handleSponsorInputChange}
-                                        required
-                                        placeholder="Ej: Empresa ABC"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Mail size={14} /> Correo Electrónico
-                                    </label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={sponsorForm.email}
-                                        onChange={handleSponsorInputChange}
-                                        required
-                                        placeholder="contacto@empresa.com"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Lock size={14} /> Contraseña
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="password"
-                                        value={sponsorForm.password}
-                                        onChange={handleSponsorInputChange}
-                                        required
-                                        placeholder="Contraseña de acceso"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Nueva fila para Aportación */}
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <span className="text-emerald-400">💲</span> Aportación Económica ($)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="aportacion"
-                                    value={sponsorForm.aportacion}
-                                    onChange={handleSponsorInputChange}
-                                    placeholder="Ej: 50000"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Esta cifra será visible solo para este patrocinador.</p>
-                            </div>
-
-                            {sponsorMessage.text && (
-                                <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${sponsorMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                                    {sponsorMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                    {sponsorMessage.text}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={sponsorLoading}
-                                className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSponsorId
-                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
-                                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 text-white'
-                                    }`}
-                            >
-                                {sponsorLoading ? (
-                                    <><Loader2 size={18} className="animate-spin" /> {editingSponsorId ? 'Actualizando...' : 'Guardando...'} </>
-                                ) : (
-                                    <>{editingSponsorId ? <RefreshCw size={18} /> : <Building2 size={18} />} {editingSponsorId ? 'Actualizar Datos' : 'Registrar Patrocinador'}</>
-                                )}
-                            </button>
-
-                            {editingSponsorId && (
-                                <button
-                                    type="button"
-                                    onClick={handleCancelEdit}
-                                    className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <X size={18} /> Cancelar Edición
-                                </button>
-                            )}
-                        </form>
-                    </section>
-
-                    {/* --- LISTA DE PATROCINADORES --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
-                                    <Users className="w-5 h-5 text-fuchsia-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Patrocinadores Registrados</h2>
-                                    <p className="text-slate-400 text-xs">{sponsors.length} registros</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setShowPasswords(!showPasswords)}
-                                    className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                                    title={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
-                                >
-                                    {showPasswords ? <EyeOff size={18} className="text-slate-400" /> : <Eye size={18} className="text-slate-400" />}
-                                </button>
-                                <button
-                                    onClick={fetchSponsors}
-                                    className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                                    title="Actualizar lista"
-                                >
-                                    <RefreshCw size={18} className="text-slate-400" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {fetchingSponsors ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 size={32} className="animate-spin text-slate-400" />
-                            </div>
-                        ) : sponsors.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
-                                <Building2 size={48} className="mx-auto mb-4 opacity-30" />
-                                <p>No hay patrocinadores registrados</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {sponsors.map((sponsor) => (
-                                    <div
-                                        key={sponsor.id}
-                                        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-colors"
+                                {editingSponsorId && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelEdit}
+                                        className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
                                     >
-                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
-                                            <div>
-                                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Empresa</p>
-                                                <p className="font-bold text-white">{sponsor.nombre}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Correo</p>
-                                                <p className="text-slate-300">{sponsor.email}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Contraseña</p>
-                                                <p className="text-slate-300 font-mono">
-                                                    {showPasswords ? sponsor.password : '••••••••'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Inversión</p>
-                                                <p className="text-emerald-400 font-bold font-mono">
-                                                    ${(sponsor.aportacion_total || 0).toLocaleString()} MXN
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-row md:flex-col gap-2 justify-end mt-4 md:mt-0">
-                                            <button
-                                                onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
-                                                className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded-xl hover:bg-violet-500/20 transition-colors"
-                                                title="Probar Login y Ver Dashboard"
-                                            >
-                                                <Eye size={16} /> <span className="text-xs font-bold">Test</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleEditSponsor(sponsor)}
-                                                className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
-                                                title="Editar datos"
-                                            >
-                                                <Pencil size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteSponsor(sponsor.id)}
-                                                className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
-                                                title="Eliminar patrocinador"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
+                                        <X size={18} /> Cancelar Edición
+                                    </button>
+                                )}
+                            </form>
+                        </section>
+
+                        {/* --- LISTA DE PATROCINADORES --- */}
+                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
+                                        <Users className="w-5 h-5 text-fuchsia-400" />
                                     </div>
-                                ))}
+                                    <div>
+                                        <h2 className="text-lg md:text-xl font-bold">Patrocinadores Registrados</h2>
+                                        <p className="text-slate-400 text-xs">{sponsors.length} registros</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowPasswords(!showPasswords)}
+                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                        title={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
+                                    >
+                                        {showPasswords ? <EyeOff size={18} className="text-slate-400" /> : <Eye size={18} className="text-slate-400" />}
+                                    </button>
+                                    <button
+                                        onClick={fetchSponsors}
+                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                        title="Actualizar lista"
+                                    >
+                                        <RefreshCw size={18} className="text-slate-400" />
+                                    </button>
+                                </div>
                             </div>
-                        )}
-                    </section>
 
-                    {/* --- VISTA PREVIA EMBEBIDA --- */}
-                    <div className="pt-8 border-t border-white/10 mt-8">
-                        <div className="flex justify-center mb-8">
-                            <button
-                                onClick={() => setShowDashboardPreview(!showDashboardPreview)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition-all transform hover:scale-105 ${showDashboardPreview
-                                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                    : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-violet-500/30'
-                                    }`}
-                            >
-                                {showDashboardPreview ? <EyeOff size={24} /> : <Eye size={24} />}
-                                {showDashboardPreview ? 'Ocultar Vista Previa' : 'Vista Previa del Dashboard'}
-                            </button>
+                            {fetchingSponsors ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 size={32} className="animate-spin text-slate-400" />
+                                </div>
+                            ) : sponsors.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400">
+                                    <Building2 size={48} className="mx-auto mb-4 opacity-30" />
+                                    <p>No hay patrocinadores registrados</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {sponsors.map((sponsor) => (
+                                        <div
+                                            key={sponsor.id}
+                                            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-colors"
+                                        >
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
+                                                <div>
+                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Empresa</p>
+                                                    <p className="font-bold text-white">{sponsor.nombre}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Correo</p>
+                                                    <p className="text-slate-300">{sponsor.email}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Contraseña</p>
+                                                    <p className="text-slate-300 font-mono">
+                                                        {showPasswords ? sponsor.password : '••••••••'}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Inversión</p>
+                                                    <p className="text-emerald-400 font-bold font-mono">
+                                                        ${(sponsor.aportacion_total || 0).toLocaleString()} MXN
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-row md:flex-col gap-2 justify-end mt-4 md:mt-0">
+                                                <button
+                                                    onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
+                                                    className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded-xl hover:bg-violet-500/20 transition-colors"
+                                                    title="Probar Login y Ver Dashboard"
+                                                >
+                                                    <Eye size={16} /> <span className="text-xs font-bold">Test</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditSponsor(sponsor)}
+                                                    className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
+                                                    title="Editar datos"
+                                                >
+                                                    <Pencil size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteSponsor(sponsor.id)}
+                                                    className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
+                                                    title="Eliminar patrocinador"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* --- VISTA PREVIA EMBEBIDA --- */}
+                        <div className="pt-8 border-t border-white/10 mt-8">
+                            <div className="flex justify-center mb-8">
+                                <button
+                                    onClick={() => setShowDashboardPreview(!showDashboardPreview)}
+                                    className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition-all transform hover:scale-105 ${showDashboardPreview
+                                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                        : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-violet-500/30'
+                                        }`}
+                                >
+                                    {showDashboardPreview ? <EyeOff size={24} /> : <Eye size={24} />}
+                                    {showDashboardPreview ? 'Ocultar Vista Previa' : 'Vista Previa del Dashboard'}
+                                </button>
+                            </div>
+
+                            {showDashboardPreview && (
+                                <div className="w-full bg-white rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-700/50 relative">
+                                    <div className="bg-slate-900 text-white text-center py-2 text-xs font-mono uppercase tracking-widest border-b border-white/10">
+                                        Modo Vista Previa (Simulación)
+                                    </div>
+                                    <div className="h-[800px] overflow-y-auto isolate navbar-static-force">
+                                        <DashboardPage previewMode={true} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
-
-                        {showDashboardPreview && (
-                            <div className="w-full bg-white rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-700/50 relative">
-                                <div className="bg-slate-900 text-white text-center py-2 text-xs font-mono uppercase tracking-widest border-b border-white/10">
-                                    Modo Vista Previa (Simulación)
-                                </div>
-                                <div className="h-[800px] overflow-y-auto isolate navbar-static-force">
-                                    <DashboardPage previewMode={true} />
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* CONTENIDO CRONOGRAMA */}
-            {activeTab === 'cronograma' && (
-                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                    {/* --- TARJETA: PROGRAMAR ESCUELA --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                                <Calendar className="w-5 h-5 text-amber-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold">Programar Misión</h2>
-                                <p className="text-slate-400 text-xs">Agendar próxima visita a escuela</p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <School size={14} /> Nombre de la Escuela
-                                </label>
-                                <input
-                                    type="text"
-                                    value={nextSchoolForm.nombre_escuela}
-                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, nombre_escuela: e.target.value })}
-                                    required
-                                    placeholder="Ej: Primaria Lázaro Cárdenas"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <MapPin size={14} /> Colonia / Ubicación
-                                </label>
-                                <input
-                                    type="text"
-                                    value={nextSchoolForm.colonia}
-                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, colonia: e.target.value })}
-                                    required
-                                    placeholder="Ej: Col. La Charanda"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <Calendar size={14} /> Fecha Programada
-                                </label>
-                                <input
-                                    type="date"
-                                    value={nextSchoolForm.fecha_programada}
-                                    onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, fecha_programada: e.target.value })}
-                                    required
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={nextSchoolLoading}
-                                className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSchoolId
-                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
-                                    : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
-                                    }`}
-                            >
-                                {nextSchoolLoading ? (
-                                    <><Loader2 size={18} className="animate-spin" /> {editingSchoolId ? 'Actualizando...' : 'Guardando...'} </>
-                                ) : (
-                                    <>{editingSchoolId ? <RefreshCw size={18} /> : <Calendar size={18} />} {editingSchoolId ? 'Actualizar Misión' : 'Agendar Visita'}</>
-                                )}
-                            </button>
-
-                            {editingSchoolId && (
-                                <button
-                                    type="button"
-                                    onClick={handleCancelNextSchoolEdit}
-                                    className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <X size={18} /> Cancelar Edición
-                                </button>
-                            )}
-                        </form>
-                    </section>
-
-                    {/* --- LISTA DE PRÓXIMAS ESCUELAS --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                    <Plane className="w-5 h-5 text-blue-400" />
+            {
+                activeTab === 'cronograma' && (
+                    <>
+                        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                            {/* --- TARJETA: PROGRAMAR ESCUELA --- */}
+                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                        <Calendar className="w-5 h-5 text-amber-400" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg md:text-xl font-bold">Programar Misión</h2>
+                                        <p className="text-slate-400 text-xs">Agendar próxima visita a escuela</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Lista de Misiones</h2>
-                                    <p className="text-slate-400 text-xs">{nextSchools.length} programadas</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={fetchNextSchools}
-                                className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                            >
-                                <RefreshCw size={18} className="text-slate-400" />
-                            </button>
-                        </div>
 
-                        {fetchingNextSchools ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 size={32} className="animate-spin text-slate-400" />
-                            </div>
-                        ) : nextSchools.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
-                                <Calendar size={48} className="mx-auto mb-4 opacity-30" />
-                                <p>No hay misiones programadas</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {nextSchools.map((school) => (
-                                    <div
-                                        key={school.id}
-                                        className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completado'
-                                            ? 'bg-emerald-500/10 border-emerald-500/30'
-                                            : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
+                                <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <School size={14} /> Nombre de la Escuela
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nextSchoolForm.nombre_escuela}
+                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, nombre_escuela: e.target.value })}
+                                            required
+                                            placeholder="Ej: Primaria Lázaro Cárdenas"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <MapPin size={14} /> Colonia / Ubicación
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={nextSchoolForm.colonia}
+                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, colonia: e.target.value })}
+                                            required
+                                            placeholder="Ej: Col. La Charanda"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <Calendar size={14} /> Fecha Programada
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={nextSchoolForm.fecha_programada}
+                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, fecha_programada: e.target.value })}
+                                            required
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={nextSchoolLoading}
+                                        className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSchoolId
+                                            ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
+                                            : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
                                             }`}
                                     >
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p className={`font-bold ${school.estatus === 'completado' ? 'text-emerald-400 line-through' : 'text-white'}`}>
-                                                    {school.nombre_escuela}
-                                                </p>
-                                                {school.estatus === 'completado' && (
-                                                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
-                                                )}
-                                            </div>
+                                        {nextSchoolLoading ? (
+                                            <><Loader2 size={18} className="animate-spin" /> {editingSchoolId ? 'Actualizando...' : 'Guardando...'} </>
+                                        ) : (
+                                            <>{editingSchoolId ? <RefreshCw size={18} /> : <Calendar size={18} />} {editingSchoolId ? 'Actualizar Misión' : 'Agendar Visita'}</>
+                                        )}
+                                    </button>
 
-                                            <div className="flex items-center gap-4 text-xs text-slate-400">
-                                                <span className="flex items-center gap-1">
-                                                    <MapPin size={12} /> {school.colonia}
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar size={12} /> {school.fecha_programada}
-                                                </span>
-                                            </div>
+                                    {editingSchoolId && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelNextSchoolEdit}
+                                            className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <X size={18} /> Cancelar Edición
+                                        </button>
+                                    )}
+                                </form>
+                            </section>
+
+                            {/* --- LISTA DE PRÓXIMAS ESCUELAS --- */}
+                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                                            <Plane className="w-5 h-5 text-blue-400" />
                                         </div>
-
-                                        <div className="flex items-center gap-2 self-end md:self-center">
-                                            <button
-                                                onClick={() => handleEditNextSchool(school)}
-                                                className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
-                                                title="Editar detalles"
-                                            >
-                                                <Pencil size={18} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleCompleteNextSchool(school.id, school.estatus)}
-                                                className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completado'
-                                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                                                    : 'bg-slate-700/50 text-slate-400 border-slate-600/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30'
-                                                    }`}
-                                                title={school.estatus === 'completado' ? "Marcar como pendiente" : "Marcar como realizada"}
-                                            >
-                                                <CheckCircle size={18} />
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleDeleteNextSchool(school.id)}
-                                                className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
-                                                title="Eliminar misión"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                        <div>
+                                            <h2 className="text-lg md:text-xl font-bold">Lista de Misiones</h2>
+                                            <p className="text-slate-400 text-xs">{nextSchools.length} programadas</p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                </div>
-            )}
+                                    <button
+                                        onClick={fetchNextSchools}
+                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                    >
+                                        <RefreshCw size={18} className="text-slate-400" />
+                                    </button>
+                                </div>
+
+                                {fetchingNextSchools ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 size={32} className="animate-spin text-slate-400" />
+                                    </div>
+                                ) : nextSchools.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <Calendar size={48} className="mx-auto mb-4 opacity-30" />
+                                        <p>No hay misiones programadas</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {nextSchools.map((school) => (
+                                            <div
+                                                key={school.id}
+                                                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completado'
+                                                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                                                    : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
+                                                    }`}
+                                            >
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <p className={`font-bold ${school.estatus === 'completado' ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                                                            {school.nombre_escuela}
+                                                        </p>
+                                                        {school.estatus === 'completado' && (
+                                                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4 text-xs text-slate-400">
+                                                        <span className="flex items-center gap-1">
+                                                            <MapPin size={12} /> {school.colonia}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar size={12} /> {school.fecha_programada}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 self-end md:self-center">
+                                                    <button
+                                                        onClick={() => handleEditNextSchool(school)}
+                                                        className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
+                                                        title="Editar detalles"
+                                                    >
+                                                        <Pencil size={18} />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleCompleteNextSchool(school.id, school.estatus)}
+                                                        className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completado'
+                                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                                                            : 'bg-slate-700/50 text-slate-400 border-slate-600/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30'
+                                                            }`}
+                                                        title={school.estatus === 'completado' ? "Marcar como pendiente" : "Marcar como realizada"}
+                                                    >
+                                                        <CheckCircle size={18} />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleDeleteNextSchool(school.id)}
+                                                        className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
+                                                        title="Eliminar misión"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+
+                        {/* --- SECCIÓN: ESCUELAS EXTRAS / HISTÓRICAS --- */}
+                        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-12 pt-8 border-t border-white/10">
+                            {/* FORMULARIO EXTRAS */}
+                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+                                        <School className="w-5 h-5 text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg md:text-xl font-bold">Escuelas Extras</h2>
+                                        <p className="text-slate-400 text-xs">Agrega manualmente escuelas pasadas o especiales</p>
+                                    </div>
+                                </div>
+
+                                {/* Disclaimer */}
+                                {/* Disclaimer Collapsible */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDisclaimerOpen(!isDisclaimerOpen)}
+                                    className={`w-full text-left bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mb-6 transition-all hover:bg-amber-500/15 group ${isDisclaimerOpen ? 'shadow-lg shadow-amber-900/10' : ''}`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="shrink-0 w-5 h-5 text-amber-500 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-bold text-amber-500 text-sm">Nota Importante</p>
+                                                {isDisclaimerOpen ? <ChevronUp size={16} className="text-amber-500/70" /> : <ChevronDown size={16} className="text-amber-500/70" />}
+                                            </div>
+
+                                            <div className={`overflow-hidden transition-all duration-300 ${isDisclaimerOpen ? 'max-h-40 mt-2 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                                <div className="text-xs text-amber-200/80 leading-relaxed">
+                                                    Estas escuelas <span className="text-white font-bold">SOLO</span> se reflejarán en los sitios de testimonios (Carrusel de la Home). <br />
+                                                    <span className="opacity-70">No afectarán las métricas ni aparecerán en los Dashboards de los Patrocinadores.</span>
+                                                </div>
+                                            </div>
+
+                                            {!isDisclaimerOpen && (
+                                                <p className="text-xs text-amber-200/60 mt-0.5 truncate max-w-[250px] md:max-w-none">
+                                                    Estas escuelas solo son para testimonios...
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+
+                                <form onSubmit={handleExtraSchoolSubmit} className="space-y-5">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                            <School size={14} /> Nombre de la Escuela
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={extraSchoolForm.nombre}
+                                            onChange={(e) => setExtraSchoolForm({ nombre: e.target.value })}
+                                            required
+                                            placeholder="Ej: Instituto Histórico 2023"
+                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={extraSchoolLoading}
+                                        className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {extraSchoolLoading ? (
+                                            <><Loader2 size={18} className="animate-spin" /> Guardando...</>
+                                        ) : (
+                                            <><School size={18} /> Agregar a Lista Extra</>
+                                        )}
+                                    </button>
+                                </form>
+                            </section>
+
+                            {/* LISTA EXTRAS */}
+                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-slate-700/50 rounded-xl flex items-center justify-center">
+                                            <FileText className="w-5 h-5 text-slate-300" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg md:text-xl font-bold">Lista Manual</h2>
+                                            <p className="text-slate-400 text-xs">{extraSchools.length} registros extra</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={fetchExtraSchools}
+                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                    >
+                                        <RefreshCw size={18} className="text-slate-400" />
+                                    </button>
+                                </div>
+
+                                {fetchingExtraSchools ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 size={32} className="animate-spin text-slate-400" />
+                                    </div>
+                                ) : extraSchools.length === 0 ? (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <School size={48} className="mx-auto mb-4 opacity-30" />
+                                        <p>No hay escuelas extra registradas</p>
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
+                                        {extraSchools.map((school) => (
+                                            <div key={school.id} className="flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-colors group">
+                                                <span className="font-bold text-slate-200">{school.nombre}</span>
+                                                <button
+                                                    onClick={() => handleDeleteExtraSchool(school.id)}
+                                                    className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        </div>
+                    </>
+                )
+            }
 
             {/* FOOTER */}
             <footer className="max-w-5xl mx-auto mt-12 text-center text-slate-500 text-xs">

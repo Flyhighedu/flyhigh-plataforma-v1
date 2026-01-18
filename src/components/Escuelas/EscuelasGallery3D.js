@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { School } from 'lucide-react';
+import { supabaseNew } from '@/lib/supabaseClientNew';
 
 export default function EscuelasGallery3D() {
     // Parallax Ref
@@ -50,13 +51,66 @@ export default function EscuelasGallery3D() {
         "/img/EDU Patrocinios11.png",
     ];
 
-    const schools = [
-        "Instituto Morelos", "Colegio La Paz", "ESFU #1", "ESFU #2", "Escuela Vasco de Quiroga",
-        "Colegio Casa del Niño", "Escuela Manuel Perez", "Instituto Uruapan", "Colegio Michoacán",
-        "Prepa UNAM", "Tec de Monterrey", "Universidad La Salle", "Instituto Piaget",
-        "Colegio Salesiano", "Escuela Benito Juárez", "Instituto Kolob", "Colegio Sor Juana",
-        "Escuela Mártires", "Instituto Tecnológico", "Colegio Reforma"
-    ];
+    const [schools, setSchools] = useState([]);
+
+    // Función de limpieza de nombres
+    const sanitizeSchoolName = (name) => {
+        if (!name) return "";
+        let cleanName = name;
+
+        // 1. Eliminar horarios (ej: 9:00 am, 10:30am, 900 hrs)
+        cleanName = cleanName.replace(/\b\d{1,2}(:\d{2})?\s*(am|pm|hrs|horas)?\b/gi, '');
+
+        // 2. Eliminar turnos y palabras clave de irrelevancia
+        cleanName = cleanName.replace(/\b(matutino|vespertino|turno|horario)\b/gi, '');
+
+        // 3. Limpiar caracteres extra y espacios
+        cleanName = cleanName.replace(/[-|]/g, ''); // Eliminar guiones o pipes sueltos
+        return cleanName.replace(/\s+/g, ' ').trim();
+    };
+
+    useEffect(() => {
+        const fetchSchools = async () => {
+            try {
+                // 1. Fetch Scheduled/Completed Schools from proximas_escuelas
+                const { data: scheduledData, error: scheduledError } = await supabaseNew
+                    .from('proximas_escuelas')
+                    .select('nombre_escuela');
+
+                if (scheduledError) console.error('Error fetching scheduled schools:', scheduledError);
+
+                // 2. Fetch Extra/Historical Schools from escuelas_extras
+                const { data: extrasData, error: extrasError } = await supabaseNew
+                    .from('escuelas_extras')
+                    .select('nombre');
+
+                if (extrasError) console.error('Error fetching extra schools:', extrasError);
+
+                // 3. Combine and Dedup with Sanitation
+                const allNames = new Set();
+
+                // Add scheduled
+                (scheduledData || []).forEach(item => {
+                    const clean = sanitizeSchoolName(item.nombre_escuela);
+                    if (clean && clean.length > 2) allNames.add(clean);
+                });
+
+                // Add extras
+                (extrasData || []).forEach(item => {
+                    const clean = sanitizeSchoolName(item.nombre);
+                    if (clean && clean.length > 2) allNames.add(clean);
+                });
+
+                // 4. Update State (No fallback/mock data)
+                setSchools(Array.from(allNames));
+
+            } catch (err) {
+                console.error("Unexpected error fetching schools:", err);
+            }
+        };
+
+        fetchSchools();
+    }, []);
 
     return (
         <section className="relative w-full overflow-hidden z-20">

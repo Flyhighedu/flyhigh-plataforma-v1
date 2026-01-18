@@ -190,7 +190,7 @@ export default function Hero() {
 
                 {/* PLAY BUTTON (Posición Baja + "LIVING PRISM" Ultra-Clear) */}
                 {/* AJUSTE: bg-white/5 (Casi invisible, solo textura) para bajar opacidad sin tocar el icono */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20 pt-8 md:pt-16">
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20 pt-4 md:pt-12">
                     <div className="relative w-24 h-24 flex items-center justify-center group pointer-events-auto cursor-pointer" onClick={openModal}>
 
                         {/* 1. MOTOR DE GRADIENTE (Fluid Glow Aura - Doble Capa) */}
@@ -212,8 +212,8 @@ export default function Hero() {
                         <div className="absolute inset-[1px] rounded-full bg-white/5 backdrop-blur-sm" />
 
                         {/* 3. CASCO DE CRISTAL (Pure Transparent Hull) */}
-                        {/* CAMBIO: Borde más definido (white/30) + Sombra exterior sutil para marcar el contorno */}
-                        <div className="absolute inset-[3px] rounded-full bg-transparent backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_15px_rgba(255,255,255,0.05)] transition-transform duration-300 group-hover:scale-95">
+                        {/* CAMBIO: Blur mínimo (2px) y borde sutil (white/20) para máxima transparencia */}
+                        <div className="absolute inset-[3px] rounded-full bg-transparent backdrop-blur-[2px] border border-white/20 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.05),inset_0_0_10px_rgba(255,255,255,0.05)] transition-transform duration-300 group-hover:scale-95">
                             {/* Icono PLAY (Blanco Puro - Intacto) */}
                             <Play size={32} fill="white" className="text-white ml-1 drop-shadow-md opacity-100" />
                         </div>

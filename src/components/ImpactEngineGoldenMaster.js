@@ -116,6 +116,7 @@ const CheckoutForm = ({ amount, onSuccess }) => {
                 <button
                     disabled={isLoading || !stripe || !elements}
                     className="w-full bg-black text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-lg active:scale-95 group relative overflow-hidden"
+                    suppressHydrationWarning={true}
                 >
                     {isLoading ? (
                         <span className="animate-pulse">Procesando...</span>
@@ -531,6 +532,7 @@ const ImpactEngine = ({ onDonate, onImpactChange }) => {
                 <button
                     onClick={() => onDonate(childCount, cost)}
                     className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl shadow-fuchsia-200 hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 group ${isLegend ? 'bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-white animate-pulse shadow-amber-200' : 'bg-gradient-to-r from-cyan-500 to-fuchsia-600 text-white hover:scale-[1.02]'}`}
+                    suppressHydrationWarning={true}
                 >
                     {isLegend ? (<><span>PATROCINAR ESCUELA</span> <Sparkles className="animate-spin-slow" /></>) : (<><span>Apadrinar {childCount} {childCount === 1 ? 'niño' : 'niños'}</span> <Heart className="w-5 h-5 group-hover:scale-110 transition-transform fill-white/20" /></>)}
                 </button>
