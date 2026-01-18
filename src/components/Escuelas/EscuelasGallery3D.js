@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
@@ -14,8 +14,16 @@ export default function EscuelasGallery3D() {
         offset: ["start end", "end start"]
     });
 
-    // Parallax movement for the middle column
-    const middleY = useTransform(scrollYProgress, [0, 1], [100, -100]);
+    // Native-Grade Inertial Smoothing
+    const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+
+    // Middle Column Parallax
+    const middleYRange = useTransform(scrollYProgress, [0, 1], [150, -150]);
+    const middleY = useSpring(middleYRange, springConfig);
+
+    // Subtle opposite parallax for side columns to enhance 3D feel
+    const sidesYRange = useTransform(scrollYProgress, [0, 1], [-20, 20]);
+    const sidesY = useSpring(sidesYRange, springConfig);
 
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
@@ -120,8 +128,8 @@ export default function EscuelasGallery3D() {
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
                     style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
 
-                    {/* Column 1 (Static) - GPU Promoted */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Left Column (Inertial Sync) */}
+                    <motion.div style={{ y: sidesY, ...cardStyle }} className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl">
                         {column1.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -135,12 +143,12 @@ export default function EscuelasGallery3D() {
                                 />
                             </div>
                         ))}
-                    </div>
+                    </motion.div>
 
-                    {/* Column 2 (Parallax Middle) - GPU Accelerated with Framer Motion */}
+                    {/* Middle Column (Native-Grade Smoothness) */}
                     <motion.div
                         style={{ y: middleY, ...cardStyle }}
-                        className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
+                        className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl"
                     >
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
@@ -157,8 +165,8 @@ export default function EscuelasGallery3D() {
                         ))}
                     </motion.div>
 
-                    {/* Column 3 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
+                    {/* Right Column (Inertial Sync) */}
+                    <motion.div style={{ y: sidesY, ...cardStyle }} className="flex flex-col gap-3 md:gap-6 w-1/3 shadow-2xl">
                         {column3.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image
@@ -171,7 +179,7 @@ export default function EscuelasGallery3D() {
                                 />
                             </div>
                         ))}
-                    </div>
+                    </motion.div>
 
                 </div>
 
