@@ -2,91 +2,30 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { School } from 'lucide-react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 
 export default function EscuelasGallery3D() {
-    // 1. Zero-Reflow Manual Engine Refs
+    // PRODUCTION ENGINE: Framer Motion + Spring Physics (Winner of A/B Test)
     const containerRef = useRef(null);
-    const middleColumnRef = useRef(null);
 
-    // Cached values to avoid layout thrashing
-    const layoutData = useRef({
-        containerTop: 0,
-        containerHeight: 0,
-        currentY: 0,
-        targetY: 0,
-        lerp: 0.12
+    // 1. Detect Scroll Progress
+    const { scrollYProgress } = useScroll({
+        target: containerRef,
+        offset: ["start end", "end start"]
     });
 
-    // Capture initial layout once (and on resize)
-    useEffect(() => {
-        const updateLayout = () => {
-            if (containerRef.current) {
-                const rect = containerRef.current.getBoundingClientRect();
-                // Add scrollY to get absolute coordinate
-                layoutData.current.containerTop = rect.top + window.scrollY;
-                layoutData.current.containerHeight = rect.height;
-            }
-        };
+    // 2. Spring Physics (The "Silky" Damper)
+    // Low stiffness = soft spring, High damping = heavy resistance
+    const smoothProgress = useSpring(scrollYProgress, {
+        stiffness: 50,
+        damping: 20,
+        restDelta: 0.001
+    });
 
-        // Init layout capture
-        updateLayout();
-
-        // Passive listeners for updates
-        window.addEventListener('resize', updateLayout, { passive: true });
-
-        // Critical: Update once on first scroll to catch any late layout shifts (hydration hydration)
-        const onFirstScroll = () => {
-            updateLayout();
-            window.removeEventListener('scroll', onFirstScroll);
-        };
-        window.addEventListener('scroll', onFirstScroll, { passive: true });
-
-        return () => {
-            window.removeEventListener('resize', updateLayout);
-            window.removeEventListener('scroll', onFirstScroll);
-        };
-    }, []);
-
-    // 2. High-Performance Manual Loop (Zero-Reflow)
-    useEffect(() => {
-        let rafId;
-
-        const updateParallax = () => {
-            if (!middleColumnRef.current) {
-                rafId = requestAnimationFrame(updateParallax);
-                return;
-            }
-
-            // USE window.scrollY (FAST) instead of getBoundingClientRect (SLOW)
-            const scrollY = window.scrollY;
-            const viewportHeight = window.innerHeight;
-
-            // Calculate relative offset without triggering layout reflow
-            const containerMiddle = layoutData.current.containerTop + (layoutData.current.containerHeight / 2);
-            const viewportMiddle = scrollY + (viewportHeight / 2);
-
-            // Difference from center of screen (math only)
-            const diff = (containerMiddle - viewportMiddle) * -0.15;
-
-            // Clamp and set target
-            layoutData.current.targetY = Math.max(-25, Math.min(25, diff));
-
-            // Smooth Lerp
-            layoutData.current.currentY += (layoutData.current.targetY - layoutData.current.currentY) * layoutData.current.lerp;
-
-            // Direct DOM update with precision control
-            middleColumnRef.current.style.transform = `translate3d(0, ${layoutData.current.currentY.toFixed(2)}px, 0) translateZ(1px)`;
-
-            rafId = requestAnimationFrame(updateParallax);
-        };
-
-        rafId = requestAnimationFrame(updateParallax);
-        return () => {
-            if (rafId) cancelAnimationFrame(rafId);
-        };
-    }, []);
+    // 3. Transform Map
+    const middleY = useTransform(smoothProgress, [0, 1], [100, -100]);
 
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
@@ -142,17 +81,18 @@ export default function EscuelasGallery3D() {
         fetchSchools();
     }, []);
 
-    // Base card styling for GPU stability
+    // Hardware Acceleration Styles
     const cardStyle = {
+        transform: 'translate3d(0,0,0)',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
         WebkitTransformStyle: 'preserve-3d',
         transformStyle: 'preserve-3d',
-        transform: 'translate3d(0,0,0)'
     };
 
     return (
-        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'paint layout style' }}>
+        <section ref={containerRef} className="relative w-full overflow-hidden z-20" style={{ contain: 'layout paint' }}>
+
             {/* Container */}
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
                 {/* 3D Masonry Grid */}
@@ -168,14 +108,17 @@ export default function EscuelasGallery3D() {
                         ))}
                     </div>
 
-                    {/* Column 2 (Zero-Reflow Parallax) */}
-                    <div ref={middleColumnRef} className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl" style={{ willChange: 'transform' }}>
+                    {/* Column 2 (Active Spring Parallax) */}
+                    <motion.div
+                        style={{ y: middleY, ...cardStyle, willChange: 'transform' }}
+                        className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl"
+                    >
                         {column2.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100" style={cardStyle}>
                                 <Image src={src} fill className="object-cover" alt="Gallery" sizes="(max-width: 768px) 33vw, 25vw" priority decoding="async" />
                             </div>
                         ))}
-                    </div>
+                    </motion.div>
 
                     {/* Column 3 (Static) */}
                     <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
@@ -187,7 +130,7 @@ export default function EscuelasGallery3D() {
                     </div>
                 </div>
 
-                {/* Marquee Section (Preserved) */}
+                {/* Marquee Section */}
                 <div className="absolute top-[400px] md:top-[550px] left-0 w-full h-[600px] flex flex-col justify-start z-20 pointer-events-none">
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white via-70% to-transparent"></div>
                     <div className="relative z-30 w-full pt-32" style={{ perspective: '1000px' }}>
