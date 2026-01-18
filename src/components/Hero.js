@@ -193,13 +193,21 @@ export default function Hero() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20 pt-8 md:pt-16">
                     <div className="relative w-24 h-24 flex items-center justify-center group pointer-events-auto cursor-pointer" onClick={openModal}>
 
-                        {/* 1. MOTOR DE GRADIENTE (Spinning Turbine) */}
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#22d3ee,#f472b6,#fb923c,#a3e635,#8b5cf6,#22d3ee)] blur-md opacity-80 group-hover:opacity-100 group-hover:blur-lg transition-all duration-300"
-                        />
-
+                        {/* 1. MOTOR DE GRADIENTE (Fluid Glow Aura - Doble Capa) */}
+                        <div className="absolute inset-0 rounded-full overflow-hidden opacity-80 group-hover:opacity-100 transition-opacity duration-500">
+                            {/* Capa A: Colores Primarios (Giro Lento) */}
+                            <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                                className="absolute inset-[-10px] bg-[conic-gradient(from_0deg,#22d3ee,#8b5cf6,#fb923c,#22d3ee)] blur-xl"
+                            />
+                            {/* Capa B: Colores Secundarios (Giro Inverso y Rápido - Mezcla Orgánica) */}
+                            <motion.div
+                                animate={{ rotate: -360 }}
+                                transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
+                                className="absolute inset-[-10px] bg-[conic-gradient(from_180deg,#f472b6,#a3e635,transparent,#f472b6)] blur-2xl mix-blend-overlay"
+                            />
+                        </div>
                         {/* 2. ANILLO DE CONTENCIÓN (Invisible/Sutil) */}
                         <div className="absolute inset-[1px] rounded-full bg-white/5 backdrop-blur-sm" />
 
