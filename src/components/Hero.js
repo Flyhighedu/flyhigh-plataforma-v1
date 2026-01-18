@@ -204,8 +204,8 @@ export default function Hero() {
                         <div className="absolute inset-[1px] rounded-full bg-white/5 backdrop-blur-sm" />
 
                         {/* 3. CASCO DE CRISTAL (Pure Transparent Hull) */}
-                        {/* CAMBIO: bg-transparent (Cero tinte blanco) para que sea cristal puro, solo blur y borde */}
-                        <div className="absolute inset-[3px] rounded-full bg-transparent backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-[inset_0_0_15px_rgba(255,255,255,0.1)] transition-transform duration-300 group-hover:scale-95">
+                        {/* CAMBIO: Borde más definido (white/30) + Sombra exterior sutil para marcar el contorno */}
+                        <div className="absolute inset-[3px] rounded-full bg-transparent backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1),inset_0_0_15px_rgba(255,255,255,0.05)] transition-transform duration-300 group-hover:scale-95">
                             {/* Icono PLAY (Blanco Puro - Intacto) */}
                             <Play size={32} fill="white" className="text-white ml-1 drop-shadow-md opacity-100" />
                         </div>
