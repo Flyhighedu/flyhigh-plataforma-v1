@@ -23,12 +23,9 @@ export default function Home() {
       <ExperienciaInmersiva />
       <SteamPlatform />
       {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
-
       <section className="relative w-full bg-white rounded-b-[50px] rounded-t-none overflow-hidden shadow-lg z-20 pb-10 mb-10">
         <EscuelasGallery3D />
       </section>
-      {/* ------------------------ */}
-
       <Manifiesto />
       <ImpactEngineGoldenMaster />
       <AlliesSection />
