@@ -111,8 +111,19 @@ export default function RitualVuelo() {
         return () => mm.revert(); // Limpieza total al desmontar
     }, []);
 
+    // Optimizado: Usar refs para evitar re-renders innecesarios
+    const lastActiveIndexRef = useRef(0);
+    const rafIdRef = useRef(null);
+
     const handleScroll = () => {
-        if (scrollContainerRef.current) {
+        // Cancelar cualquier frame pendiente para evitar acumulación
+        if (rafIdRef.current) {
+            cancelAnimationFrame(rafIdRef.current);
+        }
+
+        rafIdRef.current = requestAnimationFrame(() => {
+            if (!scrollContainerRef.current) return;
+
             const container = scrollContainerRef.current;
             const scrollLeft = container.scrollLeft;
             const maxScroll = container.scrollWidth - container.clientWidth;
@@ -120,28 +131,29 @@ export default function RitualVuelo() {
             // Progreso del scroll (0 a 1)
             const progress = Math.min(Math.max(scrollLeft / maxScroll, 0), 1);
 
-            // 1. Parallax Vertical del Fondo
+            // 1. Parallax Vertical del Fondo (GPU accelerated)
             if (backgroundRef.current) {
                 const translateY = -50 + (progress * 50);
-                backgroundRef.current.style.transform = `translateY(${translateY}%)`;
+                backgroundRef.current.style.transform = `translateY(${translateY}%) translateZ(0)`;
             }
 
-            // 2. Opacidad de Partículas (Polvo de Hadas)
+            // 2. Opacidad de Partículas
             if (particlesRef.current) {
                 const opacity = Math.max(0, (progress - 0.5) * 2);
                 particlesRef.current.style.opacity = opacity;
             }
 
-            const firstCard = container.firstElementChild;
-            if (!firstCard) return;
+            // 3. Calcular índice activo sin causar re-render innecesario
+            const cardWidth = container.firstElementChild?.offsetWidth || 280;
+            const gap = 24;
+            const newIndex = Math.min(Math.max(Math.round(scrollLeft / (cardWidth + gap)), 0), 2);
 
-            const cardWidth = firstCard.offsetWidth;
-            const gap = 24; // gap-6
-
-            // Usar un umbral de 0.5 para el redondeo
-            const index = Math.round(scrollLeft / (cardWidth + gap));
-            setActiveIndex(Math.min(Math.max(index, 0), 2));
-        }
+            // Solo actualizar estado si cambió el índice
+            if (newIndex !== lastActiveIndexRef.current) {
+                lastActiveIndexRef.current = newIndex;
+                setActiveIndex(newIndex);
+            }
+        });
     };
 
     // Cancelar animación de guiño al interactuar
@@ -157,7 +169,7 @@ export default function RitualVuelo() {
     const opacityLayer3 = useTransform(scrollXProgress, [0.5, 0.8], [0, 1]);
 
     return (
-        <section id="how-it-works" className="relative z-10 w-full rounded-t-[3rem] sm:rounded-t-[5rem] pt-20 pb-16 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden min-h-screen flex flex-col justify-center bg-slate-100">
+        <section id="how-it-works" className="relative z-10 w-full rounded-t-[3rem] sm:rounded-t-[5rem] pt-20 pb-16 shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden min-h-[100svh] flex flex-col justify-center bg-slate-100" style={{ contain: 'layout paint' }}>
 
             {/* --- FONDO PARALLAX (CAPAS DE OPACIDAD - GPU OPTIMIZED) --- */}
             <div
