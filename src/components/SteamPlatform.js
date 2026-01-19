@@ -23,7 +23,7 @@ export default function SteamPlatform() {
 
     return (
         <section
-            className="pt-4 md:pt-24 pb-20 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center"
+            className="pt-2 md:pt-24 pb-8 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center"
             style={{ minHeight: minHeight, overscrollBehavior: 'none' }}
         >
             <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full">
@@ -31,10 +31,10 @@ export default function SteamPlatform() {
                     <div className="absolute -right-20 -top-20 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-[#7000FF]/10 rounded-full blur-[100px] animate-pulse"></div>
                     <div className="absolute -left-20 -bottom-20 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-[#FF0055]/10 rounded-full blur-[100px] animate-pulse"></div>
 
-                    <div className="flex flex-col md:flex-row items-center p-6 sm:p-12 gap-6 md:gap-16">
+                    <div className="flex flex-col md:flex-row items-center p-4 sm:p-12 gap-4 md:gap-16">
                         <div className="w-full md:w-[40%] flex justify-center relative order-2 md:order-1">
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-64 sm:h-64 bg-white/5 rounded-full blur-3xl -z-10"></div>
-                            <div className="iphone-dark w-[160px] h-[320px] sm:w-[200px] sm:h-[400px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] transform rotate-[-8deg] md:group-hover:rotate-[-4deg] transition-all duration-700">
+                            <div className="iphone-dark w-[140px] h-[280px] sm:w-[200px] sm:h-[400px] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] transform rotate-[-8deg] md:group-hover:rotate-[-4deg] transition-all duration-700">
                                 <div className="notch-dark w-[60px] sm:w-[80px]"></div>
                                 <div className="w-full h-full bg-[#0f0f0f] p-2 sm:p-3 pt-6 sm:pt-8 overflow-hidden">
                                     <div className="flex justify-between items-center mb-3 sm:mb-4">
@@ -80,11 +80,11 @@ export default function SteamPlatform() {
                                 <span className="text-2xl sm:text-3xl font-black text-[#00FF94]">M</span>
                             </div>
 
-                            <h2 className="font-['Outfit',sans-serif] font-bold text-xl sm:text-4xl text-white mb-3">
+                            <h2 className="font-['Outfit',sans-serif] font-bold text-lg sm:text-4xl text-white mb-2 md:mb-3">
                                 El dron aterriza, pero la <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] to-[#7000FF]">mente sigue volando.</span>
                             </h2>
 
-                            <p className="text-slate-400 text-xs sm:text-base mb-6 sm:mb-8 max-w-lg mx-auto md:mx-0 leading-relaxed">
+                            <p className="text-slate-400 text-[10px] sm:text-base mb-4 sm:mb-8 max-w-lg mx-auto md:mx-0 leading-relaxed">
                                 Reforzamos lo visto en el aire con retos digitales. Un marketplace de actividades donde los maestros se convierten en "Game Masters" y el patio en un tablero gigante.
                             </p>
 
