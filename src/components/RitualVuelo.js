@@ -48,6 +48,7 @@ export default function RitualVuelo() {
         }, (context) => {
             const { isDesktop, isMobile } = context.conditions;
 
+            /* ===== TEST: GSAP DESHABILITADO TEMPORALMENTE =====
             // 1. Animación de entrada de tarjetas
             if (isDesktop) {
                 gsap.fromTo('.step-card',
@@ -106,6 +107,13 @@ export default function RitualVuelo() {
             } else {
                 setIsSnapping(true); // Desktop: activar snap inmediatamente
             }
+            ===== FIN TEST ===== */
+
+            // Activar snap inmediatamente (sin animación)
+            setIsSnapping(true);
+
+            // Mostrar tarjetas sin animación
+            gsap.set('.step-card', { y: 0, opacity: 1, scale: 1 });
         });
 
         return () => mm.revert(); // Limpieza total al desmontar
