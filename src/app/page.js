@@ -21,10 +21,10 @@ export default function Home() {
 
       <RitualVuelo />
       <PlanVuelo />
-      <ExperienciaInmersiva />
+      {/* TEST AISLAMIENTO: ExperienciaInmersiva comentado temporalmente */}
+      {/* <ExperienciaInmersiva /> */}
       <SteamPlatform />
-      {/* TEST AISLAMIENTO: FlyHighTestimonialGallery comentado temporalmente */}
-      {/* <FlyHighTestimonialGallery /> */}
+      <FlyHighTestimonialGallery />
       {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
 
       <Manifiesto />
