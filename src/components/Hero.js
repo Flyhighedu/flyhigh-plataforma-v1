@@ -61,26 +61,36 @@ export default function Hero() {
         }
     }, [isModalOpen]);
 
-    // OPTIMIZACIÓN DE RENDIMIENTO: Pausar video cuando no es visible
+    // OPTIMIZACIÓN DE RENDIMIENTO: Pausar video cuando no es visible (IntersectionObserver)
     useEffect(() => {
-        const handleScroll = () => {
-            if (!videoRef.current) return;
+        if (!videoRef.current) return;
 
-            // Si el usuario ha bajado más allá de la altura del viewport (Hero oculto)
-            if (window.scrollY > window.innerHeight) {
-                if (!videoRef.current.paused) {
-                    videoRef.current.pause();
-                }
-            } else {
-                // Si el Hero es visible y el modal no está abierto
-                if (videoRef.current.paused && !isModalOpen) {
-                    videoRef.current.play().catch(() => { });
-                }
-            }
-        };
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!videoRef.current) return;
 
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
+                if (entry.isIntersecting) {
+                    // Hero visible - reproducir video
+                    if (videoRef.current.paused && !isModalOpen) {
+                        videoRef.current.play().catch(() => { });
+                    }
+                } else {
+                    // Hero no visible - pausar video
+                    if (!videoRef.current.paused) {
+                        videoRef.current.pause();
+                    }
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        // Observar el elemento padre del video
+        const heroElement = videoRef.current.closest('div');
+        if (heroElement) {
+            observer.observe(heroElement);
+        }
+
+        return () => observer.disconnect();
     }, [isModalOpen]);
 
     const openModal = () => {
@@ -94,7 +104,7 @@ export default function Hero() {
 
     return (
         // LIENZO "OFF-WHITE" PREMIUM (#F2F2F7)
-        <div className="h-[100dvh] w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 sticky top-0 z-0">
+        <div className="h-[100dvh] w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 z-0" style={{ contain: 'layout paint' }}>
 
             {/* =====================================================================================
           2. ZONA SPLIT 65/35 (Título vs. Misión)
