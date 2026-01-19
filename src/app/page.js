@@ -19,9 +19,9 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      <RitualVuelo />
-      {/* TEST AISLAMIENTO: PlanVuelo comentado temporalmente */}
-      {/* <PlanVuelo /> */}
+      {/* TEST AISLAMIENTO: RitualVuelo comentado temporalmente */}
+      {/* <RitualVuelo /> */}
+      <PlanVuelo />
       <ExperienciaInmersiva />
       <SteamPlatform />
       <FlyHighTestimonialGallery />
