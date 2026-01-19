@@ -92,8 +92,7 @@ export default function PlanVuelo() {
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(error => {
-                                console.log("Auto-play prevented (low power mode or buffer req):", error);
-                                // Fallback: El poster seguirá visible, no hay pantalla negra.
+                                console.log("Auto-play prevented:", error);
                             });
                         }
                     } else {
@@ -101,17 +100,10 @@ export default function PlanVuelo() {
                     }
                 });
             },
-            { threshold: 0.1 } // 10% visible
+            { threshold: 0.1 }
         );
 
-        observer.observe(visorRef.current);
-
-        // Watchdog para asegurar que si se traba, lo notemos
-        const handlePlaying = () => setIsPlaying(true);
-        const handleWaiting = () => setIsPlaying(false); // Mostrar poster si bufferea (opcional, pero seguro)
-
-        // Mejor estrategia: Solo ocultar poster cuando REALMENTE avance.
-        // Lo manejamos en onTimeUpdate en el JSX.
+        if (visorRef.current) observer.observe(visorRef.current);
 
         return () => {
             observer.disconnect();
@@ -157,34 +149,34 @@ export default function PlanVuelo() {
                     <div className="absolute top-1/3 -left-20 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(250,245,255,0.6)_0%,transparent_70%)] transform-gpu"></div>
                 </div>
 
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full h-full flex flex-col justify-center">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 w-full h-full flex flex-col justify-center gap-4 md:gap-6">
 
                     {/* 1. HEADER */}
-                    <div ref={headerRef} className="text-center mb-1 md:mb-2 shrink-0 relative">
+                    <div ref={headerRef} className="text-center shrink-0 relative">
 
-                        <div className="inline-flex items-center gap-2 px-6 py-2 md:px-4 md:py-1.5 rounded-full bg-slate-900 text-white mb-2 md:mb-3 shadow-lg">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 md:px-5 md:py-2 rounded-full bg-slate-900 text-white mb-3 md:mb-4 shadow-lg">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00F0FF] opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00F0FF]"></span>
                             </span>
-                            <span className="text-xs md:text-[10px] font-bold tracking-[0.2em] uppercase text-[#00F0FF]">Experiencia Aérea</span>
+                            <span className="text-[10px] md:text-xs font-bold tracking-[0.15em] uppercase text-[#00F0FF]">Experiencia Aérea</span>
                         </div>
 
-                        {/* TÍTULO COMPLETO */}
-                        <h2 className="font-['Outfit',sans-serif] font-black text-5xl md:text-5xl lg:text-6xl text-slate-900 tracking-tighter leading-[1.1] mb-2 md:mb-3 drop-shadow-xl max-w-6xl mx-auto">
-                            Aventura por el <br className="md:hidden" />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00C6FF] via-cyan-400 to-[#00C6FF] bg-[length:200%_auto] animate-pulse">cielo de Uruapan.</span>
+                        {/* TÍTULO - Más compacto en móvil */}
+                        <h2 className="font-['Outfit',sans-serif] font-black text-[2.5rem] md:text-7xl lg:text-8xl text-slate-900 tracking-tighter leading-[0.9] mb-2 md:mb-4 max-w-5xl mx-auto">
+                            ¡Aventura por el <br className="md:hidden" />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00C6FF] via-cyan-400 to-[#00C6FF]">cielo de Uruapan!</span>
                         </h2>
 
-                        <p className="text-slate-500 text-base md:text-xl leading-relaxed max-w-4xl mx-auto text-pretty px-4">
-                            Un emocionante vuelo por los principales puntos de interés de Uruapan, <span className="text-slate-900 font-bold bg-sky-50 px-1 rounded">totalmente en tiempo real</span>, que inspira a nuestros niños a volver a mirar hacia el cielo.
+                        <p className="text-slate-500 text-sm md:text-lg leading-relaxed max-w-md md:max-w-xl mx-auto text-center">
+                            Vuelo inmersivo <span className="text-slate-800 font-semibold">en tiempo real</span> sobre los puntos más emblemáticos de Uruapan.
                         </p>
                     </div>
 
                     {/* 2. LA ATRACCIÓN (Pure CSS VR Visor) */}
                     <div
                         ref={visorRef}
-                        className="relative w-full max-w-3xl mx-auto flex flex-col items-center opacity-0 translate-y-[300px] will-change-transform transform-gpu"
+                        className="relative w-full max-w-[90vw] md:max-w-3xl mx-auto flex flex-col items-center opacity-0 translate-y-[300px] will-change-transform transform-gpu"
                         style={{ backfaceVisibility: 'hidden' }}
                     >
 
@@ -200,7 +192,7 @@ export default function PlanVuelo() {
                         {/* Wrapper for Visor + Shadow */}
                         <div className="relative w-full aspect-[16/9] md:aspect-[2/1] animate-float" style={{ backfaceVisibility: 'hidden' }}>
 
-                            {/* SEPARATED SHADOW ELEMENT (Static & Diffuse, moves with parent) */}
+                            {/* SEPARATED SHADOW ELEMENT */}
                             <div
                                 className="absolute inset-0 bg-black/40 blur-[25px] z-0 translate-y-6 scale-[0.98]"
                                 style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)' }}
@@ -219,7 +211,7 @@ export default function PlanVuelo() {
                                         className="absolute inset-x-[3%] inset-y-[10%] bg-slate-900 overflow-hidden shadow-inner"
                                         style={{ clipPath: 'url(#visor-shape)', WebkitClipPath: 'url(#visor-shape)', transform: 'translateZ(0)' }}
                                     >
-                                        {/* Fallback Poster Image (Always visible until video moves) */}
+                                        {/* Fallback Poster Image */}
                                         <img
                                             src="/img/poster-visor.jpg"
                                             className={`absolute inset-0 w-full h-full object-cover z-20 transition-opacity duration-700 ${isPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
@@ -229,12 +221,11 @@ export default function PlanVuelo() {
                                         <video
                                             ref={videoRef}
                                             className="w-full h-full object-cover opacity-90 relative z-10"
-                                            preload="metadata" // Balance entre rendimiento y velocidad
+                                            preload="metadata"
                                             muted
                                             loop
                                             playsInline
-                                            {...{ 'webkit-playsinline': 'true' }} // Legacy iOS support forced as spread to avoid React warnings if any
-                                            suppressHydrationWarning={true} // Prevent browser extension attribute mismatch issues
+                                            suppressHydrationWarning={true}
                                             onTimeUpdate={(e) => {
                                                 if (e.target.currentTime > 0.1 && !isPlaying) {
                                                     setIsPlaying(true);
@@ -256,11 +247,9 @@ export default function PlanVuelo() {
                                             </span>
                                         </div>
                                     </div>
-
-                                    {/* Bezel Shading Removed for Uniform White Look */}
                                 </div>
 
-                                {/* En Vivo Indicator (Floating outside or inside?) Inside looks better for HUD feel */}
+                                {/* En Vivo Indicator */}
                                 <div className="absolute bottom-[25%] left-[15%] z-30 flex items-center gap-2 pointer-events-none">
                                     <div className="relative flex h-2 w-2 md:h-3 md:w-3">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
