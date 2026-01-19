@@ -10,14 +10,15 @@ export default function EscuelasGallery3D() {
     // Parallax Ref (Container-based for stability)
     const containerRef = useRef(null);
 
-    // Framer Motion Scroll Hook: Decoupled from window height changes
+    // Unified parallax effect with Framer Motion (Optimized for Stability)
     const { scrollYProgress } = useScroll({
         target: containerRef,
-        offset: ["start end", "end start"]
+        offset: ["start end", "end start"],
+        layoutEffect: false // Prevent layout thrashing
     });
 
-    // Transform: Maps visual scroll progress to Y translation (Parallax)
-    const yMiddle = useTransform(scrollYProgress, [0, 1], [0, 200]);
+    // Reduced range to prevent "growing" sensation while maintaining movement
+    const yMiddle = useTransform(scrollYProgress, [0, 1], [-50, 50]);
 
     const column1 = [
         "/img/Estoy viendo la fabrica.png",
@@ -104,14 +105,21 @@ export default function EscuelasGallery3D() {
     }, []);
 
     return (
-        <section ref={containerRef} className="relative w-full overflow-hidden z-20">
+        <section
+            ref={containerRef}
+            className="relative w-full overflow-hidden z-20"
+            style={{ contain: 'layout paint' }} // STRICT CONTAINMENT: Prevents "growing" layout shifts
+        >
 
             {/* Container */}
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
 
                 {/* 3D Masonry Grid - STATIC with bleeding edges */}
                 <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top will-change-transform"
-                    style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
+                    style={{
+                        transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)',
+                        transformStyle: 'preserve-3d' // Force stable 3D context
+                    }}>
 
                     {/* Column 1 (Static) - Priority LCP */}
                     <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
