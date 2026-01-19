@@ -110,11 +110,11 @@ export default function EscuelasGallery3D() {
             <div className="relative h-[680px] md:h-[880px] w-full flex justify-center pt-12">
 
                 {/* 3D Masonry Grid - STATIC with bleeding edges */}
-                <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top"
+                <div className="flex justify-center gap-3 md:gap-6 w-[140%] md:w-full max-w-[1700px] px-0 md:px-12 transform origin-top will-change-transform"
                     style={{ transform: 'perspective(1000px) rotateX(10deg) rotateZ(-3deg)' }}>
 
                     {/* Column 1 (Static) - Priority LCP */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl will-change-transform">
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
                         {column1.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
                                 <Image
@@ -149,7 +149,7 @@ export default function EscuelasGallery3D() {
                     </motion.div>
 
                     {/* Column 3 (Static) */}
-                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl will-change-transform">
+                    <div className="flex flex-col gap-3 md:gap-6 w-1/3 opacity-100 shadow-2xl">
                         {column3.map((src, i) => (
                             <div key={i} className="relative aspect-[3/4] w-full rounded-lg md:rounded-2xl overflow-hidden bg-slate-100">
                                 <Image
