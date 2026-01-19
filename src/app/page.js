@@ -19,16 +19,17 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      <RitualVuelo />
-      <PlanVuelo />
-      <ExperienciaInmersiva />
-      <SteamPlatform />
-      <FlyHighTestimonialGallery />
-      {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
+      {/* ===== TEST AISLAMIENTO RADICAL: Todo comentado ===== */}
+      {/* <RitualVuelo /> */}
+      {/* <PlanVuelo /> */}
+      {/* <ExperienciaInmersiva /> */}
+      {/* <SteamPlatform /> */}
+      {/* <FlyHighTestimonialGallery /> */}
+      {/* <HorizontalGallery /> */}
 
-      <Manifiesto />
-      <ImpactEngineGoldenMaster />
-      <AlliesSection />
+      {/* <Manifiesto /> */}
+      {/* <ImpactEngineGoldenMaster /> */}
+      {/* <AlliesSection /> */}
       <MinimalFooter />
     </main>
   );
