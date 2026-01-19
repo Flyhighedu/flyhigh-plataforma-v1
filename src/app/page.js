@@ -20,9 +20,9 @@ export default function Home() {
       <Hero />
 
       <RitualVuelo />
-      <PlanVuelo />
-      {/* TEST AISLAMIENTO: ExperienciaInmersiva comentado temporalmente */}
-      {/* <ExperienciaInmersiva /> */}
+      {/* TEST AISLAMIENTO: PlanVuelo comentado temporalmente */}
+      {/* <PlanVuelo /> */}
+      <ExperienciaInmersiva />
       <SteamPlatform />
       <FlyHighTestimonialGallery />
       {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
