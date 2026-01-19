@@ -22,9 +22,9 @@ export default function Home() {
       <RitualVuelo />
       <PlanVuelo />
       <ExperienciaInmersiva />
-      {/* TEST AISLAMIENTO: SteamPlatform comentado temporalmente */}
-      {/* <SteamPlatform /> */}
-      <FlyHighTestimonialGallery />
+      <SteamPlatform />
+      {/* TEST AISLAMIENTO: FlyHighTestimonialGallery comentado temporalmente */}
+      {/* <FlyHighTestimonialGallery /> */}
       {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
 
       <Manifiesto />
