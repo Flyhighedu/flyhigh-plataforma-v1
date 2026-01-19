@@ -19,10 +19,10 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      {/* ===== TEST AISLAMIENTO RADICAL: Todo comentado ===== */}
-      {/* <RitualVuelo /> */}
-      {/* <PlanVuelo /> */}
-      {/* <ExperienciaInmersiva /> */}
+      {/* ===== TEST BINARIO: Primera mitad ===== */}
+      <RitualVuelo />
+      <PlanVuelo />
+      <ExperienciaInmersiva />
       {/* <SteamPlatform /> */}
       {/* <FlyHighTestimonialGallery /> */}
       {/* <HorizontalGallery /> */}
