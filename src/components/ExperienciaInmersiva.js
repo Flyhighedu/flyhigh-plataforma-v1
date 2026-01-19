@@ -194,7 +194,7 @@ export default function ExperienciaInmersiva() {
     };
 
     return (
-        <section ref={sectionRef} id="experiencia-inmersiva" className="min-h-screen w-full flex flex-col justify-center relative z-[60] py-12 md:py-32 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]">
+        <section ref={sectionRef} id="experiencia-inmersiva" className="min-h-[100svh] w-full flex flex-col justify-center relative z-[60] py-12 md:py-32 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]" style={{ contain: 'layout paint' }}>
 
             {/* Custom Styles for Hide Scrollbar */}
             <style jsx>{`

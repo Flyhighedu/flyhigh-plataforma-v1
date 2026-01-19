@@ -112,7 +112,7 @@ export default function FlyHighTestimonialGallery() {
     };
 
     return (
-        <section className="relative w-full py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]">
+        <section className="relative w-full py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]" style={{ contain: 'layout paint' }}>
             {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-sky-200/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
 

@@ -1,30 +1,50 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Users, Wind, Zap, Eye, Gamepad2, Lock } from 'lucide-react';
 import gsap from 'gsap';
 
 export default function SteamPlatform() {
-    const [minHeight, setMinHeight] = React.useState('100vh');
+    const sectionRef = useRef(null);
+    const animationRef = useRef(null);
 
     useEffect(() => {
-        // Fix for mobile layout shifts: Set exact viewport height on mount
-        const setPhysicalHeight = () => {
-            setMinHeight(`${window.innerHeight}px`);
+        // Create GSAP animation
+        animationRef.current = gsap.to(".iphone-dark", {
+            y: -15,
+            duration: 4,
+            repeat: -1,
+            yoyo: true,
+            ease: "power1.inOut"
+        });
+
+        // Pause animation when section is not visible (Performance optimization)
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (animationRef.current) {
+                    entry.isIntersecting ? animationRef.current.play() : animationRef.current.pause();
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (sectionRef.current) {
+            observer.observe(sectionRef.current);
+        }
+
+        return () => {
+            observer.disconnect();
+            if (animationRef.current) {
+                animationRef.current.kill();
+            }
         };
-
-        setPhysicalHeight();
-        window.addEventListener('resize', setPhysicalHeight);
-
-        gsap.to(".iphone-dark", { y: -15, duration: 4, repeat: -1, yoyo: true, ease: "power1.inOut" });
-
-        return () => window.removeEventListener('resize', setPhysicalHeight);
     }, []);
 
     return (
         <section
-            className="pt-2 md:pt-24 pb-8 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center"
-            style={{ minHeight: minHeight, overscrollBehavior: 'none' }}
+            ref={sectionRef}
+            className="pt-2 md:pt-24 pb-8 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center min-h-[100svh]"
+            style={{ contain: 'layout paint', overscrollBehavior: 'none' }}
         >
             <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full">
                 <div className="bg-[#0B1120] rounded-[2rem] sm:rounded-[3.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden relative border border-white/5 group">
