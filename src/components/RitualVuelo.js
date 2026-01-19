@@ -247,7 +247,7 @@ export default function RitualVuelo() {
 
                         {/* PASO 1 */}
                         <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
-                            <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
+                            <div className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-lg">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-[#00C6FF] shadow-md border border-white z-10 group-hover:scale-110 transition-transform">1</div>
                                 <div className="w-full aspect-square bg-blue-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
                                     <Rocket className="w-20 h-20 text-[#00C6FF] stroke-1 group-hover:scale-110 transition-transform duration-500" />
@@ -259,7 +259,7 @@ export default function RitualVuelo() {
 
                         {/* PASO 2 */}
                         <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
-                            <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
+                            <div className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-lg">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-[#0072FF] shadow-md border border-white z-10 group-hover:scale-110 transition-transform">2</div>
                                 <div className="w-full aspect-square bg-indigo-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
                                     <Eye className="w-20 h-20 text-[#0072FF] stroke-1 group-hover:scale-110 transition-transform duration-500" />
@@ -271,7 +271,7 @@ export default function RitualVuelo() {
 
                         {/* PASO 3 */}
                         <div className="snap-center shrink-0 w-[85vw] sm:w-auto step-card opacity-0 translate-y-12 will-change-transform transform-gpu">
-                            <div className="group relative bg-white/80 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-500 hover:-translate-y-3">
+                            <div className="group relative bg-white rounded-[2rem] p-6 border border-slate-100 shadow-lg">
                                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-white to-slate-100 flex items-center justify-center font-['Outfit',sans-serif] font-bold text-lg text-pink-500 shadow-md border border-white z-10 group-hover:scale-110 transition-transform">3</div>
                                 <div className="w-full aspect-square bg-pink-50/50 rounded-2xl mb-6 flex items-center justify-center h-48">
                                     <Globe2 className="w-20 h-20 text-pink-500 stroke-1 group-hover:scale-110 transition-transform duration-500" />
