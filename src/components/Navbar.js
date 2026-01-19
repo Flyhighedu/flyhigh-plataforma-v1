@@ -7,13 +7,12 @@ import { Rocket, Heart, Menu, X, School, GraduationCap, HeartHandshake, Building
 
 import { useImpact } from '../context/ImpactContext';
 
-export default function Navbar() {
+export default function Navbar({ onOpenDonation }) {
   const { totalImpact } = useImpact();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
   const [mobileShowCTA, setMobileShowCTA] = useState(false);
-  const [isImpactVisible, setIsImpactVisible] = useState(false);
-
+  // const [isImpactVisible, setIsImpactVisible] = useState(false); // Removed since section is gone
 
   useEffect(() => {
     setIsPulsing(true);
@@ -29,23 +28,7 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
-  // Detect if Impact Section is visible using IntersectionObserver (Performance optimized)
-  useEffect(() => {
-    const section = document.getElementById('impact-engine');
-    if (!section) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Activate when 40% of the section is visible
-        setIsImpactVisible(entry.isIntersecting);
-      },
-      { threshold: 0.4 }
-    );
-
-    observer.observe(section);
-
-    return () => observer.disconnect();
-  }, []);
+  // Removed Impact Observer since section is gone
 
   const menuItems = [
     { name: "Escuelas", href: "/escuelas", icon: School },
@@ -63,9 +46,9 @@ export default function Navbar() {
           initial={{ y: -20, opacity: 0 }}
           animate={{
             y: 0,
-            opacity: isImpactVisible ? 0 : 1,
-            x: isImpactVisible ? -100 : 0,
-            pointerEvents: isImpactVisible ? 'none' : 'auto'
+            opacity: 1,
+            x: 0,
+            pointerEvents: 'auto'
           }}
           className="bg-white px-2 sm:px-3 h-10 sm:h-12 rounded-full shadow-sm border border-gray-100 flex items-center gap-2 sm:gap-3 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -117,10 +100,10 @@ export default function Navbar() {
       </div>
 
       {/* Píldora Derecha: Contador / CTA (Soft Clay Progress) */}
-      <motion.a
+      <motion.div
         layout
-        href="#impact-engine"
-        className={`group pointer-events-auto cursor-pointer ${isImpactVisible ? 'absolute left-1/2 -translate-x-1/2 pointer-events-none' : 'relative'}`}
+        onClick={onOpenDonation}
+        className="group pointer-events-auto cursor-pointer relative"
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
         <motion.div
@@ -141,27 +124,27 @@ export default function Navbar() {
             style={{ width: `${totalImpact === null ? 0 : Math.min((totalImpact / 30000) * 100, 100)}%` }}
           ></div>
 
-          {/* 3. FONDO HOVER (Gradiente Rosa - Aparece en Hover SOLO si NO estamos en la sección) */}
-          <div className={`absolute inset-0 bg-gradient-to-r from-pink-500 to-rose-500 opacity-0 ${!isImpactVisible ? 'group-hover:opacity-100' : ''} transition-opacity duration-300`}></div>
+          {/* 3. FONDO HOVER (Gradiente Rosa) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
           {/* 4. CONTENIDO (Texto e Iconos) */}
           <div className="relative z-10 flex items-center gap-2 px-4">
 
             {/* ESTADO NORMAL (Contador) */}
-            <div className={`flex items-center gap-2 ${!isImpactVisible ? 'group-hover:hidden group-hover:opacity-0' : ''} transition-all duration-300`}>
+            <div className="flex items-center gap-2 group-hover:hidden group-hover:opacity-0 transition-all duration-300">
 
               {/* Mobile Switch with Fade */}
               <div className="md:hidden relative h-10 sm:h-12 w-[100px] sm:w-[120px] flex items-center justify-center overflow-hidden">
                 <AnimatePresence mode="wait">
                   <motion.span
-                    key={!isImpactVisible && mobileShowCTA ? "cta" : "counter"}
+                    key={mobileShowCTA ? "cta" : "counter"}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.3 }}
                     className="absolute inset-0 flex items-center justify-center font-['Inter',sans-serif] font-bold text-[10px] sm:text-xs text-slate-700 tabular-nums"
                   >
-                    {!isImpactVisible && mobileShowCTA ? "APADRINAR" : (totalImpact === null ? "..." : `${totalImpact.toLocaleString()} / 30k Niños`)}
+                    {mobileShowCTA ? "APADRINAR" : (totalImpact === null ? "..." : `${totalImpact.toLocaleString()} / 30k Niños`)}
                   </motion.span>
                 </AnimatePresence>
               </div>
@@ -179,16 +162,14 @@ export default function Navbar() {
             </div>
 
             {/* ESTADO HOVER (CTA) */}
-            {!isImpactVisible && (
-              <div className="hidden group-hover:flex items-center gap-2 text-white animate-in fade-in slide-in-from-bottom-1 duration-200">
-                <Heart size={14} className="fill-white animate-pulse" />
-                <span className="font-['Inter',sans-serif] font-bold text-xs tracking-wide">APADRINAR AHORA</span>
-              </div>
-            )}
+            <div className="hidden group-hover:flex items-center gap-2 text-white animate-in fade-in slide-in-from-bottom-1 duration-200">
+              <Heart size={14} className="fill-white animate-pulse" />
+              <span className="font-['Inter',sans-serif] font-bold text-xs tracking-wide">APADRINAR AHORA</span>
+            </div>
 
           </div>
         </motion.div>
-      </motion.a>
+      </motion.div>
 
     </div>
   );

@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Body scroll optimization */
+body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Custom Global Styles from Original HTML */
 @layer utilities {
   .mask-fade-edges {
