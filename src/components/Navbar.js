@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { Rocket, Heart, Menu, X, School, GraduationCap, HeartHandshake, Building2 } from 'lucide-react';
 
@@ -13,7 +13,7 @@ export default function Navbar() {
   const [isPulsing, setIsPulsing] = useState(false);
   const [mobileShowCTA, setMobileShowCTA] = useState(false);
   const [isImpactVisible, setIsImpactVisible] = useState(false);
-  const { scrollYProgress } = useScroll();
+
 
   useEffect(() => {
     setIsPulsing(true);
