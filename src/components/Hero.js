@@ -104,7 +104,7 @@ export default function Hero() {
 
     return (
         // LIENZO "OFF-WHITE" PREMIUM (#F2F2F7)
-        <div className="h-[100dvh] w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 z-0" style={{ contain: 'layout paint' }}>
+        <div className="h-[100svh] w-full bg-white text-[#1D1D1F] font-sans overflow-hidden flex flex-col relative selection:bg-black selection:text-white pt-16 z-0" style={{ contain: 'layout paint' }}>
 
             {/* =====================================================================================
           2. ZONA SPLIT 65/35 (Título vs. Misión)
