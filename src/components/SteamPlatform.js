@@ -5,12 +5,27 @@ import { Users, Wind, Zap, Eye, Gamepad2, Lock } from 'lucide-react';
 import gsap from 'gsap';
 
 export default function SteamPlatform() {
+    const [minHeight, setMinHeight] = React.useState('100vh');
+
     useEffect(() => {
+        // Fix for mobile layout shifts: Set exact viewport height on mount
+        const setPhysicalHeight = () => {
+            setMinHeight(`${window.innerHeight}px`);
+        };
+
+        setPhysicalHeight();
+        window.addEventListener('resize', setPhysicalHeight);
+
         gsap.to(".iphone-dark", { y: -15, duration: 4, repeat: -1, yoyo: true, ease: "power1.inOut" });
+
+        return () => window.removeEventListener('resize', setPhysicalHeight);
     }, []);
 
     return (
-        <section className="pt-4 md:pt-24 pb-20 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center">
+        <section
+            className="pt-4 md:pt-24 pb-20 md:pb-48 bg-gradient-to-b from-white via-[#F5F7FA] to-white relative z-[70] flex flex-col justify-center"
+            style={{ minHeight: minHeight, overscrollBehavior: 'none' }}
+        >
             <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full">
                 <div className="bg-[#0B1120] rounded-[2rem] sm:rounded-[3.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden relative border border-white/5 group">
                     <div className="absolute -right-20 -top-20 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-[#7000FF]/10 rounded-full blur-[100px] animate-pulse"></div>
