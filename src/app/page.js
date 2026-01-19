@@ -19,18 +19,23 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      {/* ===== TEST: Solo RitualVuelo ===== */}
-      <RitualVuelo />
-      {/* <PlanVuelo /> */}
-      {/* <ExperienciaInmersiva /> */}
-      {/* <SteamPlatform /> */}
-      {/* <FlyHighTestimonialGallery /> */}
-      {/* <HorizontalGallery /> */}
+      {/* MAIN CONTENT - Pasa por encima del Hero sticky */}
+      <div
+        className="relative z-10 bg-transparent"
+        style={{ isolation: 'isolate' }}
+      >
+        <RitualVuelo />
+        <PlanVuelo />
+        <ExperienciaInmersiva />
+        <SteamPlatform />
+        <FlyHighTestimonialGallery />
+        {/* <HorizontalGallery /> */} {/* BACKUP: Galerías originales de Home Page */}
 
-      {/* <Manifiesto /> */}
-      {/* <ImpactEngineGoldenMaster /> */}
-      {/* <AlliesSection /> */}
-      <MinimalFooter />
+        <Manifiesto />
+        <ImpactEngineGoldenMaster />
+        <AlliesSection />
+        <MinimalFooter />
+      </div>
     </main>
   );
 }
