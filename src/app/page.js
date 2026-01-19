@@ -19,10 +19,10 @@ export default function Home() {
       <Navbar />
       <Hero />
 
-      {/* ===== TEST BINARIO: Primera mitad ===== */}
+      {/* ===== TEST: Solo RitualVuelo ===== */}
       <RitualVuelo />
-      <PlanVuelo />
-      <ExperienciaInmersiva />
+      {/* <PlanVuelo /> */}
+      {/* <ExperienciaInmersiva /> */}
       {/* <SteamPlatform /> */}
       {/* <FlyHighTestimonialGallery /> */}
       {/* <HorizontalGallery /> */}
