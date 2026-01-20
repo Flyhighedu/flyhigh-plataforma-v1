@@ -63,6 +63,17 @@ export default function FlightLogger({ onFlightComplete }) {
         alert("¡Vuelo Registrado Exitosamente!");
     };
 
+    const handleCancelFlight = () => {
+        if (confirm("¿Cancelar este vuelo? No se guardará nada.")) {
+            setStatus('idle');
+            setStudents(0);
+            setStaff(0);
+            setIncidents([]);
+            setElapsed(0);
+            setStartTime(null);
+        }
+    };
+
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -88,8 +99,8 @@ export default function FlightLogger({ onFlightComplete }) {
                 </div>
             </div>
 
-            {/* Counters - Always visible but maybe disabled during flight? User didn't specify, best to keep editable often but let's assume locked during flight to prevent accidents? 
-               User requested logic: "The staff must FIRST input... Once entered.. enable button". 
+            {/* Counters - Always visible but maybe disabled during flight? User didn't specify, best to keep editable often but let's assume locked during flight to prevent accidents?
+               User requested logic: "The staff must FIRST input... Once entered.. enable button".
                It implies input is a pre-requisite step. Let's leave them editable during flight just in case of correction, but emphasize PRE-flight input.
             */}
             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${!isIdle ? 'opacity-80' : ''}`}>
@@ -135,23 +146,33 @@ export default function FlightLogger({ onFlightComplete }) {
                         ¡DESPEGAR!
                     </button>
                 ) : (
-                    <div className="grid grid-cols-4 gap-3">
-                        {/* Incident Button (Small) */}
-                        <button
-                            onClick={() => setShowIncidentModal(true)}
-                            className="col-span-1 rounded-2xl bg-red-100 text-red-600 border-2 border-red-200 flex flex-col items-center justify-center active:bg-red-200"
-                        >
-                            <AlertTriangle size={24} />
-                            <span className="text-[10px] font-bold mt-1">FALLA</span>
-                        </button>
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-4 gap-3">
+                            {/* Incident Button (Small) */}
+                            <button
+                                onClick={() => setShowIncidentModal(true)}
+                                className="col-span-1 rounded-2xl bg-red-100 text-red-600 border-2 border-red-200 flex flex-col items-center justify-center active:bg-red-200"
+                            >
+                                <AlertTriangle size={24} />
+                                <span className="text-[10px] font-bold mt-1">FALLA</span>
+                            </button>
 
-                        {/* Land Button (Large) */}
+                            {/* Land Button (Large) */}
+                            <button
+                                onClick={handleLandAndSave}
+                                className="col-span-3 h-24 rounded-2xl bg-slate-900 text-white font-bold text-xl shadow-xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                            >
+                                <StopCircle size={32} className="text-red-500" />
+                                ATERRIZAR Y GUARDAR
+                            </button>
+                        </div>
+
+                        {/* Cancel Flight Button */}
                         <button
-                            onClick={handleLandAndSave}
-                            className="col-span-3 h-24 rounded-2xl bg-slate-900 text-white font-bold text-xl shadow-xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                            onClick={handleCancelFlight}
+                            className="w-full py-3 text-sm text-slate-400 font-medium hover:text-red-500 transition-colors flex items-center justify-center gap-2"
                         >
-                            <StopCircle size={32} className="text-red-500" />
-                            ITERRIZAR Y GUARDAR
+                            Cancelar Vuelo (Sin Guardar)
                         </button>
                     </div>
                 )}

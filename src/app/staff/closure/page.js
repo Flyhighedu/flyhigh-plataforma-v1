@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckSquare, Camera, ArrowLeft, Send, Check } from 'lucide-react';
 import { syncMissionClosure } from '@/utils/staff/sync';
+import SignaturePad from '@/components/staff/SignaturePad';
+
+import DailyImpactReport from '@/components/staff/DailyImpactReport';
 
 export default function ClosurePage() {
     const router = useRouter();
@@ -12,6 +15,8 @@ export default function ClosurePage() {
     const [photo, setPhoto] = useState(null);
     const [signature, setSignature] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [showReport, setShowReport] = useState(false);
+    const [missionId, setMissionId] = useState(null);
 
     useEffect(() => {
         // Load data from today (localStorage)
@@ -20,6 +25,9 @@ export default function ClosurePage() {
         const totalDuration = logs.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
 
         setStats({ flights: logs, totalStudents, totalDuration });
+
+        const currentMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
+        setMissionId(currentMission.id);
     }, []);
 
     const toggleCheck = (key) => setChecks(prev => ({ ...prev, [key]: !prev[key] }));
@@ -55,10 +63,10 @@ export default function ClosurePage() {
             localStorage.removeItem('flyhigh_flight_logs');
             localStorage.removeItem('flyhigh_staff_mission');
 
-            alert("¡Misión Cerrada con Éxito y Sincronizada!");
-            router.push('/staff/dashboard');
+            // Instead of redirecting immediately, show the report
+            setShowReport(true);
         } else {
-            alert("Error al sincronizar. Se guardará localmente (Pendiente de implementación robusta offline).");
+            alert("Error al sincronizar. Se guardará localmente.");
             // Here we should ideally keep it pending
             router.push('/staff/dashboard');
         }
@@ -68,6 +76,12 @@ export default function ClosurePage() {
     const allChecks = Object.values(checks).every(Boolean);
     const canSubmit = allChecks && signature && photo;
 
+    // Show Report View if submitted
+    if (showReport) {
+        return <DailyImpactReport missionId={missionId} onExit={() => router.push('/staff/dashboard')} />;
+    }
+
+    // Default Closure View
     return (
         <div className="space-y-8 animate-in slide-in-from-right-8 duration-300">
             <div className="flex items-center gap-2 text-slate-500">

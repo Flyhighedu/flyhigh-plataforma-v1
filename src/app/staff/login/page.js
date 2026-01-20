@@ -62,6 +62,50 @@ export default function StaffLoginPage() {
         }
     };
 
+    const handleTestLogin = async () => {
+        setLoading(true);
+        const supabase = createClient();
+        const testEmail = 'staff_test@flyhigh.com';
+        const testPass = 'flyhigh_test_123';
+
+        try {
+            // Attempt login
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+                email: testEmail,
+                password: testPass
+            });
+
+            if (loginError) {
+                // If invalid login, maybe user doesn't exist. Try to create it.
+                if (loginError.message.includes("Invalid login")) {
+                    const { error: signUpError } = await supabase.auth.signUp({
+                        email: testEmail,
+                        password: testPass
+                    });
+
+                    if (signUpError) throw signUpError;
+
+                    // After signup, try login again
+                    const { error: retryError } = await supabase.auth.signInWithPassword({
+                        email: testEmail,
+                        password: testPass
+                    });
+                    if (retryError) throw retryError;
+                } else {
+                    throw loginError;
+                }
+            }
+
+            router.push('/staff/dashboard');
+            router.refresh();
+
+        } catch (err) {
+            console.error("Test login failed:", err);
+            alert("Error en Modo Test: " + err.message);
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
             <div className="w-full max-w-sm space-y-8">
@@ -144,10 +188,12 @@ export default function StaffLoginPage() {
 
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <button
-                        onClick={() => router.push('/staff/dashboard')}
-                        className="w-full py-2 px-4 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2"
+                        type="button"
+                        onClick={handleTestLogin}
+                        disabled={loading}
+                        className="w-full py-2 px-4 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                     >
-                        🚀 Entrar sin contraseña (Modo Test)
+                        🚀 Entrar como Tester (Auth Real)
                     </button>
                 </div>
             </div>

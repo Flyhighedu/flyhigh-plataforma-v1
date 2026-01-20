@@ -46,22 +46,33 @@ async function uploadImage(base64Data, bucket, prefix = 'evidencia') {
  */
 export async function syncFlightLog(flightLog) {
     try {
+        // 0. Check Auth
+        const { data: { session }, error: authError } = await supabase.auth.getSession();
+        if (authError || !session) {
+            console.error("Sync Error: User not authenticated.", authError);
+            throw new Error("Usuario no autenticado. Inicia sesión nuevamente.");
+        }
+
         // 1. Process Incidents Images
         const processedIncidents = await Promise.all(
             (flightLog.incidents || []).map(async (inc) => {
                 if (inc.image && inc.image.startsWith('data:')) {
                     const url = await uploadImage(inc.image, 'staff-evidence', 'incident');
-                    return { ...inc, image: url || inc.image }; // Fallback to base64 if upload fails? Prefer not to, but safe for now.
+                    return { ...inc, image: url || inc.image };
                 }
                 return inc;
             })
         );
 
+        // Handle mission_id checking - DB column is TEXT so we can store 'manual-...' explicitly.
+        // No need to nullify it.
+        const missionIdToSend = flightLog.mission_id?.toString();
+
         // 2. Insert into DB
         const { error } = await supabase
             .from('bitacora_vuelos')
             .insert({
-                mission_id: flightLog.mission_id?.toString(), // Ensure string
+                mission_id: missionIdToSend,
                 mission_data: flightLog.mission_data || {},
                 duration_seconds: flightLog.durationSeconds,
                 student_count: flightLog.studentCount,
@@ -75,7 +86,9 @@ export async function syncFlightLog(flightLog) {
         return true;
 
     } catch (error) {
-        console.error("Sync Flight Error:", error);
+        console.error("Sync Flight Error Detailed:", JSON.stringify(error, null, 2));
+        // Also log the message if it's a standard Error object
+        if (error.message) console.error("Error Message:", error.message);
         return false;
     }
 }
