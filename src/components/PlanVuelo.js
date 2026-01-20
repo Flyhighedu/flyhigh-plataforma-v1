@@ -16,8 +16,9 @@ export default function PlanVuelo() {
     const headerRef = useRef(null);
 
     const [isPlaying, setIsPlaying] = useState(false); // State to control poster visibility
-    const [videoError, setVideoError] = useState(false); // State to detect video load failure
-    const [showPlayButton, setShowPlayButton] = useState(false); // Show manual play button as last resort
+    const [useGifFallback, setUseGifFallback] = useState(false); // Ultimate fallback: show GIF instead of video
+    const retryCountRef = useRef(0); // Track retry attempts
+    const retryIntervalRef = useRef(null); // Persistent retry interval
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -81,94 +82,115 @@ export default function PlanVuelo() {
         return () => ctx.revert();
     }, []);
 
-    // OPTIMIZACIÓN ROBUSTA: Observer de Visibilidad + Fallback
+    // NIVEL 2: Observer ULTRA-AGRESIVO con Retry
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+
+        const attemptPlay = () => {
+            if (video.paused && !isPlaying) {
+                video.muted = true;
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        setIsPlaying(true);
+                        if (retryIntervalRef.current) {
+                            clearInterval(retryIntervalRef.current);
+                            retryIntervalRef.current = null;
+                        }
+                    }).catch(() => {
+                        retryCountRef.current++;
+                    });
+                }
+            }
+        };
 
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        // Intentar reproducir de forma AGRESIVA
-                        const playPromise = video.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(error => {
-                                console.log("Auto-play prevented (trying again muted):", error);
-                                // Fallback: Force mute just in case
-                                video.muted = true;
-                                video.play().catch(e => console.error("Force play failed:", e));
-                            });
+                        attemptPlay();
+                        // NIVEL 4: Iniciar intervalo persistente de retry
+                        if (!retryIntervalRef.current) {
+                            retryIntervalRef.current = setInterval(() => {
+                                if (retryCountRef.current < 20 && !isPlaying) {
+                                    attemptPlay();
+                                } else if (retryIntervalRef.current) {
+                                    clearInterval(retryIntervalRef.current);
+                                    retryIntervalRef.current = null;
+                                }
+                            }, 500);
                         }
                     } else {
                         video.pause();
+                        if (retryIntervalRef.current) {
+                            clearInterval(retryIntervalRef.current);
+                            retryIntervalRef.current = null;
+                        }
                     }
                 });
             },
-            { threshold: 0.1, rootMargin: "50%" } // Cargar MUCHO ANTES (50% viewport height)
+            { threshold: 0.05, rootMargin: "100%" } // 1 PANTALLA COMPLETA de anticipación
         );
 
         if (visorRef.current) observer.observe(visorRef.current);
 
         return () => {
             observer.disconnect();
+            if (retryIntervalRef.current) {
+                clearInterval(retryIntervalRef.current);
+            }
         };
-    }, []);
+    }, [isPlaying]);
 
-    // FALLBACK NUCLEAR: Reproducir video al primer toque/click del usuario en CUALQUIER parte
+    // NIVEL 3: Desbloqueo por interacción global
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
         const forcePlayOnInteraction = () => {
-            if (video.paused) {
+            if (video.paused && !isPlaying) {
                 video.muted = true;
                 video.play().then(() => {
                     setIsPlaying(true);
-                    // Una vez que funcionó, remover listeners
-                    document.removeEventListener('touchstart', forcePlayOnInteraction);
-                    document.removeEventListener('click', forcePlayOnInteraction);
                 }).catch(() => { });
             }
         };
 
-        document.addEventListener('touchstart', forcePlayOnInteraction, { once: true, passive: true });
-        document.addEventListener('click', forcePlayOnInteraction, { once: true });
+        document.addEventListener('touchstart', forcePlayOnInteraction, { passive: true });
+        document.addEventListener('click', forcePlayOnInteraction);
+        document.addEventListener('scroll', forcePlayOnInteraction, { passive: true, once: true });
 
         return () => {
             document.removeEventListener('touchstart', forcePlayOnInteraction);
             document.removeEventListener('click', forcePlayOnInteraction);
+            document.removeEventListener('scroll', forcePlayOnInteraction);
         };
-    }, []);
+    }, [isPlaying]);
 
-    // TIMEOUT ABSOLUTO: Después de 3 segundos, forzar poster a desaparecer y mostrar botón de play
+    // NIVEL 5: Timeout de revelación (2 segundos)
     useEffect(() => {
         const timeout = setTimeout(() => {
-            const video = videoRef.current;
-            if (video && video.paused && !isPlaying) {
-                console.log('Video playback timeout - showing manual controls');
-                setShowPlayButton(true);
-                // Forzar poster a desaparecer para revelar el video (o su estado actual)
-                setIsPlaying(true);
+            if (!isPlaying) {
+                setIsPlaying(true); // Forzar poster a desaparecer
             }
-        }, 3000);
+        }, 2000);
 
         return () => clearTimeout(timeout);
     }, [isPlaying]);
 
-    // Función para play manual (botón)
-    const handleManualPlay = () => {
+    // NIVEL 7: GIF Fallback Absoluto (8 segundos)
+    useEffect(() => {
         const video = videoRef.current;
-        if (video) {
-            video.muted = true;
-            video.play().then(() => {
-                setShowPlayButton(false);
-            }).catch((e) => {
-                console.error('Manual play failed:', e);
-                setVideoError(true);
-            });
-        }
-    };
+        const ultimateTimeout = setTimeout(() => {
+            if (video && video.paused && video.currentTime === 0) {
+                console.log('VIDEO FALLBACK: Switching to GIF');
+                setUseGifFallback(true);
+            }
+        }, 8000);
+
+        return () => clearTimeout(ultimateTimeout);
+    }, []);
 
 
     return (
@@ -295,31 +317,23 @@ export default function PlanVuelo() {
                                             suppressHydrationWarning={true}
                                             onLoadedData={() => setIsPlaying(true)}
                                             onCanPlay={() => setIsPlaying(true)}
-                                            onPlaying={() => { setIsPlaying(true); setShowPlayButton(false); }}
-                                            onError={() => { setVideoError(true); setShowPlayButton(true); }}
+                                            onPlaying={() => setIsPlaying(true)}
+                                            onError={() => setUseGifFallback(true)}
                                             onTimeUpdate={(e) => {
                                                 if (e.target.currentTime > 0.05 && !isPlaying) {
                                                     setIsPlaying(true);
-                                                    setShowPlayButton(false);
                                                 }
                                             }}
                                             style={{ transform: 'translateZ(0)' }}
                                         />
 
-                                        {/* BOTÓN DE PLAY MANUAL - Último recurso */}
-                                        {showPlayButton && (
-                                            <button
-                                                onClick={handleManualPlay}
-                                                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 backdrop-blur-sm cursor-pointer group"
-                                                aria-label="Reproducir video"
-                                            >
-                                                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/90 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-                                                    <PlayCircle className="w-12 h-12 md:w-16 md:h-16 text-cyan-500 ml-1" />
-                                                </div>
-                                                {videoError && (
-                                                    <span className="absolute bottom-4 text-white text-xs">Toca para reproducir</span>
-                                                )}
-                                            </button>
+                                        {/* GIF FALLBACK ABSOLUTO - Si el video no puede reproducirse */}
+                                        {useGifFallback && (
+                                            <img
+                                                src="/img/poster-visor.jpg"
+                                                className="absolute inset-0 w-full h-full object-cover z-25"
+                                                alt="Vista aérea de Uruapan"
+                                            />
                                         )}
 
                                         {/* Screen Glare / Reflection */}
