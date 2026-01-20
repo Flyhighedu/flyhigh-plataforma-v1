@@ -88,20 +88,17 @@ export default function PlanVuelo() {
         if (!video) return;
 
         const attemptPlay = () => {
-            if (video.paused && !isPlaying) {
+            if (video.paused) {
                 video.muted = true;
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        setIsPlaying(true);
-                        if (retryIntervalRef.current) {
-                            clearInterval(retryIntervalRef.current);
-                            retryIntervalRef.current = null;
-                        }
-                    }).catch(() => {
-                        retryCountRef.current++;
-                    });
-                }
+                video.play().then(() => {
+                    setIsPlaying(true);
+                    if (retryIntervalRef.current) {
+                        clearInterval(retryIntervalRef.current);
+                        retryIntervalRef.current = null;
+                    }
+                }).catch(() => {
+                    retryCountRef.current++;
+                });
             }
         };
 
@@ -110,10 +107,10 @@ export default function PlanVuelo() {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         attemptPlay();
-                        // NIVEL 4: Iniciar intervalo persistente de retry
+                        // Iniciar intervalo persistente de retry
                         if (!retryIntervalRef.current) {
                             retryIntervalRef.current = setInterval(() => {
-                                if (retryCountRef.current < 20 && !isPlaying) {
+                                if (retryCountRef.current < 20 && video.paused) {
                                     attemptPlay();
                                 } else if (retryIntervalRef.current) {
                                     clearInterval(retryIntervalRef.current);
@@ -121,16 +118,11 @@ export default function PlanVuelo() {
                                 }
                             }, 500);
                         }
-                    } else {
-                        video.pause();
-                        if (retryIntervalRef.current) {
-                            clearInterval(retryIntervalRef.current);
-                            retryIntervalRef.current = null;
-                        }
                     }
+                    // NO pausar cuando sale del viewport - dejar que siga reproduciendo
                 });
             },
-            { threshold: 0.05, rootMargin: "100%" } // 1 PANTALLA COMPLETA de anticipación
+            { threshold: 0.05, rootMargin: "100%" }
         );
 
         if (visorRef.current) observer.observe(visorRef.current);
@@ -141,7 +133,7 @@ export default function PlanVuelo() {
                 clearInterval(retryIntervalRef.current);
             }
         };
-    }, [isPlaying]);
+    }, []); // Sin dependencias - ejecutar solo una vez
 
     // NIVEL 3: Desbloqueo por interacción global
     useEffect(() => {
