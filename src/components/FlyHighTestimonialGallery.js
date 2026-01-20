@@ -260,7 +260,7 @@ export default function FlyHighTestimonialGallery() {
 
     return (
         <section
-            className="relative w-full min-h-[100svh] md:min-h-screen py-8 md:py-20 bg-slate-50 overflow-hidden z-[80] flex flex-col justify-center"
+            className="relative w-full min-h-screen py-20 md:py-32 bg-slate-50 overflow-hidden z-[80] flex flex-col justify-center"
             style={{ contain: 'layout paint' }}
         >
             {/* Background Glow */}
@@ -269,13 +269,13 @@ export default function FlyHighTestimonialGallery() {
             {/* Header con animación de entrada */}
             <motion.div
                 ref={headerRef}
-                className="text-center mb-4 md:mb-10 px-4"
+                className="text-center mb-6 md:mb-16 px-4"
                 initial={{ opacity: 0, y: 40 }}
                 animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
                 transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             >
                 <motion.h2
-                    className="font-['Outfit',sans-serif] font-black text-3xl md:text-6xl text-slate-900 leading-[0.95] tracking-tighter mb-2 md:mb-4"
+                    className="font-['Outfit',sans-serif] font-black text-4xl md:text-6xl text-slate-900 leading-[0.9] tracking-tighter mb-3 md:mb-6"
                     initial={{ opacity: 0, y: 30 }}
                     animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                     transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
@@ -283,7 +283,7 @@ export default function FlyHighTestimonialGallery() {
                     Momentos Que <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">Inspiran</span>
                 </motion.h2>
                 <motion.p
-                    className="text-slate-500 text-xs md:text-lg leading-relaxed max-w-md md:max-w-2xl mx-auto"
+                    className="text-slate-500 text-sm md:text-xl leading-relaxed max-w-2xl mx-auto text-pretty"
                     initial={{ opacity: 0, y: 20 }}
                     animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                     transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -293,7 +293,7 @@ export default function FlyHighTestimonialGallery() {
             </motion.div>
 
             {/* Carousel */}
-            <div className="relative w-full mb-2 md:mb-4">
+            <div className="relative w-full mb-4">
                 <div
                     ref={containerRef}
                     className="flex gap-8 overflow-x-auto w-full px-[50vw] pb-10 pt-10 no-scrollbar snap-x snap-mandatory overscroll-x-contain"
@@ -343,8 +343,8 @@ export default function FlyHighTestimonialGallery() {
                 </div>
 
                 {/* Pagination Dots */}
-                <div className="flex justify-center mt-1 md:mt-2">
-                    <div className="flex items-center gap-1.5 md:gap-2 p-1 md:p-1.5 rounded-full bg-slate-200/40 backdrop-blur-sm border border-white/40 shadow-sm">
+                <div className="flex justify-center mt-2">
+                    <div className="flex items-center gap-2 p-1.5 rounded-full bg-slate-200/40 backdrop-blur-sm border border-white/40 shadow-sm">
                         {testimonials.map((_, index) => (
                             <PaginationDot
                                 key={index}
@@ -358,7 +358,7 @@ export default function FlyHighTestimonialGallery() {
             </div>
 
             {/* CTA Button */}
-            <div className="flex justify-center px-4 mt-3 md:mt-6">
+            <div className="flex justify-center px-4 mt-6">
                 <motion.button
                     type="button"
                     suppressHydrationWarning
