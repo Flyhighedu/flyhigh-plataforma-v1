@@ -178,10 +178,6 @@ export default function PlanVuelo() {
 
             <section
                 className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative z-50 overflow-hidden"
-                style={{
-                    contentVisibility: 'auto',
-                    containIntrinsicSize: 'auto 100vh'
-                }}
             >
 
                 {/* Styles for this component */}
