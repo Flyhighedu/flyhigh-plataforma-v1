@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import TodayFlightList from '@/components/staff/TodayFlightList';
+import { syncFlightLog } from '@/utils/staff/sync';
 
 export default function StaffDashboard() {
     const [currentMission, setCurrentMission] = useState(null);
@@ -45,16 +46,32 @@ export default function StaffDashboard() {
         }
     };
 
-    const handleFlightComplete = (data) => {
+    const handleFlightComplete = async (data) => {
+        // 1. Save Local (Optimistic)
         const existingLogs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
-        const newLog = { ...data, mission_id: currentMission.id, id: Date.now() };
+        const newLog = {
+            ...data,
+            mission_id: currentMission.id,
+            mission_data: currentMission,
+            id: Date.now(),
+            synced: false
+        };
         const updatedLogs = [...existingLogs, newLog];
 
         localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
-        setFlightLogs(updatedLogs); // Update state to trigger re-render
+        setFlightLogs(updatedLogs);
 
-        // Removed intrusive alert
-        // alert("¡Vuelo registrado! Total hoy: " + (existingLogs.length + 1)); 
+        // 2. Try Sync
+        if (navigator.onLine) {
+            const success = await syncFlightLog(newLog);
+            if (success) {
+                // Update local log to marked as synced
+                newLog.synced = true;
+                const syncedLogs = updatedLogs.map(l => l.id === newLog.id ? newLog : l);
+                localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
+                setFlightLogs(syncedLogs);
+            }
+        }
     };
 
     if (isRestoring) return null;

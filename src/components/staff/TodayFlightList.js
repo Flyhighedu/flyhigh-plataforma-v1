@@ -22,6 +22,7 @@ export default function TodayFlightList({ flights }) {
                                 <div className="text-slate-900 font-bold flex items-center gap-2">
                                     <Clock size={14} className="text-slate-400" />
                                     {Math.floor(flight.durationSeconds / 60)}m {flight.durationSeconds % 60}s
+                                    {flight.synced && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 rounded-full border border-green-200">Sync</span>}
                                 </div>
                                 <div className="text-xs text-slate-500 flex items-center gap-3 mt-1">
                                     <span className="flex items-center gap-1"><Users size={12} /> {flight.studentCount} Niños</span>

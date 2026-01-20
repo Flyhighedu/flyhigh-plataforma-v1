@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckSquare, Camera, ArrowLeft, Send, Check } from 'lucide-react';
-import SignaturePad from '@/components/staff/SignaturePad';
+import { syncMissionClosure } from '@/utils/staff/sync';
 
 export default function ClosurePage() {
     const router = useRouter();
@@ -38,15 +38,31 @@ export default function ClosurePage() {
 
         setSubmitting(true);
 
-        // Simulate API call to Edge Function
-        await new Promise(r => setTimeout(r, 1500));
+        const currentMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
 
-        // Cleanup local storage for next day (or move to archive)
-        localStorage.removeItem('flyhigh_flight_logs');
-        localStorage.removeItem('flyhigh_staff_mission');
+        const closureData = {
+            mission_id: currentMission.id,
+            stats: stats,
+            checklistVerified: Object.values(checks).every(Boolean),
+            photo: photo,
+            signature: signature
+        };
 
-        alert("¡Misión Cerrada con Éxito!");
-        router.push('/staff/dashboard'); // Or back to login
+        const success = await syncMissionClosure(closureData);
+
+        if (success) {
+            // Cleanup local storage
+            localStorage.removeItem('flyhigh_flight_logs');
+            localStorage.removeItem('flyhigh_staff_mission');
+
+            alert("¡Misión Cerrada con Éxito y Sincronizada!");
+            router.push('/staff/dashboard');
+        } else {
+            alert("Error al sincronizar. Se guardará localmente (Pendiente de implementación robusta offline).");
+            // Here we should ideally keep it pending
+            router.push('/staff/dashboard');
+        }
+        setSubmitting(false);
     };
 
     const allChecks = Object.values(checks).every(Boolean);
