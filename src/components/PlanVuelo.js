@@ -88,11 +88,14 @@ export default function PlanVuelo() {
             (entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        // Intentar reproducir de forma robusta
+                        // Intentar reproducir de forma AGRESIVA
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(error => {
-                                console.log("Auto-play prevented:", error);
+                                console.log("Auto-play prevented (trying again muted):", error);
+                                // Fallback: Force mute just in case
+                                video.muted = true;
+                                video.play().catch(e => console.error("Force play failed:", e));
                             });
                         }
                     } else {
@@ -100,7 +103,7 @@ export default function PlanVuelo() {
                     }
                 });
             },
-            { threshold: 0.1 }
+            { threshold: 0.1, rootMargin: "50%" } // Cargar MUCHO ANTES (50% viewport height)
         );
 
         if (visorRef.current) observer.observe(visorRef.current);
@@ -227,7 +230,8 @@ export default function PlanVuelo() {
                                         <video
                                             ref={videoRef}
                                             className="w-full h-full object-cover opacity-90 relative z-10"
-                                            preload="metadata"
+                                            preload="auto"
+                                            autoPlay
                                             muted
                                             loop
                                             playsInline
