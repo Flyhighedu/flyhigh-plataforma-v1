@@ -8,6 +8,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 export default function StaffLoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const router = useRouter();
@@ -24,10 +25,29 @@ export default function StaffLoginPage() {
         const supabase = createClient();
 
         try {
-            const { error: authError } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
+            let errorResult;
+
+            if (isSignUp) {
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+                errorResult = error;
+                if (!error) {
+                    alert('Registro exitoso! Por favor inicia sesión (o verifica tu email si es necesario).');
+                    setIsSignUp(false); // Switch back to login
+                    setLoading(false);
+                    return;
+                }
+            } else {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                errorResult = error;
+            }
+
+            const authError = errorResult;
 
             if (authError) {
                 throw authError; // triggers catch
@@ -104,14 +124,24 @@ export default function StaffLoginPage() {
                             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             {loading ? (
-                                <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" /> Entrando...</>
+                                <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" /> Procesando...</>
                             ) : (
-                                'Iniciar Sesión'
+                                isSignUp ? 'Registrarse' : 'Iniciar Sesión'
                             )}
                         </button>
                     </div>
+
+                    <div className="text-center">
+                        <button
+                            type="button"
+                            onClick={() => setIsSignUp(!isSignUp)}
+                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                            {isSignUp ? '¿Ya tienes cuenta? Inicia Sesión' : '¿No tienes cuenta? Regístrate'}
+                        </button>
+                    </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
