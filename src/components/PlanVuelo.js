@@ -115,7 +115,13 @@ export default function PlanVuelo() {
             {/* White Curtain (Fixed Background) */}
             <div ref={curtainRef} className="fixed inset-0 bg-white z-40 pointer-events-none opacity-0" />
 
-            <section className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative z-50 overflow-hidden">
+            <section
+                className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative z-50 overflow-hidden"
+                style={{
+                    contentVisibility: 'auto',
+                    containIntrinsicSize: '0 100vh'
+                }}
+            >
 
                 {/* Styles for this component */}
                 <style jsx>{`
@@ -286,8 +292,6 @@ export default function PlanVuelo() {
 
             </section>
 
-            {/* PATCH: Independent White Canvas - Massive patch to ensure no gaps */}
-            <div className="absolute top-[50%] left-0 w-full h-[800vh] z-[-50] pointer-events-none" style={{ backgroundColor: '#FFFFFF' }}></div>
         </div>
     );
 }

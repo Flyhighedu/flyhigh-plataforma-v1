@@ -192,6 +192,8 @@ export default function Hero() {
                         muted
                         loop
                         playsInline
+                        preload="metadata"
+                        decoding="async"
                     />
 
                     {/* Gradiente Sutil (Solo abajo para resaltar la Isla) */}

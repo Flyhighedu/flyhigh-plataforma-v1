@@ -226,12 +226,24 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
 export default function FlyHighTestimonialGallery() {
     const [modalOpen, setModalOpen] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [activeCardIndex, setActiveCardIndex] = useState(0); // Para virtualización
     const containerRef = useRef(null);
 
     const { scrollXProgress } = useScroll({
         container: containerRef,
         axis: 'x'
     });
+
+    // Actualizar índice activo basado en scroll (para virtualización)
+    useEffect(() => {
+        const unsubscribe = scrollXProgress.on('change', (value) => {
+            const newIndex = Math.round(value * (testimonials.length - 1));
+            if (newIndex !== activeCardIndex) {
+                setActiveCardIndex(newIndex);
+            }
+        });
+        return () => unsubscribe();
+    }, [scrollXProgress, activeCardIndex]);
 
     const buttonScale = useTransform(
         scrollXProgress,
@@ -245,7 +257,14 @@ export default function FlyHighTestimonialGallery() {
     };
 
     return (
-        <section className="relative w-full py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]" style={{ contain: 'layout paint' }}>
+        <section
+            className="relative w-full py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]"
+            style={{
+                contain: 'layout paint',
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 800px'
+            }}
+        >
             {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-sky-200/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
 
@@ -282,15 +301,31 @@ export default function FlyHighTestimonialGallery() {
                         }
                     `}</style>
 
-                    {testimonials.map((item, index) => (
-                        <TestimonialCard
-                            key={item.id}
-                            item={item}
-                            index={index}
-                            scrollXProgress={scrollXProgress}
-                            onClick={() => handleCardClick(index)}
-                        />
-                    ))}
+                    {testimonials.map((item, index) => {
+                        // VIRTUALIZACIÓN: Solo renderizar cards cercanas al índice activo
+                        const isVisible = Math.abs(index - activeCardIndex) <= 1;
+
+                        if (!isVisible) {
+                            // Placeholder vacío para mantener el espaciado
+                            return (
+                                <div
+                                    key={item.id}
+                                    className="shrink-0 w-[200px] h-[280px] md:w-[260px] md:h-[340px] snap-center"
+                                    aria-hidden="true"
+                                />
+                            );
+                        }
+
+                        return (
+                            <TestimonialCard
+                                key={item.id}
+                                item={item}
+                                index={index}
+                                scrollXProgress={scrollXProgress}
+                                onClick={() => handleCardClick(index)}
+                            />
+                        );
+                    })}
                 </div>
 
                 {/* Pagination Dots */}

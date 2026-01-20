@@ -83,7 +83,13 @@ const VideoCard = ({ card, isActive, onVideoEnded, sectionVisible, shouldLoad })
                         <span className="text-white font-['Outfit',sans-serif] font-black text-xl leading-none tracking-tight whitespace-pre-line">{card.title}</span>
                     </div>
                     <div className="w-16 h-16 flex items-center justify-center">
-                        <img src={card.logo} alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
+                        <img
+                            src={card.logo}
+                            alt="Logo"
+                            className="w-full h-full object-contain drop-shadow-lg"
+                            loading="lazy"
+                            decoding="async"
+                        />
                     </div>
                 </div>
 
@@ -194,7 +200,16 @@ export default function ExperienciaInmersiva() {
     };
 
     return (
-        <section ref={sectionRef} id="experiencia-inmersiva" className="min-h-[100svh] w-full flex flex-col justify-center relative z-[60] py-12 md:py-32 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]" style={{ contain: 'layout paint' }}>
+        <section
+            ref={sectionRef}
+            id="experiencia-inmersiva"
+            className="min-h-[100svh] w-full flex flex-col justify-center relative z-[60] py-12 md:py-32 bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFBF0_100%)]"
+            style={{
+                contain: 'layout paint',
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 900px'
+            }}
+        >
 
             {/* Custom Styles for Hide Scrollbar */}
             <style jsx>{`
