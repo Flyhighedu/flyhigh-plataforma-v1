@@ -64,23 +64,31 @@ export default function IncidentReporter({ onClose, onSave }) {
                     </div>
 
                     {/* Camera */}
+                    {/* Camera */}
                     <div
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer transition-colors ${image ? 'border-red-400 bg-red-50' : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+                        className={`relative group rounded-2xl h-48 flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${image
+                            ? 'bg-slate-900'
+                            : 'bg-slate-100 border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50'
                             }`}
                     >
                         {image ? (
-                            <div className="relative w-full h-full p-2">
-                                <img src={image} alt="Evidencia" className="w-full h-full object-cover rounded-lg" decoding="async" />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-white font-medium opacity-0 hover:opacity-100 transition-opacity">
-                                    Cambiar Foto
-                                </div>
-                            </div>
-                        ) : (
                             <>
-                                <Camera size={32} className="text-slate-400 mb-2" />
-                                <span className="text-sm text-slate-500 font-medium">Adjuntar Evidencia</span>
+                                <img src={image} alt="Evidencia" className="w-full h-full object-contain" decoding="async" />
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-white font-bold flex items-center gap-2">
+                                        <Camera size={20} /> Cambiar Foto
+                                    </span>
+                                </div>
                             </>
+                        ) : (
+                            <div className="text-center p-4">
+                                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Camera size={32} />
+                                </div>
+                                <span className="block text-slate-900 font-bold mb-1">Toma una foto</span>
+                                <span className="text-xs text-slate-500">Obligatorio para reportar falla</span>
+                            </div>
                         )}
                         <input
                             type="file"
