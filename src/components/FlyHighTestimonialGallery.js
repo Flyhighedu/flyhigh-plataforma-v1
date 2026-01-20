@@ -260,11 +260,11 @@ export default function FlyHighTestimonialGallery() {
 
     return (
         <section
-            className="relative w-full py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]"
+            className="relative w-full min-h-screen py-20 md:py-32 bg-slate-50 overflow-hidden z-[80]"
             style={{
                 contain: 'layout paint',
                 contentVisibility: 'auto',
-                containIntrinsicSize: '0 800px'
+                containIntrinsicSize: 'auto 100vh'
             }}
         >
             {/* Background Glow */}

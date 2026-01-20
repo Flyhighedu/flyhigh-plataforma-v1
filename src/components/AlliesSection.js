@@ -23,8 +23,9 @@ const AlliesSection = () => {
         <section
             className="relative z-[80] w-full overflow-hidden font-sans border-t border-slate-100 bg-white"
             style={{
+                contain: 'layout paint',
                 contentVisibility: 'auto',
-                containIntrinsicSize: '0 500px'
+                containIntrinsicSize: 'auto 500px'
             }}
         >
 

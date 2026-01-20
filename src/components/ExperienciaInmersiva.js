@@ -207,7 +207,7 @@ export default function ExperienciaInmersiva() {
             style={{
                 contain: 'layout paint',
                 contentVisibility: 'auto',
-                containIntrinsicSize: '0 900px'
+                containIntrinsicSize: 'auto 100vh'
             }}
         >
 

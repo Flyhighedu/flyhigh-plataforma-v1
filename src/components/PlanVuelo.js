@@ -16,6 +16,8 @@ export default function PlanVuelo() {
     const headerRef = useRef(null);
 
     const [isPlaying, setIsPlaying] = useState(false); // State to control poster visibility
+    const [videoError, setVideoError] = useState(false); // State to detect video load failure
+    const [showPlayButton, setShowPlayButton] = useState(false); // Show manual play button as last resort
 
     useLayoutEffect(() => {
         const ctx = gsap.context(() => {
@@ -139,6 +141,35 @@ export default function PlanVuelo() {
         };
     }, []);
 
+    // TIMEOUT ABSOLUTO: Después de 3 segundos, forzar poster a desaparecer y mostrar botón de play
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            const video = videoRef.current;
+            if (video && video.paused && !isPlaying) {
+                console.log('Video playback timeout - showing manual controls');
+                setShowPlayButton(true);
+                // Forzar poster a desaparecer para revelar el video (o su estado actual)
+                setIsPlaying(true);
+            }
+        }, 3000);
+
+        return () => clearTimeout(timeout);
+    }, [isPlaying]);
+
+    // Función para play manual (botón)
+    const handleManualPlay = () => {
+        const video = videoRef.current;
+        if (video) {
+            video.muted = true;
+            video.play().then(() => {
+                setShowPlayButton(false);
+            }).catch((e) => {
+                console.error('Manual play failed:', e);
+                setVideoError(true);
+            });
+        }
+    };
+
 
     return (
         <div ref={sectionRef} className="relative z-10 bg-white w-full snap-start -mt-1">
@@ -149,7 +180,7 @@ export default function PlanVuelo() {
                 className="h-[100dvh] w-full flex flex-col py-2 md:py-4 bg-white relative z-50 overflow-hidden"
                 style={{
                     contentVisibility: 'auto',
-                    containIntrinsicSize: '0 100vh'
+                    containIntrinsicSize: 'auto 100vh'
                 }}
             >
 
@@ -268,13 +299,32 @@ export default function PlanVuelo() {
                                             suppressHydrationWarning={true}
                                             onLoadedData={() => setIsPlaying(true)}
                                             onCanPlay={() => setIsPlaying(true)}
+                                            onPlaying={() => { setIsPlaying(true); setShowPlayButton(false); }}
+                                            onError={() => { setVideoError(true); setShowPlayButton(true); }}
                                             onTimeUpdate={(e) => {
                                                 if (e.target.currentTime > 0.05 && !isPlaying) {
                                                     setIsPlaying(true);
+                                                    setShowPlayButton(false);
                                                 }
                                             }}
                                             style={{ transform: 'translateZ(0)' }}
                                         />
+
+                                        {/* BOTÓN DE PLAY MANUAL - Último recurso */}
+                                        {showPlayButton && (
+                                            <button
+                                                onClick={handleManualPlay}
+                                                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 backdrop-blur-sm cursor-pointer group"
+                                                aria-label="Reproducir video"
+                                            >
+                                                <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/90 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+                                                    <PlayCircle className="w-12 h-12 md:w-16 md:h-16 text-cyan-500 ml-1" />
+                                                </div>
+                                                {videoError && (
+                                                    <span className="absolute bottom-4 text-white text-xs">Toca para reproducir</span>
+                                                )}
+                                            </button>
+                                        )}
 
                                         {/* Screen Glare / Reflection */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none mix-blend-overlay"></div>

@@ -48,7 +48,7 @@ export default function SteamPlatform() {
                 contain: 'layout paint',
                 overscrollBehavior: 'none',
                 contentVisibility: 'auto',
-                containIntrinsicSize: '0 900px'
+                containIntrinsicSize: 'auto 100vh'
             }}
         >
             <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full">
