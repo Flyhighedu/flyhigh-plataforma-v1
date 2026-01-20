@@ -280,7 +280,7 @@ export default function FlyHighTestimonialGallery() {
                     animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                     transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
                 >
-                    Momentos Que <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">Inspiran</span>
+                    Momentos Que <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">Inspiran</span>
                 </motion.h2>
                 <motion.p
                     className="text-slate-500 text-sm md:text-xl leading-relaxed max-w-2xl mx-auto text-pretty"
