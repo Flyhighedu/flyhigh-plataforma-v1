@@ -20,7 +20,13 @@ const AlliesSection = () => {
     ];
 
     return (
-        <section className="relative z-[80] w-full overflow-hidden font-sans border-t border-slate-100 bg-white">
+        <section
+            className="relative z-[80] w-full overflow-hidden font-sans border-t border-slate-100 bg-white"
+            style={{
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 500px'
+            }}
+        >
 
             {/* CSS LOCAL: ANIMACIONES Y ESTILO CLAY */}
             <style>{`
@@ -37,9 +43,13 @@ const AlliesSection = () => {
         
         .animate-scroll {
           animation: scroll 45s linear infinite;
+          will-change: transform;
+          transform: translate3d(0,0,0);
         }
         .animate-scroll-reverse {
           animation: scroll-reverse 50s linear infinite;
+          will-change: transform;
+          transform: translate3d(0,0,0);
         }
         
         .animate-scroll:hover, .animate-scroll-reverse:hover {
@@ -48,6 +58,8 @@ const AlliesSection = () => {
 
         .animate-scroll-slow {
           animation: scroll 100s linear infinite;
+          will-change: transform;
+          transform: translate3d(0,0,0);
         }
         .animate-scroll-slow:hover {
           animation-play-state: paused;
@@ -94,9 +106,8 @@ const AlliesSection = () => {
             radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.25) 0px, transparent 50%),
             radial-gradient(at 0% 0%, rgba(244, 114, 182, 0.2) 0px, transparent 50%),
             radial-gradient(at 50% 50%, rgba(255, 192, 203, 0.15) 0px, transparent 50%);
-          filter: blur(60px);
-          opacity: 0.9;
-          animation: aurora 60s linear infinite;
+          filter: blur(30px);
+          opacity: 0.7;
         }
       `}</style>
 
@@ -120,7 +131,7 @@ const AlliesSection = () => {
                         {/* Strong Plastic */}
                         <div className="flex flex-col items-center gap-2 group">
                             <div className="h-16 md:h-20 flex items-center justify-center">
-                                <img src="/img/logo sp Negro.png" alt="Strong Plastic" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                                <img src="/img/logo sp Negro.png" alt="Strong Plastic" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" decoding="async" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors">Patrocinador</span>
                         </div>
@@ -130,7 +141,7 @@ const AlliesSection = () => {
                         {/* RV Fresh */}
                         <div className="flex flex-col items-center gap-2 group">
                             <div className="h-16 md:h-20 flex items-center justify-center">
-                                <img src="/img/logo RV Fresh.png" alt="RV Fresh" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                                <img src="/img/logo RV Fresh.png" alt="RV Fresh" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" decoding="async" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-green-500 transition-colors">Patrocinador</span>
                         </div>
@@ -140,7 +151,7 @@ const AlliesSection = () => {
                         {/* Madobox */}
                         <div className="flex flex-col items-center gap-2 group">
                             <div className="h-16 md:h-20 flex items-center justify-center">
-                                <img src="/img/Logo Madobox.png" alt="Madobox" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                                <img src="/img/Logo Madobox.png" alt="Madobox" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" decoding="async" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-orange-500 transition-colors">Patrocinador</span>
                         </div>
@@ -150,7 +161,7 @@ const AlliesSection = () => {
                         {/* Bonanza */}
                         <div className="flex flex-col items-center gap-2 group">
                             <div className="h-12 md:h-14 flex items-center justify-center">
-                                <img src="/img/bonanza.png" alt="La Bonanza" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                                <img src="/img/bonanza.png" alt="La Bonanza" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" decoding="async" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-rose-500 transition-colors">Patrocinador</span>
                         </div>
@@ -160,7 +171,7 @@ const AlliesSection = () => {
                         {/* Global Frut */}
                         <div className="flex flex-col items-center gap-2 group">
                             <div className="h-16 md:h-20 flex items-center justify-center">
-                                <img src="/img/Logo Global Frut png.png" alt="Global Frut" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" />
+                                <img src="/img/Logo Global Frut png.png" alt="Global Frut" className="h-full w-auto object-contain opacity-90 group-hover:opacity-100 transition-opacity" loading="lazy" decoding="async" />
                             </div>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-emerald-500 transition-colors">Patrocinador</span>
                         </div>
@@ -179,13 +190,13 @@ const AlliesSection = () => {
                     {/* FILA A: EMPRESAS (Altura reducida h-20) */}
                     <div className="relative w-full overflow-hidden mask-fade-sides">
                         <div className="flex w-max animate-scroll gap-4 py-2">
-                            {[...sponsors, ...sponsors, ...sponsors].map((sponsor, idx) => (
+                            {[...sponsors, ...sponsors].map((sponsor, idx) => (
                                 <div
                                     key={idx}
                                     className="clay-card w-48 h-20 flex flex-col items-center justify-center rounded-xl cursor-pointer group border border-transparent hover:border-pink-100"
                                 >
                                     <div className="flex items-center gap-2 mb-1">
-                                        <img src={sponsor.logo} alt={sponsor.name} className="h-8 w-auto object-contain transition-all duration-300" />
+                                        <img src={sponsor.logo} alt={sponsor.name} className="h-8 w-auto object-contain" loading="lazy" decoding="async" />
                                     </div>
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide group-hover:text-pink-500 transition-colors">{sponsor.name}</span>
                                 </div>
@@ -202,7 +213,7 @@ const AlliesSection = () => {
                     {/* FILA B: ESCUELAS (Píldoras compactas) */}
                     <div className="relative w-full overflow-hidden mask-fade-sides">
                         <div className="flex w-max animate-scroll-reverse gap-3 py-1">
-                            {[...schools, ...schools, ...schools].map((school, idx) => (
+                            {[...schools, ...schools].map((school, idx) => (
                                 <div
                                     key={idx}
                                     className="clay-pill px-4 py-2 rounded-full flex items-center gap-2 cursor-default group hover:scale-105 transition-transform border border-slate-100"
@@ -228,7 +239,7 @@ const AlliesSection = () => {
             {/* --- 3. TICKER DE PADRINOS (El Retorno del Rosa Vibrante) --- */}
             <div className="absolute bottom-0 w-full bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 py-2.5 overflow-hidden shadow-lg z-20">
                 <div className="flex w-max animate-scroll-slow gap-10">
-                    {[...donors, ...donors, ...donors, ...donors].map((donor, idx) => (
+                    {[...donors, ...donors].map((donor, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-white font-medium text-xs md:text-sm whitespace-nowrap">
                             <Heart size={14} className="fill-white animate-pulse" />
                             <span className="opacity-90">Gracias a</span>

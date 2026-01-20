@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence, useInView } from 'framer-motion';
 import { X, Play, Wind, ChevronDown, Sparkles, MapPin, Plane } from 'lucide-react';
 
 const testimonials = [
@@ -228,6 +228,8 @@ export default function FlyHighTestimonialGallery() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [activeCardIndex, setActiveCardIndex] = useState(0); // Para virtualización
     const containerRef = useRef(null);
+    const headerRef = useRef(null);
+    const isHeaderInView = useInView(headerRef, { once: true, margin: '-100px' });
 
     const { scrollXProgress } = useScroll({
         container: containerRef,
@@ -268,15 +270,31 @@ export default function FlyHighTestimonialGallery() {
             {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-sky-200/20 rounded-full blur-[100px] -z-10 animate-pulse"></div>
 
-            {/* Header */}
-            <div className="text-center mb-10 md:mb-16 px-4">
-                <h2 className="font-['Outfit',sans-serif] text-3xl md:text-5xl font-bold text-slate-900 mb-3">
+            {/* Header con animación de entrada */}
+            <motion.div
+                ref={headerRef}
+                className="text-center mb-6 md:mb-16 px-4"
+                initial={{ opacity: 0, y: 40 }}
+                animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            >
+                <motion.h2
+                    className="font-['Outfit',sans-serif] font-black text-4xl md:text-6xl text-slate-900 leading-[0.9] tracking-tighter mb-3 md:mb-6"
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+                    transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+                >
                     Momentos Que <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">Inspiran</span>
-                </h2>
-                <p className="text-slate-500 text-sm md:text-base max-w-lg mx-auto">
+                </motion.h2>
+                <motion.p
+                    className="text-slate-500 text-sm md:text-xl leading-relaxed max-w-2xl mx-auto text-pretty"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={isHeaderInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                    transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                >
                     Revive la experiencia de los niños que ya están <span className="font-bold text-violet-600">conquistando el cielo</span> con <span className="font-bold text-slate-900">FlyHigh</span>.
-                </p>
-            </div>
+                </motion.p>
+            </motion.div>
 
             {/* Carousel */}
             <div className="relative w-full mb-4">

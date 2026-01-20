@@ -27,7 +27,7 @@ export default function Home() {
 
       {/* MAIN CONTENT - Pasa por encima del Hero sticky */}
       <div
-        className="relative z-10 bg-transparent"
+        className="relative z-10 bg-white"
         style={{ isolation: 'isolate' }}
       >
         <RitualVuelo />
