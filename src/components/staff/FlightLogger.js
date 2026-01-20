@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Play, StopCircle, Clock, Users, UserCheck, AlertTriangle } from 'lucide-react';
+import { Play, StopCircle, Clock, Send, Plane, AlertTriangle } from 'lucide-react';
 import CounterData from './CounterData';
 import IncidentReporter from './IncidentReporter';
 
 export default function FlightLogger({ onFlightComplete }) {
-    const [status, setStatus] = useState('idle'); // idle, active
+    const [status, setStatus] = useState('idle'); // 'idle' (pre-flight), 'active' (in-flight)
     const [startTime, setStartTime] = useState(null);
     const [elapsed, setElapsed] = useState(0);
     const [students, setStudents] = useState(0);
@@ -28,21 +28,19 @@ export default function FlightLogger({ onFlightComplete }) {
         return () => clearInterval(timerRef.current);
     }, [status, startTime]);
 
-    const handleStartFlight = () => {
+    const handleTakeOff = () => {
+        if (students === 0 && staff === 0) {
+            alert("Por favor ingresa al menos un alumno o staff antes de despegar.");
+            return;
+        }
         setStatus('active');
         setStartTime(Date.now());
         setElapsed(0);
         setIncidents([]);
-        // Keep counters if they represent the group, or reset? 
-        // User request: "limpia los contadores para el siguiente grupo" implies reset AFTER flight.
-        // So we start fresh or keep previous if needed? Assuming fresh flight = fresh counters usually, 
-        // but maybe group setup is pre-flight. Let's assume reset on start for now or manual set.
-        setStudents(0);
-        setStaff(0);
     };
 
-    const handleEndFlight = () => {
-        if (!confirm("¿Finalizar vuelo y guardar registro?")) return;
+    const handleLandAndSave = () => {
+        if (!confirm("¿Aterrizar y Guardar Vuelo?")) return;
 
         setStatus('idle');
         const finalData = {
@@ -56,12 +54,13 @@ export default function FlightLogger({ onFlightComplete }) {
 
         onFlightComplete(finalData);
 
-        // Reset for next
+        // Auto-Reset Logic
         setStudents(0);
         setStaff(0);
         setIncidents([]);
         setElapsed(0);
         setStartTime(null);
+        alert("¡Vuelo Registrado Exitosamente!");
     };
 
     const formatTime = (seconds) => {
@@ -70,40 +69,30 @@ export default function FlightLogger({ onFlightComplete }) {
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // IDLE STATE
-    if (status === 'idle') {
-        return (
-            <div className="flex flex-col items-center justify-center py-10 space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                <button
-                    onClick={handleStartFlight}
-                    className="group relative w-64 h-64 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 shadow-2xl shadow-blue-500/40 flex flex-col items-center justify-center text-white transition-transform active:scale-95 hover:scale-105"
-                >
-                    <div className="absolute inset-0 rounded-full border-4 border-white/20 animate-pulse"></div>
-                    <Play size={64} fill="currentColor" className="mb-2 ml-2" />
-                    <span className="text-xl font-bold tracking-wider">AGREGAR VUELO</span>
-                </button>
-                <p className="text-slate-500 text-sm font-medium">Listo para iniciar operación</p>
-            </div>
-        );
-    }
+    const isIdle = status === 'idle';
 
-    // ACTIVE STATE
     return (
         <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-10 duration-500">
             {/* Timer Display */}
-            <div className="bg-slate-900 text-white rounded-2xl p-6 flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500 animate-pulse"></div>
+            <div className={`transition-all duration-500 rounded-2xl p-6 flex flex-col items-center justify-center shadow-lg relative overflow-hidden ${isIdle ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white'}`}>
+                {!isIdle && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500 animate-pulse"></div>}
+
                 <div className="flex items-center gap-3 mb-1">
-                    <Clock size={20} className="text-blue-400" />
-                    <span className="uppercase tracking-widest text-xs font-bold text-blue-200">Tiempo de Vuelo</span>
+                    <Clock size={20} className={isIdle ? "text-slate-400" : "text-blue-400"} />
+                    <span className={`uppercase tracking-widest text-xs font-bold ${isIdle ? 'text-slate-500' : 'text-blue-200'}`}>
+                        {isIdle ? 'Tiempo en Tierra' : 'Tiempo de Vuelo'}
+                    </span>
                 </div>
                 <div className="text-6xl font-mono font-bold tracking-tighter tabular-nums">
                     {formatTime(elapsed)}
                 </div>
             </div>
 
-            {/* Counters */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Counters - Always visible but maybe disabled during flight? User didn't specify, best to keep editable often but let's assume locked during flight to prevent accidents? 
+               User requested logic: "The staff must FIRST input... Once entered.. enable button". 
+               It implies input is a pre-requisite step. Let's leave them editable during flight just in case of correction, but emphasize PRE-flight input.
+            */}
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${!isIdle ? 'opacity-80' : ''}`}>
                 <CounterData
                     label="Alumnos"
                     value={students}
@@ -118,7 +107,7 @@ export default function FlightLogger({ onFlightComplete }) {
                 />
             </div>
 
-            {/* Incidents Preview */}
+            {/* Incidents Preview (Only Show in Active or if happened) */}
             {incidents.length > 0 && (
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
                     <h4 className="text-sm font-bold text-red-800 flex items-center gap-2">
@@ -134,23 +123,38 @@ export default function FlightLogger({ onFlightComplete }) {
                 </div>
             )}
 
-            {/* Actions Footer */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
-                <button
-                    onClick={() => setShowIncidentModal(true)}
-                    className="flex flex-col items-center justify-center gap-2 p-4 bg-white border border-red-200 rounded-xl shadow-sm text-red-600 font-bold active:bg-red-50 transition-colors"
-                >
-                    <AlertTriangle size={24} />
-                    <span>REPORTAR FALLA</span>
-                </button>
+            {/* Primary Action Button */}
+            <div className="pt-4">
+                {isIdle ? (
+                    <button
+                        onClick={handleTakeOff}
+                        disabled={students === 0 && staff === 0}
+                        className="w-full h-24 rounded-2xl bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:text-slate-500 text-white font-black text-2xl shadow-xl shadow-green-500/30 flex items-center justify-center gap-4 transition-all active:scale-95"
+                    >
+                        <Plane size={32} className={students > 0 || staff > 0 ? "animate-pulse" : ""} />
+                        ¡DESPEGAR!
+                    </button>
+                ) : (
+                    <div className="grid grid-cols-4 gap-3">
+                        {/* Incident Button (Small) */}
+                        <button
+                            onClick={() => setShowIncidentModal(true)}
+                            className="col-span-1 rounded-2xl bg-red-100 text-red-600 border-2 border-red-200 flex flex-col items-center justify-center active:bg-red-200"
+                        >
+                            <AlertTriangle size={24} />
+                            <span className="text-[10px] font-bold mt-1">FALLA</span>
+                        </button>
 
-                <button
-                    onClick={handleEndFlight}
-                    className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-800 text-white rounded-xl shadow-lg shadow-slate-900/20 font-bold active:bg-slate-900 transition-colors"
-                >
-                    <StopCircle size={24} />
-                    <span>FINALIZAR VUELO</span>
-                </button>
+                        {/* Land Button (Large) */}
+                        <button
+                            onClick={handleLandAndSave}
+                            className="col-span-3 h-24 rounded-2xl bg-slate-900 text-white font-bold text-xl shadow-xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                        >
+                            <StopCircle size={32} className="text-red-500" />
+                            ITERRIZAR Y GUARDAR
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Incident Modal */}

@@ -126,49 +126,50 @@ export default function MissionSelector({ onSelect }) {
                 />
             </div>
 
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                {filteredMissions.length > 0 ? (
-                    filteredMissions.map((mission) => (
-                        <button
-                            key={mission.id}
-                            onClick={() => onSelect({
-                                ...mission,
-                                school_name: mission.nombre_escuela // Map to consistent prop if needed
-                            })}
-                            className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 hover:bg-blue-50 transition-all group text-left"
-                        >
-                            <div className="space-y-1">
-                                <h3 className="font-bold text-slate-800 group-hover:text-blue-700 text-sm md:text-base">
-                                    {mission.nombre_escuela}
-                                </h3>
-                                <div className="flex flex-col md:flex-row md:items-center text-xs text-slate-500 gap-1 md:gap-3">
-                                    <span className="flex items-center gap-1"><MapPin size={12} /> {mission.colonia || 'Sin ubicación'}</span>
-                                    {mission.fecha_programada && (
-                                        <span className="flex items-center gap-1 text-slate-400">
-                                            <Calendar size={12} /> {new Date(mission.fecha_programada).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                </div>
+            {/* School List */}
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1 pb-4">
+                {filteredMissions.map((mission) => (
+                    <button
+                        key={mission.id}
+                        onClick={() => onSelect({
+                            ...mission,
+                            school_name: mission.nombre_escuela
+                        })}
+                        className="w-full flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 hover:bg-blue-50 transition-all group text-left"
+                    >
+                        <div className="space-y-1">
+                            <h3 className="font-bold text-slate-800 group-hover:text-blue-700 text-sm md:text-base">
+                                {mission.nombre_escuela}
+                            </h3>
+                            <div className="flex flex-col md:flex-row md:items-center text-xs text-slate-500 gap-1 md:gap-3">
+                                <span className="flex items-center gap-1"><MapPin size={12} /> {mission.colonia || 'Sin ubicación'}</span>
+                                {mission.fecha_programada && (
+                                    <span className="flex items-center gap-1 text-slate-400">
+                                        <Calendar size={12} /> {new Date(mission.fecha_programada).toLocaleDateString()}
+                                    </span>
+                                )}
                             </div>
-                            <div className="text-slate-300 group-hover:text-blue-500 pl-2">
-                                <ArrowRight size={20} />
-                            </div>
-                        </button>
-                    ))
-                ) : (
-                    <div className="text-center py-8 text-slate-400">
-                        <p>No se encontraron escuelas.</p>
-                    </div>
-                )}
-            </div>
+                        </div>
+                        <div className="text-slate-300 group-hover:text-blue-500 pl-2">
+                            <ArrowRight size={20} />
+                        </div>
+                    </button>
+                ))}
 
-            <div className="pt-2 border-t border-slate-100">
+                {/* Manual Entry Option appended at the end */}
                 <button
                     onClick={() => setIsManual(true)}
-                    className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                    className="w-full flex items-center justify-between p-4 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all group text-left"
                 >
-                    <PlusCircle size={18} />
-                    ¿No aparece? Ingresar nombre manualmente
+                    <div className="space-y-1">
+                        <h3 className="font-bold text-slate-600 group-hover:text-blue-700 text-sm md:text-base flex items-center gap-2">
+                            <PlusCircle size={16} /> OTRA (Ingreso Manual)
+                        </h3>
+                        <p className="text-xs text-slate-400">Si la escuela no aparece en la lista</p>
+                    </div>
+                    <div className="text-slate-300 group-hover:text-blue-500 pl-2">
+                        <ArrowRight size={20} />
+                    </div>
                 </button>
             </div>
 
