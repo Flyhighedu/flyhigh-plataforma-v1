@@ -113,6 +113,33 @@ export default function PlanVuelo() {
         };
     }, []);
 
+    // FALLBACK NUCLEAR: Reproducir video al primer toque/click del usuario en CUALQUIER parte
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const forcePlayOnInteraction = () => {
+            if (video.paused) {
+                video.muted = true;
+                video.play().then(() => {
+                    setIsPlaying(true);
+                    // Una vez que funcionó, remover listeners
+                    document.removeEventListener('touchstart', forcePlayOnInteraction);
+                    document.removeEventListener('click', forcePlayOnInteraction);
+                }).catch(() => { });
+            }
+        };
+
+        document.addEventListener('touchstart', forcePlayOnInteraction, { once: true, passive: true });
+        document.addEventListener('click', forcePlayOnInteraction, { once: true });
+
+        return () => {
+            document.removeEventListener('touchstart', forcePlayOnInteraction);
+            document.removeEventListener('click', forcePlayOnInteraction);
+        };
+    }, []);
+
+
     return (
         <div ref={sectionRef} className="relative z-10 bg-white w-full snap-start -mt-1">
             {/* White Curtain (Fixed Background) */}
@@ -229,22 +256,25 @@ export default function PlanVuelo() {
 
                                         <video
                                             ref={videoRef}
+                                            src="/videos/TeaserWeb.mp4"
                                             className="w-full h-full object-cover opacity-90 relative z-10"
                                             preload="auto"
                                             autoPlay
                                             muted
                                             loop
                                             playsInline
+                                            webkit-playsinline="true"
+                                            x5-playsinline="true"
                                             suppressHydrationWarning={true}
+                                            onLoadedData={() => setIsPlaying(true)}
+                                            onCanPlay={() => setIsPlaying(true)}
                                             onTimeUpdate={(e) => {
-                                                if (e.target.currentTime > 0.1 && !isPlaying) {
+                                                if (e.target.currentTime > 0.05 && !isPlaying) {
                                                     setIsPlaying(true);
                                                 }
                                             }}
                                             style={{ transform: 'translateZ(0)' }}
-                                        >
-                                            <source src="/videos/TeaserWeb.mp4" type="video/mp4" />
-                                        </video>
+                                        />
 
                                         {/* Screen Glare / Reflection */}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none mix-blend-overlay"></div>
