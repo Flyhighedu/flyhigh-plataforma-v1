@@ -36,6 +36,7 @@ export async function middleware(request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Proteger rutas /staff
+    /*
     if (request.nextUrl.pathname.startsWith('/staff') && !request.nextUrl.pathname.startsWith('/staff/login')) {
         if (!user) {
             return NextResponse.redirect(new URL('/staff/login', request.url))
@@ -46,6 +47,7 @@ export async function middleware(request) {
         // if (profile?.role !== 'staff') { ... }
         // Por ahora solo validamos sesión activa como pidió el usuario inicial (ajustable luego)
     }
+    */
 
     // Redirigir de login a dashboard si ya hay sesión
     if (request.nextUrl.pathname === ('/staff/login') && user) {

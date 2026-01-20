@@ -144,12 +144,13 @@ export default function StaffLoginPage() {
 
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <button
-                        onClick={() => router.push('/staff')}
+                        onClick={() => router.push('/staff/dashboard')}
                         className="w-full py-2 px-4 border border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2"
                     >
                         🚀 Entrar sin contraseña (Modo Test)
                     </button>
                 </div>
-            </div >
-            );
+            </div>
+        </div>
+    );
 }
