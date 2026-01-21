@@ -69,6 +69,9 @@ export default function StaffLoginPage() {
         const testPass = 'flyhigh_test_123';
 
         try {
+            // Force sign out to clear any stale/invalid sessions
+            await supabase.auth.signOut();
+
             // Attempt login
             const { error: loginError } = await supabase.auth.signInWithPassword({
                 email: testEmail,

@@ -100,6 +100,22 @@ export async function syncFlightLog(flightLog) {
  */
 export async function syncMissionClosure(closureData) {
     try {
+        // 0. Ensure Auth (Auto-recover session if possible)
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            console.warn("Session lost during closure. Attempting emergency re-auth as Test User...");
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+                email: 'staff_test@flyhigh.com',
+                password: 'flyhigh_test_123'
+            });
+
+            if (loginError) {
+                console.error("Emergency re-auth failed:", loginError);
+                throw new Error("No hay sesión y falló la re-autenticación.");
+            }
+        }
+
         // 1. Upload Signature and Group Photo
         const signatureUrl = await uploadImage(closureData.signature, 'staff-signatures', 'sig');
         const photoUrl = await uploadImage(closureData.photo, 'staff-evidence', 'group');
@@ -127,10 +143,13 @@ export async function syncMissionClosure(closureData) {
                 .eq('id', closureData.mission_id);
         }
 
-        return true;
+        return { success: true };
 
     } catch (error) {
         console.error("Sync Closure Error:", error);
-        return false;
+        return {
+            success: false,
+            error: error.message || "Error desconocido al guardar en base de datos."
+        };
     }
 }

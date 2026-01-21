@@ -12,9 +12,12 @@ export default function HistoryPage() {
     const [loading, setLoading] = useState(true);
     const [selectedMission, setSelectedMission] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        setIsMounted(true);
         const fetchHistory = async () => {
+            // ... existing fetch logic ...
             const supabase = createClient();
 
             // Fetch closures
@@ -30,9 +33,6 @@ export default function HistoryPage() {
             }
 
             // Fetch school names for these missions
-            // We can do this efficiently by getting all unique mission_ids (which should map to schools?)
-            // Actually, in our schema: mission_id usually links to 'proximas_escuelas.id'
-
             const missionIds = closures.map(c => c.mission_id);
             const { data: schools } = await supabase
                 .from('proximas_escuelas')
@@ -57,6 +57,8 @@ export default function HistoryPage() {
 
         fetchHistory();
     }, []);
+
+    if (!isMounted) return null;
 
     const filteredHistory = history.filter(h =>
         h.schoolName.toLowerCase().includes(searchTerm.toLowerCase()) ||

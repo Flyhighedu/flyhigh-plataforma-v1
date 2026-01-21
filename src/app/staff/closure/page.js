@@ -56,9 +56,9 @@ export default function ClosurePage() {
             signature: signature
         };
 
-        const success = await syncMissionClosure(closureData);
+        const result = await syncMissionClosure(closureData);
 
-        if (success) {
+        if (result.success) {
             // Cleanup local storage
             localStorage.removeItem('flyhigh_flight_logs');
             localStorage.removeItem('flyhigh_staff_mission');
@@ -66,9 +66,9 @@ export default function ClosurePage() {
             // Instead of redirecting immediately, show the report
             setShowReport(true);
         } else {
-            alert("Error al sincronizar. Se guardará localmente.");
+            alert(`Error al sincronizar: ${result.error || 'Intenta nuevamente.'}`);
             // Here we should ideally keep it pending
-            router.push('/staff/dashboard');
+            // router.push('/staff/dashboard'); // Don't redirect on error so they can retry
         }
         setSubmitting(false);
     };
