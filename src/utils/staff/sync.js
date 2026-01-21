@@ -153,3 +153,54 @@ export async function syncMissionClosure(closureData) {
         };
     }
 }
+
+/**
+ * Syncs ALL pending (unsynced) flight logs from localStorage
+ * Called before mission closure to ensure all data is in DB
+ * @returns {Promise<{synced: number, failed: number}>}
+ */
+export async function syncAllPendingFlights() {
+    const logs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
+    const pendingLogs = logs.filter(l => !l.synced);
+
+    if (pendingLogs.length === 0) {
+        console.log("No pending flights to sync.");
+        return { synced: 0, failed: 0 };
+    }
+
+    console.log(`Syncing ${pendingLogs.length} pending flights...`);
+
+    // Ensure auth before batch sync
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        console.warn("No session for batch sync. Attempting emergency re-auth...");
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+            email: 'staff_test@flyhigh.com',
+            password: 'flyhigh_test_123'
+        });
+        if (loginError) {
+            console.error("Emergency re-auth failed for batch sync:", loginError);
+            return { synced: 0, failed: pendingLogs.length };
+        }
+    }
+
+    let syncedCount = 0;
+    let failedCount = 0;
+    const updatedLogs = [...logs];
+
+    for (const flight of pendingLogs) {
+        const success = await syncFlightLog(flight);
+        if (success) {
+            syncedCount++;
+            const idx = updatedLogs.findIndex(l => l.id === flight.id);
+            if (idx !== -1) updatedLogs[idx].synced = true;
+        } else {
+            failedCount++;
+        }
+    }
+
+    localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
+
+    console.log(`Batch sync complete: ${syncedCount} synced, ${failedCount} failed.`);
+    return { synced: syncedCount, failed: failedCount };
+}

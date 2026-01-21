@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckSquare, Camera, ArrowLeft, Send, Check } from 'lucide-react';
-import { syncMissionClosure } from '@/utils/staff/sync';
+import { syncMissionClosure, syncAllPendingFlights } from '@/utils/staff/sync';
 import SignaturePad from '@/components/staff/SignaturePad';
 
 import DailyImpactReport from '@/components/staff/DailyImpactReport';
@@ -55,6 +55,10 @@ export default function ClosurePage() {
             photo: photo,
             signature: signature
         };
+
+        // CRITICAL: Sync all pending flights FIRST before closing
+        const flightSyncResult = await syncAllPendingFlights();
+        console.log("Pre-closure flight sync:", flightSyncResult);
 
         const result = await syncMissionClosure(closureData);
 

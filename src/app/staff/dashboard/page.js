@@ -32,6 +32,43 @@ export default function StaffDashboard() {
         setIsRestoring(false);
     }, []);
 
+    // Keep session alive with periodic refresh + reconnection handler
+    useEffect(() => {
+        const supabase = createClient();
+
+        // Refresh session immediately on mount
+        supabase.auth.refreshSession();
+
+        // Refresh session every 10 minutes to prevent expiry
+        const intervalId = setInterval(() => {
+            if (navigator.onLine) {
+                supabase.auth.refreshSession().then(({ error }) => {
+                    if (error) console.warn("Session refresh failed:", error);
+                    else console.log("Session refreshed successfully");
+                });
+            }
+        }, 10 * 60 * 1000); // 10 minutes
+
+        // Refresh session immediately when internet connection is restored
+        const handleOnline = () => {
+            console.log("🌐 Conexión restaurada. Refrescando sesión...");
+            supabase.auth.refreshSession().then(({ error }) => {
+                if (error) {
+                    console.warn("Session refresh after reconnect failed:", error);
+                } else {
+                    console.log("✅ Sesión refrescada exitosamente tras reconexión");
+                }
+            });
+        };
+
+        window.addEventListener('online', handleOnline);
+
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('online', handleOnline);
+        };
+    }, []);
+
     const handleSelectMission = (mission) => {
         setCurrentMission(mission);
         localStorage.setItem('flyhigh_staff_mission', JSON.stringify(mission));
