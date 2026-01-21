@@ -3,23 +3,35 @@
 import { useState, useEffect } from 'react';
 import TodayFlightList from '@/components/staff/TodayFlightList';
 import FlightLogger from '@/components/staff/FlightLogger';
-import { syncFlightLog } from '@/utils/staff/sync';
-import { LogOut, MoreVertical, RotateCcw, Clock } from 'lucide-react';
+import { syncFlightLog, syncPauseStart, syncPauseEnd } from '@/utils/staff/sync';
+import { LogOut, MoreVertical, RotateCcw, Clock, Pause } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import MissionSelector from '@/components/staff/MissionSelector';
+import PauseMenu from '@/components/staff/PauseMenu';
+import PauseActiveOverlay from '@/components/staff/PauseActiveOverlay';
+import ResumeProtocolModal from '@/components/staff/ResumeProtocolModal';
 
 export default function StaffDashboard() {
     const [currentMission, setCurrentMission] = useState(null);
     const [isRestoring, setIsRestoring] = useState(true);
     const [flightLogs, setFlightLogs] = useState([]);
     const [showMenu, setShowMenu] = useState(false);
+
+    // Pause State
+    const [showPauseMenu, setShowPauseMenu] = useState(false);
+    const [activePause, setActivePause] = useState(null); // { type, reason, startTime, pauseId }
+    const [showResumeModal, setShowResumeModal] = useState(false);
+    const [completedPauses, setCompletedPauses] = useState([]); // Track finished pauses for timeline
+
     const router = useRouter();
 
     useEffect(() => {
         // Try to restore mission from localStorage on mount
         const savedMission = localStorage.getItem('flyhigh_staff_mission');
         const savedLogs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
+        const savedPause = localStorage.getItem('flyhigh_active_pause');
+        const savedCompletedPauses = JSON.parse(localStorage.getItem('flyhigh_completed_pauses') || '[]');
 
         if (savedMission) {
             try {
@@ -29,6 +41,19 @@ export default function StaffDashboard() {
                 console.error("Failed to restore mission", e);
             }
         }
+
+        // Restore active pause if exists
+        if (savedPause) {
+            try {
+                setActivePause(JSON.parse(savedPause));
+            } catch (e) {
+                console.error("Failed to restore pause", e);
+            }
+        }
+
+        // Restore completed pauses
+        setCompletedPauses(savedCompletedPauses);
+
         setIsRestoring(false);
     }, []);
 
@@ -93,6 +118,61 @@ export default function StaffDashboard() {
     const handleCloseDay = () => {
         router.push('/staff/closure');
         setShowMenu(false);
+    };
+
+    const handleOpenPauseMenu = () => {
+        setShowMenu(false);
+        setShowPauseMenu(true);
+    };
+
+    const handleStartPause = async (pauseData) => {
+        // Sync pause start to DB
+        const result = await syncPauseStart({
+            ...pauseData,
+            mission_id: currentMission.id
+        });
+
+        // Set active pause state
+        setActivePause({
+            type: pauseData.type,
+            reason: pauseData.reason,
+            startTime: new Date().toISOString(),
+            pauseId: result.pauseId || `local-${Date.now()}`
+        });
+
+        // Save to localStorage for persistence
+        localStorage.setItem('flyhigh_active_pause', JSON.stringify({
+            type: pauseData.type,
+            reason: pauseData.reason,
+            startTime: new Date().toISOString(),
+            pauseId: result.pauseId || `local-${Date.now()}`
+        }));
+    };
+
+    const handleRequestResume = () => {
+        setShowResumeModal(true);
+    };
+
+    const handleConfirmResume = async (resumeChecklist) => {
+        if (activePause?.pauseId) {
+            await syncPauseEnd(activePause.pauseId, resumeChecklist);
+        }
+
+        // Save completed pause to timeline (with mission_id for filtering)
+        const completedPause = {
+            ...activePause,
+            mission_id: currentMission?.id,
+            endTime: new Date().toISOString(),
+            resumeChecklist
+        };
+        const updatedPauses = [...completedPauses, completedPause];
+        setCompletedPauses(updatedPauses);
+        localStorage.setItem('flyhigh_completed_pauses', JSON.stringify(updatedPauses));
+
+        // Clear active pause state
+        setActivePause(null);
+        setShowResumeModal(false);
+        localStorage.removeItem('flyhigh_active_pause');
     };
 
     const handleFlightComplete = async (data) => {
@@ -175,6 +255,12 @@ export default function StaffDashboard() {
                     <div className="absolute top-full right-4 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
                         <div className="p-2 space-y-1">
                             <button
+                                onClick={handleOpenPauseMenu}
+                                className="w-full text-left px-4 py-3 hover:bg-amber-50 rounded-lg flex items-center gap-3 text-amber-600 text-sm font-medium"
+                            >
+                                <Pause size={18} /> Iniciar Pausa
+                            </button>
+                            <button
                                 onClick={handleChangeSchool}
                                 className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium"
                             >
@@ -198,10 +284,13 @@ export default function StaffDashboard() {
             </div>
 
             <div className="px-4 py-6 space-y-8 max-w-lg mx-auto">
-                <FlightLogger onFlightComplete={handleFlightComplete} />
+                <FlightLogger onFlightComplete={handleFlightComplete} disabled={!!activePause} />
 
                 <div className="pt-4 border-t border-slate-200">
-                    <TodayFlightList flights={flightLogs} />
+                    <TodayFlightList
+                        flights={flightLogs}
+                        pauses={completedPauses.filter(p => p.mission_id === currentMission?.id)}
+                    />
                 </div>
             </div>
 
@@ -209,6 +298,28 @@ export default function StaffDashboard() {
             {showMenu && (
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)}></div>
             )}
+
+            {/* Pause Menu Modal */}
+            <PauseMenu
+                isOpen={showPauseMenu}
+                onClose={() => setShowPauseMenu(false)}
+                onStartPause={handleStartPause}
+            />
+
+            {/* Pause Active Overlay */}
+            {activePause && (
+                <PauseActiveOverlay
+                    pauseData={activePause}
+                    onRequestResume={handleRequestResume}
+                />
+            )}
+
+            {/* Resume Protocol Modal */}
+            <ResumeProtocolModal
+                isOpen={showResumeModal}
+                onClose={() => setShowResumeModal(false)}
+                onConfirmResume={handleConfirmResume}
+            />
         </div>
     );
 }

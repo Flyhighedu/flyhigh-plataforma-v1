@@ -204,3 +204,85 @@ export async function syncAllPendingFlights() {
     console.log(`Batch sync complete: ${syncedCount} synced, ${failedCount} failed.`);
     return { synced: syncedCount, failed: failedCount };
 }
+
+/**
+ * Starts a pause event and saves to DB
+ * @param {Object} pauseData - { mission_id, type, reason, maintenanceChecklist }
+ * @returns {Promise<{success: boolean, pauseId?: string}>}
+ */
+export async function syncPauseStart(pauseData) {
+    try {
+        let { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            console.warn("No session for pause sync. Attempting emergency re-auth...");
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email: 'staff_test@flyhigh.com',
+                password: 'flyhigh_test_123'
+            });
+            if (authError) throw authError;
+            session = authData.session;
+        }
+
+        const { data, error } = await supabase
+            .from('bitacora_pausas')
+            .insert({
+                mission_id: pauseData.mission_id?.toString(),
+                pause_type: pauseData.type,
+                reason: pauseData.reason,
+                maintenance_checklist: pauseData.maintenanceChecklist || {},
+                start_time: new Date().toISOString(),
+                created_by: session?.user?.id
+            })
+            .select('id')
+            .single();
+
+        if (error) throw error;
+
+        console.log("Pause started and synced:", data.id);
+        return { success: true, pauseId: data.id };
+
+    } catch (error) {
+        console.error("Sync Pause Start Error:", error.message || error);
+        return { success: false };
+    }
+}
+
+/**
+ * Ends a pause event
+ * @param {string} pauseId - The pause record ID
+ * @param {Object} resumeChecklist - The safety checks completed
+ * @returns {Promise<boolean>}
+ */
+export async function syncPauseEnd(pauseId, resumeChecklist) {
+    try {
+        // Ensure we have a session
+        let { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            console.warn("No session for pause end. Attempting emergency re-auth...");
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email: 'staff_test@flyhigh.com',
+                password: 'flyhigh_test_123'
+            });
+            if (authError) throw authError;
+        }
+
+        const { error } = await supabase
+            .from('bitacora_pausas')
+            .update({
+                end_time: new Date().toISOString(),
+                resume_checklist: resumeChecklist
+            })
+            .eq('id', pauseId);
+
+        if (error) throw error;
+
+        console.log("Pause ended and synced:", pauseId);
+        return true;
+
+    } catch (error) {
+        console.error("Sync Pause End Error:", error.message || error);
+        return false;
+    }
+}

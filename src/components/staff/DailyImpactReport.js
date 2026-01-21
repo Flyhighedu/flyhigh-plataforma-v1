@@ -105,9 +105,17 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                 }));
             }
 
+            // 4. Fetch Pauses
+            const { data: pauses } = await supabase
+                .from('bitacora_pausas')
+                .select('*')
+                .eq('mission_id', missionId)
+                .order('start_time', { ascending: true });
+
             let totalKids = 0;
             let totalStaff = 0;
             let totalDuration = 0;
+            let totalPauseTime = 0;
             let allIncidents = [];
 
             flights.forEach(f => {
@@ -121,6 +129,14 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                 }
             });
 
+            // Calculate total pause time
+            (pauses || []).forEach(p => {
+                if (p.start_time && p.end_time) {
+                    const duration = Math.floor((new Date(p.end_time) - new Date(p.start_time)) / 1000);
+                    totalPauseTime += duration;
+                }
+            });
+
             const avgDuration = flights.length > 0 ? Math.floor(totalDuration / flights.length) : 0;
 
             setStats(prev => ({
@@ -130,7 +146,9 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                 avgDuration,
                 flightCount: flights.length,
                 incidents: allIncidents,
-                flights: flights
+                flights: flights,
+                pauses: pauses || [],
+                totalPauseTime
             }));
             setLoading(false);
         };
@@ -208,14 +226,14 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
 
                 {/* Flight Breakdown Table */}
                 <div className="p-6">
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Clock size={16} className="text-slate-400" /> Desglose de Vuelos
+                    <h3 className="text-sm font-bold text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Clock size={16} className="text-slate-400" /> Desglose de Actividad
                     </h3>
                     <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                                 <tr>
-                                    <th className="px-3 py-3 whitespace-nowrap"># Ciclo</th>
+                                    <th className="px-3 py-3 whitespace-nowrap"># Actividad</th>
                                     <th className="px-3 py-3 whitespace-nowrap">Hora</th>
                                     <th className="px-2 py-3 text-center">Alumnos</th>
                                     <th className="px-2 py-3 text-center">Docentes</th>
@@ -223,21 +241,68 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {stats.flights.map((flight, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap">Vuelo {idx + 1}</td>
-                                        <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
-                                            {(flight.start_time || flight.startTime) ?
-                                                new Date(flight.start_time || flight.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
-                                                '--:--'}
-                                        </td>
-                                        <td className="px-2 py-3 text-center text-slate-600">{flight.student_count || flight.studentCount}</td>
-                                        <td className="px-2 py-3 text-center text-slate-600">{flight.staff_count || flight.staffCount}</td>
-                                        <td className="px-3 py-3 text-right font-mono text-slate-500 whitespace-nowrap">
-                                            {formatTime(flight.duration_seconds || flight.durationSeconds)}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {/* Combine flights and pauses into chronological order */}
+                                {(() => {
+                                    const flightItems = stats.flights.map((f, idx) => ({
+                                        type: 'flight',
+                                        number: idx + 1,
+                                        time: f.start_time || f.startTime,
+                                        students: f.student_count || f.studentCount || 0,
+                                        staff: f.staff_count || f.staffCount || 0,
+                                        duration: f.duration_seconds || f.durationSeconds || 0,
+                                        data: f
+                                    }));
+
+                                    const pauseItems = (stats.pauses || []).map(p => ({
+                                        type: p.pause_type === 'receso' ? 'receso' : 'pausa',
+                                        time: p.start_time,
+                                        endTime: p.end_time,
+                                        reason: p.reason,
+                                        duration: p.end_time ? Math.floor((new Date(p.end_time) - new Date(p.start_time)) / 1000) : 0,
+                                        data: p
+                                    }));
+
+                                    const allItems = [...flightItems, ...pauseItems].sort((a, b) =>
+                                        new Date(a.time) - new Date(b.time)
+                                    );
+
+                                    return allItems.map((item, idx) => {
+                                        if (item.type === 'flight') {
+                                            return (
+                                                <tr key={`flight-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap">Vuelo {item.number}</td>
+                                                    <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
+                                                        {item.time ? new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                                    </td>
+                                                    <td className="px-2 py-3 text-center text-slate-600">{item.students}</td>
+                                                    <td className="px-2 py-3 text-center text-slate-600">{item.staff}</td>
+                                                    <td className="px-3 py-3 text-right font-mono text-slate-500 whitespace-nowrap">
+                                                        {formatTime(item.duration)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        } else {
+                                            // Pause row
+                                            const isReceso = item.type === 'receso';
+                                            const reasonLabels = { clima: '🌧️', evento: '🎉', falla: '⚠️', otro: '📝' };
+                                            return (
+                                                <tr key={`pause-${idx}`} className={isReceso ? 'bg-amber-50/50' : 'bg-red-50/50'}>
+                                                    <td className={`px-3 py-3 font-bold whitespace-nowrap ${isReceso ? 'text-amber-700' : 'text-red-700'}`}>
+                                                        {isReceso ? '☕ Receso' : `⏸️ Pausa ${item.reason ? reasonLabels[item.reason] || '' : ''}`}
+                                                    </td>
+                                                    <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
+                                                        {item.time ? new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                                    </td>
+                                                    <td className="px-2 py-3 text-center text-slate-400">—</td>
+                                                    <td className="px-2 py-3 text-center text-slate-400">—</td>
+                                                    <td className={`px-3 py-3 text-right font-mono whitespace-nowrap ${isReceso ? 'text-amber-600' : 'text-red-600'}`}>
+                                                        {formatTime(item.duration)}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+                                    });
+                                })()}
                             </tbody>
                             <tfoot className="bg-slate-50 font-bold text-slate-900">
                                 <tr>
@@ -246,6 +311,12 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                                     <td className="px-2 py-3 text-center">{stats.totalStaff}</td>
                                     <td className="px-3 py-3 text-right text-[10px] text-slate-400 uppercase">Acumulado</td>
                                 </tr>
+                                {stats.totalPauseTime > 0 && (
+                                    <tr className="bg-amber-50/50 text-amber-800">
+                                        <td className="px-3 py-2 text-xs" colSpan={4}>⏸️ Tiempo en Pausas</td>
+                                        <td className="px-3 py-2 text-right font-mono text-sm">{formatTime(stats.totalPauseTime)}</td>
+                                    </tr>
+                                )}
                             </tfoot>
                         </table>
                     </div>

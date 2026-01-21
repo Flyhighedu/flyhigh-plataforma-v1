@@ -5,7 +5,7 @@ import { Play, StopCircle, Clock, Send, Plane, AlertTriangle } from 'lucide-reac
 import CounterData from './CounterData';
 import IncidentReporter from './IncidentReporter';
 
-export default function FlightLogger({ onFlightComplete }) {
+export default function FlightLogger({ onFlightComplete, disabled = false }) {
     const [status, setStatus] = useState('idle'); // 'idle' (pre-flight), 'active' (in-flight)
     const [startTime, setStartTime] = useState(null);
     const [elapsed, setElapsed] = useState(0);
@@ -81,6 +81,19 @@ export default function FlightLogger({ onFlightComplete }) {
     };
 
     const isIdle = status === 'idle';
+
+    // Show disabled state when paused
+    if (disabled) {
+        return (
+            <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+                <div className="rounded-2xl p-8 bg-amber-50 border-2 border-amber-200 text-center">
+                    <div className="text-4xl mb-3">⏸️</div>
+                    <h3 className="text-lg font-bold text-amber-800 mb-1">Operación en Pausa</h3>
+                    <p className="text-sm text-amber-600">Los vuelos están deshabilitados durante la pausa</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-10 duration-500">
