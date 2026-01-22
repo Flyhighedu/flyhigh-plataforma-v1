@@ -315,31 +315,15 @@ export default function FlyHighTestimonialGallery() {
                         }
                     `}</style>
 
-                    {testimonials.map((item, index) => {
-                        // VIRTUALIZACIÓN: Solo renderizar cards cercanas al índice activo
-                        const isVisible = Math.abs(index - activeCardIndex) <= 1;
-
-                        if (!isVisible) {
-                            // Placeholder vacío para mantener el espaciado
-                            return (
-                                <div
-                                    key={item.id}
-                                    className="shrink-0 w-[200px] h-[280px] md:w-[260px] md:h-[340px] snap-center"
-                                    aria-hidden="true"
-                                />
-                            );
-                        }
-
-                        return (
-                            <TestimonialCard
-                                key={item.id}
-                                item={item}
-                                index={index}
-                                scrollXProgress={scrollXProgress}
-                                onClick={() => handleCardClick(index)}
-                            />
-                        );
-                    })}
+                    {testimonials.map((item, index) => (
+                        <TestimonialCard
+                            key={item.id}
+                            item={item}
+                            index={index}
+                            scrollXProgress={scrollXProgress}
+                            onClick={() => handleCardClick(index)}
+                        />
+                    ))}
                 </div>
 
                 {/* Pagination Dots */}

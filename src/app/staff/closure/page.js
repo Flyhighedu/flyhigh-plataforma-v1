@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckSquare, Camera, ArrowLeft, Send, Check } from 'lucide-react';
-import { syncMissionClosure, syncAllPendingFlights } from '@/utils/staff/sync';
+import { syncMissionClosure, syncAllPendingFlights, syncAllPendingPauses } from '@/utils/staff/sync';
 import SignaturePad from '@/components/staff/SignaturePad';
 
 import DailyImpactReport from '@/components/staff/DailyImpactReport';
@@ -60,12 +60,18 @@ export default function ClosurePage() {
         const flightSyncResult = await syncAllPendingFlights();
         console.log("Pre-closure flight sync:", flightSyncResult);
 
+        // CRITICAL: Sync all pending pauses before closing
+        const pauseSyncResult = await syncAllPendingPauses(currentMission.id);
+        console.log("Pre-closure pause sync:", pauseSyncResult);
+
         const result = await syncMissionClosure(closureData);
 
         if (result.success) {
             // Cleanup local storage
             localStorage.removeItem('flyhigh_flight_logs');
             localStorage.removeItem('flyhigh_staff_mission');
+            localStorage.removeItem('flyhigh_completed_pauses');
+            localStorage.removeItem('flyhigh_active_pause');
 
             // Instead of redirecting immediately, show the report
             setShowReport(true);

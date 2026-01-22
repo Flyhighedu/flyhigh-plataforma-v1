@@ -162,15 +162,38 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
         setIsDeleting(true);
         const supabase = createClient();
 
-        // DELETE Everything for this mission
-        await supabase.from('bitacora_vuelos').delete().eq('mission_id', missionId);
-        await supabase.from('cierres_mision').delete().eq('mission_id', missionId);
+        try {
+            // Ensure session before delete
+            let { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                const { error: authError } = await supabase.auth.signInWithPassword({
+                    email: 'staff_test@flyhigh.com',
+                    password: 'flyhigh_test_123'
+                });
+                if (authError) throw authError;
+            }
 
-        alert("Datos de prueba eliminados correctamente.");
-        localStorage.removeItem('flyhigh_staff_mission');
-        localStorage.removeItem('flyhigh_flight_logs');
+            // DELETE Everything for this mission
+            const { error: e1 } = await supabase.from('bitacora_vuelos').delete().eq('mission_id', missionId);
+            const { error: e2 } = await supabase.from('bitacora_pausas').delete().eq('mission_id', missionId);
+            const { error: e3 } = await supabase.from('cierres_mision').delete().eq('mission_id', missionId);
 
-        router.push('/staff/dashboard');
+            if (e1) console.error("Error deleting flights:", e1);
+            if (e2) console.error("Error deleting pauses:", e2);
+            if (e3) console.error("Error deleting closure:", e3);
+
+            alert("Datos de prueba eliminados correctamente.");
+            localStorage.removeItem('flyhigh_staff_mission');
+            localStorage.removeItem('flyhigh_flight_logs');
+            localStorage.removeItem('flyhigh_completed_pauses');
+            localStorage.removeItem('flyhigh_active_pause');
+
+            router.push('/staff/dashboard');
+        } catch (err) {
+            console.error("Delete error:", err);
+            alert("Error al eliminar: " + (err.message || "Intenta nuevamente."));
+            setIsDeleting(false);
+        }
     };
 
     const formatTime = (seconds) => {

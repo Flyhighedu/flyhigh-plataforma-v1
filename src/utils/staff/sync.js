@@ -286,3 +286,66 @@ export async function syncPauseEnd(pauseId, resumeChecklist) {
         return false;
     }
 }
+
+/**
+ * Syncs ALL pending pauses from localStorage before closure
+ * @param {string} missionId - Current mission ID
+ * @returns {Promise<{synced: number, failed: number}>}
+ */
+export async function syncAllPendingPauses(missionId) {
+    const allPauses = JSON.parse(localStorage.getItem('flyhigh_completed_pauses') || '[]');
+    const pendingPauses = allPauses.filter(p =>
+        p.mission_id?.toString() === missionId?.toString() &&
+        p.pauseId?.startsWith('local-')
+    );
+
+    if (pendingPauses.length === 0) {
+        console.log("No pending pauses to sync.");
+        return { synced: 0, failed: 0 };
+    }
+
+    console.log(`Syncing ${pendingPauses.length} pending pauses...`);
+
+    // Ensure auth
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email: 'staff_test@flyhigh.com',
+            password: 'flyhigh_test_123'
+        });
+        if (authError) {
+            console.error("Emergency re-auth failed for pause sync:", authError);
+            return { synced: 0, failed: pendingPauses.length };
+        }
+        session = authData.session;
+    }
+
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    for (const pause of pendingPauses) {
+        try {
+            const { error } = await supabase
+                .from('bitacora_pausas')
+                .insert({
+                    mission_id: pause.mission_id?.toString(),
+                    pause_type: pause.type,
+                    reason: pause.reason,
+                    maintenance_checklist: pause.maintenanceChecklist || {},
+                    resume_checklist: pause.resumeChecklist || {},
+                    start_time: pause.startTime,
+                    end_time: pause.endTime,
+                    created_by: session?.user?.id
+                });
+
+            if (error) throw error;
+            syncedCount++;
+        } catch (err) {
+            console.error("Failed to sync pause:", err);
+            failedCount++;
+        }
+    }
+
+    console.log(`Pause sync complete: ${syncedCount} synced, ${failedCount} failed.`);
+    return { synced: syncedCount, failed: failedCount };
+}
