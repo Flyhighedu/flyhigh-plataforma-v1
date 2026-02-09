@@ -11,7 +11,7 @@ const AlliesSection = () => {
         { logo: "/img/Logo Global Frut png.png", name: "GLOBAL FRUT" },
     ];
 
-    const schools = Array(10).fill("Escuela Impulsora");
+    const schools = Array(6).fill(["Instituto Santa Maria", "Instituto Morelos"]).flat();
 
     const donors = [
         "Hector Avila", "Alberto Avila", "Emilio Herrera", "Alejandro",
@@ -206,24 +206,44 @@ const AlliesSection = () => {
                         </div>
                     </div>
 
-                    {/* FILA B: ESCUELAS (Píldoras compactas) */}
-                    <div className="relative w-full overflow-hidden mask-fade-sides">
-                        <div className="flex w-max animate-scroll-reverse gap-3 py-1">
-                            {[...schools, ...schools].map((school, idx) => (
-                                <div
-                                    key={idx}
-                                    className="clay-pill px-4 py-2 rounded-full flex items-center gap-2 cursor-default group hover:scale-105 transition-transform border border-slate-100"
-                                >
-                                    <School size={14} className="text-pink-400" />
-                                    <span className="text-slate-600 font-bold text-xs whitespace-nowrap">{school}</span>
-                                </div>
-                            ))}
+                    {/* FILA B: ESCUELAS IMPULSORAS (KPIs Integrados) */}
+                    <div className="flex flex-col items-center gap-6 py-8 border-t border-slate-50 relative">
+                        {/* Texto Minimalista */}
+                        <div className="text-center max-w-lg mx-auto mb-2">
+                            <span className="inline-block text-[10px] font-black tracking-[0.2em] text-pink-500 uppercase mb-2 bg-pink-50 px-3 py-1 rounded-full border border-pink-100">
+                                Escuelas Impulsoras
+                            </span>
+                            <h3 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-tight">
+                                Transformando su éxito en <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-500">oportunidades para todos.</span>
+                            </h3>
+                        </div>
 
-                            {/* CTA ESCUELAS */}
-                            <div className="clay-pill px-4 py-2 rounded-full flex items-center gap-2 cursor-pointer border border-pink-200 bg-pink-50 group hover:bg-pink-100">
-                                <span className="text-pink-600 font-bold text-xs whitespace-nowrap flex items-center gap-1">
-                                    Postula tu Escuela <ArrowRight size={12} />
-                                </span>
+                        {/* Chips de Escuelas con KPIs y Colores de Marca */}
+                        <div className="flex flex-wrap justify-center items-center gap-6 cursor-default">
+                            {/* Instituto Santa Maria - Morado/Verde */}
+                            <div className="clay-pill pl-4 pr-6 py-3 rounded-[2rem] flex items-center gap-4 group hover:-translate-y-1 transition-all duration-300 border border-purple-100 bg-white shadow-sm hover:shadow-lg hover:shadow-purple-500/10">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-50 to-white flex items-center justify-center border border-purple-100 shadow-inner">
+                                    <School size={18} className="text-purple-700" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-slate-800 font-black text-sm tracking-tight leading-none mb-1">Instituto Santa Maria</span>
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                                        <Sparkles size={10} className="fill-emerald-600" /> Becó a +150 niños
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Instituto Morelos - Azul Marino Estilo Militar */}
+                            <div className="clay-pill pl-4 pr-6 py-3 rounded-[2rem] flex items-center gap-4 group hover:-translate-y-1 transition-all duration-300 border border-slate-200 bg-white shadow-sm hover:shadow-lg hover:shadow-blue-900/10">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-50 to-white flex items-center justify-center border border-slate-200 shadow-inner">
+                                    <Building2 size={18} className="text-slate-800" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-slate-900 font-black text-sm tracking-tight leading-none mb-1">Instituto Morelos</span>
+                                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                                        <Heart size={10} className="fill-blue-700" /> Becó a +150 niños
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
