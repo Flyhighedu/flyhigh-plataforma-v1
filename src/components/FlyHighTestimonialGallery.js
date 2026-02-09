@@ -122,24 +122,56 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
         setIsLandscapeVideo(false);
         setIsLoading(true);
 
-        if (videoRef.current) {
-            videoRef.current.play().catch(() => { });
+        const video = videoRef.current;
+        if (!video) return;
 
-            // Detect video aspect ratio when metadata loads
-            const handleLoadedMetadata = () => {
-                if (videoRef.current) {
-                    const { videoWidth, videoHeight } = videoRef.current;
-                    setIsLandscapeVideo(videoWidth > videoHeight);
-                }
-            };
+        // Ensure video is unmuted
+        video.muted = false;
 
-            videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+        // Force play with audio - user already interacted by clicking "Ver Momento"
+        const attemptPlay = () => {
+            video.play().catch((err) => {
+                // If autoplay with audio fails, try muted then unmute
+                video.muted = true;
+                video.play().then(() => {
+                    // Unmute after play starts
+                    setTimeout(() => {
+                        video.muted = false;
+                    }, 100);
+                }).catch(() => { });
+            });
+        };
 
-            // Check if already loaded
-            if (videoRef.current.videoWidth > 0) {
-                handleLoadedMetadata();
+        // Detect video aspect ratio when metadata loads
+        const handleLoadedMetadata = () => {
+            if (video) {
+                const { videoWidth, videoHeight } = video;
+                setIsLandscapeVideo(videoWidth > videoHeight);
+                attemptPlay();
             }
+        };
+
+        // When enough data is loaded, try to play
+        const handleCanPlayThrough = () => {
+            setIsLoading(false);
+            attemptPlay();
+        };
+
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('canplaythrough', handleCanPlayThrough);
+
+        // Initial play attempt
+        attemptPlay();
+
+        // Check if already loaded
+        if (video.videoWidth > 0) {
+            handleLoadedMetadata();
         }
+
+        return () => {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('canplaythrough', handleCanPlayThrough);
+        };
     }, [currentIndex]);
 
     const handleTapToPause = () => {
@@ -204,12 +236,12 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
                             autoPlay
                             loop
                             playsInline
+                            preload="auto"
                             onLoadStart={() => setIsLoading(true)}
                             onWaiting={() => setIsLoading(true)}
                             onCanPlay={() => setIsLoading(false)}
                             onPlaying={() => setIsLoading(false)}
                         />
-                        {/* Gradient Overlay Removed */}
                     </div>
 
                     {/* Loading Spinner */}
