@@ -7,11 +7,8 @@ import { motion, useScroll, useTransform, AnimatePresence, useInView } from 'fra
 import { X, Play, Wind, ChevronDown, Sparkles, MapPin, Plane } from 'lucide-react';
 
 const testimonials = [
-    { id: 1, image: '/img/Estoy viendo la fabrica.png', name: 'Escuela Benito Juárez', videoUrl: '/videos/reel1.mp4', author: 'Mtra. Lucina', quote: 'HABÍA UNA ALEGRÍA QUE VIBRABA EN EL PATIO.', location: 'Uruapan, Mich.', serial: 'FLP-001' },
-    { id: 2, image: '/img/EDU Patrocinios.png', name: 'Primaria Altamirano', videoUrl: '/videos/reel2.mp4', author: 'Mtra. Xatziri', quote: 'DESCUBRIMOS UNA CHISPA INCREÍBLE EN ELLOS.', location: 'Fábrica San Pedro', serial: 'FLP-002' },
-    { id: 3, image: '/img/Portada 2 niños.jpg', name: 'Secundaria Nicolás Bravo', videoUrl: '/videos/reel3.mp4', author: 'Mtra. Karina', quote: 'LO IMPOSIBLE HOY ES UNA HERRAMIENTA REAL.', location: 'Parque Nacional', serial: 'FLP-003' },
-    { id: 4, image: '/img/Patio altamirano.png', name: 'Colegio Vasco de Quiroga', videoUrl: '/videos/reel4.mp4', author: 'Mtro. Carlos', quote: 'VER SU CIUDAD DESDE ARRIBA LES CAMBIÓ LA VIDA.', location: 'Centro Histórico', serial: 'FLP-004' },
-    { id: 5, image: '/img/EDU Patrocinios11.png', name: 'Escuela Eduardo Ruiz', videoUrl: '/videos/reel5.mp4', author: 'Mtra. Elena', quote: 'AHORA SABEN QUE PUEDEN LLEGAR A LAS NUBES.', location: 'Volcán Paricutín', serial: 'FLP-005' },
+    { id: 1, image: '/img/portada otilio montaño.png', name: 'Escuela Otilio Montaño', videoUrl: '/videos/Comprimido otilio montaño.mp4', author: 'Mtra. Rocío', quote: 'EL VUELO LES ABRIÓ LOS OJOS A UN NUEVO MUNDO.', location: 'Uruapan, Mich.', serial: 'FLP-001' },
+    { id: 2, image: '/img/portada altamirano.png', name: 'Primaria Altamirano', videoUrl: '/videos/altamirano.mp4', author: 'Mtra. Xatziri', quote: 'UNA EXPERIENCIA QUE MARCÓ SUS VIDAS PARA SIEMPRE.', location: 'Uruapan, Mich.', serial: 'FLP-002' },
 ];
 
 function TestimonialCard({ item, index, scrollXProgress, onClick }) {
@@ -92,11 +89,67 @@ function PaginationDot({ index, scrollXProgress, testimonialsCount }) {
 // === REELS/TIKTOK STYLE PLAYER ===
 function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentIndex }) {
     const [mounted, setMounted] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
+    const [isLandscapeMode, setIsLandscapeMode] = useState(false);
+    const videoRef = useRef(null);
 
     useEffect(() => {
         setMounted(true);
-        return () => setMounted(false);
+
+        // Detect device orientation changes
+        const handleOrientationChange = () => {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            setIsLandscapeMode(isLandscape);
+        };
+
+        handleOrientationChange();
+        window.addEventListener('resize', handleOrientationChange);
+        window.addEventListener('orientationchange', handleOrientationChange);
+
+        return () => {
+            setMounted(false);
+            window.removeEventListener('resize', handleOrientationChange);
+            window.removeEventListener('orientationchange', handleOrientationChange);
+        };
     }, []);
+
+    // Reset pause state and detect video orientation when changing videos
+    useEffect(() => {
+        setIsPaused(false);
+        setIsLandscapeVideo(false);
+
+        if (videoRef.current) {
+            videoRef.current.play().catch(() => { });
+
+            // Detect video aspect ratio when metadata loads
+            const handleLoadedMetadata = () => {
+                if (videoRef.current) {
+                    const { videoWidth, videoHeight } = videoRef.current;
+                    setIsLandscapeVideo(videoWidth > videoHeight);
+                }
+            };
+
+            videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+            // Check if already loaded
+            if (videoRef.current.videoWidth > 0) {
+                handleLoadedMetadata();
+            }
+        }
+    }, [currentIndex]);
+
+    const handleTapToPause = () => {
+        if (videoRef.current) {
+            if (isPaused) {
+                videoRef.current.play();
+            } else {
+                videoRef.current.pause();
+            }
+            setIsPaused(!isPaused);
+        }
+    };
 
     if (!isOpen || !mounted) return null;
 
@@ -106,6 +159,9 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
 
     const onNext = () => hasNext && setCurrentIndex(currentIndex + 1);
     const onPrev = () => hasPrev && setCurrentIndex(currentIndex - 1);
+
+    // Use object-contain for landscape videos in portrait mode to preserve aspect ratio
+    const videoObjectFit = isLandscapeVideo && !isLandscapeMode ? 'object-contain' : 'object-cover';
 
     const playerContent = (
         <AnimatePresence>
@@ -122,7 +178,7 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
                     position: 'fixed'
                 }}
             >
-                <div className="relative flex-1 flex flex-col">
+                <div className="relative flex-1 flex flex-col items-center justify-center">
                     {/* Gestural Navigation Layer */}
                     <motion.div
                         drag="y"
@@ -132,22 +188,58 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
                             else if (info.offset.y > 100 && hasPrev) onPrev();
                             else if (info.offset.y > 200) onClose();
                         }}
-                        className="absolute inset-0 z-10 touch-none"
+                        onClick={handleTapToPause}
+                        className="absolute inset-0 z-10 touch-none cursor-pointer"
                     />
 
                     {/* Video Content */}
-                    <div className="absolute inset-0">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black">
                         <video
+                            ref={videoRef}
                             key={testimonial.id}
                             src={testimonial.videoUrl}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full ${videoObjectFit}`}
                             autoPlay
                             loop
                             playsInline
-                            muted
                         />
                         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
                     </div>
+
+                    {/* Rotate Hint for Landscape Videos in Portrait Mode */}
+                    <AnimatePresence>
+                        {isLandscapeVideo && !isLandscapeMode && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute top-20 inset-x-0 flex justify-center z-30 pointer-events-none"
+                            >
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-white animate-pulse">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+                                    </svg>
+                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Gira para pantalla completa</span>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Pause Indicator */}
+                    <AnimatePresence>
+                        {isPaused && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.5 }}
+                                className="absolute inset-0 flex items-center justify-center z-15 pointer-events-none"
+                            >
+                                <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center">
+                                    <Play size={40} fill="white" className="text-white ml-1" />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Top Controls */}
                     <div className="absolute top-0 inset-x-0 p-6 flex justify-between items-center z-20 pointer-events-none">
@@ -167,52 +259,63 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
                     </div>
 
                     {/* Right Side Actions (TikTok Style) */}
-                    <div className="absolute right-4 bottom-32 flex flex-col gap-8 z-20 items-center pointer-events-none">
-                        <button className="flex flex-col items-center pointer-events-auto group">
-                            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
-                                <Sparkles size={22} className="fill-white/20" />
-                            </div>
-                            <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Meta</span>
+                    <div className="absolute right-4 bottom-40 flex flex-col gap-6 z-20 items-center pointer-events-none">
+                        {/* Me Gusta */}
+                        <button
+                            onClick={() => setIsLiked(!isLiked)}
+                            className="flex flex-col items-center pointer-events-auto group"
+                        >
+                            <motion.div
+                                animate={isLiked ? { scale: [1, 1.3, 1] } : {}}
+                                className={`w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center group-active:scale-90 transition-all ${isLiked
+                                    ? 'bg-red-500 border-red-400 text-white'
+                                    : 'bg-white/10 border-white/20 text-white'
+                                    }`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={isLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                                </svg>
+                            </motion.div>
+                            <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Me gusta</span>
                         </button>
-                        <button className="flex flex-col items-center pointer-events-auto group">
-                            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-active:scale-90 transition-transform">
-                                <Plane size={22} className="fill-white/20" />
+
+                        {/* Agenda */}
+                        <a href="/escuelas" className="flex flex-col items-center pointer-events-auto group">
+                            <div className="w-12 h-12 rounded-full bg-violet-500/80 backdrop-blur-md border border-violet-400/50 flex items-center justify-center text-white group-active:scale-90 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                                </svg>
                             </div>
-                            <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Vuelo</span>
+                            <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Agenda</span>
+                        </a>
+
+                        {/* Dona */}
+                        <button
+                            onClick={() => document.getElementById('impact-engine')?.scrollIntoView({ behavior: 'smooth' }) || onClose()}
+                            className="flex flex-col items-center pointer-events-auto group"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-amber-500/80 backdrop-blur-md border border-amber-400/50 flex items-center justify-center text-white group-active:scale-90 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1014.625 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 109.375 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                                </svg>
+                            </div>
+                            <span className="text-[9px] font-black text-white mt-1 drop-shadow-sm uppercase">Dona</span>
                         </button>
                     </div>
 
-                    {/* Bottom Metadata */}
-                    <div className="absolute bottom-0 inset-x-0 p-8 pt-20 bg-gradient-to-t from-black/90 to-transparent z-20 pointer-events-none">
-                        <div className="space-y-4 max-w-[80%]">
-                            <div className="flex items-center gap-2 text-violet-400">
-                                <MapPin size={12} fill="currentColor" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{testimonial.location}</span>
-                            </div>
-                            <h2 className="text-3xl font-black text-white leading-none tracking-tighter uppercase italic drop-shadow-lg">
-                                @{testimonial.author.replace('Mtra. ', '').replace('Mtro. ', '').toLowerCase()}
+                    {/* Bottom Metadata - Minimal */}
+                    <div className="absolute bottom-0 inset-x-0 p-4 pb-6 bg-gradient-to-t from-black/60 to-transparent z-20 pointer-events-none">
+                        <div className="flex-1 min-w-0">
+                            {/* School Name */}
+                            <h2 className="text-lg font-black text-white leading-tight tracking-tight uppercase drop-shadow-lg truncate">
+                                {testimonial.name}
                             </h2>
-                            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4">
-                                <p className="text-white text-sm font-medium leading-tight">"{testimonial.quote.toLowerCase()}"</p>
-                                <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-2">{testimonial.name}</p>
+                            {/* Location Badge */}
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <MapPin size={10} className="text-violet-400" fill="currentColor" />
+                                <span className="text-[9px] font-bold text-white/70 uppercase tracking-wider">{testimonial.location}</span>
                             </div>
                         </div>
-
-                        {/* Progress Dots */}
-                        <div className="absolute bottom-20 inset-x-8 flex items-center justify-center gap-2">
-                            {testimonials.map((_, i) => (
-                                <div
-                                    key={i}
-                                    className={`h-1 rounded-full transition-all duration-300 ${i === currentIndex ? 'w-6 bg-violet-500' : 'w-1 bg-white/30'}`}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Navigation Guide */}
-                    <div className="absolute bottom-6 inset-x-0 flex flex-col items-center gap-1 opacity-30 pointer-events-none">
-                        <ChevronDown size={14} className="text-white animate-bounce" />
-                        <span className="text-[8px] font-black text-white uppercase tracking-widest">Desliza para más</span>
                     </div>
                 </div>
             </motion.div>
@@ -346,7 +449,7 @@ export default function FlyHighTestimonialGallery() {
                 <motion.button
                     type="button"
                     suppressHydrationWarning
-                    onClick={() => handleCardClick(2)}
+                    onClick={() => handleCardClick(activeCardIndex)}
                     style={{
                         scale: buttonScale,
                         willChange: 'transform'

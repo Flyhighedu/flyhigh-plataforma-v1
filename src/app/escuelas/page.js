@@ -6,7 +6,6 @@ import EscuelasGallery3D from '@/components/Escuelas/EscuelasGallery3D';
 import EscuelasIntro from '@/components/Escuelas/EscuelasIntro';
 
 import EscuelasBenefits from '@/components/Escuelas/EscuelasBenefits';
-import EscuelasSteps from '@/components/Escuelas/EscuelasSteps';
 import EscuelasCalculator from '@/components/Escuelas/EscuelasCalculator';
 import EscuelasWizard from '@/components/Escuelas/EscuelasWizard';
 
@@ -29,7 +28,6 @@ export default function EscuelasPage() {
 
 
                 <EscuelasBenefits />
-                <EscuelasSteps />
                 <EscuelasCalculator />
                 <EscuelasWizard />
             </div>

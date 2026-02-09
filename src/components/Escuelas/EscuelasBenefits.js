@@ -553,14 +553,6 @@ export default function EscuelasBenefits() {
             desc: "Inspiramos a la próxima generación de ingenieros, pilotos y científicas. La tecnología es el lienzo; su futuro es la obra maestra.",
             bg: "bg-fuchsia-600",
             gradient: "from-fuchsia-600 to-fuchsia-800"
-        },
-        {
-            icon: <BookOpen className="w-10 h-10 text-white" />,
-            title: "Plataforma Educativa",
-            subtitle: "Valor Todo el Año",
-            desc: "El vuelo es solo el inicio. Otorgamos acceso a una plataforma digital exclusiva con recursos pedagógicos para detonar la creatividad en el aula.",
-            bg: "bg-indigo-600",
-            gradient: "from-indigo-600 to-indigo-800"
         }
     ];
 
@@ -598,7 +590,7 @@ export default function EscuelasBenefits() {
                 {/* Mobile Snap Carousel / Desktop Grid */}
                 <div
                     ref={scrollContainerRef}
-                    className="flex xl:grid xl:grid-cols-4 gap-4 overflow-x-auto xl:overflow-visible snap-x snap-mandatory px-6 pb-12 xl:pb-0 scrollbar-hide"
+                    className="flex xl:grid xl:grid-cols-3 gap-4 overflow-x-auto xl:overflow-visible snap-x snap-mandatory px-6 pb-12 xl:pb-0 scrollbar-hide"
                 >
                     {pillars.map((item, idx) => (
                         <motion.div
@@ -659,7 +651,6 @@ export default function EscuelasBenefits() {
 
                 <div className="flex justify-center gap-2 mt-4 xl:hidden opacity-40">
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                     <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
                 </div>
