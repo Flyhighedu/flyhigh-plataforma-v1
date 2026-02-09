@@ -93,6 +93,7 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
     const [isLiked, setIsLiked] = useState(false);
     const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
     const [isLandscapeMode, setIsLandscapeMode] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const videoRef = useRef(null);
 
     useEffect(() => {
@@ -119,6 +120,7 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
     useEffect(() => {
         setIsPaused(false);
         setIsLandscapeVideo(false);
+        setIsLoading(true);
 
         if (videoRef.current) {
             videoRef.current.play().catch(() => { });
@@ -202,9 +204,27 @@ function FlyPlayer({ isOpen, onClose, testimonials, currentIndex, setCurrentInde
                             autoPlay
                             loop
                             playsInline
+                            onLoadStart={() => setIsLoading(true)}
+                            onWaiting={() => setIsLoading(true)}
+                            onCanPlay={() => setIsLoading(false)}
+                            onPlaying={() => setIsLoading(false)}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
+                        {/* Gradient Overlay Removed */}
                     </div>
+
+                    {/* Loading Spinner */}
+                    <AnimatePresence>
+                        {isLoading && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+                            >
+                                <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     {/* Rotate Hint for Landscape Videos in Portrait Mode */}
                     <AnimatePresence>
