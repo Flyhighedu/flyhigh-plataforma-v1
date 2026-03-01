@@ -1,5 +1,46 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #137fec;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #101a22;
+  --color-surface-dark: #1c2a35;
+  --color-surface-darker: #15202b;
+
+  --font-display: "Inter", sans-serif;
+
+  --animate-pulse-slow: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse-dot {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    50% {
+      transform: scale(1.5);
+      opacity: 0.5;
+    }
+
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes text-shimmer {
+    from {
+      background-position: 0 0;
+    }
+
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  --animate-text-shimmer: text-shimmer 3s linear infinite;
+}
+
 /* Body scroll optimization */
 body {
   overscroll-behavior: none;
@@ -24,6 +65,112 @@ body {
 
   .animate-spin-slow {
     animation: spin-slow 8s linear infinite;
+  }
+
+  @keyframes wait-header-tint {
+    0%,
+    100% {
+      opacity: 0.74;
+    }
+
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes wait-header-shell {
+    0%,
+    100% {
+      transform: translateY(0) scale(var(--wait-scale-min, 0.999));
+    }
+
+    50% {
+      transform: translateY(var(--wait-shift-y, 0.45px)) scale(var(--wait-scale-max, 1.008));
+    }
+  }
+
+  @keyframes wait-header-breathe {
+    0%,
+    100% {
+      transform: scale(0.98);
+      opacity: 0.74;
+    }
+
+    50% {
+      transform: scale(1.03);
+      opacity: 0.92;
+    }
+  }
+
+  @keyframes wait-header-edge-halo {
+    0%,
+    100% {
+      opacity: 0.36;
+      transform: scaleX(0.95);
+    }
+
+    50% {
+      opacity: 0.82;
+      transform: scaleX(1.03);
+    }
+  }
+
+  @keyframes wait-status-dot {
+    0%,
+    100% {
+      transform: scale(0.9);
+      opacity: 0.62;
+    }
+
+    50% {
+      transform: scale(1.12);
+      opacity: 0.92;
+    }
+  }
+
+  @keyframes wait-status-focus {
+    0%,
+    100% {
+      opacity: 0.46;
+      transform: translateY(-50%) scaleX(0.94);
+    }
+
+    50% {
+      opacity: 0.95;
+      transform: translateY(-50%) scaleX(1.03);
+    }
+  }
+
+  .animate-wait-header-shell {
+    animation: wait-header-shell 3.8s cubic-bezier(0.42, 0, 0.2, 1) infinite;
+    transform-origin: top center;
+    will-change: transform;
+  }
+
+  .animate-wait-header-tint {
+    animation: wait-header-tint 4.2s ease-in-out infinite;
+  }
+
+  .animate-wait-header-breathe {
+    animation: wait-header-breathe 4s ease-in-out infinite;
+    transform-origin: left bottom;
+    will-change: transform, opacity;
+  }
+
+  .animate-wait-header-edge-halo {
+    animation: wait-header-edge-halo 3.8s cubic-bezier(0.42, 0, 0.2, 1) infinite;
+    transform-origin: center;
+    will-change: transform, opacity;
+  }
+
+  .animate-wait-status-dot {
+    animation: wait-status-dot 2.6s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .animate-wait-status-focus {
+    animation: wait-status-focus 2.6s ease-in-out infinite;
+    will-change: transform, opacity;
   }
 
   .perspective-1000 {
@@ -127,5 +274,16 @@ body {
     to {
       transform: rotate(360deg);
     }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-wait-header-shell,
+  .animate-wait-header-tint,
+  .animate-wait-header-breathe,
+  .animate-wait-header-edge-halo,
+  .animate-wait-status-dot,
+  .animate-wait-status-focus {
+    animation: none !important;
   }
 }

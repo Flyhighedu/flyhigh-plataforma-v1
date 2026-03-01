@@ -2,6 +2,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
 export async function middleware(request) {
+    if (request.nextUrl.pathname.startsWith('/staff-v2')) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = request.nextUrl.pathname.replace('/staff-v2', '/staff')
+        return NextResponse.redirect(redirectUrl)
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -33,21 +39,38 @@ export async function middleware(request) {
         }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // OPTIMIZATION: Only check user if likely to be logged in or accessing protected route
+    let user = null;
 
-    // Proteger rutas /staff
-    /*
-    if (request.nextUrl.pathname.startsWith('/staff') && !request.nextUrl.pathname.startsWith('/staff/login')) {
-        if (!user) {
+    // Check if we have auth cookies before expensive getUser call
+    const cookieStore = request.cookies.getAll();
+    const hasAuthCookie = cookieStore.some(c => c.name.includes('auth-token') || c.name.startsWith('sb-'));
+
+    if (hasAuthCookie) {
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+    }
+
+    // Proteger rutas /staff (excepto /staff/login y /staff/preview)
+    if (request.nextUrl.pathname.startsWith('/staff') &&
+        !request.nextUrl.pathname.startsWith('/staff/login') &&
+        !request.nextUrl.pathname.startsWith('/staff/preview')) {
+
+        const isTestMode = request.cookies.get('flyhigh_test_mode')?.value === 'true';
+
+        if (!user && !isTestMode) {
             return NextResponse.redirect(new URL('/staff/login', request.url))
         }
-
-        // Aquí podríamos verificar roles, ej:
-        // const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        // if (profile?.role !== 'staff') { ... }
-        // Por ahora solo validamos sesión activa como pidió el usuario inicial (ajustable luego)
     }
-    */
+
+    // Proteger rutas /supervisor (misma lógica que /staff)
+    if (request.nextUrl.pathname.startsWith('/supervisor')) {
+        const isTestMode = request.cookies.get('flyhigh_test_mode')?.value === 'true';
+
+        if (!user && !isTestMode) {
+            return NextResponse.redirect(new URL('/staff/login', request.url))
+        }
+    }
 
     // Redirigir de login a dashboard si ya hay sesión
     if (request.nextUrl.pathname === ('/staff/login') && user) {
@@ -64,8 +87,10 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/staff/:path*',
+        '/staff-v2/:path*',
+        '/supervisor/:path*',
+        '/api/:path*',
     ],
 }

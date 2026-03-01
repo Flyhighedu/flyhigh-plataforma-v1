@@ -3,81 +3,21 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Trash2, AlertTriangle, CheckCircle, Clock, Users, User, ArrowRight, FileText, Calendar, MapPin } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import HeaderHamburgerMenu from './HeaderHamburgerMenu';
+import { buildFlightSnapshotMap, buildSchoolMapById, missionDateTimeFromClosure, resolveHistorySchoolName } from '@/utils/missionHistory';
 
-export default function DailyImpactReport({ missionId, onExit, allowDelete = true }) {
-    // ... (rest of state)
-
-    // ... (useEffect and logic)
-
-    // ... (in JSX, footer section)
-    <div className="p-6 bg-slate-50 border-t border-slate-200 space-y-3">
-        <button
-            onClick={onExit}
-            className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg"
-        >
-            {allowDelete ? 'Salir al Dashboard' : 'Volver al Historial'} <ArrowRight size={18} />
-        </button>
-
-        {allowDelete && (
-            <button
-                onClick={() => setShowDeleteModal(true)}
-                className="w-full py-2 text-xs text-red-400 font-bold hover:text-red-600 transition-colors flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
-            >
-                <Trash2 size={12} /> ELIMINAR REGISTROS (MODO TEST)
-            </button>
-        )}
-    </div>
+export default function DailyImpactReport({ missionId, journeyId, onExit, allowDelete = true }) {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
     const [missionData, setMissionData] = useState(null);
-    const [currentDate, setCurrentDate] = useState("");
-    const router = useRouter();
-
-    useEffect(() => {
-        setCurrentDate(new Date().toLocaleDateString());
-    }, []);
+    const showDeleteActions = false;
+    const currentDate = new Date().toLocaleDateString();
 
     useEffect(() => {
         const fetchStats = async () => {
             const supabase = createClient();
-
-            // 1. Fetch Mission Details (School Name)
-            // Try fetching from DB first to be accurate for History mode
-            let schoolName = "Escuela Desconocida";
-            let missionDate = new Date().toLocaleDateString();
-
-            if (missionId && !missionId.startsWith('manual-')) {
-                const { data: schoolData, error: schoolError } = await supabase
-                    .from('proximas_escuelas')
-                    .select('school_name, nombre_escuela, fecha_programada')
-                    .eq('id', missionId)
-                    .single();
-
-                if (schoolData) {
-                    schoolName = schoolData.school_name || schoolData.nombre_escuela;
-                    if (schoolData.fecha_programada) {
-                        missionDate = new Date(schoolData.fecha_programada).toLocaleDateString();
-                    }
-                }
-            } else if (missionId && missionId.startsWith('manual-')) {
-                // For manual missions in history, we might have lost the name unless we stored it in 'mission_data' column of flights or closure.
-                // We'll rely on what we can find.
-                schoolName = "Registro Manual";
-            }
-
-            // Fallback to local storage if available (for active session)
-            const localMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
-            if (localMission && localMission.id === missionId) {
-                schoolName = localMission.school_name || localMission.nombre_escuela || schoolName;
-            }
-
-            setMissionData({ school_name: schoolName, date: missionDate });
-
-            // 2. Fetch flights
             const { data: flights, error } = await supabase
                 .from('bitacora_vuelos')
                 .select('*')
@@ -90,22 +30,75 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                 return;
             }
 
-            // 3. Fetch Closure Data (Signature & Photo)
-            const { data: closureData, error: closureError } = await supabase
+            let closureData = null;
+            let { data: closureWithSnapshot, error: closureError } = await supabase
                 .from('cierres_mision')
-                .select('signature_url, group_photo_url')
+                .select('signature_url, group_photo_url, school_id, school_name_snapshot, mission_datetime, end_time, created_at')
                 .eq('mission_id', missionId)
-                .single();
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-            if (closureData) {
-                setStats(prev => ({
-                    ...prev,
-                    signature: closureData.signature_url,
-                    photo: closureData.group_photo_url
-                }));
+            if (closureError && /column/i.test(closureError.message || '')) {
+                const fallback = await supabase
+                    .from('cierres_mision')
+                    .select('signature_url, group_photo_url, end_time, created_at')
+                    .eq('mission_id', missionId)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                closureWithSnapshot = fallback.data;
+                closureError = fallback.error;
             }
 
-            // 4. Fetch Pauses
+            if (closureError) {
+                console.warn('No se pudo cargar metadata extendida de cierre:', closureError.message);
+            }
+
+            closureData = closureWithSnapshot;
+
+            const closureSchoolId =
+                closureData?.school_id ?? (/^\d+$/.test(String(missionId || '')) ? Number(missionId) : null);
+
+            const { data: schoolData } = closureSchoolId
+                ? await supabase
+                    .from('proximas_escuelas')
+                    .select('id, nombre_escuela, fecha_programada')
+                    .eq('id', closureSchoolId)
+                    .maybeSingle()
+                : { data: null };
+
+            const schoolMapById = buildSchoolMapById(schoolData ? [schoolData] : []);
+            const flightSnapshotMap = buildFlightSnapshotMap(flights || []);
+
+            let schoolName = resolveHistorySchoolName({
+                closure: {
+                    mission_id: missionId,
+                    school_id: closureData?.school_id || null,
+                    school_name_snapshot: closureData?.school_name_snapshot || null
+                },
+                schoolMapById,
+                flightSnapshotMap
+            });
+
+            const localMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
+            if (localMission && String(localMission.id) === String(missionId)) {
+                schoolName = localMission.school_name || localMission.nombre_escuela || schoolName;
+            }
+
+            const missionDateSource =
+                missionDateTimeFromClosure(closureData) ||
+                schoolData?.fecha_programada ||
+                new Date().toISOString();
+            const missionDate = new Date(missionDateSource).toLocaleDateString();
+
+            setMissionData({
+                school_name: schoolName,
+                date: missionDate,
+                meta_label: 'Registro Manual'
+            });
+
             const { data: pauses } = await supabase
                 .from('bitacora_pausas')
                 .select('*')
@@ -139,8 +132,7 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
 
             const avgDuration = flights.length > 0 ? Math.floor(totalDuration / flights.length) : 0;
 
-            setStats(prev => ({
-                ...prev, // Keep closure info if set above
+            setStats({
                 totalKids,
                 totalStaff,
                 avgDuration,
@@ -148,8 +140,10 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                 incidents: allIncidents,
                 flights: flights,
                 pauses: pauses || [],
-                totalPauseTime
-            }));
+                totalPauseTime,
+                signature: closureData?.signature_url || null,
+                photo: closureData?.group_photo_url || null
+            });
             setLoading(false);
         };
 
@@ -157,49 +151,14 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
     }, [missionId]);
 
     const handleDeleteData = async () => {
-        if (deleteInput !== 'ELIMINAR') return;
-
-        setIsDeleting(true);
-        const supabase = createClient();
-
-        try {
-            // Ensure session before delete
-            let { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                const { error: authError } = await supabase.auth.signInWithPassword({
-                    email: 'staff_test@flyhigh.com',
-                    password: 'flyhigh_test_123'
-                });
-                if (authError) throw authError;
-            }
-
-            // DELETE Everything for this mission
-            const { error: e1 } = await supabase.from('bitacora_vuelos').delete().eq('mission_id', missionId);
-            const { error: e2 } = await supabase.from('bitacora_pausas').delete().eq('mission_id', missionId);
-            const { error: e3 } = await supabase.from('cierres_mision').delete().eq('mission_id', missionId);
-
-            if (e1) console.error("Error deleting flights:", e1);
-            if (e2) console.error("Error deleting pauses:", e2);
-            if (e3) console.error("Error deleting closure:", e3);
-
-            alert("Datos de prueba eliminados correctamente.");
-            localStorage.removeItem('flyhigh_staff_mission');
-            localStorage.removeItem('flyhigh_flight_logs');
-            localStorage.removeItem('flyhigh_completed_pauses');
-            localStorage.removeItem('flyhigh_active_pause');
-
-            router.push('/staff/dashboard');
-        } catch (err) {
-            console.error("Delete error:", err);
-            alert("Error al eliminar: " + (err.message || "Intenta nuevamente."));
-            setIsDeleting(false);
-        }
+        alert('La eliminación de historial está deshabilitada para proteger datos históricos.');
     };
 
     const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}m ${secs}s`;
+        const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+        const mins = String(Math.floor(safeSeconds / 60)).padStart(2, '0');
+        const secs = String(safeSeconds % 60).padStart(2, '0');
+        return `${mins}:${secs}`;
     };
 
     if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Generando Informe Detallado...</div>;
@@ -211,23 +170,35 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
             {/* Document Container */}
             <div className="bg-white shadow-2xl rounded-sm overflow-hidden max-w-2xl mx-auto border border-slate-200">
                 {/* Header */}
-                <div className="bg-slate-900 text-white p-8 relative overflow-hidden">
+                <div className="bg-slate-900 text-white p-8 relative overflow-hidden rounded-b-[40px] shadow-xl z-10">
                     <div className="absolute top-0 right-0 p-8 opacity-10">
                         <FileText size={120} />
                     </div>
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2 text-blue-400 font-bold uppercase tracking-widest text-xs">
-                            <CheckCircle size={14} /> Misión Completada
+                        <div className="flex items-center gap-3 mb-2 text-blue-200 font-bold uppercase tracking-widest text-xs">
+                            <CheckCircle size={14} /> MISIÓN COMPLETADA
                         </div>
-                        <h1 className="text-3xl font-black mb-2">INFORME DE MISIÓN</h1>
-                        <div className="flex flex-col gap-1 text-slate-400 text-sm">
+                        <h1 className="text-3xl font-black mb-2 tracking-tight">INFORME DE MISIÓN</h1>
+                        <div className="flex flex-col gap-1 text-slate-300 text-sm font-medium">
                             <div className="flex items-center gap-2">
-                                <MapPin size={14} /> {missionData?.school_name || "Escuela Desconocida"}
+                                <Calendar size={14} /> {missionData?.meta_label || 'Registro Manual'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <MapPin size={14} /> {missionData?.school_name || 'Escuela no vinculada'}
                             </div>
                             <div className="flex items-center gap-2">
                                 <Calendar size={14} /> {missionData?.date || currentDate}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Menu Button Top Right */}
+                    <div className="absolute top-8 right-8 z-[20]">
+                        <HeaderHamburgerMenu
+                            journeyId={journeyId}
+                            schoolId={missionId}
+                            onDemoStart={() => window.location.reload()}
+                        />
                     </div>
                 </div>
 
@@ -410,17 +381,19 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                         {allowDelete ? 'Salir al Dashboard' : 'Volver al Historial'} <ArrowRight size={18} />
                     </button>
 
-                    <button
-                        onClick={() => setShowDeleteModal(true)}
-                        className="w-full py-2 text-xs text-red-400 font-bold hover:text-red-600 transition-colors flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
-                    >
-                        <Trash2 size={12} /> ELIMINAR REGISTROS (MODO TEST)
-                    </button>
+                    {allowDelete && showDeleteActions && (
+                        <button
+                            onClick={() => setShowDeleteModal(true)}
+                            className="w-full py-2 text-xs text-red-400 font-bold hover:text-red-600 transition-colors flex items-center justify-center gap-1 opacity-60 hover:opacity-100"
+                        >
+                            <Trash2 size={12} /> ELIMINAR REGISTROS (MODO TEST)
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* DELETE MODAL (Keep Existing Logic) */}
-            {showDeleteModal && (
+            {showDeleteActions && showDeleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-6">
                         <div className="text-center space-y-2">
@@ -434,7 +407,7 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase">Escribe "ELIMINAR" para confirmar:</label>
+                            <label className="text-xs font-bold text-slate-400 uppercase">Escribe &quot;ELIMINAR&quot; para confirmar:</label>
                             <input
                                 type="text"
                                 value={deleteInput}
@@ -452,10 +425,10 @@ export default function DailyImpactReport({ missionId, onExit, allowDelete = tru
                             </button>
                             <button
                                 onClick={handleDeleteData}
-                                disabled={deleteInput !== 'ELIMINAR' || isDeleting}
+                                disabled={deleteInput !== 'ELIMINAR'}
                                 className="py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/30"
                             >
-                                {isDeleting ? 'Borrando...' : 'CONFIRMAR'}
+                                CONFIRMAR
                             </button>
                         </div>
                     </div>

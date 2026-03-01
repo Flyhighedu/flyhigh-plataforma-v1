@@ -39,6 +39,32 @@ async function uploadImage(base64Data, bucket, prefix = 'evidencia') {
     }
 }
 
+function parseSchoolId(missionId) {
+    const value = String(missionId || '').trim();
+    if (!/^\d+$/.test(value)) return null;
+    const asNumber = Number(value);
+    return Number.isFinite(asNumber) ? asNumber : null;
+}
+
+function resolveSchoolSnapshotName(closureData) {
+    if (closureData?.school_name_snapshot) {
+        return closureData.school_name_snapshot;
+    }
+
+    const mission = closureData?.mission || {};
+    const fromMission = mission.school_name || mission.nombre_escuela;
+    if (fromMission) return fromMission;
+
+    const flights = closureData?.stats?.flights || [];
+    const firstFlightWithMission = flights.find((flight) => flight?.mission_data);
+    if (firstFlightWithMission?.mission_data) {
+        const payload = firstFlightWithMission.mission_data;
+        return payload.school_name || payload.nombre_escuela || null;
+    }
+
+    return null;
+}
+
 /**
  * Syncs a single flight log to Supabase
  * @param {Object} flightLog - The flight log object from local storage
@@ -69,20 +95,51 @@ export async function syncFlightLog(flightLog) {
         const missionIdToSend = flightLog.mission_id?.toString();
 
         // 2. Insert into DB
-        const { error } = await supabase
+        const payload = {
+            mission_id: missionIdToSend,
+            journey_id: flightLog.journey_id || null,
+            mission_data: flightLog.mission_data || {},
+            duration_seconds: flightLog.durationSeconds,
+            student_count: flightLog.studentCount,
+            staff_count: flightLog.staffCount,
+            start_time: new Date(flightLog.startTime).toISOString(),
+            end_time: new Date(flightLog.endTime).toISOString(),
+            incidents: processedIncidents
+        };
+
+        let insertedRowId = null;
+        let { data: insertedRow, error } = await supabase
             .from('bitacora_vuelos')
-            .insert({
-                mission_id: missionIdToSend,
-                mission_data: flightLog.mission_data || {},
-                duration_seconds: flightLog.durationSeconds,
-                student_count: flightLog.studentCount,
-                staff_count: flightLog.staffCount,
-                start_time: new Date(flightLog.startTime).toISOString(),
-                end_time: new Date(flightLog.endTime).toISOString(),
-                incidents: processedIncidents
-            });
+            .insert(payload)
+            .select('id')
+            .single();
+
+        if (insertedRow?.id) {
+            insertedRowId = insertedRow.id;
+        }
+
+        if (error && /journey_id|column/i.test(error.message || '')) {
+            const fallbackPayload = { ...payload };
+            delete fallbackPayload.journey_id;
+
+            const fallback = await supabase
+                .from('bitacora_vuelos')
+                .insert(fallbackPayload)
+                .select('id')
+                .single();
+
+            if (fallback?.data?.id) {
+                insertedRowId = fallback.data.id;
+            }
+            error = fallback.error;
+        }
 
         if (error) throw error;
+
+        if (flightLog && typeof flightLog === 'object' && insertedRowId) {
+            flightLog.cloud_row_id = insertedRowId;
+        }
+
         return true;
 
     } catch (error) {
@@ -120,18 +177,39 @@ export async function syncMissionClosure(closureData) {
         const signatureUrl = await uploadImage(closureData.signature, 'staff-signatures', 'sig');
         const photoUrl = await uploadImage(closureData.photo, 'staff-evidence', 'group');
 
-        // 2. Insert Closure Record
-        const { error: insertError } = await supabase
+        const missionId = closureData.mission_id?.toString();
+        const missionDateTime = closureData.mission_datetime || new Date().toISOString();
+        const schoolId = closureData.school_id ?? parseSchoolId(missionId);
+        const schoolNameSnapshot = resolveSchoolSnapshotName(closureData);
+
+        const basePayload = {
+            mission_id: missionId,
+            total_flights: closureData.stats.flights.length,
+            total_students: closureData.stats.totalStudents,
+            checklist_verified: closureData.checklistVerified,
+            signature_url: signatureUrl,
+            group_photo_url: photoUrl,
+            end_time: missionDateTime
+        };
+
+        const extendedPayload = {
+            ...basePayload,
+            mission_datetime: missionDateTime,
+            school_id: schoolId,
+            school_name_snapshot: schoolNameSnapshot
+        };
+
+        let { error: insertError } = await supabase
             .from('cierres_mision')
-            .insert({
-                mission_id: closureData.mission_id?.toString(),
-                total_flights: closureData.stats.flights.length,
-                total_students: closureData.stats.totalStudents,
-                checklist_verified: closureData.checklistVerified,
-                signature_url: signatureUrl,
-                group_photo_url: photoUrl,
-                end_time: new Date().toISOString()
-            });
+            .insert(extendedPayload);
+
+        if (insertError && /column/i.test(insertError.message || '')) {
+            console.warn('Columnas snapshot no disponibles en cierres_mision. Guardando payload base.', insertError.message);
+            const fallback = await supabase
+                .from('cierres_mision')
+                .insert(basePayload);
+            insertError = fallback.error;
+        }
 
         if (insertError) throw insertError;
 
@@ -348,4 +426,36 @@ export async function syncAllPendingPauses(missionId) {
 
     console.log(`Pause sync complete: ${syncedCount} synced, ${failedCount} failed.`);
     return { synced: syncedCount, failed: failedCount };
+}
+
+/**
+ * Syncs pending check-ins from localStorage
+ * @returns {Promise<void>}
+ */
+export async function syncPendingCheckIns() {
+    const pending = JSON.parse(localStorage.getItem('pending_checkins') || '[]');
+    if (pending.length === 0) return;
+
+    console.log(`Syncing ${pending.length} pending check-ins...`);
+    const supabase = createClient();
+    const remaining = [];
+
+    for (const item of pending) {
+        try {
+            const { error } = await supabase.from('staff_prep_events').insert({
+                journey_id: item.journeyId,
+                user_id: item.userId,
+                event_type: 'checkin',
+                payload: item.payload
+            });
+
+            if (error) throw error;
+            console.log("Check-in synced for:", item.journeyId);
+        } catch (e) {
+            console.error("Failed to sync check-in:", e);
+            remaining.push(item);
+        }
+    }
+
+    localStorage.setItem('pending_checkins', JSON.stringify(remaining));
 }

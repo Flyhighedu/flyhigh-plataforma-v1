@@ -1,325 +1,2224 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import TodayFlightList from '@/components/staff/TodayFlightList';
-import FlightLogger from '@/components/staff/FlightLogger';
-import { syncFlightLog, syncPauseStart, syncPauseEnd } from '@/utils/staff/sync';
-import { LogOut, MoreVertical, RotateCcw, Clock, Pause } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
+// =====================================================
+// Staff Dashboard — Stepper Shell V1
+// 3 pasos: Preparación → Operación → Reporte
+// Auto-detecta escuela del día desde proximas_escuelas
+// =====================================================
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck } from 'lucide-react';
+import PrepChecklist from '@/components/staff/PrepChecklist';
+import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
+import ClosureLegacy from '@/components/staff/ClosureLegacy';
+import WaitingAuxLoad from '@/components/staff/WaitingAuxLoad';
+import AuxWaitingScreen from '@/components/staff/AuxWaitingScreen';
+import AuxVehicleChecklist from '@/components/staff/AuxVehicleChecklist';
 import MissionSelector from '@/components/staff/MissionSelector';
-import PauseMenu from '@/components/staff/PauseMenu';
-import PauseActiveOverlay from '@/components/staff/PauseActiveOverlay';
-import ResumeProtocolModal from '@/components/staff/ResumeProtocolModal';
+import MissionBrief from '@/components/staff/MissionBrief';
+import ResetProcessButton from '@/components/staff/ResetProcessButton';
+import TeacherWaitingScreen from '@/components/staff/TeacherWaitingScreen';
+
+import EnRutaScreen from '@/components/staff/EnRutaScreen';
+import DropzoneWaitingScreen from '@/components/staff/DropzoneWaitingScreen';
+import DropzoneActionScreen from '@/components/staff/DropzoneActionScreen';
+import UnloadAssignmentActionScreen from '@/components/staff/UnloadAssignmentActionScreen';
+import WaitingUnloadAssignmentScreen from '@/components/staff/WaitingUnloadAssignmentScreen';
+import PilotPrepareFlightScreen from '@/components/staff/PilotPrepareFlightScreen';
+import UnloadScreen from '@/components/staff/UnloadScreen';
+import AuxParkingVehicleScreen from '@/components/staff/AuxParkingVehicleScreen';
+import AuxAdWallInstallScreen from '@/components/staff/AuxAdWallInstallScreen';
+import TeacherCivicNotificationScreen from '@/components/staff/TeacherCivicNotificationScreen';
+import PilotOperationalWaitScreen from '@/components/staff/PilotOperationalWaitScreen';
+import SeatDeploymentScreen from '@/components/staff/SeatDeploymentScreen';
+import HeadphonesSetupScreen from '@/components/staff/HeadphonesSetupScreen';
+import GlassesSetupScreen from '@/components/staff/GlassesSetupScreen';
+import PilotMusicAmbienceScreen from '@/components/staff/PilotMusicAmbienceScreen';
+import TeacherOperationReadyScreen from '@/components/staff/TeacherOperationReadyScreen';
+import AuxOperationReadyScreen from '@/components/staff/AuxOperationReadyScreen';
+import OperationStartBridgeScreen from '@/components/staff/OperationStartBridgeScreen';
+import OperationPanelConstructionScreen from '@/components/staff/OperationPanelConstructionScreen';
+import TeacherCivicParallelScreen from '@/components/staff/TeacherCivicParallelScreen';
+import AuxCivicEvidenceParallelScreen from '@/components/staff/AuxCivicEvidenceParallelScreen';
+import { ROLE_LABELS } from '@/config/prepChecklistConfig';
+import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
+import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
+import HeaderHamburgerMenu from '@/components/staff/HeaderHamburgerMenu';
+
+import { STAFF_STEPS } from '@/constants/staffSteps';
+import { parseMeta, shouldLockPilot, isPilotReady } from '@/utils/metaHelpers';
+import DependencyTransitionOverlay from '@/components/staff/DependencyTransitionOverlay';
+import useDependencyTransition from '@/hooks/useDependencyTransition';
+import { getTransitionCopy } from '@/utils/transitionCopyMap';
+
+const STEPS = [
+    { id: 'prep', label: 'Preparación', icon: ClipboardList },
+    { id: 'en_ruta', label: 'En Ruta', icon: Truck },
+    { id: 'operation', label: 'Operación', icon: Plane },
+    { id: 'report', label: 'Reporte', icon: FileText },
+];
+
+const TEACHER_LOAD_PHASE_STATES = new Set([
+    'AUX_CONTAINERS_DONE',
+    'ROUTE_READY',
+    'ROUTE_IN_PROGRESS',
+    'IN_ROUTE',
+    'WAITING_AUX_VEHICLE_CHECK',
+    'PILOT_READY_FOR_LOAD'
+]);
+
+const ASSISTANT_CIVIC_PENDING_STATUSES = new Set([
+    'pending_recording',
+    'recording',
+    'pending_upload',
+    'uploading',
+    'failed'
+]);
+
+const LISTENER_STEP_ONE_STATES = new Set([
+    'ROUTE_READY',
+    'IN_ROUTE',
+    'ROUTE_IN_PROGRESS',
+    'waiting_dropzone',
+    'unload',
+    'waiting_unload_assignment',
+    'post_unload_coordination',
+    'seat_deployment',
+    'ARRIVAL_PHOTO_DONE',
+    'OPERATION'
+]);
+
+const AUX_WAITING_AUTO_CHECKLIST_STATES = new Set([
+    'WAITING_AUX_VEHICLE_CHECK',
+    'PILOT_READY_FOR_LOAD',
+    'AUX_CONTAINERS_DONE',
+    'ROUTE_READY',
+    'OPERATION'
+]);
+
+const PILOT_WAITING_AUX_RELEASE_STATES = new Set([
+    'AUX_CONTAINERS_DONE',
+    'ROUTE_IN_PROGRESS',
+    'IN_ROUTE',
+    'ROUTE_READY'
+]);
+
+const PILOT_WAITING_FOR_AUX_STATES = new Set([
+    'PILOT_READY_FOR_LOAD',
+    'WAITING_AUX_VEHICLE_CHECK',
+    'AUX_CONTAINERS_DONE'
+]);
+
+const PILOT_CONNECT_PHASE_STATES = new Set([
+    'ARRIVAL_PHOTO_DONE',
+    'waiting_unload_assignment',
+    'waiting_dropzone',
+    'unload',
+    'post_unload_coordination',
+    'seat_deployment',
+    'OPERATION',
+    'operation'
+]);
+
+const TEACHER_WAITING_ROUTE_RELEASE_STATES = new Set([
+    'AUX_CONTAINERS_DONE',
+    'ROUTE_READY',
+    'IN_ROUTE',
+    'ROUTE_IN_PROGRESS'
+]);
+
+const TEACHER_CIVIC_LOCK_AUDIO_STATUSES = new Set([
+    'recording',
+    'uploading',
+    'pending_upload',
+    'failed'
+]);
+
+function normalizeMeta(meta) {
+    if (!meta) return Object.create(null);
+
+    if (typeof meta === 'string') {
+        try {
+            const parsed = JSON.parse(meta);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                return Object.create(null);
+            }
+            return parsed;
+        } catch {
+            return Object.create(null);
+        }
+    }
+
+    if (typeof meta === 'object' && !Array.isArray(meta)) {
+        return meta;
+    }
+
+    return Object.create(null);
+}
+
+function getTeacherWaitPhase(missionState) {
+    return TEACHER_LOAD_PHASE_STATES.has(missionState) ? 'load' : 'warehouse';
+}
+
+function normalizeTeacherCivicStageLock(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return ['seat', 'headphones', 'glasses'].includes(normalized) ? normalized : null;
+}
+
+function resolveTeacherCivicStage(meta, missionState) {
+    if (String(missionState || '').trim() !== 'seat_deployment') return null;
+
+    const safeMeta = normalizeMeta(meta);
+    const seatDone = safeMeta.global_seat_deployment_done === true;
+    const headphonesDone = safeMeta.global_headphones_done === true;
+    const glassesDone = safeMeta.global_glasses_done === true;
+
+    if (seatDone && headphonesDone && !glassesDone) return 'glasses';
+    if (seatDone && !headphonesDone) return 'headphones';
+    return 'seat';
+}
+
+function shouldKeepTeacherCivicStageLocked(role, missionState, meta) {
+    if (role !== 'teacher') return false;
+    if (String(missionState || '').trim() !== 'seat_deployment') return false;
+
+    const safeMeta = normalizeMeta(meta);
+    const stageLock = normalizeTeacherCivicStageLock(safeMeta.civic_parallel_teacher_stage_lock);
+    if (!stageLock) return false;
+
+    const audioStatus = String(safeMeta.civic_parallel_teacher_audio_status || 'idle').trim().toLowerCase();
+    const teacherCivicDone =
+        Boolean(safeMeta.civic_parallel_teacher_done_at) ||
+        audioStatus === 'uploaded';
+
+    return !teacherCivicDone && TEACHER_CIVIC_LOCK_AUDIO_STATUSES.has(audioStatus);
+}
+
+function hasPendingPilotControllerConnect(missionState, meta) {
+    const safeMeta = meta || Object.create(null);
+    const spotAtMs = Date.parse(safeMeta.pilot_spot_set_at || '');
+    const prepAtMs = Date.parse(safeMeta.pilot_prep_complete_at || '');
+    const controllerAtMs = Date.parse(safeMeta.pilot_controller_connected_at || '');
+    const audioAtMs = Date.parse(safeMeta.pilot_audio_configured_at || '');
+    const hasChecklistForCurrentSpot =
+        Number.isFinite(spotAtMs) &&
+        Number.isFinite(prepAtMs) &&
+        prepAtMs >= spotAtMs;
+
+    const hasControllerForCurrentSpot =
+        hasChecklistForCurrentSpot &&
+        safeMeta.pilot_controller_connected === true &&
+        (!Number.isFinite(controllerAtMs) || controllerAtMs >= prepAtMs);
+
+    const hasAudioForCurrentSpot =
+        hasControllerForCurrentSpot &&
+        safeMeta.pilot_audio_configured === true &&
+        (!Number.isFinite(audioAtMs) || audioAtMs >= (Number.isFinite(controllerAtMs) ? controllerAtMs : prepAtMs));
+
+    return (
+        PILOT_CONNECT_PHASE_STATES.has(missionState) &&
+        hasChecklistForCurrentSpot &&
+        !hasAudioForCurrentSpot
+    );
+}
+
+function getVisibleTaskKey(snapshot) {
+    const role = snapshot.profileRole;
+    const missionState = snapshot.missionState;
+    const currentStep = Number.isFinite(snapshot.currentStep) ? snapshot.currentStep : 0;
+    const meta = normalizeMeta(snapshot.missionMeta);
+    const arrivalPhotoTakenAt = snapshot.arrivalPhotoTakenAt || null;
+
+    if (snapshot.showBrief) {
+        return 'brief:mission';
+    }
+
+    if (shouldLockPilot(role, missionState, meta, arrivalPhotoTakenAt)) {
+        return 'pilot:fortress';
+    }
+
+    const pilotNeedsControllerConnect =
+        role === 'pilot' &&
+        hasPendingPilotControllerConnect(missionState, meta);
+
+    if (pilotNeedsControllerConnect) {
+        const prepAtMs = Date.parse(meta.pilot_prep_complete_at || '');
+        const controllerAtMs = Date.parse(meta.pilot_controller_connected_at || '');
+        const controllerConnectedForCurrentSpot =
+            Number.isFinite(prepAtMs) &&
+            meta.pilot_controller_connected === true &&
+            (!Number.isFinite(controllerAtMs) || controllerAtMs >= prepAtMs);
+
+        return controllerConnectedForCurrentSpot ? 'pilot:configure_audio' : 'pilot:connect_controller';
+    }
+
+    if (snapshot.waitingForAux && role === 'pilot') {
+        return 'pilot:waiting_aux_load';
+    }
+
+    if (role === 'assistant' && snapshot.auxFlowState === 'waiting') {
+        return 'assistant:waiting_pilot';
+    }
+
+    if (role === 'assistant' && snapshot.auxFlowState === 'checklist') {
+        return 'assistant:vehicle_checklist';
+    }
+
+    if (role === 'teacher' && snapshot.teacherFlowState === 'waiting') {
+        return `teacher:waiting:${getTeacherWaitPhase(missionState)}`;
+    }
+
+    const teacherCivicConfirmed = meta.teacher_civic_notified === true;
+    const civicParallelInProgress = meta.civic_parallel_status === 'in_progress';
+    const teacherCivicDone =
+        Boolean(meta.civic_parallel_teacher_done_at) ||
+        meta.civic_parallel_teacher_audio_status === 'uploaded';
+    const assistantCivicStatus = meta.civic_parallel_aux_status || null;
+    const assistantNeedsCivicPanel =
+        civicParallelInProgress &&
+        (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
+    const teacherCivicStageLock = normalizeTeacherCivicStageLock(meta.civic_parallel_teacher_stage_lock);
+    const teacherCivicStageLocked = shouldKeepTeacherCivicStageLocked(role, missionState, meta);
+
+    const shouldShowTeacherCivicParallel =
+        role === 'teacher' &&
+        teacherCivicConfirmed &&
+        meta.civic_parallel_use_legacy_panel === true &&
+        !teacherCivicDone &&
+        (snapshot.teacherCivicPanelOpen || (civicParallelInProgress && !snapshot.teacherCivicPanelDismissed));
+
+    if (shouldShowTeacherCivicParallel) {
+        return 'teacher:civic_parallel';
+    }
+
+    const shouldShowAssistantCivicParallel =
+        role === 'assistant' &&
+        assistantNeedsCivicPanel &&
+        !snapshot.assistantCivicPanelDismissed;
+
+    if (shouldShowAssistantCivicParallel) {
+        return 'assistant:civic_parallel';
+    }
+
+    const postGlassesKickoffActive =
+        missionState === 'seat_deployment' &&
+        meta.global_glasses_done === true;
+
+    if (teacherCivicStageLocked) {
+        return `teacher:civic_locked:${teacherCivicStageLock || resolveTeacherCivicStage(meta, missionState) || 'seat'}`;
+    }
+
+    if (postGlassesKickoffActive && meta.operation_start_bridge_at) {
+        return 'global:operation_start_bridge';
+    }
+
+    if (postGlassesKickoffActive) {
+        if (role === 'pilot') return 'pilot:music_ambience';
+        if (role === 'teacher') return 'teacher:operation_ready';
+        if (role === 'assistant') return 'assistant:operation_ready';
+        return 'global:operation_kickoff';
+    }
+
+    if (currentStep === 1) {
+        if (missionState === 'unload') {
+            return `step1:unload:${role || 'unknown'}`;
+        }
+
+        if (missionState === 'post_unload_coordination') {
+            if (role === 'pilot') return 'pilot:seat_deployment';
+            if (role === 'assistant') return 'assistant:parking_vehicle';
+            if (role === 'teacher') return 'teacher:civic_notification';
+            return `step1:post_unload_wait:${role || 'unknown'}`;
+        }
+
+        if (missionState === 'seat_deployment') {
+            const auxReady = meta.aux_ready_seat_deployment === true;
+            const adWallDone = meta.aux_ad_wall_done === true;
+            const teacherReady = meta.teacher_civic_notified === true;
+            const seatDone = meta.global_seat_deployment_done === true;
+            const headphonesDone = meta.global_headphones_done === true;
+            const glassesDone = meta.global_glasses_done === true;
+
+            if (role === 'assistant' && !auxReady) return 'assistant:parking_vehicle';
+            if (role === 'assistant' && auxReady && !adWallDone) return 'assistant:ad_wall_install';
+            if (role === 'teacher' && !teacherReady) return 'teacher:civic_notification';
+
+            if (seatDone && !headphonesDone) {
+                return `global:headphones_setup:${role || 'unknown'}`;
+            }
+
+            if (seatDone && headphonesDone && !glassesDone) {
+                return `global:glasses_setup:${role || 'unknown'}`;
+            }
+
+            return `step1:seat_deployment:${role || 'unknown'}`;
+        }
+
+        if (missionState === 'waiting_dropzone') {
+            if (role === 'assistant') return 'assistant:dropzone_action';
+            return `step1:dropzone_waiting:${role || 'unknown'}`;
+        }
+
+        if (missionState === 'waiting_unload_assignment') {
+            if (role === 'teacher') return 'teacher:unload_assignment_action';
+            return `step1:waiting_unload_assignment:${role || 'unknown'}`;
+        }
+
+        if (role === 'teacher') {
+            if (missionState === 'IN_ROUTE' || missionState === 'ROUTE_IN_PROGRESS') {
+                return 'teacher:en_route_travel';
+            }
+
+            return `teacher:waiting:${getTeacherWaitPhase(missionState)}`;
+        }
+
+        return `step1:en_ruta:${role || 'unknown'}:${missionState || 'unknown'}`;
+    }
+
+    if (currentStep === 0 && ['pilot', 'assistant', 'teacher'].includes(role)) {
+        return `step0:prep_checklist:${role}`;
+    }
+
+    if (currentStep === 2) {
+        return `step2:operation:${role || 'unknown'}`;
+    }
+
+    if (currentStep === 3) {
+        return `step3:report:${role || 'unknown'}`;
+    }
+
+    return `stepper:step${currentStep}:${role || 'unknown'}:${missionState || 'unknown'}`;
+}
+
+function projectSnapshotForRealtimeUpdate(snapshot, nextState, incomingMeta, arrivalPhotoTakenAt) {
+    const projected = {
+        ...snapshot,
+        missionState: nextState,
+        missionMeta: incomingMeta,
+        arrivalPhotoTakenAt: arrivalPhotoTakenAt || snapshot.arrivalPhotoTakenAt || null
+    };
+
+    if (
+        projected.profileRole === 'assistant' &&
+        projected.auxFlowState === 'waiting' &&
+        AUX_WAITING_AUTO_CHECKLIST_STATES.has(nextState)
+    ) {
+        projected.auxFlowState = 'checklist';
+    }
+
+    if (
+        projected.profileRole === 'pilot'
+    ) {
+        const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(nextState, incomingMeta);
+
+        if (pilotNeedsControllerConnect) {
+            projected.waitingForAux = false;
+        } else if (PILOT_WAITING_FOR_AUX_STATES.has(nextState)) {
+            projected.waitingForAux = true;
+        } else if (projected.waitingForAux && PILOT_WAITING_AUX_RELEASE_STATES.has(nextState)) {
+            projected.waitingForAux = false;
+            projected.currentStep = Math.max(Number(projected.currentStep) || 0, 1);
+        } else if (LISTENER_STEP_ONE_STATES.has(nextState) || nextState === 'report') {
+            projected.waitingForAux = false;
+        }
+    }
+
+    if (
+        projected.profileRole === 'teacher' &&
+        projected.teacherFlowState === 'waiting' &&
+        TEACHER_WAITING_ROUTE_RELEASE_STATES.has(nextState)
+    ) {
+        projected.teacherFlowState = null;
+        projected.currentStep = Math.max(Number(projected.currentStep) || 0, 1);
+    }
+
+    if (projected.currentCheckIn) {
+        const isPilotLocked = shouldLockPilot(
+            projected.profileRole,
+            nextState,
+            incomingMeta,
+            projected.arrivalPhotoTakenAt || null
+        );
+
+        if (isPilotLocked) {
+            if ((Number(projected.currentStep) || 0) < 1) {
+                projected.currentStep = 1;
+            }
+            return projected;
+        }
+
+        if (LISTENER_STEP_ONE_STATES.has(nextState) && (Number(projected.currentStep) || 0) < 1) {
+            projected.currentStep = 1;
+        }
+
+        if (LISTENER_STEP_ONE_STATES.has(nextState)) {
+            projected.auxFlowState = null;
+            projected.teacherFlowState = null;
+        }
+
+        if (nextState === 'OPERATION') {
+            projected.currentStep = 2;
+        }
+
+        if (nextState === 'report') {
+            projected.currentStep = 3;
+        }
+    }
+
+    return projected;
+}
 
 export default function StaffDashboard() {
-    const [currentMission, setCurrentMission] = useState(null);
-    const [isRestoring, setIsRestoring] = useState(true);
-    const [flightLogs, setFlightLogs] = useState([]);
-    const [showMenu, setShowMenu] = useState(false);
-
-    // Pause State
-    const [showPauseMenu, setShowPauseMenu] = useState(false);
-    const [activePause, setActivePause] = useState(null); // { type, reason, startTime, pauseId }
-    const [showResumeModal, setShowResumeModal] = useState(false);
-    const [completedPauses, setCompletedPauses] = useState([]); // Track finished pauses for timeline
-
     const router = useRouter();
+    const [currentStep, setCurrentStep] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState(null);
+    const [todaySchool, setTodaySchool] = useState(null);
+    const [manualMission, setManualMission] = useState(null);
+    const [journeyId, setJourneyId] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [error, setError] = useState(null);
+    const [noSchoolToday, setNoSchoolToday] = useState(false);
+    const [showBrief, setShowBrief] = useState(true);
+    const [checkInTimestamp, setCheckInTimestamp] = useState(null);
+    const [waitingForAux, setWaitingForAux] = useState(false);
+    const [auxFlowState, setAuxFlowState] = useState(null); // 'waiting' | 'checklist' | null
+    const [teacherFlowState, setTeacherFlowState] = useState(null); // 'waiting'
+    const [isTestMode, setIsTestMode] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [missionState, setMissionState] = useState(null); // Local reliable state
+    const [directOperationMode, setDirectOperationMode] = useState(false);
+    const [teacherCivicPanelOpen, setTeacherCivicPanelOpen] = useState(false);
+    const [teacherCivicPanelDismissed, setTeacherCivicPanelDismissed] = useState(false);
+    const [assistantCivicPanelDismissed, setAssistantCivicPanelDismissed] = useState(false);
 
-    useEffect(() => {
-        // Try to restore mission from localStorage on mount
-        const savedMission = localStorage.getItem('flyhigh_staff_mission');
-        const savedLogs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
-        const savedPause = localStorage.getItem('flyhigh_active_pause');
-        const savedCompletedPauses = JSON.parse(localStorage.getItem('flyhigh_completed_pauses') || '[]');
+    const profileRef = useRef(profile);
+    const missionStateRef = useRef(missionState);
+    const checkInRef = useRef(checkInTimestamp);
+    const currentStepRef = useRef(currentStep);
+    const isPilotLockedRef = useRef(false);
+    const todaySchoolRef = useRef(todaySchool);
+    const showBriefRef = useRef(showBrief);
+    const waitingForAuxRef = useRef(waitingForAux);
+    const auxFlowStateRef = useRef(auxFlowState);
+    const teacherFlowStateRef = useRef(teacherFlowState);
+    const teacherCivicPanelOpenRef = useRef(teacherCivicPanelOpen);
+    const teacherCivicPanelDismissedRef = useRef(teacherCivicPanelDismissed);
+    const assistantCivicPanelDismissedRef = useRef(assistantCivicPanelDismissed);
 
-        if (savedMission) {
-            try {
-                setCurrentMission(JSON.parse(savedMission));
-                setFlightLogs(savedLogs);
-            } catch (e) {
-                console.error("Failed to restore mission", e);
-            }
-        }
+    // ── Dependency Transition Overlay ──
+    const { overlayData, triggerTransition } = useDependencyTransition();
+    const prevMissionStateRef = useRef(missionState);
+    useEffect(() => { prevMissionStateRef.current = missionState; }, [missionState]);
 
-        // Restore active pause if exists
-        if (savedPause) {
-            try {
-                setActivePause(JSON.parse(savedPause));
-            } catch (e) {
-                console.error("Failed to restore pause", e);
-            }
-        }
+    useEffect(() => { profileRef.current = profile; }, [profile]);
+    useEffect(() => { missionStateRef.current = missionState; }, [missionState]);
+    useEffect(() => { checkInRef.current = checkInTimestamp; }, [checkInTimestamp]);
+    useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
+    useEffect(() => { todaySchoolRef.current = todaySchool; }, [todaySchool]);
+    useEffect(() => { showBriefRef.current = showBrief; }, [showBrief]);
+    useEffect(() => { waitingForAuxRef.current = waitingForAux; }, [waitingForAux]);
+    useEffect(() => { auxFlowStateRef.current = auxFlowState; }, [auxFlowState]);
+    useEffect(() => { teacherFlowStateRef.current = teacherFlowState; }, [teacherFlowState]);
+    useEffect(() => { teacherCivicPanelOpenRef.current = teacherCivicPanelOpen; }, [teacherCivicPanelOpen]);
+    useEffect(() => { teacherCivicPanelDismissedRef.current = teacherCivicPanelDismissed; }, [teacherCivicPanelDismissed]);
+    useEffect(() => { assistantCivicPanelDismissedRef.current = assistantCivicPanelDismissed; }, [assistantCivicPanelDismissed]);
 
-        // Restore completed pauses
-        setCompletedPauses(savedCompletedPauses);
+    const buildListenerSnapshot = useCallback((overrides = {}) => {
+        const missionInfo = todaySchoolRef.current || Object.create(null);
 
-        setIsRestoring(false);
+        return {
+            profileRole: profileRef.current?.role || null,
+            showBrief: showBriefRef.current,
+            currentStep: currentStepRef.current,
+            currentCheckIn: Boolean(checkInRef.current),
+            missionState: missionStateRef.current,
+            waitingForAux: waitingForAuxRef.current,
+            auxFlowState: auxFlowStateRef.current,
+            teacherFlowState: teacherFlowStateRef.current,
+            missionMeta: missionInfo.meta,
+            arrivalPhotoTakenAt: missionInfo.arrival_photo_taken_at || null,
+            teacherCivicPanelOpen: teacherCivicPanelOpenRef.current,
+            teacherCivicPanelDismissed: teacherCivicPanelDismissedRef.current,
+            assistantCivicPanelDismissed: assistantCivicPanelDismissedRef.current,
+            ...overrides
+        };
     }, []);
 
-    // Keep session alive with periodic refresh + reconnection handler
+    // ── [FORTRESS] Stabilize Pilot Lock status via Ref ──
+    useEffect(() => {
+        const lockValue = shouldLockPilot(
+            profile?.role,
+            missionState,
+            todaySchool?.meta,
+            todaySchool?.arrival_photo_taken_at
+        );
+        if (lockValue !== isPilotLockedRef.current) {
+            console.log(`🛡️ Fortress Lock Toggle: ${lockValue} (State: ${missionState}, Role: ${profile?.role})`);
+            isPilotLockedRef.current = lockValue;
+        }
+    }, [profile, todaySchool, missionState]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleOpenCivicParallel = (event) => {
+            const eventJourneyId = event?.detail?.journeyId;
+            if (eventJourneyId && String(eventJourneyId) !== String(journeyId)) return;
+            if (profileRef.current?.role !== 'teacher') return;
+
+            setTeacherCivicPanelOpen(true);
+            setTeacherCivicPanelDismissed(false);
+        };
+
+        window.addEventListener('flyhigh:civic:open', handleOpenCivicParallel);
+        return () => window.removeEventListener('flyhigh:civic:open', handleOpenCivicParallel);
+    }, [journeyId]);
+
+    useEffect(() => {
+        const meta = parseMeta(todaySchool?.meta);
+        const civicInProgress = meta.civic_parallel_status === 'in_progress';
+
+        if (!civicInProgress) {
+            setTeacherCivicPanelOpen(false);
+            setTeacherCivicPanelDismissed(false);
+            setAssistantCivicPanelDismissed(false);
+        }
+    }, [todaySchool?.meta]);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // ── REUSABLE FETCH FUNCTION (For Manual Refresh) ──
+    const refreshMission = useCallback(async () => {
+        // If we don't have a userId yet, we can't do much (unless we rely on implicit triggers)
+        // But for manual refresh, we expect userId to be set.
+        if (!userId) return;
+
+        setLoading(true);
+        console.log('🔄 Refreshing Mission Data...');
+
+        try {
+            const supabase = createClient();
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+            // 1. Get School
+            const { data: scheduled } = await supabase
+                .from('proximas_escuelas')
+                .select('*')
+                .eq('fecha_programada', today)
+                .in('estatus', ['pendiente', 'en_progreso'])
+                .order('id', { ascending: false })
+                .limit(1);
+
+            if (scheduled && scheduled.length > 0) {
+                const school = scheduled[0];
+                // Fetch staff names
+                const staffIds = [school.pilot_id, school.teacher_id, school.aux_id].filter(Boolean);
+                let staffMap = {};
+
+                if (staffIds.length > 0) {
+                    const { data: profiles } = await supabase
+                        .from('staff_profiles')
+                        .select('user_id, full_name')
+                        .in('user_id', staffIds);
+
+                    if (profiles) {
+                        profiles.forEach(p => {
+                            staffMap[p.user_id] = p.full_name;
+                        });
+                    }
+                }
+
+                const schoolData = {
+                    id: school.id,
+                    school_name: school.nombre_escuela,
+                    colonia: school.colonia,
+                    fecha: school.fecha_programada,
+                    // ID Data for Realtime Logic
+                    pilot_id: school.pilot_id,
+                    teacher_id: school.teacher_id,
+                    aux_id: school.aux_id,
+                    // Name Data for UI
+                    pilot_name: staffMap[school.pilot_id] || 'Por asignar',
+                    teacher_name: staffMap[school.teacher_id] || 'Por asignar',
+                    aux_name: staffMap[school.aux_id] || 'Por asignar',
+                };
+
+                setTodaySchool(schoolData);
+                localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
+                setNoSchoolToday(false);
+
+                // 2. Get Journey
+                const { data: journeyData } = await supabase
+                    .from('staff_journeys')
+                    .select('id, mission_state, meta, status, arrival_photo_taken_at')
+                    .eq('date', today)
+                    .eq('school_id', school.id)
+                    .single();
+
+                if (journeyData) {
+                    setJourneyId(journeyData.id);
+                    const state = journeyData.mission_state;
+                    const meta = parseMeta(journeyData.meta);
+
+                    setMissionState(state);
+                    setTodaySchool(prev => ({
+                        ...prev,
+                        meta,
+                        arrival_photo_taken_at: journeyData.arrival_photo_taken_at || null
+                    }));
+
+                    // ── [NEW] Fetch Active Staff Participants (via Check-ins AND Presence) ──
+
+                    // 1. Register SELF as Present immediately
+                    if (profile && journeyData.id) {
+                        await supabase
+                            .from('staff_presence')
+                            .upsert({
+                                user_id: profile.user_id,
+                                journey_id: journeyData.id,
+                                role: profile.role,
+                                is_online: true,
+                                last_seen_at: new Date().toISOString()
+                            }, { onConflict: 'user_id' });
+                    }
+
+                    // 2. Fetch Check-ins (for status)
+                    const { data: checkIns } = await supabase
+                        .from('staff_prep_events')
+                        .select('user_id, created_at')
+                        .eq('journey_id', journeyData.id)
+                        .eq('event_type', 'checkin');
+
+                    // 3. Fetch Presence (for names even before check-in)
+                    const { data: presenceList } = await supabase
+                        .from('staff_presence')
+                        .select('user_id, role')
+                        .eq('journey_id', journeyData.id);
+
+                    // Combine unique User IDs
+                    const checkInIds = checkIns?.map(c => c.user_id) || [];
+                    const presenceIds = presenceList?.map(p => p.user_id) || [];
+                    const allParticipantIds = [...new Set([...checkInIds, ...presenceIds])];
+
+                    // Add CURRENT USER explicitly if not in list (to ensure local display works instantly)
+                    if (userId && !allParticipantIds.includes(userId)) {
+                        allParticipantIds.push(userId);
+                    }
+
+                    let staffMap = {};
+
+                    if (allParticipantIds.length > 0) {
+                        const { data: profiles } = await supabase
+                            .from('staff_profiles')
+                            .select('user_id, full_name, role')
+                            .in('user_id', allParticipantIds);
+
+                        if (profiles) {
+                            profiles.forEach(p => {
+                                staffMap[p.role] = { name: p.full_name, id: p.user_id };
+                            });
+                        }
+                    }
+
+                    // Force Self-Correction if staffMap missing current user due to race condition
+                    if (profile && !staffMap[profile.role]) {
+                        staffMap[profile.role] = { name: profile.full_name, id: profile.user_id };
+                    }
+
+                    // Update schoolData with discovered participants
+                    setTodaySchool(prev => ({
+                        ...prev,
+                        pilot_name: staffMap.pilot?.name || prev?.pilot_name || 'Por asignar',
+                        teacher_name: staffMap.teacher?.name || prev?.teacher_name || 'Por asignar',
+                        aux_name: staffMap.assistant?.name || prev?.aux_name || 'Por asignar',
+                        pilot_id: staffMap.pilot?.id,
+                        teacher_id: staffMap.teacher?.id,
+                        aux_id: staffMap.assistant?.id || prev?.aux_id
+                    }));
+
+                    if (profile?.role === 'pilot') {
+                        const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(state, meta);
+
+                        if (pilotNeedsControllerConnect) {
+                            setWaitingForAux(false);
+                        } else if (PILOT_WAITING_FOR_AUX_STATES.has(state)) {
+                            setWaitingForAux(true);
+                        } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed') {
+                            setWaitingForAux(false);
+                        }
+                    }
+
+                    if (profile?.role === 'assistant') {
+                        if (state === 'WAITING_AUX_VEHICLE_CHECK') {
+                            setAuxFlowState('checklist');
+                        } else if (['AUX_VEHICLE_CHECK_DONE', 'OPERATION', 'ROUTE_READY', 'IN_ROUTE'].includes(state)) {
+                            setAuxFlowState(null);
+                        } else {
+                            setAuxFlowState(null);
+                        }
+                    }
+
+                    // Determine Step based on State (LOCAL GATING APPLIED)
+                    // We must use the just-fetched checkInEvent to decide.
+                    // The variable 'checkInAvailable' will track if this user has checked in.
+                    let checkInAvailable = false;
+
+                    // Logic to find checkInEvent is further down in original code (loop issue),
+                    // but we need it HERE to decide step.
+                    // Let's look at checkIns array fetched above (line 159).
+                    if (checkIns && checkIns.find(c => c.user_id === userId)) {
+                        checkInAvailable = true;
+                    }
+
+                    if (checkInAvailable) {
+                        if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
+                            setCurrentStep(0);
+                        } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
+                            setCurrentStep(1); // En Ruta (and Post-Arrival subflow)
+                        } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation'].includes(state)) {
+                            setCurrentStep(2); // Operation
+                        } else if (['report', 'closed'].includes(state) || journeyData.status === 'report') {
+                            setCurrentStep(3); // Report
+                        }
+                    } else {
+                        // If NOT checked in, we stay at default (MissionBrief / Prep)
+                        // Actually, if not checked in, showBrief defaults to true?
+                        // We do NOT set currentStep to 1 or 2 here.
+                        // We might set it to 0 as base.
+                        setCurrentStep(0);
+                        console.log('🔒 User not checked in locally. Staying at Step 0/Brief.');
+                    }
+
+                } else {
+                    const { data: newJourney, error: insertError } = await supabase
+                        .from('staff_journeys')
+                        .insert({
+                            date: today,
+                            school_id: school.id,
+                            school_name: school.nombre_escuela,
+                            created_by: userId,
+                            status: 'prep'
+                        })
+                        .select('id')
+                        .single();
+
+                    if (insertError) {
+                        // If it fails for ANY reason (likely race condition or constraint), try fetching existing
+                        console.warn('⚠️ Journey insert failed (Race condition likely). Fetching existing ID...', insertError);
+                        const { data: existing } = await supabase
+                            .from('staff_journeys')
+                            .select('id')
+                            .eq('date', today)
+                            .eq('school_id', school.id)
+                            .single();
+
+                        if (existing) {
+                            setJourneyId(existing.id);
+                        } else {
+                            console.error('❌ Critical: Could not create nor find journey:', insertError);
+                        }
+                    } else if (newJourney) {
+                        setJourneyId(newJourney.id);
+                    }
+                }
+
+                // 3. Check for Check-in
+                if (journeyData || journeyId) {
+                    const jId = journeyData?.id || journeyId;
+                    if (jId) {
+                        const { data: checkInRows, error: checkInError } = await supabase
+                            .from('staff_prep_events')
+                            .select('payload, created_at')
+                            .eq('journey_id', jId)
+                            .eq('event_type', 'checkin')
+                            .eq('user_id', userId) // CRITICAL FIX: Only user's own check-in!
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+
+                        if (checkInError) {
+                            console.warn('Check-in query fallback (non-blocking):', checkInError);
+
+                            const inferredState = journeyData?.mission_state || todaySchoolRef.current?.mission_state || null;
+                            const isOperationalFlowState = LISTENER_STEP_ONE_STATES.has(inferredState) || inferredState === 'report' || inferredState === 'closed';
+
+                            if (isOperationalFlowState || checkInRef.current) {
+                                setShowBrief(false);
+                            } else {
+                                setCheckInTimestamp(null);
+                                setShowBrief(true);
+                            }
+
+                            return;
+                        }
+
+                        const checkInEvent = Array.isArray(checkInRows) && checkInRows.length > 0
+                            ? checkInRows[0]
+                            : null;
+
+                        if (checkInEvent) {
+                            const checkInTs = checkInEvent?.payload?.timestamp || checkInEvent?.created_at || new Date().toISOString();
+                            setCheckInTimestamp(checkInTs);
+                            setTodaySchool(prev => ({ ...prev, checkInTimestamp: checkInTs }));
+                            setShowBrief(false);
+                        } else {
+                            const inferredState =
+                                journeyData?.mission_state ||
+                                todaySchoolRef.current?.mission_state ||
+                                missionStateRef.current ||
+                                null;
+                            const isOperationalFlowState =
+                                LISTENER_STEP_ONE_STATES.has(inferredState) ||
+                                inferredState === 'OPERATION' ||
+                                inferredState === 'operation' ||
+                                inferredState === 'report' ||
+                                inferredState === 'closed';
+
+                            if (isOperationalFlowState || checkInRef.current) {
+                                setShowBrief(false);
+                            } else {
+                                // Explicitly clear checking state only if user is really still pre-checkin
+                                setCheckInTimestamp(null);
+                                setShowBrief(true);
+                            }
+                        }
+                    }
+                }
+
+            } else {
+                setNoSchoolToday(true);
+                localStorage.removeItem('flyhigh_staff_mission');
+                setTodaySchool(null);
+            }
+        } catch (error) {
+            console.error('Error refreshing mission:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [userId, profile]); // Removed journeyId from dependencies to avoid loop
+
+    // ── INITIALIZATION ──
+    useEffect(() => {
+        const init = async () => {
+            console.log('🚀 Dashboard: Init started');
+            try {
+                // ── PRIORITY: CHECK TEST MODE FIRST ──
+                if (typeof window !== 'undefined') {
+                    const testConfigStr = sessionStorage.getItem('flyhigh_test_mode');
+                    if (testConfigStr) {
+                        try {
+                            const testConfig = JSON.parse(testConfigStr);
+                            if (testConfig.active) {
+                                console.log('🔹 MODO TEST DETECTADO:', testConfig);
+                                setIsTestMode(true);
+                                const mockRole = testConfig.role || 'pilot';
+                                let finalProfile = testConfig.impersonatedProfile || {
+                                    id: mockRole === 'pilot' ? 'test-pilot-id' : 'test-assistant-id',
+                                    role: mockRole,
+                                    full_name: `Operativo ${mockRole.toUpperCase()} (Test)`,
+                                    is_active: true
+                                };
+                                finalProfile = { ...finalProfile, id: finalProfile.role === 'pilot' ? 'test-pilot-id' : 'test-assistant-id' };
+                                setProfile(finalProfile);
+                                setUserId(finalProfile.id);
+                                const testJourney = await ensureTestJourney(finalProfile.id, finalProfile.role);
+                                setJourneyId(TEST_JOURNEY_ID);
+                                setLoading(false);
+                                return;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing test mode config:', e);
+                        }
+                    }
+                }
+
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    router.push('/staff/login');
+                    return;
+                }
+                setUserId(user.id);
+
+                const { data: profileData, error: profileError } = await supabase
+                    .from('staff_profiles')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (profileError || !profileData || !profileData.is_active) {
+                    setError('Perfil no encontrado o inactivo.');
+                    setLoading(false);
+                    return;
+                }
+                setProfile(profileData);
+
+            } catch (e) {
+                console.error('Init error:', e);
+                setError('Error al inicializar.');
+            }
+        };
+        init();
+    }, [router]);
+
+    // Trigger Refresh when User/Profile is ready
+    useEffect(() => {
+        if (userId && profile && !journeyId) { // Only auto-refresh if journeyId not set yet
+            refreshMission();
+        }
+    }, [userId, profile, journeyId, refreshMission]);
+
+    // ── GLOBAL RESET LISTENER ──
+    useEffect(() => {
+        if (!journeyId) return;
+        const supabase = createClient();
+        console.log('🔌 Listening for Global Resets on journey:', journeyId);
+
+        const channel = supabase
+            .channel(`global_reset_${journeyId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen for UPDATE and DELETE
+                    schema: 'public',
+                    table: 'staff_journeys',
+                    filter: `id=eq.${journeyId}`
+                },
+                (payload) => {
+                    console.log('🔄 Global Reset/Update Check:', payload);
+
+                    // Case 1: Journey Reset via Update (Legacy/Alternative)
+                    if (payload.eventType === 'UPDATE') {
+                        // [PHASE 12-B] Closure Safety using Refs
+                        const currentProfile = profileRef.current;
+                        const currentCheckIn = checkInRef.current;
+                        const missionInfo = todaySchoolRef.current;
+
+                        const newState = payload.new.mission_state;
+                        const incomingMeta = parseMeta(payload.new?.meta);
+                        const incomingArrivalPhotoTakenAt = payload.new?.arrival_photo_taken_at || null;
+
+                        const beforeSnapshot = buildListenerSnapshot();
+                        const afterSnapshot = projectSnapshotForRealtimeUpdate(
+                            beforeSnapshot,
+                            newState,
+                            incomingMeta,
+                            incomingArrivalPhotoTakenAt
+                        );
+
+                        const beforeVisibleTaskKey = getVisibleTaskKey(beforeSnapshot);
+                        const afterVisibleTaskKey = getVisibleTaskKey(afterSnapshot);
+                        setMissionState(newState); // Keep local state in sync
+
+                        // ── Dependency Transition Overlay ──
+                        const transitionCopy = getTransitionCopy(
+                            newState,
+                            prevMissionStateRef.current,
+                            currentProfile?.role,
+                            {
+                                pilot_name: missionInfo?.pilot_name,
+                                teacher_name: missionInfo?.teacher_name,
+                                aux_name: missionInfo?.aux_name,
+                            }
+                        );
+
+                        const hasEnteredOperationalFlow = showBriefRef.current === false;
+                        const hasVisibleTaskChange = beforeVisibleTaskKey !== afterVisibleTaskKey;
+
+                        if (transitionCopy && hasEnteredOperationalFlow && hasVisibleTaskChange) {
+                            triggerTransition(transitionCopy);
+                            console.log('🔔 Dependency overlay fired (visible task changed).', {
+                                prevState: prevMissionStateRef.current,
+                                newState,
+                                beforeVisibleTaskKey,
+                                afterVisibleTaskKey,
+                                transitionKey: transitionCopy.transitionKey
+                            });
+                        } else if (transitionCopy) {
+                            console.log('ℹ️ Dependency overlay skipped.', {
+                                prevState: prevMissionStateRef.current,
+                                newState,
+                                hasEnteredOperationalFlow,
+                                hasVisibleTaskChange,
+                                beforeVisibleTaskKey,
+                                afterVisibleTaskKey,
+                                transitionKey: transitionCopy.transitionKey
+                            });
+                        }
+
+                        prevMissionStateRef.current = newState;
+
+                        // [PHASE 12-B] Real-time Meta Updates
+                        if (payload.new) {
+                            setTodaySchool(prev => {
+                                if (!prev) return prev;
+                                const next = payload.new;
+
+                                return {
+                                    ...prev,
+                                    ...next,
+                                    meta: incomingMeta
+                                };
+
+                            });
+                        }
+
+                        if (['PILOT_PREP', 'prep'].includes(newState)) {
+                            console.warn('⚠️ Global Reset (State Change) Detected! Reloading...');
+                            clearJourneyLocalOperationalData(journeyId);
+                            window.location.reload();
+                        }
+
+                        // Auto-advance logic (LOCAL GATING ADDED)
+                        // Auto-advance logic (LOCAL GATING WITH META CHECK)
+                        if (currentCheckIn) {
+                            if (currentProfile?.role === 'pilot') {
+                                const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(newState, incomingMeta);
+
+                                if (pilotNeedsControllerConnect) {
+                                    setWaitingForAux(false);
+                                } else if (PILOT_WAITING_FOR_AUX_STATES.has(newState)) {
+                                    setWaitingForAux(true);
+                                } else if (LISTENER_STEP_ONE_STATES.has(newState) || newState === 'report') {
+                                    setWaitingForAux(false);
+                                }
+                            }
+
+                            const isPilotLocked = shouldLockPilot(
+                                currentProfile?.role,
+                                newState,
+                                incomingMeta,
+                                incomingArrivalPhotoTakenAt
+                            );
+
+                            if (isPilotLocked) {
+                                console.log('🛡️ Fortress Gating: Navigation BLOCKED in listener for Pilot.', {
+                                    state: newState,
+                                    pilot_ready: isPilotReady(incomingMeta, incomingArrivalPhotoTakenAt),
+                                    meta: incomingMeta
+                                });
+
+                                // Allow initial step advancement from Brief to Prep
+                                if (currentStepRef.current < 1) {
+                                    setCurrentStep(1);
+                                }
+                                // No other transitions allowed (Step 2/3 blocked until pilot_ready = true)
+                                return;
+                            }
+
+
+                            // If the mission has advanced to any post-checklist state, move to Step 1
+                            if (LISTENER_STEP_ONE_STATES.has(newState)) {
+                                if (currentStepRef.current < 1) {
+                                    setCurrentStep(1);
+                                }
+                                setAuxFlowState(null);
+                                setTeacherFlowState(null);
+                            }
+
+                            // Advance to Step 2 (Operation)
+                            if (['OPERATION'].includes(newState)) {
+                                setCurrentStep(2);
+                            }
+
+                            if (['report'].includes(newState)) setCurrentStep(3);
+                        } else {
+                            console.log('⛔ Global update received but ignored for navigation - Waiting for local Check-in.');
+                        }
+                    }
+
+                    // Case 2: Journey DELETED (Real School Reset)
+                    // If the journey is deleted, we reload. 
+                    // Since the school still exists (for real missions), the app will reload, 
+                    // find the school, see no journey, and start fresh (or create new journey).
+                    if (payload.eventType === 'DELETE') {
+                        console.warn('⚠️ Current Journey Deleted! Reloading to reset...');
+                        // Optional: Clear local storage if we want to force a full re-fetch
+                        clearJourneyLocalOperationalData(journeyId);
+                        localStorage.removeItem('flyhigh_staff_mission');
+                        window.location.reload();
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [journeyId, triggerTransition, buildListenerSnapshot]);
+
+    // ── [NEW] SCHOOL ASSIGNMENT LISTENER (For Demo Mode) ──
+    useEffect(() => {
+        // Only listen if we don't have a school yet, OR if we want to switch to demo dynamically
+        const supabase = createClient();
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+        console.log('📡 Listening for School Assignments for:', today);
+
+        const channel = supabase
+            .channel('school_assignments')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // INSERT, UPDATE, DELETE
+                    schema: 'public',
+                    table: 'proximas_escuelas'
+                    // FILTER REMOVED: catch all events to ensure reliability
+                },
+                (payload) => {
+                    console.log('🔔 Raw School Update Received:', payload);
+
+                    // 1. HANDLE INSERT / UPDATE
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                        const newSchool = payload.new;
+                        // Client-side Date Check
+                        if (newSchool.fecha_programada === today && newSchool.estatus === 'pendiente') {
+                            const schoolData = {
+                                id: newSchool.id,
+                                school_name: newSchool.nombre_escuela,
+                                colonia: newSchool.colonia,
+                                fecha: newSchool.fecha_programada,
+                            };
+                            console.log('✨ Auto-assigning new school (Sync):', schoolData);
+                            setTodaySchool(schoolData);
+                            localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
+                            setNoSchoolToday(false);
+                            refreshMission();
+                        }
+                    }
+
+                    // 2. HANDLE DELETE (Global Reset)
+                    if (payload.eventType === 'DELETE') {
+                        console.warn('🗑️ Global Reset (Delete Event) detected.');
+                        // For safety, if WE are seeing a mission, and A mission was deleted, we reload.
+                        // Ideally we check ID, but payload.old might be empty depending on Supabase config.
+                        // Given the use case (one mission per day usually), a reload is safe.
+
+                        const deletedId = payload.old?.id;
+                        const currentId = todaySchool?.id || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}').id : null);
+
+                        // Loose check: If we have ANY mission, and a mission was deleted, assume it's ours or a reset
+                        // especially if deletedId matches OR is the known demo ID
+                        if (currentId) {
+                            console.log('Testing Delete match:', deletedId, currentId);
+                            if (!deletedId || String(deletedId) === String(currentId) || String(deletedId) === '999999') {
+                                console.log('✅ Match confirmed. Reloading...');
+                                localStorage.removeItem('flyhigh_staff_mission');
+                                localStorage.removeItem('flyhigh_test_mode');
+                                setTodaySchool(null);
+                                setNoSchoolToday(true);
+                                setJourneyId(null);
+                                window.location.reload();
+                            }
+                        }
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [refreshMission]);
+
+    // Session refresh
     useEffect(() => {
         const supabase = createClient();
-
-        // Refresh session immediately on mount
         supabase.auth.refreshSession();
 
-        // Refresh session every 10 minutes to prevent expiry
-        const intervalId = setInterval(() => {
+        const interval = setInterval(() => {
             if (navigator.onLine) {
-                supabase.auth.refreshSession().then(({ error }) => {
-                    if (error) console.warn("Session refresh failed:", error);
-                    else console.log("Session refreshed successfully");
-                });
+                supabase.auth.refreshSession();
             }
-        }, 10 * 60 * 1000); // 10 minutes
+        }, 10 * 60 * 1000);
 
-        // Refresh session immediately when internet connection is restored
-        const handleOnline = () => {
-            console.log("🌐 Conexión restaurada. Refrescando sesión...");
-            supabase.auth.refreshSession().then(({ error }) => {
-                if (error) {
-                    console.warn("Session refresh after reconnect failed:", error);
-                } else {
-                    console.log("✅ Sesión refrescada exitosamente tras reconexión");
-                }
-            });
-        };
-
-        window.addEventListener('online', handleOnline);
-
-        return () => {
-            clearInterval(intervalId);
-            window.removeEventListener('online', handleOnline);
-        };
+        return () => clearInterval(interval);
     }, []);
-
-    const handleSelectMission = (mission) => {
-        setCurrentMission(mission);
-        localStorage.setItem('flyhigh_staff_mission', JSON.stringify(mission));
-        // Load logs for this mission potentially? For now simple local storage.
-    };
 
     const handleLogout = async () => {
         const supabase = createClient();
         await supabase.auth.signOut();
         localStorage.removeItem('flyhigh_staff_mission');
         router.push('/staff/login');
+        router.refresh();
     };
 
-    const handleChangeSchool = () => {
-        if (confirm("¿Seguro que quieres cambiar de escuela?")) {
-            setCurrentMission(null);
-            localStorage.removeItem('flyhigh_staff_mission');
-            setShowMenu(false);
-        }
+    const handleExitTestMode = () => {
+        sessionStorage.removeItem('flyhigh_test_mode');
+        localStorage.removeItem('flyhigh_staff_mission');
+        // Clear cookie
+        document.cookie = "flyhigh_test_mode=; path=/; max-age=0";
+        window.location.href = '/staff/login';
     };
 
-    const handleCloseDay = () => {
-        router.push('/staff/closure');
-        setShowMenu(false);
-    };
+    const activateDirectOperationMode = useCallback(() => {
+        const activeRole = String(profileRef.current?.role || '').toLowerCase();
+        if (!['pilot', 'teacher', 'assistant', 'auxiliar'].includes(activeRole)) return;
 
-    const handleOpenPauseMenu = () => {
-        setShowMenu(false);
-        setShowPauseMenu(true);
-    };
+        setDirectOperationMode(true);
+        setShowBrief(false);
+        setWaitingForAux(false);
+        setAuxFlowState(null);
+        setTeacherFlowState(null);
+        setTeacherCivicPanelOpen(false);
+        setCurrentStep(2);
 
-    const handleStartPause = async (pauseData) => {
-        // Sync pause start to DB
-        const result = await syncPauseStart({
-            ...pauseData,
-            mission_id: currentMission.id
-        });
+        console.log('🚀 Direct operation mode activated:', { role: activeRole });
+    }, []);
 
-        // Set active pause state
-        setActivePause({
-            type: pauseData.type,
-            reason: pauseData.reason,
-            startTime: new Date().toISOString(),
-            pauseId: result.pauseId || `local-${Date.now()}`
-        });
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
 
-        // Save to localStorage for persistence
-        localStorage.setItem('flyhigh_active_pause', JSON.stringify({
-            type: pauseData.type,
-            reason: pauseData.reason,
-            startTime: new Date().toISOString(),
-            pauseId: result.pauseId || `local-${Date.now()}`
-        }));
-    };
-
-    const handleRequestResume = () => {
-        setShowResumeModal(true);
-    };
-
-    const handleConfirmResume = async (resumeChecklist) => {
-        if (activePause?.pauseId) {
-            await syncPauseEnd(activePause.pauseId, resumeChecklist);
-        }
-
-        // Save completed pause to timeline (with mission_id for filtering)
-        const completedPause = {
-            ...activePause,
-            mission_id: currentMission?.id,
-            endTime: new Date().toISOString(),
-            resumeChecklist
+        const handleDirectOperation = (event) => {
+            const roleFromEvent = String(event?.detail?.role || profileRef.current?.role || '').toLowerCase();
+            if (!['pilot', 'teacher', 'assistant', 'auxiliar'].includes(roleFromEvent)) return;
+            activateDirectOperationMode();
         };
-        const updatedPauses = [...completedPauses, completedPause];
-        setCompletedPauses(updatedPauses);
-        localStorage.setItem('flyhigh_completed_pauses', JSON.stringify(updatedPauses));
 
-        // Clear active pause state
-        setActivePause(null);
-        setShowResumeModal(false);
-        localStorage.removeItem('flyhigh_active_pause');
-    };
+        window.addEventListener('flyhigh:direct-operation', handleDirectOperation);
+        return () => window.removeEventListener('flyhigh:direct-operation', handleDirectOperation);
+    }, [activateDirectOperationMode]);
 
-    const handleFlightComplete = async (data) => {
-        // 1. Save Local (Optimistic)
-        const existingLogs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
-        const newLog = {
-            ...data,
-            mission_id: currentMission.id,
-            mission_data: currentMission,
-            id: Date.now(),
-            synced: false
+    const handleManualMissionSelect = async (mission) => {
+        setManualMission(mission);
+        const missionData = {
+            id: mission.id,
+            school_name: mission.school_name || mission.nombre_escuela,
         };
-        const updatedLogs = [...existingLogs, newLog];
+        setTodaySchool(missionData);
+        // FIX: Persist to localStorage
+        localStorage.setItem('flyhigh_staff_mission', JSON.stringify(missionData));
+        setNoSchoolToday(false);
 
-        localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
-        setFlightLogs(updatedLogs);
+        // Crear jornada para misión manual
+        try {
+            const supabase = createClient();
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
 
-        // 2. Try Sync
-        if (navigator.onLine) {
-            const success = await syncFlightLog(newLog);
-            if (success) {
-                // Update local log to marked as synced
-                newLog.synced = true;
-                const syncedLogs = updatedLogs.map(l => l.id === newLog.id ? newLog : l);
-                localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
-                setFlightLogs(syncedLogs);
-            } else {
-                // Sync failed
-                alert("⚠️ AVISO: El vuelo se guardó en tu dispositivo, pero falló la sincronización con la nube.\n\nPosibles causas:\n1. No tienes internet.\n2. Tu sesión expiró (Modo Test sin login).\n\nPor favor, verifica tu conexión o vuelve a iniciar sesión si persiste.");
-            }
+            const { data: newJourney } = await supabase
+                .from('staff_journeys')
+                .upsert({
+                    date: today,
+                    school_id: mission.id,
+                    school_name: mission.school_name || mission.nombre_escuela,
+                    created_by: userId,
+                    status: 'prep'
+                }, { onConflict: 'date,school_id' })
+                .select('id')
+                .single();
+
+            if (newJourney) setJourneyId(newJourney.id);
+        } catch (e) {
+            console.warn('Error creando jornada manual:', e);
         }
     };
 
-    if (isRestoring) return null;
+    const handleCheckIn = () => {
+        setCheckInTimestamp(new Date().toISOString());
+        setCurrentStep(0); // Go to Prep Checklists
+        console.log('📍 CheckIn processed, moving to Step 0 (Prep)');
+    };
 
-    if (!currentMission) {
-        return (
-            <div className="py-6 animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
-                <MissionSelector onSelect={handleSelectMission} />
+    const handlePrepComplete = async () => {
+        console.log('✅ Dashboard: handlePrepComplete called', { isTestMode, role: profile?.role });
+        // Test Mode Logic -> Broadcast handled in component, we just update local state if needed
 
-                <div className="mt-12 text-center pb-8 border-t border-slate-100 pt-8 space-y-4">
-                    <button
-                        onClick={() => router.push('/staff/history')}
-                        className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm hover:bg-slate-50 transition-all"
-                    >
-                        <Clock size={18} /> Ver Historial de Misiones
-                    </button>
 
-                    <button onClick={handleLogout} className="text-sm text-slate-400 underline hover:text-slate-600 flex items-center justify-center gap-2 mx-auto p-4">
-                        <LogOut size={16} /> Cerrar Sesión Staff
-                    </button>
+        // Pilots: show waiting screen for aux to confirm vehicle loading
+        if (profile?.role === 'pilot') {
+            setWaitingForAux(true);
+        } else if (profile?.role === 'assistant') {
+            // Assistants go through their own flow (handled by auxFlowState)
+            setAuxFlowState('waiting');
+            // Do NOT advance step yet; waiting screen is part of Step 0 visual flow or overlay
+        } else if (profile?.role === 'teacher') {
+            setTeacherFlowState('waiting');
+        } else {
+            setCurrentStep(0); // Actually wait for state change
+        }
+        // Actualizar estado de jornada
+        if (journeyId) {
+            try {
+                const supabase = createClient();
+                const updates = {
+                    updated_at: new Date().toISOString()
+                };
+
+                // Pilot completing prep -> signal aux and teacher
+                if (profile?.role === 'pilot') {
+                    updates.mission_state = 'PILOT_READY_FOR_LOAD';
+                }
+
+                await supabase
+                    .from('staff_journeys')
+                    .update(updates)
+                    .eq('id', journeyId);
+            } catch (e) { console.warn('Error actualizando jornada:', e); }
+        }
+    };
+
+    // Handler for when aux vehicle checklist is done
+    const handleAuxVehicleCheckDone = async () => {
+        setAuxFlowState(null);
+        setMissionState('IN_ROUTE');
+        setCurrentStep(1); // En Ruta
+    };
+
+    // --- Gating Logic for Subflow ---
+    const canEnterPostArrival = (missionState) => {
+        // Only allow post-arrival views if the global state is ready AND we are largely in the right step.
+        // However, the main gating is actually: "Don't show Dropzone/Unload if local user hasn't finished Check-in/Prep".
+        // currentStep === 1 means we are functionally "En Ruta" or later in the stepper.
+        return true;
+        // Only allow post-arrival views if the global state is ready AND we are largely in the right step.
+        // However, the main gating is actually: "Don't show Dropzone/Unload if local user hasn't finished Check-in/Prep".
+        // currentStep === 1 means we are functionally "En Ruta" or later in the stepper.
+
+        // Critical: If missionState is 'waiting_dropzone' or 'unload', we typically want to show it.
+        // BUT, if the user refreshes, we must ensure they don't jump here if they were actually in PREP.
+        // `currentStep` handles the macro-phase. If currentStep < 1, we are in PREP.
+        // So checking `currentStep >= 1` is enough, which is implicit because we only render these screens if currentStep === 1.
+        return true;
+    };
+
+    // Handler when pilot is ready (from aux waiting screen)
+    const handlePilotReadyForAux = useCallback(() => {
+        console.log('🚀 Dashboard: Pilot ready signal received. Switching to checklist.');
+        setAuxFlowState('checklist');
+    }, []);
+
+    const handlePilotReadyForLoad = useCallback((nextMeta = null) => {
+        setWaitingForAux(true);
+        setCurrentStep(0);
+        setMissionState('PILOT_READY_FOR_LOAD');
+
+        if (nextMeta) {
+            const safeMeta = parseMeta(nextMeta);
+            setTodaySchool(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    meta: safeMeta
+                };
+            });
+        }
+    }, []);
+
+    const handleAuxConfirmed = () => {
+        setWaitingForAux(false);
+        // Pilot also waits for route start? No, pilot waits for En Ruta
+        // Actually if Aux finished, state is ROUTE_READY.
+        setCurrentStep(1);
+    };
+
+    const handleGoToReport = () => {
+        setDirectOperationMode(false);
+        setCurrentStep(3); // Report is step 3
+        if (journeyId) {
+            const supabase = createClient();
+            supabase.from('staff_journeys')
+                .update({ status: 'report', updated_at: new Date().toISOString() })
+                .eq('id', journeyId)
+                .then(() => { });
+        }
+    };
+
+    const handleReportComplete = async () => {
+        if (journeyId) {
+            try {
+                const supabase = createClient();
+                await supabase
+                    .from('staff_journeys')
+                    .update({ status: 'closed', updated_at: new Date().toISOString() })
+                    .eq('id', journeyId);
+            } catch (e) { console.warn('Error cerrando jornada:', e); }
+        }
+        router.push('/staff/login');
+    };
+
+    const withDependencyOverlay = (content) => (
+        <>
+            <DependencyTransitionOverlay overlayData={overlayData} />
+            {content}
+        </>
+    );
+
+    // --- Loading / Hydration Guard ---
+    if (!mounted || loading) {
+        return withDependencyOverlay(
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
+                    <p className="text-slate-500 font-medium">Cargando tu jornada...</p>
                 </div>
             </div>
         );
     }
 
-    return (
-        <div className="min-h-screen bg-slate-50 pb-20">
-            {/* Improved Sticky Header */}
-            <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 shadow-sm border-b border-slate-100 transition-all">
-                <div className="flex items-center justify-between px-4 py-3">
-                    <div className="flex-1 min-w-0 pr-2">
-                        <h1 className="text-base font-bold text-slate-900 leading-tight truncate">{currentMission.school_name}</h1>
-                        <p className="text-[10px] text-green-600 font-bold tracking-wide uppercase flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                            En Operación
-                        </p>
+    // --- Error ---
+    if (error) {
+        return withDependencyOverlay(
+            <div className="flex items-center justify-center min-h-[60vh] px-4">
+                <div className="max-w-sm text-center space-y-4">
+                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
+                    <p className="text-slate-700 font-medium">{error}</p>
+                    <button onClick={handleLogout} className="text-sm text-blue-500 underline">Cerrar sesión</button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- No school today → Fallback mission selector ---
+    if (noSchoolToday && showBrief && !directOperationMode) {
+        return withDependencyOverlay(
+            <div className="min-h-screen bg-slate-50">
+                <MissionBrief
+                    profile={profile}
+                    school={null}
+                    journeyId={null}
+                    userId={userId}
+                    onCheckedIn={() => { }}
+                    onLogout={handleLogout}
+                    onRefresh={refreshMission} // [NEW] Pass refresh handler
+                /* onComplete missing? No, not needed here */
+                />
+                {profile?.role === 'admin' && (
+                    <div className="max-w-lg mx-auto px-5 pb-10">
+                        <button
+                            onClick={() => { setShowBrief(false); }}
+                            className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50 transition-all"
+                        >
+                            Seleccionar misión manualmente
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Legacy manual selector (after admin clicks manual selection)
+    if (noSchoolToday && !showBrief && !directOperationMode) {
+        return withDependencyOverlay(
+            <div className="min-h-screen bg-slate-50 p-4">
+                <div className="max-w-md mx-auto space-y-6 pt-6">
+                    {profile && (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <User className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-slate-800">{profile.full_name}</p>
+                                    <p className="text-xs text-slate-500">{ROLE_LABELS[profile.role] || profile.role}</p>
+                                </div>
+                            </div>
+                            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500">
+                                <LogOut size={20} />
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                        <Calendar className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-semibold text-amber-800 text-sm">No hay escuela programada hoy</p>
+                            <p className="text-xs text-amber-600 mt-1">Selecciona una misión manualmente para continuar.</p>
+                        </div>
                     </div>
 
-                    <button
-                        onClick={() => setShowMenu(!showMenu)}
-                        className="p-2 -mr-2 text-slate-600 hover:bg-slate-100 rounded-full active:bg-slate-200"
-                    >
-                        <MoreVertical size={24} />
-                    </button>
+                    <MissionSelector onSelect={handleManualMissionSelect} />
                 </div>
+            </div>
+        );
+    }
 
-                {/* Dropdown Menu */}
-                {showMenu && (
-                    <div className="absolute top-full right-4 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                        <div className="p-2 space-y-1">
-                            <button
-                                onClick={handleOpenPauseMenu}
-                                className="w-full text-left px-4 py-3 hover:bg-amber-50 rounded-lg flex items-center gap-3 text-amber-600 text-sm font-medium"
-                            >
-                                <Pause size={18} /> Iniciar Pausa
-                            </button>
-                            <button
-                                onClick={handleChangeSchool}
-                                className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium"
-                            >
-                                <RotateCcw size={18} /> Cambiar Escuela
-                            </button>
-                            <button
-                                onClick={handleCloseDay}
-                                className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium"
-                            >
-                                <LogOut size={18} /> Cerrar Día / Misión
-                            </button>
-                            <button
-                                onClick={() => router.push('/staff/history')}
-                                className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium border-t border-slate-100"
-                            >
-                                <Clock size={18} /> Historial de Misiones
-                            </button>
+
+    // --- Mission Brief (first screen) ---
+    // If we haven't checked in OR if we are explicitly showing brief
+    if (showBrief && !manualMission && !directOperationMode) {
+        return withDependencyOverlay(
+            <>
+                <MissionBrief
+                    profile={profile}
+                    school={todaySchool}
+                    journeyId={journeyId}
+                    userId={userId}
+                    // If we found a journey with check-in event, pass timestamp
+                    existingCheckIn={todaySchool?.checkInTimestamp}
+                    onCheckedIn={() => setShowBrief(false)}
+                    onLogout={handleLogout}
+                    onRefresh={refreshMission} // [NEW] Pass refresh handler
+                /* onComplete? */
+                />
+            </>
+        );
+    }
+
+    if (directOperationMode && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
+        if (profile?.role === 'teacher') {
+            return withDependencyOverlay(
+                <StaffOperationLegacy
+                    initialMission={todaySchool}
+                    onCloseDay={handleGoToReport}
+                    hideMenu={false}
+                    useSyncHeader={true}
+                    startFromMissionSelector={true}
+                    journeyId={journeyId}
+                    userId={userId}
+                    profile={profile}
+                    missionState={missionState}
+                    onRefresh={refreshMission}
+                />
+            );
+        }
+
+        return withDependencyOverlay(
+            <OperationPanelConstructionScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+
+
+
+
+    // ── [SURGICAL PRIORITY #0] THE PILOT FORTRESS (Absolute Zero Bypass) ──
+    const pilotLockedFinal = shouldLockPilot(
+        profile?.role,
+        missionState,
+        todaySchool?.meta,
+        todaySchool?.arrival_photo_taken_at
+    );
+
+    // 🔍 DEBUG TEMPORAL - Ver estado del meta
+    if (profile?.role === 'pilot') {
+        const meta = parseMeta(todaySchool?.meta);
+        console.log('🔍 PILOT FORTRESS DEBUG:', {
+            missionState: missionState,
+            meta: meta,
+            pilot_ready: isPilotReady(meta, todaySchool?.arrival_photo_taken_at),
+            pilotLockedFinal: pilotLockedFinal,
+            todaySchool: todaySchool
+        });
+    }
+
+
+    const renderPilotFortressScreen = () => (
+        withDependencyOverlay(
+            <PilotPrepareFlightScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onPilotReadyForLoad={handlePilotReadyForLoad}
+                onRefresh={refreshMission}
+            />
+        )
+    );
+
+
+    if (pilotLockedFinal) {
+        console.log(`🛡️ FORTRESS RENDER: Pilot ${profile?.full_name} is locked. State: ${missionState}, MetaReady: ${isPilotReady(todaySchool?.meta, todaySchool?.arrival_photo_taken_at)}`);
+
+
+        // Final fallback: if somehow currentStep drifted to 2 or 3, snap it back to 1 (En Ruta shell)
+        if (currentStep > 1) {
+            console.warn('🛡️ Fortress Emergency: Snapping step back to 1.');
+            setCurrentStep(1);
+        }
+
+        return renderPilotFortressScreen();
+    }
+
+    // --- Pilot: Waiting for Aux to confirm vehicle loading ---
+    if (waitingForAux && profile?.role === 'pilot') {
+        return withDependencyOverlay(
+            <WaitingAuxLoad
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={{ ...todaySchool, profile, mission_state: missionState }}
+                onAuxReady={handleAuxConfirmed}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    // --- Assistant: Waiting for pilot OR doing vehicle checklist ---
+    if (profile?.role === 'assistant' && auxFlowState === 'waiting') {
+        return withDependencyOverlay(
+            <AuxWaitingScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={{ ...todaySchool, profile, mission_state: missionState }}
+                onPilotReady={handlePilotReadyForAux}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    if (profile?.role === 'assistant' && auxFlowState === 'checklist') {
+        return withDependencyOverlay(
+            <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+                {profile && journeyId && userId ? (
+                    <AuxVehicleChecklist
+                        journeyId={journeyId}
+                        userId={userId}
+                        onComplete={handleAuxVehicleCheckDone}
+                        missionInfo={{ ...todaySchool, profile, mission_state: missionState }}
+                        onRefresh={refreshMission}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-center text-slate-400">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                            Preparando carga de vehículo...
                         </div>
                     </div>
                 )}
             </div>
+        );
+    }
 
-            <div className="px-4 py-6 space-y-8 max-w-lg mx-auto">
-                <FlightLogger onFlightComplete={handleFlightComplete} disabled={!!activePause} />
+    if (profile?.role === 'teacher' && teacherFlowState === 'waiting') {
+        return withDependencyOverlay(
+            <TeacherWaitingScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={{ ...todaySchool, profile, mission_state: missionState }}
+                onRouteStarted={() => {
+                    setTeacherFlowState(null);
+                    setCurrentStep(1);
+                }}
+                onRefresh={refreshMission}
+            />
+        );
+    }
 
-                <div className="pt-4 border-t border-slate-200">
-                    <TodayFlightList
-                        flights={flightLogs}
-                        pauses={completedPauses.filter(p => p.mission_id === currentMission?.id)}
+    const parallelMeta = parseMeta(todaySchool?.meta);
+    const teacherCivicConfirmed = parallelMeta.teacher_civic_notified === true;
+    const civicParallelInProgress = parallelMeta.civic_parallel_status === 'in_progress';
+    const teacherCivicAudioStatus = String(parallelMeta.civic_parallel_teacher_audio_status || 'idle').trim().toLowerCase();
+    const teacherCivicStageLock = normalizeTeacherCivicStageLock(parallelMeta.civic_parallel_teacher_stage_lock);
+    const teacherCivicDone =
+        Boolean(parallelMeta.civic_parallel_teacher_done_at) ||
+        teacherCivicAudioStatus === 'uploaded';
+    const teacherCivicEvidenceInProgress =
+        !teacherCivicDone &&
+        TEACHER_CIVIC_LOCK_AUDIO_STATUSES.has(teacherCivicAudioStatus);
+    const shouldHoldTeacherInLockedStage =
+        profile?.role === 'teacher' &&
+        missionState === 'seat_deployment' &&
+        Boolean(teacherCivicStageLock) &&
+        teacherCivicEvidenceInProgress;
+    const assistantCivicStatus = parallelMeta.civic_parallel_aux_status || null;
+    const assistantNeedsCivicPanel =
+        civicParallelInProgress &&
+        (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
+
+    const shouldShowTeacherCivicParallel =
+        profile?.role === 'teacher' &&
+        teacherCivicConfirmed &&
+        parallelMeta.civic_parallel_use_legacy_panel === true &&
+        !teacherCivicDone &&
+        (teacherCivicPanelOpen || (civicParallelInProgress && !teacherCivicPanelDismissed));
+
+    const shouldShowAssistantCivicParallel =
+        profile?.role === 'assistant' &&
+        assistantNeedsCivicPanel &&
+        !assistantCivicPanelDismissed;
+
+    if (shouldShowTeacherCivicParallel) {
+        return withDependencyOverlay(
+            <TeacherCivicParallelScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+                onBackToTask={() => {
+                    setTeacherCivicPanelOpen(false);
+                    setTeacherCivicPanelDismissed(true);
+                }}
+            />
+        );
+    }
+
+    if (shouldShowAssistantCivicParallel) {
+        return withDependencyOverlay(
+            <AuxCivicEvidenceParallelScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+                onBackToTask={() => setAssistantCivicPanelDismissed(true)}
+            />
+        );
+    }
+
+    const operationKickoffMeta = parseMeta(todaySchool?.meta);
+    const operationKickoffActive =
+        missionState === 'seat_deployment' &&
+        operationKickoffMeta.global_glasses_done === true;
+    const shouldDeferOperationKickoffForTeacher =
+        profile?.role === 'teacher' &&
+        shouldHoldTeacherInLockedStage;
+
+    if (!shouldDeferOperationKickoffForTeacher && operationKickoffActive && operationKickoffMeta.operation_start_bridge_at) {
+        return withDependencyOverlay(
+            <OperationStartBridgeScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    if (!shouldDeferOperationKickoffForTeacher && operationKickoffActive) {
+        if (profile?.role === 'pilot') {
+            return withDependencyOverlay(
+                <PilotMusicAmbienceScreen
+                    journeyId={journeyId}
+                    userId={userId}
+                    role={profile?.role}
+                    profile={profile}
+                    missionInfo={todaySchool}
+                    missionState={missionState}
+                    onRefresh={refreshMission}
+                />
+            );
+        }
+
+        if (profile?.role === 'teacher') {
+            return withDependencyOverlay(
+                <TeacherOperationReadyScreen
+                    journeyId={journeyId}
+                    userId={userId}
+                    role={profile?.role}
+                    profile={profile}
+                    missionInfo={todaySchool}
+                    missionState={missionState}
+                    onRefresh={refreshMission}
+                />
+            );
+        }
+
+        if (profile?.role === 'assistant') {
+            return withDependencyOverlay(
+                <AuxOperationReadyScreen
+                    journeyId={journeyId}
+                    userId={userId}
+                    role={profile?.role}
+                    profile={profile}
+                    missionInfo={todaySchool}
+                    missionState={missionState}
+                    onRefresh={refreshMission}
+                />
+            );
+        }
+    }
+
+
+
+    // --- Step 1: En Ruta (y Subflujo Post-Llegada) ---
+    if (currentStep === 1) {
+        const pilotPostArrivalLock = shouldLockPilot(
+            profile?.role,
+            missionState,
+            todaySchool?.meta,
+            todaySchool?.arrival_photo_taken_at
+        );
+
+        // Helper to keep code clean
+        const commonProps = {
+            journeyId, userId, role: profile?.role, profile,
+            missionInfo: todaySchool, missionState,
+            onRefresh: refreshMission
+        };
+
+        // 1. Unload Phase (Global)
+        if (missionState === 'unload') {
+            if (pilotPostArrivalLock) {
+                return renderPilotFortressScreen();
+            }
+            return withDependencyOverlay(<UnloadScreen {...commonProps} />);
+        }
+
+        // 1.5. Post-unload coordination split (Aux + Teacher in parallel)
+        if (missionState === 'post_unload_coordination') {
+            if (pilotPostArrivalLock) {
+                return renderPilotFortressScreen();
+            }
+
+            if (profile?.role === 'pilot') {
+                return withDependencyOverlay(<SeatDeploymentScreen {...commonProps} missionState="seat_deployment" />);
+            }
+
+            if (profile?.role === 'assistant') {
+                return withDependencyOverlay(<AuxParkingVehicleScreen {...commonProps} />);
+            }
+
+            if (profile?.role === 'teacher') {
+                return withDependencyOverlay(<TeacherCivicNotificationScreen {...commonProps} />);
+            }
+
+            return withDependencyOverlay(<PilotOperationalWaitScreen {...commonProps} />);
+        }
+
+        // 1.6. Seat deployment (Global)
+        if (missionState === 'seat_deployment') {
+            if (pilotPostArrivalLock) {
+                return renderPilotFortressScreen();
+            }
+
+            const seatMeta = parseMeta(todaySchool?.meta);
+            const auxReady = seatMeta.aux_ready_seat_deployment === true;
+            const adWallDone = seatMeta.aux_ad_wall_done === true;
+            const teacherReady = seatMeta.teacher_civic_notified === true;
+            const seatDone = seatMeta.global_seat_deployment_done === true;
+            const headphonesDone = seatMeta.global_headphones_done === true;
+            const glassesDone = seatMeta.global_glasses_done === true;
+
+            if (profile?.role === 'teacher' && shouldHoldTeacherInLockedStage) {
+                if (teacherCivicStageLock === 'headphones') {
+                    return withDependencyOverlay(<HeadphonesSetupScreen {...commonProps} />);
+                }
+
+                if (teacherCivicStageLock === 'glasses') {
+                    return withDependencyOverlay(<GlassesSetupScreen {...commonProps} />);
+                }
+
+                return withDependencyOverlay(<SeatDeploymentScreen {...commonProps} missionState="seat_deployment" />);
+            }
+
+            if (profile?.role === 'assistant' && !auxReady) {
+                return withDependencyOverlay(<AuxParkingVehicleScreen {...commonProps} />);
+            }
+
+            if (profile?.role === 'assistant' && auxReady && !adWallDone) {
+                return withDependencyOverlay(<AuxAdWallInstallScreen {...commonProps} />);
+            }
+
+            if (profile?.role === 'teacher' && !teacherReady) {
+                return withDependencyOverlay(<TeacherCivicNotificationScreen {...commonProps} />);
+            }
+
+            if (seatDone && !headphonesDone) {
+                return withDependencyOverlay(<HeadphonesSetupScreen {...commonProps} />);
+            }
+
+            if (seatDone && headphonesDone && !glassesDone) {
+                return withDependencyOverlay(<GlassesSetupScreen {...commonProps} />);
+            }
+
+            return withDependencyOverlay(<SeatDeploymentScreen {...commonProps} />);
+        }
+
+        // 2. Waiting Dropzone Phase (Global)
+        if (missionState === 'waiting_dropzone') {
+            if (pilotPostArrivalLock) {
+                return renderPilotFortressScreen();
+            }
+
+            if (profile?.role === 'assistant') {
+                return withDependencyOverlay(
+                    <DropzoneActionScreen
+                        {...commonProps}
+                    />
+                );
+            } else {
+                return withDependencyOverlay(
+                    <DropzoneWaitingScreen
+                        {...commonProps}
+                        auxName={todaySchool?.aux_name}
+                    />
+                );
+            }
+        }
+
+        // 3. Unload Assignment Phase (Global)
+        if (missionState === 'waiting_unload_assignment') {
+            if (pilotPostArrivalLock) {
+                return renderPilotFortressScreen();
+            }
+
+            if (profile?.role === 'teacher') {
+                return withDependencyOverlay(
+                    <UnloadAssignmentActionScreen
+                        {...commonProps}
+                        missionInfo={todaySchool} // Ensure this has updated meta
+                    />
+                );
+            } else {
+                // Piloto protegido por Fortress Check (línea 895)
+                return withDependencyOverlay(
+                    <WaitingUnloadAssignmentScreen
+                        {...commonProps}
+                        missionInfo={todaySchool}
+                    />
+                );
+            }
+        }
+
+        // 4. Default: En Ruta / Teacher Waiting Logic (Pre-Arrival)
+        if (profile?.role === 'teacher') {
+            // Check if we are actually EN RUTA (traveling)
+            // If so, show the EnRutaScreen (Stitch UI) so teacher can Notify Arrival
+            if (missionState === 'IN_ROUTE' || missionState === 'ROUTE_IN_PROGRESS') {
+                return withDependencyOverlay(
+                    <div className="min-h-screen">
+                        <EnRutaScreen
+                            {...commonProps}
+                            onStateChange={(newState) => {
+                                // Teacher triggers 'waiting_dropzone' via ArrivalPhoto
+                                // EnRutaScreen handles internal logic but calls this to update parent
+                                setMissionState(newState);
+                            }}
+                        />
+                    </div>
+                );
+            }
+
+            // Otherwise (e.g. PILOT_READY_FOR_LOAD, AUX_CONTAINERS_DONE, ROUTE_READY), show waiting screen
+            // Teacher has their own waiting logic inside TeacherWaitingScreen
+            return withDependencyOverlay(
+                <TeacherWaitingScreen
+                    {...commonProps}
+                    onRouteStarted={() => {
+                        // Realtime listener handles updates
+                    }}
+                />
+            );
+        }
+
+        // 4. Default: En Ruta Screen (Pilot / Aux during travel)
+        return withDependencyOverlay(
+            <div className="min-h-screen">
+                <EnRutaScreen
+                    {...commonProps}
+                    onStateChange={(newState) => {
+                        setMissionState(newState);
+                        if (['ARRIVAL_PHOTO_DONE', 'OPERATION'].includes(newState)) {
+                            setCurrentStep(2);
+                        }
+                    }}
+                />
+            </div>
+        );
+    }
+
+    // --- Step 0: Prep Checklist (Pilot, Assistant & Teacher) ---
+    if (currentStep === 0 && (profile?.role === 'pilot' || profile?.role === 'assistant' || profile?.role === 'teacher')) {
+        return withDependencyOverlay(
+            <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+                {profile && journeyId && userId ? (
+                    <PrepChecklist
+                        role={profile.role}
+                        journeyId={journeyId}
+                        userId={userId}
+                        onComplete={handlePrepComplete}
+                        missionInfo={{ ...todaySchool, profile, mission_state: missionState }}
+                        preview={false} // Enable DB writes to Test Journey
+                        onRefresh={refreshMission}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-center text-slate-400">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                            Preparando jornada...
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (currentStep === 2 && profile?.role === 'teacher') {
+        return withDependencyOverlay(
+            <StaffOperationLegacy
+                initialMission={todaySchool}
+                onCloseDay={handleGoToReport}
+                hideMenu={false}
+                useSyncHeader={true}
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionState={missionState}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    if (currentStep === 2 && (profile?.role === 'pilot' || profile?.role === 'assistant')) {
+        return withDependencyOverlay(
+            <OperationPanelConstructionScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    // --- Main Stepper View ---
+    return withDependencyOverlay(
+        <div className="min-h-screen bg-slate-50">
+            {/* Test Mode Banner */}
+            {isTestMode && (
+                <div className="bg-amber-400 text-black px-4 py-2 flex items-center justify-between shadow-sm sticky top-0 z-50">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5" />
+                        <span className="font-bold text-sm">MODO TEST (REALTIME)</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={async () => {
+                                if (confirm('¿Reiniciar estado de la misión de prueba?')) {
+                                    await resetTestJourney();
+                                    window.location.reload();
+                                }
+                            }}
+                            className="bg-black/10 hover:bg-black/20 px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        >
+                            Reset
+                        </button>
+                        <button
+                            onClick={handleExitTestMode}
+                            className="bg-black/10 hover:bg-black/20 px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        >
+                            Salir
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Top Bar */}
+            <div className="bg-white border-b border-slate-100 px-4 py-3">
+                <div className="max-w-lg mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                        {currentStep > 0 && (
+                            <button onClick={() => setCurrentStep(s => Math.max(0, s - 1))} className="p-1 hover:bg-slate-100 rounded-full">
+                                <ChevronLeft size={20} className="text-slate-600" />
+                            </button>
+                        )}
+                        <div className="min-w-0">
+                            <p className="font-bold text-slate-900 truncate text-sm">{profile?.full_name}</p>
+                            <p className="text-[10px] text-slate-400">{ROLE_LABELS[profile?.role]} • {todaySchool?.school_name}</p>
+                        </div>
+                    </div>
+                    <HeaderHamburgerMenu
+                        journeyId={journeyId}
+                        schoolId={todaySchool?.id}
+                        role={profile?.role}
+                        onDemoStart={() => refreshMission()}
                     />
                 </div>
             </div>
 
-            {/* Overlay to close menu */}
-            {showMenu && (
-                <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)}></div>
+            {/* Stepper Indicator */}
+            <div className="bg-white border-b border-slate-100 px-4 py-3">
+                <div className="max-w-lg mx-auto flex items-center gap-2">
+                    {STEPS.map((step, idx) => {
+                        const Icon = step.icon;
+                        const isActive = idx === currentStep;
+                        const isCompleted = idx < currentStep;
+
+                        return (
+                            <div key={step.id} className="flex-1 flex flex-col items-center gap-1">
+                                <div className={`w-full h-1.5 rounded-full transition-colors ${isCompleted ? 'bg-green-500' : isActive ? 'bg-blue-500' : 'bg-slate-200'
+                                    }`} />
+                                <div className="flex items-center gap-1.5">
+                                    <Icon size={14} className={`${isCompleted ? 'text-green-500' : isActive ? 'text-blue-600' : 'text-slate-400'
+                                        }`} />
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isCompleted ? 'text-green-600' : isActive ? 'text-blue-600' : 'text-slate-400'
+                                        }`}>{step.label}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* School Info Bar */}
+            {todaySchool && (
+                <div className="bg-blue-50 border-b border-blue-100 px-4 py-2">
+                    <div className="max-w-lg mx-auto flex items-center gap-2 text-sm">
+                        <MapPin size={14} className="text-blue-500" />
+                        <span className="font-medium text-blue-700 truncate">{todaySchool.school_name}</span>
+                        {todaySchool.colonia && (
+                            <span className="text-blue-400 text-xs truncate">• {todaySchool.colonia}</span>
+                        )}
+                    </div>
+                </div>
             )}
 
-            {/* Pause Menu Modal */}
-            <PauseMenu
-                isOpen={showPauseMenu}
-                onClose={() => setShowPauseMenu(false)}
-                onStartPause={handleStartPause}
-            />
+            {/* Step Content */}
+            <div className="max-w-lg mx-auto px-4 py-6">
+                {/* PASO 1: Preparación (non-pilot roles) */}
+                {currentStep === 0 && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h2 className="text-xl font-bold text-slate-900 mb-1">Pre-Jornada</h2>
+                        <p className="text-sm text-slate-500 mb-6">Completa tu checklist antes de salir a campo.</p>
 
-            {/* Pause Active Overlay */}
-            {activePause && (
-                <PauseActiveOverlay
-                    pauseData={activePause}
-                    onRequestResume={handleRequestResume}
-                />
-            )}
+                        {profile && journeyId && userId && (
+                            <PrepChecklist
+                                role={profile.role}
+                                journeyId={journeyId}
+                                userId={userId}
+                                onComplete={handlePrepComplete}
+                                missionInfo={{ ...todaySchool, profile }}
+                                preview={false} // Enable DB writes to Test Journey
+                                onRefresh={refreshMission}
+                            />
+                        )}
 
-            {/* Resume Protocol Modal */}
-            <ResumeProtocolModal
-                isOpen={showResumeModal}
-                onClose={() => setShowResumeModal(false)}
-                onConfirmResume={handleConfirmResume}
-            />
+                        {!journeyId && (
+                            <div className="text-center py-8 text-slate-400">
+                                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                Preparando jornada...
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* PASO 2: En Ruta (Moved to Full Screen Above) */}
+
+                {/* PASO 3: Operación */}
+                {currentStep === 2 && (
+                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                        <StaffOperationLegacy
+                            initialMission={todaySchool}
+                            onCloseDay={handleGoToReport}
+                            hideMenu={false}
+                        />
+                    </div>
+                )}
+
+                {/* PASO 4: Reporte */}
+                {currentStep === 3 && (
+                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                        <ClosureLegacy journeyId={journeyId} onComplete={handleReportComplete} />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
