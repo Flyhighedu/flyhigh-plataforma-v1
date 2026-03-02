@@ -331,6 +331,13 @@ export default function MissionBriefUI({
                         </span>
                     </div>
                 </button>
+                <button
+                    onClick={() => onCheckIn({ force: true, bypass_reason: 'test_mode_remote' })}
+                    disabled={checking}
+                    className="mt-3 w-full text-center text-xs text-gray-400 underline"
+                >
+                    Modo Prueba: Forzar Check-in
+                </button>
             </div>
 
         </div>

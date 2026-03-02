@@ -741,6 +741,118 @@ export default function CheckoutScreen({
         }
     };
 
+    // ── TEMP: Force checkout bypass for remote testing ──
+    const handleForceCheckout = async () => {
+        if (!journeyId || isSubmitting || hasCurrentUserCheckedOut) return;
+        if (!TEAM_ROLES.includes(normalizedRole)) {
+            setFeedback('No fue posible validar tu rol operativo.');
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const supabase = createClient();
+            const now = new Date().toISOString();
+            const normalizedComment = checkoutComment.trim();
+            let actorUserId = isUuid(userId) ? String(userId).trim() : '';
+            if (!actorUserId && isUuid(profile?.user_id)) actorUserId = String(profile.user_id).trim();
+            if (!actorUserId) {
+                const { data: authData } = await supabase.auth.getUser();
+                if (isUuid(authData?.user?.id)) actorUserId = String(authData.user.id).trim();
+            }
+            const doneById = actorUserId || String(userId || '').trim() || null;
+
+            let existingCheckout = [];
+            if (actorUserId) {
+                const { data: existingRows } = await supabase
+                    .from('staff_prep_events').select('id')
+                    .eq('journey_id', journeyId).eq('event_type', 'checkout').eq('user_id', actorUserId).limit(1);
+                existingCheckout = existingRows || [];
+            }
+
+            if (actorUserId && existingCheckout.length === 0) {
+                await supabase.from('staff_prep_events').insert({
+                    journey_id: journeyId, user_id: actorUserId, event_type: 'checkout',
+                    payload: {
+                        role: normalizedRole, actor_name: actorName, timestamp: now,
+                        checkout_comment: normalizedComment || null,
+                        location: {
+                            distance: null, accuracy: null, radius: STAFF_CONFIG.GEOFENCE_RADIUS_METERS,
+                            office_lat: STAFF_CONFIG.OFFICE_LOCATION.lat, office_lng: STAFF_CONFIG.OFFICE_LOCATION.lng,
+                            bypass_reason: 'test_mode_remote'
+                        }
+                    }
+                });
+            }
+
+            const { data: teamEvents } = await supabase.from('staff_prep_events')
+                .select('user_id, payload').eq('journey_id', journeyId).eq('event_type', 'checkout').limit(500);
+
+            const nextStatus = { ...EMPTY_TEAM_STATUS, ...toTeamStatus(getTeamStatusFromMeta(parseMeta(missionInfo?.meta))) };
+            for (const row of teamEvents || []) {
+                const role = resolveEventRole(row, teamUserRoleMap);
+                if (role) nextStatus[role] = true;
+            }
+            nextStatus[normalizedRole] = true;
+            const allTeamCheckedOut = TEAM_ROLES.every((role) => nextStatus[role] === true);
+
+            const { data: journeyData, error: readErr } = await supabase.from('staff_journeys')
+                .select('meta').eq('id', journeyId).single();
+            if (readErr) throw readErr;
+
+            const currentMeta = parseMeta(journeyData?.meta);
+            const closureCheckoutTeam = currentMeta.closure_checkout_team && typeof currentMeta.closure_checkout_team === 'object'
+                ? currentMeta.closure_checkout_team : {};
+            const nextMeta = {
+                ...currentMeta,
+                closure_checkout_team: { ...closureCheckoutTeam, ...nextStatus },
+                [`closure_checkout_${normalizedRole}_done`]: true,
+                [`closure_checkout_${normalizedRole}_done_at`]: now,
+                [`closure_checkout_${normalizedRole}_done_by`]: doneById,
+                [`closure_checkout_${normalizedRole}_done_by_name`]: actorName,
+                closure_checkout_done: allTeamCheckedOut,
+                closure_phase: allTeamCheckedOut ? 'report' : 'base_closure'
+            };
+            if (normalizedComment) {
+                const currentComments = buildCheckoutCommentList(currentMeta.checkout_comments);
+                currentComments.push({ message: normalizedComment, at: now, by: doneById, by_name: actorName, role: normalizedRole });
+                nextMeta.checkout_comments = currentComments;
+            }
+            if (allTeamCheckedOut) {
+                nextMeta.closure_checkout_done_at = now;
+                nextMeta.closure_checkout_done_by = doneById;
+                nextMeta.closure_checkout_done_by_name = actorName;
+                nextMeta.closure_completed_at = now;
+                nextMeta.closure_completed_by = doneById;
+                nextMeta.closure_completed_by_name = actorName;
+            }
+
+            const { error: updateError } = await supabase.from('staff_journeys')
+                .update({
+                    mission_state: allTeamCheckedOut ? 'report' : 'dismantling',
+                    ...(allTeamCheckedOut ? { status: 'report' } : {}), meta: nextMeta, updated_at: now
+                })
+                .eq('id', journeyId);
+            if (updateError) throw updateError;
+
+            setTeamCheckoutStatus(nextStatus);
+            setFeedback(allTeamCheckedOut ? 'Equipo completo. Jornada finalizada.' : 'Check-out completado (modo prueba).');
+            setCheckoutComment('');
+            onRefresh && onRefresh();
+            if (allTeamCheckedOut) {
+                clearJourneyLocalOperationalData(journeyId);
+                if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('flyhigh_staff_mission');
+            }
+            if (typeof onCheckoutComplete === 'function') onCheckoutComplete({ allTeamCheckedOut, nextStatus, finalizedAt: now });
+            router.replace('/staff/history');
+        } catch (error) {
+            const details = getErrorMessage(error);
+            console.error('Force checkout error:', { error, details });
+            setFeedback(`No se pudo finalizar. ${details}`);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const finalizeDisabled = isSubmitting || hasCurrentUserCheckedOut || !isWithinRange;
     const greetingText = useMemo(() => getTimeBasedGreeting(clockNow), [clockNow]);
     const dateLabel = useMemo(() => getTodayDateLabel(clockNow), [clockNow]);
@@ -890,6 +1002,15 @@ export default function CheckoutScreen({
                             Debes estar en el perímetro de la base para hacer check-out.
                         </p>
                     ) : null}
+
+                    <button
+                        type="button"
+                        onClick={handleForceCheckout}
+                        disabled={isSubmitting || hasCurrentUserCheckedOut}
+                        className="mt-6 w-full text-center text-xs text-gray-400 underline"
+                    >
+                        Modo Prueba: Forzar Check-out
+                    </button>
                 </div>
             </div>
         </div>
