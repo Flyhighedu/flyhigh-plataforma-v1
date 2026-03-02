@@ -206,6 +206,8 @@ export default function SyncHeader({
     const [pendingCivicBlob, setPendingCivicBlob] = useState(null);
     const [lastRecordedDuration, setLastRecordedDuration] = useState(0);
     const [lastStopPayload, setLastStopPayload] = useState({ endedEarly: false, reason: null, reasonDetail: null });
+    const [standbyNotified, setStandbyNotified] = useState(false);
+    const [isNotifyingSaving, setIsNotifyingSaving] = useState(false);
 
     const civicTimerRef = useRef(null);
     const mediaRecorderRef = useRef(null);
@@ -269,6 +271,25 @@ export default function SyncHeader({
         setShowCivicStartModal(true);
         setMicPermissionBlocked(false);
         setCivicError('');
+        setStandbyNotified(false);
+    };
+
+    const handleNotifyStandby = async () => {
+        if (isNotifyingSaving || standbyNotified) return;
+        setIsNotifyingSaving(true);
+        try {
+            await updateJourneyMeta({
+                is_recording_standby: true,
+                is_recording_standby_at: new Date().toISOString(),
+                is_recording_standby_by: userId
+            });
+            setStandbyNotified(true);
+        } catch (error) {
+            console.error('Error notificando standby:', error);
+            setCivicError('No se pudo notificar. Intenta de nuevo.');
+        } finally {
+            setIsNotifyingSaving(false);
+        }
     };
 
     // Determine TINT / Gatekeeper Status
@@ -851,7 +872,7 @@ export default function SyncHeader({
                             </button>
                         )}
 
-                        {/* ─── PRE-RECORDING VIEW ─── */}
+                        {/* ─── PRE-RECORDING VIEW (2-Step Sequential) ─── */}
                         {!showCivicRecorder && (
                             <>
                                 {/* Illustration header */}
@@ -880,42 +901,101 @@ export default function SyncHeader({
                                     <div className="text-center mb-5">
                                         <h3 className="text-2xl font-bold text-blue-900 mb-2">¿Listo para el acto cívico?</h3>
                                         <p className="text-sm text-gray-500 leading-relaxed">
-                                            Es momento de dar inicio. Asegúrate de tener todo preparado.
+                                            Sigue los pasos para coordinar con {auxDisplayName}.
                                         </p>
                                     </div>
 
-                                    <div className="bg-gray-50 rounded-xl p-4 mb-6 flex items-start gap-3 border border-gray-100">
-                                        <div className="bg-blue-100 p-2 rounded-lg shrink-0">
-                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563EB', fontVariationSettings: "'FILL' 1, 'wght' 400" }}>mic</span>
+                                    {/* Step indicators */}
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-black ${standbyNotified ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white'
+                                            }`}>
+                                            {standbyNotified ? '✓' : '1'}
+                                        </div>
+                                        <div className={`flex-1 h-0.5 rounded-full transition-colors duration-300 ${standbyNotified ? 'bg-emerald-400' : 'bg-gray-200'
+                                            }`} />
+                                        <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-black ${standbyNotified ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'
+                                            }`}>
+                                            2
+                                        </div>
+                                    </div>
+
+                                    {/* Step 1: Notify Osvaldo */}
+                                    <div className={`rounded-xl p-4 mb-3 flex items-start gap-3 border transition-all duration-300 ${standbyNotified
+                                            ? 'bg-emerald-50 border-emerald-200'
+                                            : 'bg-gray-50 border-gray-100'
+                                        }`}>
+                                        <div className={`p-2 rounded-lg shrink-0 ${standbyNotified ? 'bg-emerald-100' : 'bg-blue-100'
+                                            }`}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: standbyNotified ? '#059669' : '#2563EB', fontVariationSettings: "'FILL' 1, 'wght' 400" }}>
+                                                {standbyNotified ? 'check_circle' : 'videocam'}
+                                            </span>
                                         </div>
                                         <div>
-                                            <p className="text-xs font-semibold text-gray-800 mb-1 uppercase tracking-wide">Grabación automática</p>
+                                            <p className="text-xs font-semibold text-gray-800 mb-1 uppercase tracking-wide">Paso 1 — Preparar cámara</p>
+                                            <p className="text-sm text-gray-500 leading-relaxed">
+                                                {standbyNotified
+                                                    ? <span className="font-semibold text-emerald-700">✅ {auxDisplayName} fue notificado</span>
+                                                    : <>Notifica a <strong className="text-blue-600">{auxDisplayName}</strong> para que prepare la cámara DJI Osmo.</>
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Step 2: Info */}
+                                    <div className={`rounded-xl p-4 mb-6 flex items-start gap-3 border transition-all duration-300 ${standbyNotified
+                                            ? 'bg-gray-50 border-gray-100'
+                                            : 'bg-gray-50/50 border-gray-100/50 opacity-50'
+                                        }`}>
+                                        <div className={`p-2 rounded-lg shrink-0 ${standbyNotified ? 'bg-blue-100' : 'bg-gray-100'
+                                            }`}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 20, color: standbyNotified ? '#2563EB' : '#9CA3AF', fontVariationSettings: "'FILL' 1, 'wght' 400" }}>mic</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-800 mb-1 uppercase tracking-wide">Paso 2 — Iniciar grabación</p>
                                             <p className="text-sm text-gray-500 leading-relaxed">
                                                 Se grabarán <strong className="text-blue-600">90 segundos</strong> de tu voz para asegurar el estándar de calidad del acto.
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-start gap-3 mb-6">
-                                        <div className="mt-0.5 w-5 h-5 rounded bg-blue-600 flex items-center justify-center shrink-0">
-                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                        </div>
-                                        <span className="text-sm text-gray-500 leading-snug">
-                                            Presiona &quot;Comenzar&quot; justo cuando vayas a empezar a hablar.
-                                        </span>
-                                    </div>
+                                    {/* Button A: Notify Standby */}
+                                    <button
+                                        onClick={handleNotifyStandby}
+                                        disabled={isNotifyingSaving || standbyNotified}
+                                        className={`w-full transition-all font-semibold py-4 rounded-xl flex items-center justify-center gap-2 text-base mb-3 ${standbyNotified
+                                                ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 cursor-default'
+                                                : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white shadow-lg shadow-blue-500/30'
+                                            }`}
+                                        style={{ opacity: standbyNotified ? 0.85 : (isNotifyingSaving ? 0.65 : 1) }}
+                                    >
+                                        {isNotifyingSaving ? (
+                                            <><Loader2 size={16} className="animate-spin" /> Notificando...</>
+                                        ) : standbyNotified ? (
+                                            <><CheckCircle2 size={16} /> Notificado — {auxDisplayName} está listo</>
+                                        ) : (
+                                            <>Notificar a {auxDisplayName} (Preparar Cámara)</>
+                                        )}
+                                    </button>
 
+                                    {/* Button B: Start Civic Act */}
                                     <button
                                         onClick={startCivicRecording}
-                                        disabled={isCivicSaving}
+                                        disabled={!standbyNotified || isCivicSaving}
                                         className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all text-white font-semibold py-4 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 text-base"
-                                        style={{ opacity: isCivicSaving ? 0.65 : 1 }}
+                                        style={{ opacity: (!standbyNotified || isCivicSaving) ? 0.4 : 1 }}
                                     >
-                                        <span>{isCivicSaving ? 'Preparando...' : 'Comenzar (grabar 90s)'}</span>
-                                        {!isCivicSaving && (
+                                        <span>{isCivicSaving ? 'Preparando...' : 'Iniciar Acto Cívico (grabar 90s)'}</span>
+                                        {!isCivicSaving && standbyNotified && (
                                             <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: "'FILL' 0, 'wght' 500" }}>arrow_forward</span>
                                         )}
                                     </button>
+
+                                    {/* Error display */}
+                                    {civicError && (
+                                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                                            <p className="m-0 text-sm font-bold text-red-700">{civicError}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         )}

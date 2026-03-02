@@ -319,7 +319,7 @@ function getVisibleTaskKey(snapshot) {
         Boolean(meta.civic_parallel_aux_skipped_at) ||
         String(assistantCivicStatus || '').trim().toLowerCase() === 'skipped';
     const assistantNeedsCivicPanel =
-        civicParallelInProgress &&
+        (civicParallelInProgress || meta.is_recording_standby === true) &&
         !assistantCivicSkipped &&
         (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
     const teacherCivicStageLock = normalizeTeacherCivicStageLock(meta.civic_parallel_teacher_stage_lock);
@@ -546,6 +546,8 @@ export default function StaffDashboard() {
     const [teacherCivicPanelOpen, setTeacherCivicPanelOpen] = useState(false);
     const [teacherCivicPanelDismissed, setTeacherCivicPanelDismissed] = useState(false);
     const [assistantCivicPanelDismissed, setAssistantCivicPanelDismissed] = useState(false);
+    const [civicToastMessage, setCivicToastMessage] = useState('');
+    const prevCivicNotifiedRef = useRef(false);
 
     const profileRef = useRef(profile);
     const missionStateRef = useRef(missionState);
@@ -647,12 +649,51 @@ export default function StaffDashboard() {
         const meta = parseMeta(todaySchool?.meta);
         const civicInProgress = meta.civic_parallel_status === 'in_progress';
 
-        if (!civicInProgress) {
+        if (!civicInProgress && !meta.is_recording_standby) {
             setTeacherCivicPanelOpen(false);
             setTeacherCivicPanelDismissed(false);
             setAssistantCivicPanelDismissed(false);
         }
     }, [todaySchool?.meta]);
+
+    // ── Phase 1: Toast notification for Auxiliary when teacher confirms civic act ──
+    useEffect(() => {
+        if (profile?.role !== 'assistant') return;
+        const meta = parseMeta(todaySchool?.meta);
+        const isNotified = meta.teacher_civic_notified === true;
+
+        if (isNotified && !prevCivicNotifiedRef.current) {
+            setCivicToastMessage('El acto cívico comenzará pronto. Ten lista la cámara DJI Osmo para los mejores momentos.');
+            // Haptic: double vibration
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            // Audio: notification beep
+            try {
+                const sr = 44100, dur = 0.15, freq = 880;
+                const n = Math.floor(sr * dur);
+                const buf = new ArrayBuffer(44 + n * 2);
+                const dv = new DataView(buf);
+                const ws = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+                ws(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+                dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+                dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true);
+                dv.setUint16(34, 16, true); ws(36, 'data'); dv.setUint32(40, n * 2, true);
+                for (let i = 0; i < n; i++) {
+                    const t = i / sr, env = Math.min(1, (dur - t) * 15);
+                    dv.setInt16(44 + i * 2, Math.sin(2 * Math.PI * freq * t) * 0.35 * env * 32767, true);
+                }
+                const bytes = new Uint8Array(buf);
+                let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+                new Audio('data:audio/wav;base64,' + btoa(bin)).play().catch(() => { });
+            } catch { }
+        }
+        prevCivicNotifiedRef.current = isNotified;
+    }, [todaySchool?.meta, profile?.role]);
+
+    useEffect(() => {
+        if (!civicToastMessage) return;
+        const timer = setTimeout(() => setCivicToastMessage(''), 5000);
+        return () => clearTimeout(timer);
+    }, [civicToastMessage]);
 
     useEffect(() => {
         setMounted(true);
@@ -1583,6 +1624,28 @@ export default function StaffDashboard() {
         <>
             <DependencyTransitionOverlay overlayData={overlayData} />
             {content}
+            {civicToastMessage && (
+                <div
+                    className="fixed bottom-6 left-4 right-4 z-[200] max-w-sm mx-auto rounded-2xl bg-white border border-gray-100 p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex items-start gap-3.5"
+                    style={{ animation: 'civicToastSlideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                >
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563EB', fontVariationSettings: "'FILL' 1" }}>photo_camera</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="m-0 text-[13px] font-extrabold text-slate-800 mb-0.5">Acto Cívico</p>
+                        <p className="m-0 text-[12px] text-gray-500 leading-snug">{civicToastMessage}</p>
+                    </div>
+                    <button
+                        onClick={() => setCivicToastMessage('')}
+                        className="shrink-0 mt-0.5 text-gray-300 hover:text-gray-500 transition-colors"
+                        aria-label="Cerrar"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                    </button>
+                </div>
+            )}
+            <style>{`@keyframes civicToastSlideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </>
     );
 
@@ -1874,7 +1937,7 @@ export default function StaffDashboard() {
         Boolean(parallelMeta.civic_parallel_aux_skipped_at) ||
         String(assistantCivicStatus || '').trim().toLowerCase() === 'skipped';
     const assistantNeedsCivicPanel =
-        civicParallelInProgress &&
+        (civicParallelInProgress || parallelMeta.is_recording_standby === true) &&
         !assistantCivicSkipped &&
         (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
 

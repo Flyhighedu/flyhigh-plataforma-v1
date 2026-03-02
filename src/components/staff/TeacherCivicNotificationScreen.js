@@ -118,7 +118,8 @@ export default function TeacherCivicNotificationScreen({
                 teacher_civic_reason: null,
                 teacher_civic_reason_detail: null,
                 teacher_civic_decision_at: now,
-                teacher_civic_decision_by: userId
+                teacher_civic_decision_by: userId,
+                is_recording_standby: false
             };
 
             const { error } = await supabase
