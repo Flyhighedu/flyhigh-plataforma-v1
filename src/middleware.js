@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
-export async function proxy(request) {
+export async function middleware(request) {
     if (request.nextUrl.pathname.startsWith('/staff-v2')) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = request.nextUrl.pathname.replace('/staff-v2', '/staff')
