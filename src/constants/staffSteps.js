@@ -9,7 +9,7 @@ export const STAFF_STEPS = [
     },
     {
         id: 'preparacion',
-        label: 'PREPARACIÓN',
+        label: 'MONTAJE',
         states: ['CHECKIN_DONE', 'PREP_DONE', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT'],
     },
     {

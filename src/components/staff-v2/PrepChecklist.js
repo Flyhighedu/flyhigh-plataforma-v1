@@ -29,7 +29,7 @@ function formatShortDate() {
 
 const NAV_STEPS = [
     { id: 'informe', label: 'INFORME', icon: 'check', status: 'completed' },
-    { id: 'preparacion', label: 'PREPARACIÓN', icon: 'assignment', status: 'active' },
+    { id: 'preparacion', label: 'MONTAJE', icon: 'assignment', status: 'active' },
     { id: 'operacion', label: 'OPERACIÓN', icon: 'flight', status: 'pending' },
     { id: 'reporte', label: 'REPORTE', icon: 'description', status: 'pending' }
 ];
@@ -371,7 +371,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
 
     // Icon Logic
     const GroupIcon = role === 'assistant' ? 'local_shipping' : 'assignment_ind';
-    const GroupLabel = role === 'assistant' ? 'Vehículo listo para carga' : 'Preparación Personal';
+    const GroupLabel = role === 'assistant' ? 'Vehículo listo para carga' : 'Montaje personal';
 
     return (
         <div style={{
@@ -480,7 +480,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                 {/* ──── Section title ──── */}
                 <div>
                     <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: '#0f172a', lineHeight: 1.2, margin: 0 }}>
-                        {config.title || 'Preparación'}
+                        {config.title || 'Montaje'}
                     </h1>
                     <p style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500, marginTop: 4, margin: '4px 0 0' }}>
                         {completedBlocks}/{totalBlocks} items completados

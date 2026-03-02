@@ -385,17 +385,16 @@ export default function TeacherCivicParallelScreen({
     };
 
     const handleBackToTask = async () => {
-        if (!civicStarted) {
-            onBackToTask && onBackToTask();
-            return;
-        }
-
         try {
             const now = new Date().toISOString();
             await updateJourneyMeta({
-                civic_parallel_teacher_done_at: now,
-                civic_parallel_teacher_done_by: userId,
-                civic_parallel_teacher_done_by_name: profile?.full_name || firstName,
+                civic_parallel_teacher_skipped: true,
+                civic_parallel_teacher_skipped_at: now,
+                civic_parallel_teacher_skipped_by: userId,
+                civic_parallel_teacher_skipped_by_name: profile?.full_name || firstName,
+                civic_parallel_teacher_done_at: meta.civic_parallel_teacher_done_at || now,
+                civic_parallel_teacher_done_by: meta.civic_parallel_teacher_done_by || userId,
+                civic_parallel_teacher_done_by_name: meta.civic_parallel_teacher_done_by_name || profile?.full_name || firstName,
                 civic_parallel_teacher_stage_lock: null
             });
             onRefresh && onRefresh();

@@ -180,7 +180,7 @@ export default function EnRutaStitchLayout({
                                 ]
                             };
 
-                            const currentTasks = tasksByRole[role] || ["Preparación de equipo", "Ubicación de zona"];
+                            const currentTasks = tasksByRole[role] || ["Montaje de equipo", "Ubicación de zona"];
                             const icons = [<Settings size={20} />, <Smartphone size={20} />];
 
                             return currentTasks.map((task, idx) => (

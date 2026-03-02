@@ -6,6 +6,8 @@ const ACTIVE_PAUSE_KEY = 'flyhigh_active_pause';
 const COMPLETED_PAUSES_KEY = 'flyhigh_completed_pauses';
 const CLOSED_FLIGHTS_KEY = 'flyhigh_recently_closed_flights';
 const STAFF_MISSION_KEY = 'flyhigh_staff_mission';
+const PENDING_CHECKINS_KEY = 'pending_checkins';
+const AUX_OFFLINE_QUEUE_PREFIX = 'flyhigh_aux_queue_2_';
 
 function safeParseJson(raw, fallback) {
     try {
@@ -86,6 +88,19 @@ export function clearJourneyLocalOperationalData(journeyId) {
 
     if (filteredPauses.length !== completedPauses.length) {
         writeArrayOrRemove(COMPLETED_PAUSES_KEY, filteredPauses);
+    }
+
+    localStorage.removeItem(`${AUX_OFFLINE_QUEUE_PREFIX}${targetJourneyId}`);
+
+    const pendingCheckInsRaw = safeParseJson(localStorage.getItem(PENDING_CHECKINS_KEY), []);
+    const pendingCheckIns = Array.isArray(pendingCheckInsRaw) ? pendingCheckInsRaw : [];
+    const filteredPendingCheckIns = pendingCheckIns.filter((row) => {
+        const pendingJourneyId = normalizeJourneyId(row?.journeyId ?? row?.journey_id);
+        return pendingJourneyId !== targetJourneyId;
+    });
+
+    if (filteredPendingCheckIns.length !== pendingCheckIns.length) {
+        writeArrayOrRemove(PENDING_CHECKINS_KEY, filteredPendingCheckIns);
     }
 
     if (window.sessionStorage) {

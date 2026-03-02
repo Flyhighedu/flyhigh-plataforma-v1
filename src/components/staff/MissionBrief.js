@@ -44,6 +44,34 @@ function deg2rad(deg) {
     return deg * (Math.PI / 180);
 }
 
+function isUuid(value) {
+    const normalized = String(value || '').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
+}
+
+function getErrorMessage(error) {
+    if (!error) return 'Error desconocido.';
+    if (typeof error === 'string') return error;
+    if (typeof error.message === 'string' && error.message.trim()) return error.message.trim();
+    if (typeof error.error_description === 'string' && error.error_description.trim()) return error.error_description.trim();
+    if (typeof error.details === 'string' && error.details.trim()) return error.details.trim();
+    if (typeof error.code === 'string' && error.code.trim()) return error.code.trim();
+    return 'Error inesperado.';
+}
+
+function isNetworkLikeError(error) {
+    const text = String(
+        error?.message || error?.details || error?.error_description || ''
+    ).toLowerCase();
+
+    return (
+        text.includes('fetch') ||
+        text.includes('network') ||
+        text.includes('failed to fetch') ||
+        text.includes('offline')
+    );
+}
+
 export default function MissionBrief({
     profile,
     school,
@@ -340,32 +368,53 @@ export default function MissionBrief({
         }
 
         // Si es click normal y no hay rango ni error, prevenir (aunque el botón debería estar deshabilitado)
-        if (!fallbackData && status === 'success' && !isWithinRange) {
+        if (!fallbackData && locationStatus === 'success' && !isWithinRange) {
             alert(`Estás a ${distance}m. Acércate más.`);
             return;
         }
 
+        if (!journeyId) {
+            alert('No encontramos una jornada activa. Actualiza la pantalla e intenta de nuevo.');
+            return;
+        }
+
         setChecking(true);
+        const nowIso = new Date().toISOString();
+        const payload = {
+            timestamp: nowIso,
+            location: {
+                distance: distance,
+                radius: STAFF_CONFIG.GEOFENCE_RADIUS_METERS,
+                accuracy: accuracy,
+                is_fallback: !!fallbackData
+            },
+            fallback_evidence: fallbackData
+        };
+
+        let resolvedUserId = isUuid(userId) ? String(userId).trim() : '';
+
+        if (!resolvedUserId && isUuid(profile?.user_id)) {
+            resolvedUserId = String(profile.user_id).trim();
+        }
 
         try {
             const supabase = createClient();
-            const nowIso = new Date().toISOString();
 
-            const payload = {
-                timestamp: nowIso,
-                location: {
-                    distance: distance,
-                    radius: STAFF_CONFIG.GEOFENCE_RADIUS_METERS,
-                    accuracy: accuracy,
-                    is_fallback: !!fallbackData // Flag para saber si fue manual/foto
-                },
-                fallback_evidence: fallbackData // Metadata de la foto/código si existe
-            };
+            if (!resolvedUserId) {
+                const { data: authData } = await supabase.auth.getUser();
+                if (isUuid(authData?.user?.id)) {
+                    resolvedUserId = String(authData.user.id).trim();
+                }
+            }
+
+            if (!resolvedUserId) {
+                throw new Error('No fue posible validar tu sesión para registrar el check-in.');
+            }
 
             // Intento de guardado en DB
             const { error } = await supabase.from('staff_prep_events').insert({
                 journey_id: journeyId,
-                user_id: userId,
+                user_id: resolvedUserId,
                 event_type: 'checkin',
                 payload: payload
             });
@@ -377,16 +426,17 @@ export default function MissionBrief({
             setShowWelcome(true);
 
         } catch (e) {
-            console.error('Check-in failed:', e);
+            const details = getErrorMessage(e);
+            console.warn('Check-in failed (handled):', details);
 
             // Plan B: Guardar offline si es error de red
-            if (isOffline || e.message?.includes('fetch')) {
-                saveOfflineCheckIn(journeyId, userId, payload);
+            if (isOffline || isNetworkLikeError(e)) {
+                saveOfflineCheckIn(journeyId, resolvedUserId || userId, payload);
                 alert('Sin conexión. Check-in guardado localmente. Se sincronizará cuando recuperes internet.');
                 stopWatchingLocation();
                 setShowWelcome(true);
             } else {
-                alert('Error al registrar check-in. Intenta de nuevo.');
+                alert(`Error al registrar check-in. ${details}`);
                 setChecking(false);
             }
         }

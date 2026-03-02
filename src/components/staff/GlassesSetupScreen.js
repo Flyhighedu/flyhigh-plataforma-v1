@@ -729,16 +729,7 @@ export default function GlassesSetupScreen({
     const block1Done = block1Keys.every((key) => checks?.[key]?.confirmed);
 
     return (
-        <div style={{
-            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            backgroundColor: '#F3F4F6',
-            color: '#1F2937',
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            WebkitFontSmoothing: 'antialiased',
-            position: 'relative'
-        }}>
+        <div className="relative flex min-h-screen flex-col bg-slate-100 text-slate-800 antialiased">
             <SyncHeader
                 firstName={localFirstName}
                 roleName={roleName}
@@ -753,42 +744,22 @@ export default function GlassesSetupScreen({
                 onDemoStart={onRefresh}
             />
 
-            <main style={{
-                flex: 1,
-                padding: 'clamp(14px, 3.8vw, 22px) clamp(14px, 4.6vw, 24px) 124px',
-                maxWidth: 560,
-                margin: '0 auto',
-                width: '100%',
-                overflowY: 'auto'
-            }}>
+            <main className="mx-auto w-full max-w-[560px] flex-1 overflow-y-auto px-4 pb-32 pt-4 sm:px-6 sm:pt-5">
                 <div
-                    style={{
-                        width: '100%',
-                        maxWidth: 460,
-                        margin: '0 auto 14px'
-                    }}
+                    className="mx-auto mb-3.5 w-full max-w-[460px]"
                     dangerouslySetInnerHTML={{ __html: GLASSES_SETUP_ILLUSTRATION_SVG }}
                 />
 
-                <div style={{ textAlign: 'center', marginBottom: 18 }}>
-                    <h2 style={{ fontSize: 'clamp(24px, 5.6vw, 32px)', fontWeight: 800, margin: 0, marginBottom: 6, letterSpacing: '-0.03em', color: '#111827' }}>
+                <div className="mb-4.5 text-center">
+                    <h2 className="m-0 text-[clamp(24px,5.6vw,32px)] font-extrabold tracking-[-0.03em] text-slate-800">
                         Configuracion de Gafas
                     </h2>
-                    <p style={{ margin: '0 auto', maxWidth: 360, fontSize: 'clamp(13px, 2.9vw, 14px)', color: '#64748B', lineHeight: 1.55 }}>
+                    <p className="mx-auto mt-1.5 max-w-[360px] text-[clamp(13px,2.9vw,14px)] leading-relaxed text-slate-500">
                         Sigue los bloques en orden para dejar lista la electrónica y validar cada estación en tiempo real.
                     </p>
                 </div>
 
-                <div style={{
-                    marginBottom: 12,
-                    borderRadius: 16,
-                    border: pilotLocked ? '1px solid #BFDBFE' : '1px solid #BBF7D0',
-                    backgroundColor: pilotLocked ? '#EFF6FF' : '#ECFDF5',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10
-                }}>
+                <div className={`mb-3 flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 ${pilotLocked ? 'border-blue-200 bg-blue-50' : 'border-emerald-200 bg-emerald-50'}`}>
                     <span className="material-symbols-outlined" style={{
                         fontSize: 20,
                         color: pilotLocked ? '#2563EB' : '#16A34A',
@@ -798,13 +769,7 @@ export default function GlassesSetupScreen({
                     }}>
                         {pilotLocked ? 'shield_lock' : 'groups'}
                     </span>
-                    <p style={{
-                        margin: 0,
-                        fontSize: 'clamp(12px, 2.7vw, 13px)',
-                        lineHeight: 1.45,
-                        color: pilotLocked ? '#1D4ED8' : '#166534',
-                        fontWeight: 650
-                    }}>
+                    <p className={`m-0 text-[clamp(12px,2.7vw,13px)] font-semibold leading-[1.45] ${pilotLocked ? 'text-blue-700' : 'text-emerald-700'}`}>
                         {pilotLocked
                             ? (role === 'pilot'
                                 ? 'Tienes el control del checklist global de gafas.'
@@ -815,14 +780,7 @@ export default function GlassesSetupScreen({
                     </p>
                 </div>
 
-                <div style={{
-                    marginBottom: 14,
-                    borderRadius: 16,
-                    background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-                    border: '1px solid #E2E8F0',
-                    padding: '12px 14px',
-                    boxShadow: '0 8px 18px -14px rgba(15, 23, 42, 0.4)'
-                }}>
+                <div className="mb-3.5 rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-3.5 py-3 shadow-[0_8px_18px_-14px_rgba(15,23,42,0.4)]">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase', color: '#475569' }}>
                             Progreso global
@@ -842,8 +800,8 @@ export default function GlassesSetupScreen({
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <section style={{ backgroundColor: '#FFFFFF', borderRadius: 22, padding: '16px 14px', border: '1px solid #E2E8F0', boxShadow: '0 10px 22px -18px rgba(15, 23, 42, 0.45)' }}>
+                <div className="flex flex-col gap-4">
+                    <section className="rounded-[22px] border border-slate-200 bg-white px-3.5 py-4 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)] sm:px-4">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{
@@ -875,7 +833,7 @@ export default function GlassesSetupScreen({
                                         cable
                                     </span>
                                 </span>
-                                <h3 style={{ margin: 0, color: '#1E293B', fontSize: 'clamp(14px, 3.2vw, 15px)', fontWeight: 800, lineHeight: 1.35 }}>
+                                <h3 className="m-0 text-[clamp(14px,3.2vw,15px)] font-extrabold leading-[1.35] text-slate-800">
                                     Bloque 1 · Cables
                                 </h3>
                             </div>
@@ -892,7 +850,7 @@ export default function GlassesSetupScreen({
                         </div>
                     </section>
 
-                    <section style={{ backgroundColor: '#FFFFFF', borderRadius: 22, padding: '16px 14px', border: '1px solid #E2E8F0', boxShadow: '0 10px 22px -18px rgba(15, 23, 42, 0.45)' }}>
+                    <section className="rounded-[22px] border border-slate-200 bg-white px-3.5 py-4 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)] sm:px-4">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{
@@ -924,7 +882,7 @@ export default function GlassesSetupScreen({
                                         visibility
                                     </span>
                                 </span>
-                                <h3 style={{ margin: 0, color: '#1E293B', fontSize: 'clamp(14px, 3.2vw, 15px)', fontWeight: 800, lineHeight: 1.35 }}>
+                                <h3 className="m-0 text-[clamp(14px,3.2vw,15px)] font-extrabold leading-[1.35] text-slate-800">
                                     Bloque 2 · Gafas
                                 </h3>
                             </div>
@@ -941,7 +899,7 @@ export default function GlassesSetupScreen({
                         </div>
                     </section>
 
-                    <section style={{ backgroundColor: '#FFFFFF', borderRadius: 22, padding: '16px 14px', border: '1px solid #E2E8F0', boxShadow: '0 10px 22px -18px rgba(15, 23, 42, 0.45)' }}>
+                    <section className="rounded-[22px] border border-slate-200 bg-white px-3.5 py-4 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)] sm:px-4">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                             <span style={{
                                 display: 'inline-flex',
@@ -972,12 +930,12 @@ export default function GlassesSetupScreen({
                                     fact_check
                                 </span>
                             </span>
-                            <h3 style={{ margin: 0, color: '#1E293B', fontSize: 'clamp(14px, 3.2vw, 15px)', fontWeight: 800, lineHeight: 1.35 }}>
+                            <h3 className="m-0 text-[clamp(14px,3.2vw,15px)] font-extrabold leading-[1.35] text-slate-800">
                                 Bloque 3 · Conexion y prueba
                             </h3>
                         </div>
 
-                        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748B', lineHeight: 1.45 }}>
+                        <p className="mb-2.5 mt-0 text-xs leading-[1.45] text-slate-500">
                             Verifica estas dos tareas antes de continuar al cierre del checklist.
                         </p>
 
@@ -988,29 +946,21 @@ export default function GlassesSetupScreen({
                     </section>
                 </div>
 
-                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: 0.72 }}>
+                <div className="mt-3 flex items-center justify-center gap-1.5 opacity-75">
                     <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6B7280', fontVariationSettings: "'FILL' 1, 'wght' 400" }}>
                         verified_user
                     </span>
-                    <p style={{ margin: 0, fontSize: 11, color: '#6B7280', fontWeight: 600 }}>
+                    <p className="m-0 text-[11px] font-semibold text-slate-500">
                         No cierres la app (los datos se guardan)
                     </p>
                 </div>
             </main>
 
-            <div style={{
-                position: 'sticky',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                zIndex: 40,
-                padding: '16px 24px 20px',
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                borderTop: '1px solid #E5E7EB'
-            }}>
-                <div style={{ maxWidth: 520, margin: '0 auto' }}>
+            <div
+                className="sticky bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/90 px-4 pb-5 pt-4 backdrop-blur-xl sm:px-6"
+                style={{ WebkitBackdropFilter: 'blur(12px)' }}
+            >
+                <div className="mx-auto w-full max-w-[520px]">
                     <button
                         type="button"
                         onClick={openFinalizeModal}

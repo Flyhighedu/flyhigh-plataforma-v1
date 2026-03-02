@@ -65,6 +65,11 @@ function resolveSchoolSnapshotName(closureData) {
     return null;
 }
 
+function isUuid(value) {
+    const normalized = String(value || '').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized);
+}
+
 /**
  * Syncs a single flight log to Supabase
  * @param {Object} flightLog - The flight log object from local storage
@@ -439,12 +444,32 @@ export async function syncPendingCheckIns() {
     console.log(`Syncing ${pending.length} pending check-ins...`);
     const supabase = createClient();
     const remaining = [];
+    let authUserId = null;
+
+    const resolveAuthUserId = async () => {
+        if (authUserId) return authUserId;
+        const { data: authData } = await supabase.auth.getUser();
+        if (isUuid(authData?.user?.id)) {
+            authUserId = String(authData.user.id).trim();
+        }
+        return authUserId;
+    };
 
     for (const item of pending) {
         try {
+            let eventUserId = isUuid(item?.userId) ? String(item.userId).trim() : '';
+
+            if (!eventUserId) {
+                eventUserId = await resolveAuthUserId();
+            }
+
+            if (!eventUserId) {
+                throw new Error('No se pudo validar user_id para sincronizar check-in pendiente.');
+            }
+
             const { error } = await supabase.from('staff_prep_events').insert({
                 journey_id: item.journeyId,
-                user_id: item.userId,
+                user_id: eventUserId,
                 event_type: 'checkin',
                 payload: item.payload
             });
@@ -452,7 +477,7 @@ export async function syncPendingCheckIns() {
             if (error) throw error;
             console.log("Check-in synced for:", item.journeyId);
         } catch (e) {
-            console.error("Failed to sync check-in:", e);
+            console.warn("Failed to sync check-in:", e);
             remaining.push(item);
         }
     }

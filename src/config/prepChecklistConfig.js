@@ -1,4 +1,4 @@
-// Configuración de checklists por rol para la fase de Preparación (Pre-Jornada)
+// Configuración de checklists por rol para la fase de Montaje (Pre-Jornada)
 // ═══════════════════════════════════════════════════════════════════
 // FUENTE ÚNICA DE VERDAD — Editar este archivo actualiza automáticamente
 // tanto el sistema Operativo como el Supervisor.
@@ -24,10 +24,10 @@ export const PREP_CHECKLISTS = {
         color: 'purple',
         icon: 'school',
         items: [
-            { id: 'uniform_ok', label: 'Uniforme correcto (equipo completo)', critical: true, group: 'Preparación docente' },
-            { id: 'id_badges', label: 'Gafetes visibles', critical: true, group: 'Preparación docente' },
-            { id: 'mission_confirm', label: 'Confirmación de misión', type: 'mission_chips', critical: true, group: 'Preparación docente' },
-            { id: 'group_selfie', label: 'Selfie de Verificación', description: 'Obligatoria: Para confirmar uso de uniforme completo y gafete.', type: 'photo', critical: true, liveOnly: true, group: 'Preparación docente' },
+            { id: 'uniform_ok', label: 'Uniforme correcto (equipo completo)', critical: true, group: 'Montaje docente' },
+            { id: 'id_badges', label: 'Gafetes visibles', critical: true, group: 'Montaje docente' },
+            { id: 'mission_confirm', label: 'Confirmación de misión', type: 'mission_chips', critical: true, group: 'Montaje docente' },
+            { id: 'group_selfie', label: 'Selfie de Verificación', description: 'Obligatoria: Para confirmar uso de uniforme completo y gafete.', type: 'photo', critical: true, liveOnly: true, group: 'Montaje docente' },
         ]
     },
     assistant: {
@@ -36,10 +36,10 @@ export const PREP_CHECKLISTS = {
         color: 'amber',
         icon: 'support_agent',
         items: [
-            { id: 'vehicle_loc', label: 'Vehículo en zona de carga', type: 'photo', critical: true, group: 'Preparación del vehículo' },
-            { id: 'keys_hand', label: 'Llaves en mano', type: 'check_confirm', group: 'Preparación del vehículo', critical: true },
-            { id: 'tires_visual', label: 'Revisión visual de neumáticos', type: 'check_confirm', group: 'Preparación del vehículo', critical: true },
-            { id: 'fuel_level', label: 'Combustible mínimo (Foto tablero)', type: 'photo', critical: true, group: 'Preparación del vehículo' },
+            { id: 'vehicle_loc', label: 'Vehículo en zona de carga', type: 'photo', critical: true, group: 'Montaje del vehículo' },
+            { id: 'keys_hand', label: 'Llaves en mano', type: 'check_confirm', group: 'Montaje del vehículo', critical: true },
+            { id: 'tires_visual', label: 'Revisión visual de neumáticos', type: 'check_confirm', group: 'Montaje del vehículo', critical: true },
+            { id: 'fuel_level', label: 'Combustible mínimo (Foto tablero)', type: 'photo', critical: true, group: 'Montaje del vehículo' },
             { id: 'trunk_open', label: 'Cajuela abierta lista', type: 'photo', critical: true, group: 'Checklist de carga' },
         ]
     },

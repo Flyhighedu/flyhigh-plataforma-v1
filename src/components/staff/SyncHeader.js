@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { getDismantlingSyncBadge } from '@/utils/dismantlingRouting';
 
 /**
  * Hook to manage the Sync Mode state (tinting condition)
@@ -113,7 +114,7 @@ export function useSyncHeaderState(journeyId, role, missionState) {
 import { CheckCircle2, Loader2, Mic, X } from 'lucide-react';
 import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import HeaderOperativo from './HeaderOperativo';
-import { getHeaderPhaseForState } from '@/constants/headerPhases';
+import { getHeaderPhaseForState } from '../../constants/headerPhases';
 
 const CIVIC_REQUIRED_SECONDS = 90;
 const CIVIC_EARLY_FINISH_REASONS = [
@@ -258,6 +259,12 @@ export default function SyncHeader({
         !showCivicRecorder &&
         !isCivicRecording;
 
+    const isDismantlingPhase = String(effectiveMissionState || '').trim() === 'dismantling';
+    const dismantlingSyncBadge = isDismantlingPhase
+        ? getDismantlingSyncBadge(role, headerMeta)
+        : null;
+    const dismantlingChipText = String(dismantlingSyncBadge?.chipText || '').trim() || null;
+
     const handleTeacherCivicFabClick = () => {
         setShowCivicStartModal(true);
         setMicPermissionBlocked(false);
@@ -309,10 +316,11 @@ export default function SyncHeader({
                 ? '🟢 ACTO CÍVICO — GRABANDO'
                 : (teacherCivicCompleted ? '🟢 ACTO CÍVICO — COMPLETADO' : null))
             : null;
-    const finalChipText = civicChipText || chipOverride || chipText;
+    const finalChipText = civicChipText || chipOverride || dismantlingChipText || chipText;
     const shouldShowChip = !!finalChipText && (
         !!civicChipText ||
         !!chipOverride ||
+        !!dismantlingChipText ||
         isWaitScreen ||
         isPilotGatekeeper ||
         isAuxGatekeeper ||
@@ -336,7 +344,7 @@ export default function SyncHeader({
         return `${lower.charAt(0).toLocaleUpperCase('es-MX')}${lower.slice(1)}`;
     };
     const bottomStatusText = shouldUseBottomStatusLabel ? formatBottomStatusText(finalChipText) : '';
-    const isCheckInHeaderPhase = getHeaderPhaseForState(effectiveMissionState).id === 'checkin';
+    const isCheckInHeaderPhase = getHeaderPhaseForState(effectiveMissionState, headerMeta).id === 'checkin';
 
     const canConfirmEarlyFinish =
         !!earlyFinishReason &&
@@ -791,6 +799,7 @@ export default function SyncHeader({
                 firstName={firstName}
                 roleLabel={roleName || role}
                 missionState={effectiveMissionState}
+                missionMeta={headerMeta}
                 schoolName={missionInfo?.school_name || missionInfo?.nombre_escuela || ''}
                 compactProgress={isCheckInHeaderPhase ? compactProgress : 1}
                 waitModeActive={isWaitModeVisual}

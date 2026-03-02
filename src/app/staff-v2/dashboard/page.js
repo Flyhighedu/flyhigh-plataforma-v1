@@ -2,7 +2,7 @@
 
 // =====================================================
 // Staff Dashboard — Stepper Shell V1
-// 3 pasos: Preparación → Operación → Reporte
+// 3 pasos: Montaje → Operación → Reporte
 // Auto-detecta escuela del día desde proximas_escuelas
 // =====================================================
 
@@ -28,7 +28,7 @@ import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLoca
 import { STAFF_STEPS } from '@/constants/staffSteps';
 
 const STEPS = [
-    { id: 'prep', label: 'Preparación', icon: ClipboardList },
+    { id: 'prep', label: 'Montaje', icon: ClipboardList },
     { id: 'en_ruta', label: 'En Ruta', icon: Truck },
     { id: 'operation', label: 'Operación', icon: Plane },
     { id: 'report', label: 'Reporte', icon: FileText },
@@ -884,7 +884,7 @@ export default function StaffDashboard() {
 
             {/* Step Content */}
             <div className="max-w-lg mx-auto px-4 py-6">
-                {/* PASO 1: Preparación (non-pilot roles) */}
+                {/* PASO 1: Montaje (non-pilot roles) */}
                 {currentStep === 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <h2 className="text-xl font-bold text-slate-900 mb-1">Pre-Jornada</h2>

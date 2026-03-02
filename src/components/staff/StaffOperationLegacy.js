@@ -34,6 +34,7 @@ const OPERATION_PHASE_STATES = new Set([
     'operation',
     'PILOT_OPERATION'
 ]);
+const CLOSE_DAY_HOLD_MS = 2000;
 
 function safeParseJson(input, fallback = null) {
     try {
@@ -256,6 +257,8 @@ export default function StaffOperationLegacy({
     const [flightLogs, setFlightLogs] = useState([]);
     const [activeFlight, setActiveFlight] = useState(null);
     const [showMenu, setShowMenu] = useState(false);
+    const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
+    const [closeHoldProgress, setCloseHoldProgress] = useState(0);
 
     // Pause State
     const [showPauseMenu, setShowPauseMenu] = useState(false);
@@ -273,6 +276,9 @@ export default function StaffOperationLegacy({
     const activeMetaWriteSeqRef = useRef(0);
     const operationAnchorSyncInFlightRef = useRef(false);
     const lastSyncedOperationAnchorMsRef = useRef(0);
+    const closeHoldRafRef = useRef(null);
+    const closeHoldStartedAtRef = useRef(0);
+    const closeHoldTriggeredRef = useRef(false);
     const [operationAnchorBootstrapMs, setOperationAnchorBootstrapMs] = useState(0);
 
     const router = useRouter();
@@ -283,6 +289,14 @@ export default function StaffOperationLegacy({
         }, 1000);
 
         return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (closeHoldRafRef.current !== null) {
+                window.cancelAnimationFrame(closeHoldRafRef.current);
+            }
+        };
     }, []);
 
     const rememberClosedFlightId = (flightId) => {
@@ -490,14 +504,81 @@ export default function StaffOperationLegacy({
         }
     };
 
-    const handleCloseDay = () => {
+    const handleCloseDay = useCallback(() => {
         if (onCloseDay) {
             onCloseDay();
         } else {
             router.push('/staff/closure');
         }
         setShowMenu(false);
-    };
+    }, [onCloseDay, router]);
+
+    const resetCloseDayHold = useCallback(() => {
+        if (closeHoldRafRef.current !== null) {
+            window.cancelAnimationFrame(closeHoldRafRef.current);
+            closeHoldRafRef.current = null;
+        }
+        closeHoldStartedAtRef.current = 0;
+        closeHoldTriggeredRef.current = false;
+        setCloseHoldProgress(0);
+    }, []);
+
+    const closeCloseConfirmModal = useCallback(() => {
+        setShowCloseConfirmModal(false);
+        resetCloseDayHold();
+    }, [resetCloseDayHold]);
+
+    const openCloseConfirmModal = useCallback(() => {
+        setShowMenu(false);
+        setShowCloseConfirmModal(true);
+        resetCloseDayHold();
+    }, [resetCloseDayHold]);
+
+    const finalizeCloseDay = useCallback(() => {
+        if (closeHoldTriggeredRef.current) return;
+        closeHoldTriggeredRef.current = true;
+        setCloseHoldProgress(100);
+        setShowCloseConfirmModal(false);
+        handleCloseDay();
+    }, [handleCloseDay]);
+
+    const handleCloseHoldStart = useCallback((event) => {
+        if (closeHoldTriggeredRef.current) return;
+        if (event?.cancelable) event.preventDefault();
+
+        if (closeHoldRafRef.current !== null) {
+            window.cancelAnimationFrame(closeHoldRafRef.current);
+            closeHoldRafRef.current = null;
+        }
+
+        closeHoldStartedAtRef.current = performance.now();
+        setCloseHoldProgress(1);
+
+        const tick = (now) => {
+            const elapsed = Math.max(0, now - closeHoldStartedAtRef.current);
+            const progress = Math.min(100, (elapsed / CLOSE_DAY_HOLD_MS) * 100);
+            setCloseHoldProgress(progress);
+
+            if (progress >= 100) {
+                closeHoldRafRef.current = null;
+                finalizeCloseDay();
+                return;
+            }
+
+            closeHoldRafRef.current = window.requestAnimationFrame(tick);
+        };
+
+        closeHoldRafRef.current = window.requestAnimationFrame(tick);
+    }, [finalizeCloseDay]);
+
+    const handleCloseHoldCancel = useCallback(() => {
+        if (closeHoldTriggeredRef.current) return;
+        if (closeHoldRafRef.current !== null) {
+            window.cancelAnimationFrame(closeHoldRafRef.current);
+            closeHoldRafRef.current = null;
+        }
+        setCloseHoldProgress(0);
+    }, []);
 
     const persistActiveFlightCache = (nextFlight) => {
         if (preview) return;
@@ -1166,12 +1247,6 @@ export default function StaffOperationLegacy({
                                     <RotateCcw size={18} /> Cambiar Escuela
                                 </button>
                                 <button
-                                    onClick={handleCloseDay}
-                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium"
-                                >
-                                    <LogOut size={18} /> Cerrar Día / Misión
-                                </button>
-                                <button
                                     onClick={() => router.push('/staff/history')}
                                     className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium border-t border-slate-100"
                                 >
@@ -1208,11 +1283,75 @@ export default function StaffOperationLegacy({
                         onRequestEditFlight={canEditCompletedFlights ? handleRequestEditFlight : null}
                     />
                 </div>
+
+                <section className="rounded-2xl border border-blue-200 bg-white px-4 py-4 shadow-[0_18px_36px_-24px_rgba(30,64,175,0.35)]">
+                    <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                        Cierre operativo
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">
+                        Cuando todo el registro de vuelos esté completo, cierra la operación de hoy.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={openCloseConfirmModal}
+                        className="mt-3 w-full rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-extrabold tracking-wide text-white shadow-[0_16px_28px_-18px_rgba(37,99,235,0.6)] transition hover:bg-blue-700 active:scale-[0.99]"
+                    >
+                        Operación finalizada
+                    </button>
+                </section>
             </div>
 
             {/* Overlay to close menu */}
             {!shouldUseSyncHeader && showMenu && (
                 <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)}></div>
+            )}
+
+            {showCloseConfirmModal && (
+                <div className="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-[2px] px-4 py-6 flex items-end justify-center sm:items-center">
+                    <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_36px_72px_-34px_rgba(15,23,42,0.65)]">
+                        <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                            Confirmar cierre
+                        </p>
+                        <h3 className="mt-1 text-xl font-black text-slate-900">
+                            ¿Seguro que deseas finalizar la operación?
+                        </h3>
+                        <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+                            Esta acción te llevará al flujo de cierre. Para evitar cierres accidentales, mantén presionado 2 segundos.
+                        </p>
+
+                        <div className="mt-5 grid grid-cols-1 gap-2.5">
+                            <button
+                                type="button"
+                                onMouseDown={handleCloseHoldStart}
+                                onMouseUp={handleCloseHoldCancel}
+                                onMouseLeave={handleCloseHoldCancel}
+                                onTouchStart={handleCloseHoldStart}
+                                onTouchEnd={handleCloseHoldCancel}
+                                onTouchCancel={handleCloseHoldCancel}
+                                className="relative overflow-hidden rounded-2xl bg-blue-600 px-4 py-3.5 text-left text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)] transition active:scale-[0.99]"
+                            >
+                                <span className="block text-sm font-extrabold tracking-wide">Operación finalizada</span>
+                                <span className="mt-0.5 block text-xs font-semibold text-blue-100">
+                                    Mantén presionado por 2s para confirmar
+                                </span>
+                                <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
+                                    <span
+                                        className="block h-full rounded-full bg-white transition-[width] duration-75"
+                                        style={{ width: `${closeHoldProgress}%` }}
+                                    />
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={closeCloseConfirmModal}
+                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {flightEditModal && (

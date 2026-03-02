@@ -20,7 +20,7 @@ const MANUAL_CHECK_ITEMS = [
     }
 ];
 
-const AD_WALL_INSTALL_ILLUSTRATION_SVG = `
+export const AD_WALL_INSTALL_ILLUSTRATION_SVG = `
 <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg">
     <defs>
         <pattern id="dot-grid" width="40" height="40" patternUnits="userSpaceOnUse">

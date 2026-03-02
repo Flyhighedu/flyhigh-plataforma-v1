@@ -65,9 +65,16 @@ export default function DependencyTransitionOverlay({ overlayData }) {
 
     if (!overlayData) return null;
 
+    const hasCustomHeadline = String(overlayData.headlineText || '').trim().length > 0;
+    const hasCustomNextAction = String(overlayData.nextActionText || '').trim().length > 0;
+
     const titleLine = overlayData.triggerName
         ? `${overlayData.triggerName} (${overlayData.triggerRole}) ${overlayData.actionText}`
         : `${overlayData.triggerRole} ${overlayData.actionText}`;
+
+    const subtitleLine = hasCustomNextAction
+        ? `Ya puedes continuar con ${overlayData.nextActionText}.`
+        : `Ya puedes continuar con ${overlayData.nextPhaseText}.`;
 
     return (
         <div
@@ -151,7 +158,7 @@ export default function DependencyTransitionOverlay({ overlayData }) {
                         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
                     }}
                 >
-                    {titleLine}
+                    {hasCustomHeadline ? overlayData.headlineText : titleLine}
                 </p>
 
                 <p
@@ -164,7 +171,7 @@ export default function DependencyTransitionOverlay({ overlayData }) {
                         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
                     }}
                 >
-                    Ya pueden continuar con: <strong style={{ color: '#3b82f6', fontWeight: 600 }}>{overlayData.nextPhaseText}</strong>
+                    {subtitleLine}
                 </p>
 
                 {overlayData.hasEvidence && (

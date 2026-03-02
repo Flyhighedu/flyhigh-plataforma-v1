@@ -32,7 +32,7 @@ const AUX_GROUPS = AUX_LOAD_GROUPS;
 
 const NAV_STEPS = [
     { id: 'informe', label: 'INFORME', icon: 'check', status: 'completed' },
-    { id: 'preparacion', label: 'PREPARACIÓN', icon: 'assignment', status: 'completed' },
+    { id: 'preparacion', label: 'MONTAJE', icon: 'assignment', status: 'completed' },
     { id: 'carga', label: 'CARGA', icon: 'local_shipping', status: 'active' },
     { id: 'operacion', label: 'OPERACIÓN', icon: 'flight', status: 'pending' },
 ];

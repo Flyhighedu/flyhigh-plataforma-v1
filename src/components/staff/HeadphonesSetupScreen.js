@@ -744,7 +744,7 @@ export default function HeadphonesSetupScreen({
                                                 fontWeight: 600,
                                                 color: '#10B981'
                                             }}>
-                                                Confirmado · {confirmName}
+                                                Confirmado por: {confirmName}
                                             </span>
                                         )}
                                     </div>

@@ -702,7 +702,7 @@ export default function PilotPrepareFlightScreen({
                                 fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em',
                                 lineHeight: 1.2, marginBottom: 4, color: '#1F2937'
                             }}>
-                                Preparación de vuelo
+                                Montaje de vuelo
                             </h2>
                             <p style={{
                                 fontSize: 14, color: '#6B7280',

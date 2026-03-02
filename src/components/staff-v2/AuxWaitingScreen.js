@@ -217,7 +217,7 @@ export default function AuxWaitingScreen({
     // ── Stepper ──
     const NAV_STEPS = [
         { id: 'informe', label: 'INFORME', status: 'completed' },
-        { id: 'preparacion', label: 'PREPARACIÓN', status: 'active' },
+        { id: 'preparacion', label: 'MONTAJE', status: 'active' },
         { id: 'carga', label: 'CARGA', status: 'pending' },
         { id: 'operacion', label: 'OPERACIÓN', status: 'pending' },
     ];

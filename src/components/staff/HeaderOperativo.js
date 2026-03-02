@@ -2,7 +2,7 @@
 
 import { forwardRef } from 'react';
 import { CheckCheck, ClipboardList, GraduationCap, School, Send, Truck, Wrench } from 'lucide-react';
-import { HEADER_PHASES, getHeaderPhaseForState } from '@/constants/headerPhases';
+import { HEADER_PHASES, getHeaderPhaseForState } from '../../constants/headerPhases';
 
 function toRgba(hexColor, alpha) {
     if (typeof hexColor !== 'string') return `rgba(34,197,94,${alpha})`;
@@ -37,7 +37,11 @@ const PHASE_ICONS = {
     prep_base: ClipboardList,
     traslado: Truck,
     instalacion: Wrench,
-    operacion: GraduationCap
+    operacion: GraduationCap,
+    desmontaje: Wrench,
+    carga_retorno: Truck,
+    retorno_base: Send,
+    cierre_base: School
 };
 
 function getPhaseIcon(phaseId) {
@@ -49,7 +53,10 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
         firstName,
         roleLabel,
         missionState,
+        missionMeta,
         dateLabel,
+        checkInGreetingText = null,
+        checkInHeadlineText = null,
         schoolName = '',
         compactProgress = 0,
         waitModeActive = false,
@@ -63,13 +70,15 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
     },
     ref
 ) {
-    const phase = getHeaderPhaseForState(missionState);
+    const phase = getHeaderPhaseForState(missionState, missionMeta);
     const isCheckInPhase = phase.id === 'checkin';
     const activeColor = phase.activeColor;
     const transitionStyle = { transitionDuration: `${transitionMs}ms` };
     const displayDate = dateLabel || (isCheckInPhase ? formatToday() : formatCompactToday());
     const name = firstName || 'Operativo';
     const roleText = roleLabel || 'Operativo';
+    const checkInGreeting = String(checkInGreetingText || '¡Buenos días!').trim() || '¡Buenos días!';
+    const checkInHeadline = String(checkInHeadlineText || `Hola, ${name}`).trim() || `Hola, ${name}`;
     const normalizedSchoolName = String(schoolName || '').trim();
     const compactSecondaryText = normalizedSchoolName || displayDate;
     const compactSecondaryIsDate = !normalizedSchoolName;
@@ -192,14 +201,14 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
                     {isCheckInPhase ? (
                         <>
                             <div className="flex items-center gap-2 text-blue-100 text-sm font-medium">
-                                <span>¡Buenos días!</span>
+                                <span>{checkInGreeting}</span>
                                 <span className="w-1 h-1 bg-blue-300 rounded-full opacity-50"></span>
                                 <span className="uppercase text-xs tracking-wider opacity-80">{displayDate}</span>
                             </div>
 
                             <div className="flex flex-wrap items-end gap-x-1 gap-y-0.5">
                                 <h2 className="text-3xl font-extrabold leading-none tracking-tight text-white">
-                                    {`Hola, ${name}`}
+                                    {checkInHeadline}
                                 </h2>
                                 <span className="mb-[1px] text-[9px] font-semibold uppercase tracking-[0.08em] text-blue-100/75 sm:text-[10px]">
                                     {roleText}
@@ -336,8 +345,9 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
                     </div>
 
                     <div
-                        className="grid grid-cols-5 gap-2"
+                        className="grid gap-2"
                         style={{
+                            gridTemplateColumns: `repeat(${HEADER_PHASES.length}, minmax(0, 1fr))`,
                             minHeight: `${Math.round(8 + ((1 - compactAmount) * 4))}px`,
                             paddingTop: `${Math.max(0, 1.5 - compactAmount)}px`
                         }}

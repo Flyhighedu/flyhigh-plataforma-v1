@@ -434,7 +434,7 @@ export default function MissionBrief({
                         onClick={handleContinue}
                         className="w-full bg-[#101922] text-white font-bold py-3.5 rounded-[16px] shadow-lg active:scale-[0.98] transition-transform flex items-center justify-center gap-2 text-[15px]"
                     >
-                        Continuar a Preparación
+                        Continuar a Montaje
                         <ArrowRight size={18} />
                     </button>
                 ) : (

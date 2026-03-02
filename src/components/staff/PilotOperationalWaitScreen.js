@@ -11,17 +11,23 @@ export default function PilotOperationalWaitScreen({
     profile,
     missionInfo,
     missionState,
-    onRefresh
+    onRefresh,
+    chipOverride,
+    waitTitle = 'En espera...',
+    waitMessage = 'El equipo está finalizando logística.',
+    waitSubMessage = 'Siguiente: Despliegue de asientos.',
+    waitPhase = 'load'
 }) {
     const meta = parseMeta(missionInfo?.meta);
     const auxReady = meta.aux_ready_seat_deployment === true;
     const teacherReady = meta.teacher_civic_notified === true;
 
-    const chipText = !auxReady
+    const fallbackChipText = !auxReady
         ? 'En espera del auxiliar'
         : !teacherReady
             ? 'En espera del docente'
             : 'En espera del equipo';
+    const chipText = chipOverride || fallbackChipText;
 
     const firstName = profile?.full_name?.split(' ')[0] || 'Piloto';
     const roleName = ROLE_LABELS[profile?.role] || 'Piloto';
@@ -45,7 +51,7 @@ export default function PilotOperationalWaitScreen({
                 missionInfo={missionInfo}
                 missionState={missionState}
                 isWaitScreen={true}
-                waitPhase="load"
+                waitPhase={waitPhase}
                 chipOverride={chipText}
                 onDemoStart={onRefresh}
             />
@@ -73,14 +79,16 @@ export default function PilotOperationalWaitScreen({
                 </div>
 
                 <h1 style={{ fontSize: 30, fontWeight: 800, marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    En espera…
+                    {waitTitle}
                 </h1>
                 <p style={{ fontSize: 17, opacity: 0.9, lineHeight: 1.5, maxWidth: 320, marginBottom: 12 }}>
-                    El equipo está finalizando logística.
+                    {waitMessage}
                 </p>
-                <p style={{ fontSize: 13, opacity: 0.8 }}>
-                    Siguiente: Despliegue de asientos.
-                </p>
+                {waitSubMessage ? (
+                    <p style={{ fontSize: 13, opacity: 0.8 }}>
+                        {waitSubMessage}
+                    </p>
+                ) : null}
             </main>
         </div>
     );

@@ -28,7 +28,7 @@ const PILOT_GROUPS = PILOT_PREP_BLOCKS;
 
 const NAV_STEPS = [
     { id: 'informe', label: 'INFORME', icon: 'check', status: 'completed' },
-    { id: 'preparacion', label: 'PREPARACIÓN', icon: 'assignment', status: 'active' },
+    { id: 'preparacion', label: 'MONTAJE', icon: 'assignment', status: 'active' },
     { id: 'operacion', label: 'OPERACIÓN', icon: 'flight', status: 'pending' },
     { id: 'reporte', label: 'REPORTE', icon: 'description', status: 'pending' }
 ];

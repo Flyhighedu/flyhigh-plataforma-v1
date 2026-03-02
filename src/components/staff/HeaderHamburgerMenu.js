@@ -7,7 +7,7 @@ import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
-export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null, onCloseMission = null }) {
+export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null }) {
     const [isOpen, setIsOpen] = useState(false);
     const router = useRouter();
     const normalizedRole = role ? String(role).toLowerCase() : null;
@@ -75,24 +75,6 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                 <div>
                                     <p className="text-sm font-semibold">Historial de Misiones</p>
                                     <p className="text-[10px] text-slate-400 font-medium tracking-tight">Ver reportes e informes</p>
-                                </div>
-                            </button>
-                        )}
-
-                        {typeof onCloseMission === 'function' && (
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    onCloseMission();
-                                }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50 transition-colors rounded-lg text-amber-700 group"
-                            >
-                                <div className="p-2 bg-amber-50 rounded-lg transition-colors group-hover:bg-amber-100">
-                                    <LogOut size={18} />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold">Cerrar Día / Misión</p>
-                                    <p className="text-[10px] text-amber-500/80 font-medium tracking-tight">Ir al cierre operativo</p>
                                 </div>
                             </button>
                         )}

@@ -66,7 +66,7 @@ function VoicePlayer({ url, duration }) {
 }
 
 /* ─── Animated Unload Scene Illustration ─── */
-function TruckIllustration() {
+export function TruckIllustration() {
     return (
         <div style={{
             width: '100%', maxWidth: 420,

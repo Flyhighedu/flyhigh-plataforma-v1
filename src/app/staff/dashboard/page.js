@@ -2,7 +2,7 @@
 
 // =====================================================
 // Staff Dashboard — Stepper Shell V1
-// 3 pasos: Preparación → Operación → Reporte
+// 3 pasos: Montaje → Operación → Reporte
 // Auto-detecta escuela del día desde proximas_escuelas
 // =====================================================
 
@@ -42,6 +42,23 @@ import OperationStartBridgeScreen from '@/components/staff/OperationStartBridgeS
 import OperationPanelConstructionScreen from '@/components/staff/OperationPanelConstructionScreen';
 import TeacherCivicParallelScreen from '@/components/staff/TeacherCivicParallelScreen';
 import AuxCivicEvidenceParallelScreen from '@/components/staff/AuxCivicEvidenceParallelScreen';
+import AdWallDismantleScreen from '@/components/staff/AdWallDismantleScreen';
+import DroneStorageScreen from '@/components/staff/DroneStorageScreen';
+import GlassesStorageScreen from '@/components/staff/GlassesStorageScreen';
+import HeadphonesStorageScreen from '@/components/staff/HeadphonesStorageScreen';
+import SeatFoldingScreen from '@/components/staff/SeatFoldingScreen';
+import VehiclePositioningScreen from '@/components/staff/VehiclePositioningScreen';
+import GlobalLoadingScreen from '@/components/staff/GlobalLoadingScreen';
+import MomentoDeCargarScreen from '@/components/staff/MomentoDeCargarScreen';
+import ReturnRouteScreen from '@/components/staff/ReturnRouteScreen';
+import ArrivalNotificationScreen from '@/components/staff/ArrivalNotificationScreen';
+import ApoyoBodegaScreen from '@/components/staff/ApoyoBodegaScreen';
+import EquipmentUnloadScreen from '@/components/staff/EquipmentUnloadScreen';
+import ReturnInventoryScreen from '@/components/staff/ReturnInventoryScreen';
+import ChargingStationScreen from '@/components/staff/ChargingStationScreen';
+import AuxRecordingChargingScreen from '@/components/staff/AuxRecordingChargingScreen';
+import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
+import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
@@ -52,9 +69,14 @@ import { parseMeta, shouldLockPilot, isPilotReady } from '@/utils/metaHelpers';
 import DependencyTransitionOverlay from '@/components/staff/DependencyTransitionOverlay';
 import useDependencyTransition from '@/hooks/useDependencyTransition';
 import { getTransitionCopy } from '@/utils/transitionCopyMap';
+import {
+    DISMANTLING_ROUTE_IDS,
+    resolveDismantlingRoute,
+    normalizeDismantlingRole
+} from '@/utils/dismantlingRouting';
 
 const STEPS = [
-    { id: 'prep', label: 'Preparación', icon: ClipboardList },
+    { id: 'prep', label: 'Montaje', icon: ClipboardList },
     { id: 'en_ruta', label: 'En Ruta', icon: Truck },
     { id: 'operation', label: 'Operación', icon: Plane },
     { id: 'report', label: 'Reporte', icon: FileText },
@@ -135,6 +157,13 @@ const TEACHER_CIVIC_LOCK_AUDIO_STATUSES = new Set([
     'pending_upload',
     'failed'
 ]);
+
+function firstNameOrFallback(fullName, fallback = 'Operativo') {
+    const normalized = String(fullName || '').trim();
+    if (!normalized) return fallback;
+    const [first] = normalized.split(/\s+/);
+    return first || fallback;
+}
 
 function normalizeMeta(meta) {
     if (!meta) return Object.create(null);
@@ -231,6 +260,11 @@ function getVisibleTaskKey(snapshot) {
     const meta = normalizeMeta(snapshot.missionMeta);
     const arrivalPhotoTakenAt = snapshot.arrivalPhotoTakenAt || null;
 
+    if (missionState === 'dismantling') {
+        const dismantlingRoute = resolveDismantlingRoute(role, meta);
+        return `closure:${dismantlingRoute.routeKey}`;
+    }
+
     if (snapshot.showBrief) {
         return 'brief:mission';
     }
@@ -272,12 +306,21 @@ function getVisibleTaskKey(snapshot) {
 
     const teacherCivicConfirmed = meta.teacher_civic_notified === true;
     const civicParallelInProgress = meta.civic_parallel_status === 'in_progress';
+    const teacherCivicSkipped =
+        meta.civic_parallel_teacher_skipped === true ||
+        Boolean(meta.civic_parallel_teacher_skipped_at);
     const teacherCivicDone =
+        teacherCivicSkipped ||
         Boolean(meta.civic_parallel_teacher_done_at) ||
         meta.civic_parallel_teacher_audio_status === 'uploaded';
     const assistantCivicStatus = meta.civic_parallel_aux_status || null;
+    const assistantCivicSkipped =
+        meta.civic_parallel_aux_skipped === true ||
+        Boolean(meta.civic_parallel_aux_skipped_at) ||
+        String(assistantCivicStatus || '').trim().toLowerCase() === 'skipped';
     const assistantNeedsCivicPanel =
         civicParallelInProgress &&
+        !assistantCivicSkipped &&
         (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
     const teacherCivicStageLock = normalizeTeacherCivicStageLock(meta.civic_parallel_teacher_stage_lock);
     const teacherCivicStageLocked = shouldKeepTeacherCivicStageLocked(role, missionState, meta);
@@ -286,6 +329,7 @@ function getVisibleTaskKey(snapshot) {
         role === 'teacher' &&
         teacherCivicConfirmed &&
         meta.civic_parallel_use_legacy_panel === true &&
+        !teacherCivicSkipped &&
         !teacherCivicDone &&
         (snapshot.teacherCivicPanelOpen || (civicParallelInProgress && !snapshot.teacherCivicPanelDismissed));
 
@@ -386,7 +430,7 @@ function getVisibleTaskKey(snapshot) {
     }
 
     if (currentStep === 3) {
-        return `step3:report:${role || 'unknown'}`;
+        return `flow:completed:${role || 'unknown'}`;
     }
 
     return `stepper:step${currentStep}:${role || 'unknown'}:${missionState || 'unknown'}`;
@@ -399,6 +443,13 @@ function projectSnapshotForRealtimeUpdate(snapshot, nextState, incomingMeta, arr
         missionMeta: incomingMeta,
         arrivalPhotoTakenAt: arrivalPhotoTakenAt || snapshot.arrivalPhotoTakenAt || null
     };
+
+    if (nextState === 'dismantling') {
+        projected.waitingForAux = false;
+        projected.auxFlowState = null;
+        projected.teacherFlowState = null;
+        projected.currentStep = 2;
+    }
 
     if (
         projected.profileRole === 'assistant' &&
@@ -420,7 +471,7 @@ function projectSnapshotForRealtimeUpdate(snapshot, nextState, incomingMeta, arr
         } else if (projected.waitingForAux && PILOT_WAITING_AUX_RELEASE_STATES.has(nextState)) {
             projected.waitingForAux = false;
             projected.currentStep = Math.max(Number(projected.currentStep) || 0, 1);
-        } else if (LISTENER_STEP_ONE_STATES.has(nextState) || nextState === 'report') {
+        } else if (LISTENER_STEP_ONE_STATES.has(nextState) || nextState === 'report' || nextState === 'dismantling') {
             projected.waitingForAux = false;
         }
     }
@@ -462,9 +513,10 @@ function projectSnapshotForRealtimeUpdate(snapshot, nextState, incomingMeta, arr
             projected.currentStep = 2;
         }
 
-        if (nextState === 'report') {
-            projected.currentStep = 3;
+        if (nextState === 'dismantling') {
+            projected.currentStep = 2;
         }
+
     }
 
     return projected;
@@ -489,6 +541,7 @@ export default function StaffDashboard() {
     const [isTestMode, setIsTestMode] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [missionState, setMissionState] = useState(null); // Local reliable state
+    const [isStartingClosureFlow, setIsStartingClosureFlow] = useState(false);
     const [directOperationMode, setDirectOperationMode] = useState(false);
     const [teacherCivicPanelOpen, setTeacherCivicPanelOpen] = useState(false);
     const [teacherCivicPanelDismissed, setTeacherCivicPanelDismissed] = useState(false);
@@ -525,6 +578,19 @@ export default function StaffDashboard() {
     useEffect(() => { teacherCivicPanelOpenRef.current = teacherCivicPanelOpen; }, [teacherCivicPanelOpen]);
     useEffect(() => { teacherCivicPanelDismissedRef.current = teacherCivicPanelDismissed; }, [teacherCivicPanelDismissed]);
     useEffect(() => { assistantCivicPanelDismissedRef.current = assistantCivicPanelDismissed; }, [assistantCivicPanelDismissed]);
+
+    useEffect(() => {
+        if (missionState !== 'dismantling') return;
+
+        if (waitingForAuxRef.current) setWaitingForAux(false);
+        if (auxFlowStateRef.current) setAuxFlowState(null);
+        if (teacherFlowStateRef.current) setTeacherFlowState(null);
+        if (teacherCivicPanelOpenRef.current) setTeacherCivicPanelOpen(false);
+
+        if ((Number(currentStepRef.current) || 0) !== 2) {
+            setCurrentStep(2);
+        }
+    }, [missionState]);
 
     const buildListenerSnapshot = useCallback((overrides = {}) => {
         const missionInfo = todaySchoolRef.current || Object.create(null);
@@ -748,7 +814,7 @@ export default function StaffDashboard() {
                             setWaitingForAux(false);
                         } else if (PILOT_WAITING_FOR_AUX_STATES.has(state)) {
                             setWaitingForAux(true);
-                        } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed') {
+                        } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed' || state === 'dismantling') {
                             setWaitingForAux(false);
                         }
                     }
@@ -780,7 +846,7 @@ export default function StaffDashboard() {
                             setCurrentStep(0);
                         } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
                             setCurrentStep(1); // En Ruta (and Post-Arrival subflow)
-                        } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation'].includes(state)) {
+                        } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation', 'dismantling'].includes(state)) {
                             setCurrentStep(2); // Operation
                         } else if (['report', 'closed'].includes(state) || journeyData.status === 'report') {
                             setCurrentStep(3); // Report
@@ -844,7 +910,7 @@ export default function StaffDashboard() {
                             console.warn('Check-in query fallback (non-blocking):', checkInError);
 
                             const inferredState = journeyData?.mission_state || todaySchoolRef.current?.mission_state || null;
-                            const isOperationalFlowState = LISTENER_STEP_ONE_STATES.has(inferredState) || inferredState === 'report' || inferredState === 'closed';
+                            const isOperationalFlowState = LISTENER_STEP_ONE_STATES.has(inferredState) || inferredState === 'dismantling' || inferredState === 'report' || inferredState === 'closed';
 
                             if (isOperationalFlowState || checkInRef.current) {
                                 setShowBrief(false);
@@ -875,6 +941,7 @@ export default function StaffDashboard() {
                                 LISTENER_STEP_ONE_STATES.has(inferredState) ||
                                 inferredState === 'OPERATION' ||
                                 inferredState === 'operation' ||
+                                inferredState === 'dismantling' ||
                                 inferredState === 'report' ||
                                 inferredState === 'closed';
 
@@ -899,7 +966,7 @@ export default function StaffDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [userId, profile]); // Removed journeyId from dependencies to avoid loop
+    }, [userId, profile]);
 
     // ── INITIALIZATION ──
     useEffect(() => {
@@ -1023,6 +1090,13 @@ export default function StaffDashboard() {
                                 pilot_name: missionInfo?.pilot_name,
                                 teacher_name: missionInfo?.teacher_name,
                                 aux_name: missionInfo?.aux_name,
+                            },
+                            {
+                                beforeVisibleTaskKey,
+                                afterVisibleTaskKey,
+                                beforeMeta: beforeSnapshot.missionMeta,
+                                afterMeta: incomingMeta,
+                                currentUserId: currentProfile?.user_id || userId || null
                             }
                         );
 
@@ -1083,9 +1157,16 @@ export default function StaffDashboard() {
                                     setWaitingForAux(false);
                                 } else if (PILOT_WAITING_FOR_AUX_STATES.has(newState)) {
                                     setWaitingForAux(true);
-                                } else if (LISTENER_STEP_ONE_STATES.has(newState) || newState === 'report') {
+                                } else if (LISTENER_STEP_ONE_STATES.has(newState) || newState === 'report' || newState === 'dismantling') {
                                     setWaitingForAux(false);
                                 }
+                            }
+
+                            if (newState === 'dismantling') {
+                                setWaitingForAux(false);
+                                setAuxFlowState(null);
+                                setTeacherFlowState(null);
+                                setCurrentStep(2);
                             }
 
                             const isPilotLocked = shouldLockPilot(
@@ -1121,11 +1202,9 @@ export default function StaffDashboard() {
                             }
 
                             // Advance to Step 2 (Operation)
-                            if (['OPERATION'].includes(newState)) {
+                            if (['OPERATION', 'dismantling'].includes(newState)) {
                                 setCurrentStep(2);
                             }
-
-                            if (['report'].includes(newState)) setCurrentStep(3);
                         } else {
                             console.log('⛔ Global update received but ignored for navigation - Waiting for local Check-in.');
                         }
@@ -1147,7 +1226,7 @@ export default function StaffDashboard() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [journeyId, triggerTransition, buildListenerSnapshot]);
+    }, [journeyId, triggerTransition, buildListenerSnapshot, userId]);
 
     // ── [NEW] SCHOOL ASSIGNMENT LISTENER (For Demo Mode) ──
     useEffect(() => {
@@ -1411,15 +1490,77 @@ export default function StaffDashboard() {
         setCurrentStep(1);
     };
 
-    const handleGoToReport = () => {
+    const handleCheckoutComplete = useCallback(() => {
+        refreshMission();
+    }, [refreshMission]);
+
+    const handleGoToReport = async () => {
+        if (isStartingClosureFlow) return;
+
         setDirectOperationMode(false);
-        setCurrentStep(3); // Report is step 3
-        if (journeyId) {
+        setWaitingForAux(false);
+        setAuxFlowState(null);
+        setTeacherFlowState(null);
+        setTeacherCivicPanelOpen(false);
+        setTeacherCivicPanelDismissed(false);
+        setAssistantCivicPanelDismissed(false);
+        setCurrentStep(2);
+
+        if (!journeyId) {
+            setMissionState('dismantling');
+            return;
+        }
+
+        setIsStartingClosureFlow(true);
+        try {
             const supabase = createClient();
-            supabase.from('staff_journeys')
-                .update({ status: 'report', updated_at: new Date().toISOString() })
+            const now = new Date().toISOString();
+            const { data, error: readError } = await supabase
+                .from('staff_journeys')
+                .select('meta')
                 .eq('id', journeyId)
-                .then(() => { });
+                .single();
+
+            if (readError) throw readError;
+
+            const currentMeta = parseMeta(data?.meta);
+            const sanitizedMeta = { ...currentMeta };
+            delete sanitizedMeta.closure_step;
+            const starterName = firstNameOrFallback(profile?.full_name, 'Operativo');
+
+            const nextMeta = {
+                ...sanitizedMeta,
+                closure_phase: 'dismantling',
+                closure_started_at: sanitizedMeta.closure_started_at || now,
+                closure_started_by: sanitizedMeta.closure_started_by || userId,
+                closure_started_by_name: sanitizedMeta.closure_started_by_name || starterName
+            };
+
+            const { error: updateError } = await supabase
+                .from('staff_journeys')
+                .update({
+                    mission_state: 'dismantling',
+                    meta: nextMeta,
+                    updated_at: now
+                })
+                .eq('id', journeyId);
+
+            if (updateError) throw updateError;
+
+            setMissionState('dismantling');
+            setTodaySchool((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    meta: nextMeta
+                };
+            });
+            refreshMission();
+        } catch (error) {
+            console.error('Error iniciando desmontaje y retorno:', error);
+            alert('No se pudo iniciar el flujo de desmontaje y retorno. Intenta nuevamente.');
+        } finally {
+            setIsStartingClosureFlow(false);
         }
     };
 
@@ -1431,7 +1572,9 @@ export default function StaffDashboard() {
                     .from('staff_journeys')
                     .update({ status: 'closed', updated_at: new Date().toISOString() })
                     .eq('id', journeyId);
-            } catch (e) { console.warn('Error cerrando jornada:', e); }
+            } catch (e) {
+                console.warn('Error cerrando jornada:', e);
+            }
         }
         router.push('/staff/login');
     };
@@ -1554,7 +1697,7 @@ export default function StaffDashboard() {
         );
     }
 
-    if (directOperationMode && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
+    if (directOperationMode && missionState !== 'dismantling' && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
         if (profile?.role === 'teacher') {
             return withDependencyOverlay(
                 <StaffOperationLegacy
@@ -1710,7 +1853,11 @@ export default function StaffDashboard() {
     const civicParallelInProgress = parallelMeta.civic_parallel_status === 'in_progress';
     const teacherCivicAudioStatus = String(parallelMeta.civic_parallel_teacher_audio_status || 'idle').trim().toLowerCase();
     const teacherCivicStageLock = normalizeTeacherCivicStageLock(parallelMeta.civic_parallel_teacher_stage_lock);
+    const teacherCivicSkipped =
+        parallelMeta.civic_parallel_teacher_skipped === true ||
+        Boolean(parallelMeta.civic_parallel_teacher_skipped_at);
     const teacherCivicDone =
+        teacherCivicSkipped ||
         Boolean(parallelMeta.civic_parallel_teacher_done_at) ||
         teacherCivicAudioStatus === 'uploaded';
     const teacherCivicEvidenceInProgress =
@@ -1722,19 +1869,26 @@ export default function StaffDashboard() {
         Boolean(teacherCivicStageLock) &&
         teacherCivicEvidenceInProgress;
     const assistantCivicStatus = parallelMeta.civic_parallel_aux_status || null;
+    const assistantCivicSkipped =
+        parallelMeta.civic_parallel_aux_skipped === true ||
+        Boolean(parallelMeta.civic_parallel_aux_skipped_at) ||
+        String(assistantCivicStatus || '').trim().toLowerCase() === 'skipped';
     const assistantNeedsCivicPanel =
         civicParallelInProgress &&
+        !assistantCivicSkipped &&
         (!assistantCivicStatus || ASSISTANT_CIVIC_PENDING_STATUSES.has(assistantCivicStatus));
 
     const shouldShowTeacherCivicParallel =
         profile?.role === 'teacher' &&
         teacherCivicConfirmed &&
         parallelMeta.civic_parallel_use_legacy_panel === true &&
+        !teacherCivicSkipped &&
         !teacherCivicDone &&
         (teacherCivicPanelOpen || (civicParallelInProgress && !teacherCivicPanelDismissed));
 
     const shouldShowAssistantCivicParallel =
         profile?.role === 'assistant' &&
+        !assistantCivicSkipped &&
         assistantNeedsCivicPanel &&
         !assistantCivicPanelDismissed;
 
@@ -1831,6 +1985,73 @@ export default function StaffDashboard() {
                     onRefresh={refreshMission}
                 />
             );
+        }
+    }
+
+    if (missionState === 'dismantling') {
+        const closureCommonProps = {
+            journeyId,
+            userId,
+            profile,
+            missionInfo: todaySchool,
+            missionState,
+            onRefresh: refreshMission,
+            onCheckoutComplete: handleCheckoutComplete
+        };
+        const dismantlingRoute = resolveDismantlingRoute(profile?.role, todaySchool?.meta);
+
+        if (dismantlingRoute.kind === 'wait') {
+            return withDependencyOverlay(
+                <PilotOperationalWaitScreen
+                    {...closureCommonProps}
+                    chipOverride={dismantlingRoute.waitChip}
+                    waitTitle="En espera..."
+                    waitMessage={dismantlingRoute.waitMessage}
+                    waitSubMessage={null}
+                    waitPhase="load"
+                />
+            );
+        }
+
+        switch (dismantlingRoute.screen) {
+            case DISMANTLING_ROUTE_IDS.AD_WALL_DISMANTLE:
+                return withDependencyOverlay(<AdWallDismantleScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.DRONE_STORAGE:
+                return withDependencyOverlay(<DroneStorageScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.GLASSES_STORAGE:
+                return withDependencyOverlay(<GlassesStorageScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.HEADPHONES_STORAGE:
+                return withDependencyOverlay(<HeadphonesStorageScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.SEAT_FOLDING:
+                return withDependencyOverlay(<SeatFoldingScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.VEHICLE_POSITIONING:
+                return withDependencyOverlay(<VehiclePositioningScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.GLOBAL_LOADING:
+            case DISMANTLING_ROUTE_IDS.CONTAINER_LOADING:
+                if (normalizeDismantlingRole(profile?.role) === 'assistant') {
+                    return withDependencyOverlay(<GlobalLoadingScreen {...closureCommonProps} />);
+                }
+                return withDependencyOverlay(<MomentoDeCargarScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.RETURN_ROUTE:
+                return withDependencyOverlay(<ReturnRouteScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.ARRIVAL_NOTIFICATION:
+                return withDependencyOverlay(<ArrivalNotificationScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.APOYO_BODEGA:
+                return withDependencyOverlay(<ApoyoBodegaScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.EQUIPMENT_UNLOAD:
+                return withDependencyOverlay(<EquipmentUnloadScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.RETURN_INVENTORY:
+                return withDependencyOverlay(<ReturnInventoryScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.ELECTRONICS_CHARGING:
+                return withDependencyOverlay(<ChargingStationScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.AUX_RECORDING_CHARGING:
+                return withDependencyOverlay(<AuxRecordingChargingScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.FINAL_PARKING:
+                return withDependencyOverlay(<FinalParkingScreen {...closureCommonProps} />);
+            case DISMANTLING_ROUTE_IDS.CHECKOUT:
+                return withDependencyOverlay(<CheckoutScreen {...closureCommonProps} />);
+            default:
+                return withDependencyOverlay(<CheckoutScreen {...closureCommonProps} />);
         }
     }
 
@@ -2172,7 +2393,7 @@ export default function StaffDashboard() {
 
             {/* Step Content */}
             <div className="max-w-lg mx-auto px-4 py-6">
-                {/* PASO 1: Preparación (non-pilot roles) */}
+                {/* PASO 1: Montaje (non-pilot roles) */}
                 {currentStep === 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <h2 className="text-xl font-bold text-slate-900 mb-1">Pre-Jornada</h2>

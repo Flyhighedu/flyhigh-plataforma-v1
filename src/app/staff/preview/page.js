@@ -22,7 +22,7 @@ import { createClient } from '@/utils/supabase/client';
 
 const STEPS = [
     { id: 'brief', label: 'Informe', icon: Briefcase },
-    { id: 'prep', label: 'Preparación', icon: ClipboardList },
+    { id: 'prep', label: 'Montaje', icon: ClipboardList },
     { id: 'operation', label: 'Operación', icon: Plane },
     { id: 'report', label: 'Reporte', icon: FileText },
 ];
@@ -257,7 +257,7 @@ function PreviewContent() {
                         />
                     )}
 
-                    {/* PASO 1: Preparación (preview) */}
+                    {/* PASO 1: Montaje (preview) */}
                     {currentStep === 1 && (
                         <div>
                             {targetProfile?.role !== 'pilot' && (

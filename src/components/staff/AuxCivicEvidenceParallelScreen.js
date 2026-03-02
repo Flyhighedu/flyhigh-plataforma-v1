@@ -527,6 +527,39 @@ export default function AuxCivicEvidenceParallelScreen({
         auxStatus !== 'uploading' &&
         (!pendingVideoBlob || ['pending_recording', 'uploaded'].includes(auxStatus));
 
+    const handleBackToTaskWithSkip = async () => {
+        try {
+            const now = new Date().toISOString();
+            const shouldSkipEvidence = auxStatus !== 'uploaded';
+
+            if (journeyId && shouldSkipEvidence) {
+                await updateJourneyMeta({
+                    civic_parallel_aux_status: 'skipped',
+                    civic_parallel_aux_skipped: true,
+                    civic_parallel_aux_skipped_at: now,
+                    civic_parallel_aux_skipped_by: userId,
+                    civic_parallel_aux_skipped_by_name: profile?.full_name || firstName,
+                    civic_parallel_aux_done_at: meta.civic_parallel_aux_done_at || now,
+                    civic_parallel_aux_error: null,
+                    civic_parallel_aux_error_code: null,
+                    civic_parallel_aux_failed_at: null
+                });
+
+                setAuxStatus('skipped');
+                setAuxError('');
+                setAuxErrorCode('');
+            }
+
+            onRefresh && onRefresh();
+        } catch (error) {
+            console.error('Error marcando skip de evidencia auxiliar:', error);
+        } finally {
+            if (typeof onBackToTask === 'function') {
+                onBackToTask();
+            }
+        }
+    };
+
     return (
         <div style={{
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -886,7 +919,7 @@ export default function AuxCivicEvidenceParallelScreen({
                                         <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#16A34A' }}>Evidencia enviada</p>
                                     </div>
                                     <button
-                                        onClick={onBackToTask}
+                                        onClick={handleBackToTaskWithSkip}
                                         style={{
                                             width: '100%',
                                             padding: 13,
@@ -962,7 +995,7 @@ export default function AuxCivicEvidenceParallelScreen({
                                     </div>
 
                                     <button
-                                        onClick={onBackToTask}
+                                        onClick={handleBackToTaskWithSkip}
                                         style={{
                                             width: '100%',
                                             padding: 12,
@@ -1086,7 +1119,7 @@ export default function AuxCivicEvidenceParallelScreen({
                         </button>
 
                         <button
-                            onClick={onBackToTask}
+                            onClick={handleBackToTaskWithSkip}
                             style={{
                                 marginTop: 10,
                                 width: '100%',

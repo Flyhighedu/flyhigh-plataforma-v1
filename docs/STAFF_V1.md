@@ -64,7 +64,7 @@ En Supabase Dashboard → Storage → Create Bucket:
 
 1. **Login**: `/staff/login` — email + password
 2. **Dashboard**: `/staff/dashboard` — stepper de 3 pasos:
-   - **Preparación**: Checklist por rol (Piloto/Docente/Auxiliar)
+   - **Montaje**: Checklist por rol (Piloto/Docente/Auxiliar)
    - **Operación**: Registro de vuelos (funcionalidad existente)
    - **Reporte**: Cierre de misión con foto + firma + sync
 3. **Auto-detección de escuela**: Si hay una escuela programada para hoy en `proximas_escuelas`, se selecciona automáticamente. Si no, se muestra el selector manual.

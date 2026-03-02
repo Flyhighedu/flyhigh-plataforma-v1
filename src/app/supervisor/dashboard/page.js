@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { PREP_CHECKLISTS, getGroupedItems } from '@/config/prepChecklistConfig';
 import { AUX_LOAD_GROUPS, TEACHER_TEAM_CHECK_TYPES, PILOT_PREP_BLOCKS, PILOT_BLOCK_CHECK_MAP } from '@/config/operationalChecklists';
+import { CLOSURE_STEPS, CLOSURE_STEP_SEQUENCE, getClosurePhaseForStep } from '@/constants/closureFlow';
+import { DISMANTLING_SCREEN_LABELS, getDismantlingFlags } from '@/utils/dismantlingRouting';
 import {
     buildFlightSnapshotMap,
     buildSchoolMapById,
@@ -12,10 +14,14 @@ import {
     missionDateTimeFromClosure,
     resolveHistorySchoolName,
 } from '@/utils/missionHistory';
+import EvidenceViewerModal from '@/components/supervisor/EvidenceViewerModal';
+import V2MissionDetails from '@/components/supervisor/V2MissionDetails';
+import DeleteConfirmationModal from '@/components/supervisor/DeleteConfirmationModal';
 
 /* ═══════════════ CONSTANTS ═══════════════ */
 const ROLE_ORDER = ['pilot', 'teacher', 'assistant'];
 const ACTIVE_MS = 5 * 60 * 1000;
+const LIVE_COMPLETION_GRACE_MS = 25 * 60 * 1000;
 
 const ROLE_META = {
     pilot: { label: 'Piloto', icon: 'flight' },
@@ -24,20 +30,22 @@ const ROLE_META = {
 };
 
 const PHASES = [
-    { id: 'prep', label: 'Preparación', states: ['prep', 'PILOT_PREP', 'MISSION_BRIEF', 'CHECKIN_DONE', 'PREP_DONE', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK', 'AUX_CONTAINERS_DONE', 'ROUTE_READY'] },
+    { id: 'prep', label: 'Montaje', states: ['prep', 'PILOT_PREP', 'MISSION_BRIEF', 'CHECKIN_DONE', 'PREP_DONE', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK', 'AUX_CONTAINERS_DONE', 'ROUTE_READY'] },
     { id: 'route', label: 'En Ruta', states: ['ROUTE_IN_PROGRESS', 'IN_ROUTE'] },
     { id: 'operation', label: 'Operación', states: ['ARRIVAL_PHOTO_DONE', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment', 'OPERATION', 'PILOT_OPERATION'] },
     { id: 'closure', label: 'Cierre', states: ['SHUTDOWN', 'POST_MISSION_REPORT', 'CLOSURE', 'report', 'closed'] },
 ];
 
-const AUX_LOAD = AUX_LOAD_GROUPS[0] || { items: [], photos: [] };
+const AUX_LOADS = Array.isArray(AUX_LOAD_GROUPS) ? AUX_LOAD_GROUPS : [];
 
 /* ═══════════════ LABEL MAP ═══════════════ */
 const LABEL_MAP = (() => {
     const m = {};
     Object.values(PREP_CHECKLISTS).forEach(cfg => (cfg.items || []).forEach(it => { m[it.id] = it.label; }));
-    (AUX_LOAD.items || []).forEach(it => { m[it.id] = it.label; });
-    (AUX_LOAD.photos || []).forEach(it => { m[it.id] = it.label; });
+    AUX_LOADS.forEach((group) => {
+        (group?.items || []).forEach((it) => { m[it.id] = it.label; });
+        (group?.photos || []).forEach((it) => { m[it.id] = it.label; });
+    });
     return m;
 })();
 
@@ -69,10 +77,45 @@ function fmtMMSS(seconds) {
     return `${min}:${sec}`;
 }
 
+function fmtExactDateTime(iso) {
+    if (!iso) return '--';
+    return new Date(iso).toLocaleString('es-MX', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZone: 'America/Mexico_City'
+    });
+}
+
 function safeSchoolName(value) {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseObject(value) {
+    if (!value) return Object.create(null);
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+                ? parsed
+                : Object.create(null);
+        } catch {
+            return Object.create(null);
+        }
+    }
+
+    if (typeof value === 'object' && !Array.isArray(value)) {
+        return value;
+    }
+
+    return Object.create(null);
 }
 
 function toMs(value) {
@@ -101,6 +144,284 @@ function buildPhaseTimer(startMs, endMs, nowMs) {
         seconds: Math.max(0, Math.floor((safeEndMs - safeStartMs) / 1000)),
         startedAtMs: safeStartMs,
         endedAtMs: safeEndMs
+    };
+}
+
+function normalizeRoleKey(role) {
+    const normalized = String(role || '').trim().toLowerCase();
+    if (normalized === 'auxiliar' || normalized === 'aux') return 'assistant';
+    if (normalized === 'docente') return 'teacher';
+    return normalized;
+}
+
+function isTruthyFlag(value) {
+    return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function getMetaFlag(meta = {}, keys = []) {
+    return keys.some((key) => isTruthyFlag(meta?.[key]));
+}
+
+function getMetaTimestamp(meta = {}, keys = []) {
+    for (const key of keys) {
+        const value = meta?.[key];
+        if (!value) continue;
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+    }
+    return null;
+}
+
+function getEarliestTimestamp(values = []) {
+    let winnerMs = 0;
+    let winnerIso = null;
+
+    values.forEach((value) => {
+        if (!value) return;
+        const ms = Date.parse(value);
+        if (!Number.isFinite(ms)) return;
+        if (!winnerIso || ms < winnerMs) {
+            winnerMs = ms;
+            winnerIso = new Date(ms).toISOString();
+        }
+    });
+
+    return winnerIso;
+}
+
+function getLatestTimestamp(values = []) {
+    let winnerMs = 0;
+    let winnerIso = null;
+
+    values.forEach((value) => {
+        if (!value) return;
+        const ms = Date.parse(value);
+        if (!Number.isFinite(ms)) return;
+        if (!winnerIso || ms > winnerMs) {
+            winnerMs = ms;
+            winnerIso = new Date(ms).toISOString();
+        }
+    });
+
+    return winnerIso;
+}
+
+function getCheckoutStatusFromMeta(meta = {}) {
+    const checkoutTeam =
+        meta && typeof meta.closure_checkout_team === 'object' && !Array.isArray(meta.closure_checkout_team)
+            ? meta.closure_checkout_team
+            : Object.create(null);
+
+    if (meta?.closure_checkout_done === true) {
+        return {
+            pilot: true,
+            teacher: true,
+            assistant: true
+        };
+    }
+
+    return {
+        pilot: meta?.closure_checkout_pilot_done === true || meta?.checkout_pilot_done === true || checkoutTeam.pilot === true,
+        teacher: meta?.closure_checkout_teacher_done === true || meta?.checkout_teacher_done === true || checkoutTeam.teacher === true,
+        assistant: meta?.closure_checkout_assistant_done === true || meta?.checkout_assistant_done === true || checkoutTeam.assistant === true
+    };
+}
+
+function getCheckoutCommentsFromMeta(meta = {}) {
+    const byRole = {
+        pilot: null,
+        teacher: null,
+        assistant: null
+    };
+
+    const comments = Array.isArray(meta?.checkout_comments)
+        ? meta.checkout_comments
+        : [];
+
+    comments.forEach((entry) => {
+        const role = normalizeRoleKey(entry?.role);
+        const message = typeof entry?.message === 'string' ? entry.message.trim() : '';
+        if (!ROLE_ORDER.includes(role)) return;
+        if (!message) return;
+        byRole[role] = message;
+    });
+
+    return byRole;
+}
+
+const TERMINAL_REPORT_STATES = new Set(['REPORT', 'CLOSED', 'POST_MISSION_REPORT', 'CLOSURE']);
+
+const SCHOOL_TEARDOWN_STEP_IDS = CLOSURE_STEP_SEQUENCE.filter((step) => {
+    const closurePhase = getClosurePhaseForStep(step);
+    return closurePhase === 'dismantling' || closurePhase === 'loading';
+});
+
+const BASE_CLOSURE_STEP_IDS = [
+    CLOSURE_STEPS.EQUIPMENT_UNLOAD,
+    ...CLOSURE_STEP_SEQUENCE.filter((step) => {
+        return getClosurePhaseForStep(step) === 'base_closure' && step !== CLOSURE_STEPS.CHECKOUT;
+    })
+];
+
+const GLOBAL_CLOSURE_TASKS = new Set([
+    CLOSURE_STEPS.GLASSES_STORAGE,
+    CLOSURE_STEPS.HEADPHONES_STORAGE,
+    CLOSURE_STEPS.SEAT_FOLDING,
+    CLOSURE_STEPS.CONTAINER_LOADING,
+    CLOSURE_STEPS.RETURN_ROUTE,
+    CLOSURE_STEPS.EQUIPMENT_UNLOAD
+]);
+
+const PHASE4_ROLE_STEP_FILTERS = {
+    pilot: new Set([
+        CLOSURE_STEPS.DRONE_STORAGE,
+        CLOSURE_STEPS.GLASSES_STORAGE,
+        CLOSURE_STEPS.HEADPHONES_STORAGE,
+        CLOSURE_STEPS.SEAT_FOLDING,
+        CLOSURE_STEPS.CONTAINER_LOADING,
+        CLOSURE_STEPS.RETURN_ROUTE
+    ]),
+    teacher: new Set([
+        CLOSURE_STEPS.GLASSES_STORAGE,
+        CLOSURE_STEPS.HEADPHONES_STORAGE,
+        CLOSURE_STEPS.SEAT_FOLDING,
+        CLOSURE_STEPS.CONTAINER_LOADING,
+        CLOSURE_STEPS.RETURN_ROUTE
+    ]),
+    assistant: new Set([
+        CLOSURE_STEPS.AD_WALL_DISMANTLE,
+        CLOSURE_STEPS.GLASSES_STORAGE,
+        CLOSURE_STEPS.HEADPHONES_STORAGE,
+        CLOSURE_STEPS.VEHICLE_POSITIONING,
+        CLOSURE_STEPS.CONTAINER_LOADING,
+        CLOSURE_STEPS.RETURN_ROUTE
+    ])
+};
+
+const PHASE6_ROLE_STEP_FILTERS = {
+    pilot: new Set([
+        CLOSURE_STEPS.EQUIPMENT_UNLOAD,
+        CLOSURE_STEPS.RETURN_INVENTORY,
+        CLOSURE_STEPS.ELECTRONICS_CHARGING
+    ]),
+    teacher: new Set([
+        CLOSURE_STEPS.EQUIPMENT_UNLOAD
+    ]),
+    assistant: new Set([
+        CLOSURE_STEPS.EQUIPMENT_UNLOAD,
+        CLOSURE_STEPS.FINAL_PARKING
+    ])
+};
+
+const CLOSURE_TASK_TIME_KEYS = {
+    [CLOSURE_STEPS.AD_WALL_DISMANTLE]: ['ad_wall_dismantle_done_at', 'closure_ad_wall_dismantle_done_at', 'aux_adwall_dismantled_at'],
+    [CLOSURE_STEPS.DRONE_STORAGE]: ['drone_storage_done_at', 'global_drone_storage_done_at', 'pilot_drones_stored_at'],
+    [CLOSURE_STEPS.GLASSES_STORAGE]: ['glasses_storage_done_at', 'global_glasses_storage_done_at', 'global_glasses_stored_at'],
+    [CLOSURE_STEPS.HEADPHONES_STORAGE]: ['headphones_storage_done_at', 'global_headphones_storage_done_at', 'global_headphones_stored_at'],
+    [CLOSURE_STEPS.SEAT_FOLDING]: ['seat_folding_done_at', 'global_seat_folding_done_at', 'global_seats_folded_at'],
+    [CLOSURE_STEPS.VEHICLE_POSITIONING]: ['vehicle_positioning_done_at', 'closure_vehicle_positioning_done_at', 'aux_vehicle_positioned_at'],
+    [CLOSURE_STEPS.CONTAINER_LOADING]: ['global_equipment_loaded_at', 'global_container_loading_done_at', 'pilot_containers_loaded_at'],
+    [CLOSURE_STEPS.RETURN_ROUTE]: ['aux_return_route_started_at', 'closure_return_route_done_at'],
+    [CLOSURE_STEPS.ARRIVAL_NOTIFICATION]: ['aux_arrival_notified_at', 'arrival_notified_at', 'closure_arrival_notification_done_at'],
+    [CLOSURE_STEPS.EQUIPMENT_UNLOAD]: ['global_equipment_unloaded_at', 'closure_equipment_unload_done_at', 'team_unload_done_at'],
+    [CLOSURE_STEPS.RETURN_INVENTORY]: ['pilot_return_inventory_done_at', 'closure_return_inventory_done_at'],
+    [CLOSURE_STEPS.ELECTRONICS_CHARGING]: ['pilot_electronics_charged_at', 'closure_electronics_charging_done_at'],
+    [CLOSURE_STEPS.FINAL_PARKING]: ['aux_final_parking_done_at', 'closure_final_parking_done_at', 'aux_final_parking_checklist_done_at']
+};
+
+function getClosureStepDone(flags, stepId) {
+    switch (stepId) {
+        case CLOSURE_STEPS.AD_WALL_DISMANTLE:
+            return flags.auxAdWallDismantled;
+        case CLOSURE_STEPS.DRONE_STORAGE:
+            return flags.pilotDronesStored;
+        case CLOSURE_STEPS.GLASSES_STORAGE:
+            return flags.globalGlassesStored;
+        case CLOSURE_STEPS.HEADPHONES_STORAGE:
+            return flags.globalHeadphonesStored;
+        case CLOSURE_STEPS.SEAT_FOLDING:
+            return flags.globalSeatsFolded;
+        case CLOSURE_STEPS.VEHICLE_POSITIONING:
+            return flags.auxVehiclePositioned;
+        case CLOSURE_STEPS.CONTAINER_LOADING:
+            return flags.globalEquipmentLoaded;
+        case CLOSURE_STEPS.RETURN_ROUTE:
+            return flags.auxReturnRouteStarted;
+        case CLOSURE_STEPS.ARRIVAL_NOTIFICATION:
+            return flags.auxArrivalNotified;
+        case CLOSURE_STEPS.EQUIPMENT_UNLOAD:
+            return flags.globalEquipmentUnloaded;
+        case CLOSURE_STEPS.RETURN_INVENTORY:
+            return flags.pilotReturnInventoryDone;
+        case CLOSURE_STEPS.ELECTRONICS_CHARGING:
+            return flags.pilotElectronicsCharged;
+        case CLOSURE_STEPS.FINAL_PARKING:
+            return flags.auxFinalParkingDone;
+        default:
+            return false;
+    }
+}
+
+function getClosureStepTimestamp(meta, stepId) {
+    return getMetaTimestamp(meta, CLOSURE_TASK_TIME_KEYS[stepId] || []);
+}
+
+function getClosureTaskLabel(stepId) {
+    return DISMANTLING_SCREEN_LABELS[stepId] || String(stepId || '').replaceAll('_', ' ');
+}
+
+function buildLifecycleRoleCard({
+    role,
+    person,
+    blockLabel,
+    tasks,
+    forceComplete,
+    activePhase,
+    updatedAt
+}) {
+    const normalizedTasks = (tasks || []).map((task) => ({
+        ...task,
+        done: forceComplete ? true : Boolean(task.done)
+    }));
+
+    const firstPendingIdx = activePhase && !forceComplete
+        ? normalizedTasks.findIndex((task) => !task.done)
+        : -1;
+
+    const tasksWithStatus = normalizedTasks.map((task, idx) => {
+        let status = 'pending';
+        if (task.done) status = 'completed';
+        else if (idx === firstPendingIdx) status = 'active';
+        return { ...task, status };
+    });
+
+    const doneCount = tasksWithStatus.filter((task) => task.done).length;
+    const totalCount = tasksWithStatus.length;
+    const completed = totalCount > 0 && doneCount === totalCount;
+    const progressPct = totalCount > 0
+        ? Math.round((doneCount / totalCount) * 100)
+        : 0;
+
+    const activeTask = firstPendingIdx >= 0 ? tasksWithStatus[firstPendingIdx] : null;
+    const statusText = forceComplete || completed
+        ? 'Finalizado'
+        : activeTask
+            ? `En curso: ${activeTask.label}`
+            : 'Pendiente';
+
+    return {
+        role,
+        person,
+        blockLabel,
+        tasks: tasksWithStatus,
+        doneCount,
+        totalCount,
+        completed,
+        progressPct,
+        forceComplete,
+        activeTask,
+        statusText,
+        updatedAt
     };
 }
 
@@ -239,34 +560,34 @@ function initials(name) {
 // Per-role card content keyed by mission_state. Each entry: { emoji, title, desc, next?, showData? }
 const STATE_ROLE_CARDS = {
     prep: {
-        pilot: { emoji: '📋', title: 'En preparación', desc: 'Revisando checklist de vuelo y equipo.', next: 'Verificación de vehículo' },
-        teacher: { emoji: '📋', title: 'En preparación', desc: 'Completando checklist docente y verificación de equipo.', next: 'Confirmación de misión' },
-        assistant: { emoji: '📋', title: 'En preparación', desc: 'Revisando checklist de preparación general.', next: 'Preparación de vehículo' },
+        pilot: { emoji: '📋', title: 'En montaje', desc: 'Revisando checklist de vuelo y equipo.', next: 'Verificación de vehículo' },
+        teacher: { emoji: '📋', title: 'En montaje', desc: 'Completando checklist docente y verificación de equipo.', next: 'Confirmación de misión' },
+        assistant: { emoji: '📋', title: 'En montaje', desc: 'Revisando checklist de montaje general.', next: 'Montaje de vehículo' },
     },
     PILOT_PREP: {
-        pilot: { emoji: '🧭', title: 'Preparación de vuelo', desc: 'Reconocimiento del entorno, vuelo de prueba y ruta óptima.', next: 'Listo para carga' },
-        teacher: { emoji: '📋', title: 'En preparación', desc: 'Completando tareas de preparación.', next: 'Apoyo al piloto' },
-        assistant: { emoji: '📋', title: 'En preparación', desc: 'Revisando equipo de preparación.', next: 'Checklist de vehículo' },
+        pilot: { emoji: '🧭', title: 'Montaje de vuelo', desc: 'Reconocimiento del entorno, vuelo de prueba y ruta óptima.', next: 'Listo para carga' },
+        teacher: { emoji: '📋', title: 'En montaje', desc: 'Completando tareas de montaje.', next: 'Apoyo al piloto' },
+        assistant: { emoji: '📋', title: 'En montaje', desc: 'Revisando equipo de montaje.', next: 'Checklist de vehículo' },
     },
     CHECKIN_DONE: {
-        pilot: { emoji: '✅', title: 'Check-in completado', desc: 'Identidad verificada. Iniciando checklist de preparación.', next: 'Preparación de vuelo' },
+        pilot: { emoji: '✅', title: 'Check-in completado', desc: 'Identidad verificada. Iniciando checklist de montaje.', next: 'Montaje de vuelo' },
         teacher: { emoji: '✅', title: 'Check-in completado', desc: 'Identidad verificada. Iniciando checklist docente.', next: 'Checklist docente' },
-        assistant: { emoji: '✅', title: 'Check-in completado', desc: 'Identidad verificada. Iniciando preparación.', next: 'Checklist de vehículo' },
+        assistant: { emoji: '✅', title: 'Check-in completado', desc: 'Identidad verificada. Iniciando montaje.', next: 'Checklist de vehículo' },
     },
     PREP_DONE: {
-        pilot: { emoji: '🎯', title: 'Preparación lista', desc: 'Checklist completado. Esperando confirmación del equipo.', next: 'Carga de vehículo' },
-        teacher: { emoji: '🎯', title: 'Preparación lista', desc: 'Checklist completado. Apoyando al piloto en bodega.', next: 'Apoyo al piloto' },
-        assistant: { emoji: '🎯', title: 'Preparación lista', desc: 'Checklist completado. Esperando siguiente fase.', next: 'Checklist de vehículo' },
+        pilot: { emoji: '🎯', title: 'Montaje listo', desc: 'Checklist completado. Esperando confirmación del equipo.', next: 'Carga de vehículo' },
+        teacher: { emoji: '🎯', title: 'Montaje listo', desc: 'Checklist completado. Apoyando al piloto en bodega.', next: 'Apoyo al piloto' },
+        assistant: { emoji: '🎯', title: 'Montaje listo', desc: 'Checklist completado. En espera de confirmación global.', next: 'Checklist de vehículo' },
     },
     AUX_PREP_DONE: {
-        pilot: { emoji: '🎯', title: 'Preparación lista', desc: 'Esperando al equipo para iniciar carga.', next: 'Carga de vehículo' },
+        pilot: { emoji: '🎯', title: 'Montaje listo', desc: 'Esperando al equipo para iniciar carga.', next: 'Carga de vehículo' },
         teacher: { emoji: '🤝', title: 'Apoyando al piloto', desc: 'Asistiendo al piloto con la verificación final.', next: 'Confirmación de salida' },
-        assistant: { emoji: '🎯', title: 'Preparación lista', desc: 'Checklist del auxiliar completado.', next: 'Checklist de vehículo' },
+        assistant: { emoji: '🎯', title: 'Montaje listo', desc: 'Checklist del auxiliar completado.', next: 'Checklist de vehículo' },
     },
     TEACHER_SUPPORTING_PILOT: {
-        pilot: { emoji: '🧭', title: 'Preparación de vuelo', desc: 'Reconocimiento del entorno, vuelo de prueba y ruta óptima.', next: 'Listo para carga' },
+        pilot: { emoji: '🧭', title: 'Montaje de vuelo', desc: 'Reconocimiento del entorno, vuelo de prueba y ruta óptima.', next: 'Listo para carga' },
         teacher: { emoji: '🤝', title: 'Apoyando al piloto', desc: 'Asistiendo al piloto con la verificación final en bodega.', next: 'Momento de cargar' },
-        assistant: { emoji: '📋', title: 'En preparación', desc: 'Esperando indicación del piloto.', next: 'Checklist de vehículo' },
+        assistant: { emoji: '📋', title: 'En montaje', desc: 'Esperando indicación del piloto.', next: 'Checklist de vehículo' },
     },
     PILOT_READY_FOR_LOAD: {
         pilot: { emoji: '✅', title: 'Listo para carga', desc: 'Checklist de vuelo completado. Esperando carga del vehículo.', next: 'En ruta' },
@@ -309,7 +630,7 @@ const STATE_ROLE_CARDS = {
         assistant: { emoji: '⏳', title: 'Esperando zona', desc: 'En espera de indicación para acomodar el vehículo en descarga.', next: 'Acomodar vehículo' },
     },
     waiting_dropzone: {
-        pilot: { emoji: '📸', title: '{name} confirma pista', desc: 'Está fijando el punto final de despegue con referencia visual.', next: 'Preparación de vuelo' },
+        pilot: { emoji: '📸', title: '{name} confirma pista', desc: 'Está fijando el punto final de despegue con referencia visual.', next: 'Montaje de vuelo' },
         teacher: { emoji: '🚚', title: '{name} va a zona de descarga', desc: 'Se mueve al punto acordado para iniciar maniobra.', next: 'Descarga global', showData: ['access', 'note', 'voice'] },
         assistant: { emoji: '🚙', title: '{name} acomoda el vehículo', desc: 'Coloca el vehículo en la zona de descarga indicada.', next: 'Descarga global', showData: ['access', 'note', 'voice'] },
     },
@@ -355,7 +676,7 @@ const POST_ARRIVAL_STATES = [...ONSITE_STATES, ...OPERATION_STATES, ...CLOSURE_S
 const ROLE_TASK_ROADMAP = {
     pilot: [
         'Identificar pista',
-        'Preparación de vuelo',
+        'Montaje de vuelo',
         'Audio piloto',
         'Ambientación musical',
         'Coordinación global'
@@ -378,11 +699,25 @@ const ROLE_TASK_ROADMAP = {
 
 const UNLOAD_AND_AFTER_STATES = ['unload', 'post_unload_coordination', 'seat_deployment', ...OPERATION_STATES, ...CLOSURE_STATES];
 const SEAT_AND_AFTER_STATES = ['seat_deployment', ...OPERATION_STATES, ...CLOSURE_STATES];
+const POST_PREP_COMPLETE_STATES = [...OPERATION_STATES, ...CLOSURE_STATES, 'dismantling', 'completed', 'operation'];
+const POST_PREP_COMPLETE_STATE_SET = new Set(
+    POST_PREP_COMPLETE_STATES.map((state) => String(state || '').trim().toUpperCase())
+);
+
+function normalizeMissionState(missionState) {
+    return String(missionState || '').trim();
+}
+
+function isMissionPastPrep(missionState) {
+    const normalized = normalizeMissionState(missionState).toUpperCase();
+    if (!normalized) return false;
+    return POST_PREP_COMPLETE_STATE_SET.has(normalized);
+}
 
 function buildInactiveRoleRoadmap(role) {
     const iconByLabel = {
         'Identificar pista': 'location_on',
-        'Preparación de vuelo': 'flight_takeoff',
+        'Montaje de vuelo': 'flight_takeoff',
         'Audio piloto': 'volume_up',
         'Ambientación musical': 'music_note',
         'Coordinación global': 'hub',
@@ -485,6 +820,35 @@ function getGlobalGlassesProgress(meta = {}) {
     };
 }
 
+const GLOBAL_TASK_META_KEYS = {
+    team_unload: ['global_equipment_unloaded', 'closure_equipment_unload_done', 'global_team_unload_done', 'team_unload_done'],
+    seat_deployment: ['global_seat_deployment_done'],
+    headphones_setup: ['global_headphones_done'],
+    glasses_setup: ['global_glasses_done']
+};
+
+const GLOBAL_TASK_DONE_BY_NAME_KEYS = {
+    team_unload: ['global_equipment_unloaded_by_name', 'closure_equipment_unload_done_by_name', 'global_team_unload_done_by_name'],
+    seat_deployment: ['global_seat_deployment_done_by_name'],
+    headphones_setup: ['global_headphones_done_by_name'],
+    glasses_setup: ['global_glasses_done_by_name']
+};
+
+function getGlobalTaskDone(meta = {}, taskKey, fallbackDone = false) {
+    const keys = GLOBAL_TASK_META_KEYS[taskKey] || [];
+    const byMeta = keys.some((key) => meta?.[key] === true);
+    return byMeta || Boolean(fallbackDone);
+}
+
+function getGlobalTaskDoneByName(meta = {}, taskKey) {
+    const keys = GLOBAL_TASK_DONE_BY_NAME_KEYS[taskKey] || [];
+    for (const key of keys) {
+        const value = typeof meta?.[key] === 'string' ? meta[key].trim() : '';
+        if (value) return value;
+    }
+    return null;
+}
+
 function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, context = {}) {
     if (!postArrivalEnabled) return buildInactiveRoleRoadmap('teacher');
 
@@ -493,17 +857,11 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
     const assistantName = context.assistantName || 'Auxiliar';
     const teacherDecision = meta.teacher_civic_decision || (meta.teacher_civic_notified === true ? 'yes' : null);
     const teacherHasCivic = teacherDecision === 'yes';
-    const missionInOperation = OPERATION_STATES.includes(missionState) || CLOSURE_STATES.includes(missionState);
+    const missionInOperation = isMissionPastPrep(missionState);
 
-    const seatDeploymentDone =
-        meta.global_seat_deployment_done === true ||
-        missionInOperation;
-    const headphonesDone =
-        meta.global_headphones_done === true ||
-        missionInOperation;
-    const glassesDone =
-        meta.global_glasses_done === true ||
-        missionInOperation;
+    const seatDeploymentDone = getGlobalTaskDone(meta, 'seat_deployment', missionInOperation);
+    const headphonesDone = getGlobalTaskDone(meta, 'headphones_setup', missionInOperation);
+    const glassesDone = getGlobalTaskDone(meta, 'glasses_setup', missionInOperation);
 
     const civicDone = Boolean(meta.teacher_civic_notified) || missionInOperation;
     const directionDone = UNLOAD_AND_AFTER_STATES.includes(missionState);
@@ -525,20 +883,24 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
         status: taskStatus(directionDone, directionActive)
     });
 
-    const showTeamUnload = UNLOAD_AND_AFTER_STATES.includes(missionState);
-    if (showTeamUnload) {
-        timeline.push({
-            id: 'teacher-global-unload',
-            kind: 'global',
-            globalId: 'team_unload',
-            label: 'Descarga de equipo',
-            icon: 'inventory_2',
-            desc: missionState === 'unload'
-                ? 'Coordina y participa en la descarga de equipo.'
-                : 'Descarga global completada con el equipo.',
-            status: taskStatus(missionState !== 'unload', missionState === 'unload')
-        });
-    }
+    const unloadDone = getGlobalTaskDone(meta, 'team_unload', UNLOAD_AND_AFTER_STATES.includes(missionState) && missionState !== 'unload');
+    const unloadActive = missionState === 'unload' && !unloadDone;
+    const unloadDoneByName = getGlobalTaskDoneByName(meta, 'team_unload');
+    const unloadDesc = missionState === 'unload'
+        ? 'Coordina y participa en la descarga de equipo.'
+        : unloadDone
+            ? `Descarga global completada${unloadDoneByName ? ` por ${unloadDoneByName}` : ' con el equipo.'}`
+            : 'Se habilita cuando el auxiliar confirma zona de descarga.';
+
+    timeline.push({
+        id: 'teacher-global-unload',
+        kind: 'global',
+        globalId: 'team_unload',
+        label: 'Descarga de equipo',
+        icon: 'inventory_2',
+        desc: unloadDesc,
+        status: taskStatus(unloadDone, unloadActive)
+    });
 
     const civicActive = !civicDone && ['post_unload_coordination', 'seat_deployment'].includes(missionState);
     let civicDesc = 'Confirma con Direccion si habra acto civico.';
@@ -552,6 +914,8 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
         } else {
             civicDesc = 'Confirmacion con Direccion completada.';
         }
+    } else if (!['post_unload_coordination', 'seat_deployment'].includes(missionState)) {
+        civicDesc = 'Se habilita despues de la descarga de equipo.';
     }
 
     timeline.push({
@@ -582,26 +946,25 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
     const auxEvidenceReady = auxCivicStatus === 'uploaded';
     const auxEvidenceInProcess = civicParallelInProgress && !auxEvidenceReady && (!auxCivicStatus || ['pending_recording', 'recording', 'pending_upload', 'uploading', 'failed'].includes(auxCivicStatus));
 
-    const civicAudioDone = teacherAudioStatus === 'uploaded';
-    const civicAudioApplicable = teacherHasCivic && SEAT_AND_AFTER_STATES.includes(missionState);
-    const civicAudioActive = civicAudioApplicable && !civicAudioDone && (
+    const civicAudioApplicable = teacherHasCivic;
+    const civicAudioSkipped = teacherDecision === 'no';
+    const civicAudioDone = civicAudioSkipped || teacherAudioStatus === 'uploaded' || (civicAudioApplicable && missionInOperation);
+    const civicAudioActive = civicAudioApplicable && !civicAudioDone && SEAT_AND_AFTER_STATES.includes(missionState) && (
         missionState === 'seat_deployment' ||
         civicParallelInProgress ||
         ['recording', 'pending_upload', 'uploading'].includes(teacherAudioStatus) ||
         Boolean(meta.civic_parallel_teacher_audio_started_at)
     );
-    const civicAudioVisible = civicAudioApplicable && (
-        civicAudioActive ||
-        civicAudioDone ||
-        teacherAudioStatus === 'failed' ||
-        Boolean(meta.civic_parallel_teacher_audio_started_at) ||
-        Boolean(meta.civic_parallel_teacher_audio_url)
-    );
+    let civicAudioLabel = 'Acto civico - evidencia de audio';
+    let civicAudioDesc = 'Se habilita si Direccion confirma acto civico.';
 
-    if (civicAudioVisible) {
-        let civicAudioLabel = 'Acto civico - evidencia de audio';
-        let civicAudioDesc = 'Pendiente grabar evidencia de audio del acto civico.';
-
+    if (civicAudioSkipped) {
+        civicAudioLabel = 'Acto civico - audio no requerido';
+        civicAudioDesc = meta.teacher_civic_reason
+            ? `No aplica: ${meta.teacher_civic_reason_detail || meta.teacher_civic_reason}.`
+            : 'No aplica para esta sede.';
+    } else if (teacherDecision === 'yes') {
+        civicAudioDesc = 'Pendiente grabar evidencia de audio del acto civico.';
         if (teacherAudioStatus === 'recording') {
             civicAudioLabel = 'Acto civico - grabando audio';
             civicAudioDesc = `Grabando evidencia de audio (${fmtMMSS(audioElapsedSec)} / ${fmtMMSS(audioRequiredSec)} · ${audioProgressPct}%).`;
@@ -626,167 +989,169 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
         } else if (auxEvidenceInProcess) {
             civicAudioDesc = `${civicAudioDesc} ${assistantName} está grabando evidencia.`;
         }
-
-        timeline.push({
-            id: 'teacher-civic-audio',
-            kind: 'role',
-            label: civicAudioLabel,
-            icon: 'graphic_eq',
-            accent: 'emerald',
-            desc: civicAudioDesc,
-            audioUrl: meta.civic_parallel_teacher_audio_url || null,
-            audioDurationSec: Number(meta.civic_parallel_teacher_audio_duration_sec) || null,
-            audioUploadedAt: meta.civic_parallel_teacher_audio_uploaded_at || null,
-            countAsBlock: false,
-            status: taskStatus(civicAudioDone, civicAudioActive)
-        });
     }
 
-    const showSeatDeployment = Boolean(meta.teacher_civic_notified) && SEAT_AND_AFTER_STATES.includes(missionState);
-    const civicAudioBlocksFlow = civicAudioVisible && !civicAudioDone && teacherAudioStatus !== 'failed';
-    if (showSeatDeployment) {
-        const seatActive =
-            missionState === 'seat_deployment' &&
-            !civicAudioBlocksFlow &&
-            !seatDeploymentDone;
-        const seatDesc = seatDeploymentDone
-            ? 'Despliegue de asientos completado con el equipo.'
-            : seatActive
-                ? 'Ejecuta despliegue de asientos para liberar operacion.'
-                : civicAudioBlocksFlow
-                    ? 'En espera de cerrar evidencia de acto civico.'
+    timeline.push({
+        id: 'teacher-civic-audio',
+        kind: 'role',
+        label: civicAudioLabel,
+        icon: 'graphic_eq',
+        accent: 'emerald',
+        desc: civicAudioDesc,
+        audioUrl: meta.civic_parallel_teacher_audio_url || null,
+        audioDurationSec: Number(meta.civic_parallel_teacher_audio_duration_sec) || null,
+        audioUploadedAt: meta.civic_parallel_teacher_audio_uploaded_at || null,
+        countAsBlock: false,
+        status: taskStatus(civicAudioDone, civicAudioActive)
+    });
+
+    const civicAudioBlocksFlow = civicAudioApplicable && !civicAudioDone && teacherAudioStatus !== 'failed';
+    const seatUnlockedByCivic = civicDone && (!civicAudioApplicable || civicAudioDone || teacherAudioStatus === 'failed' || missionInOperation);
+    const seatActive =
+        missionState === 'seat_deployment' &&
+        seatUnlockedByCivic &&
+        !seatDeploymentDone;
+    const seatDesc = seatDeploymentDone
+        ? 'Despliegue de asientos completado con el equipo.'
+        : !civicDone
+            ? 'Se habilita al confirmar acto civico.'
+            : civicAudioBlocksFlow
+                ? 'En espera de cerrar evidencia de acto civico.'
+                : seatActive
+                    ? 'Ejecuta despliegue de asientos para liberar operacion.'
                     : 'Pendiente de condiciones globales para desplegar asientos.';
-        timeline.push({
-            id: 'teacher-global-seat',
-            kind: 'global',
-            globalId: 'seat_deployment',
-            label: 'Despliegue de asientos',
-            icon: 'event_seat',
-            desc: seatDesc,
-            status: taskStatus(seatDeploymentDone, seatActive)
-        });
 
-        const headphonesProgress = getGlobalHeadphonesProgress(meta);
-        const headphonesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            !headphonesDone;
-        const headphonesDoneBy = meta.global_headphones_done_by_name || null;
-        const headphonesDesc = headphonesDone
-            ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
-            : headphonesActive
-                ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
-                : 'Se habilita al terminar despliegue de asientos.';
+    timeline.push({
+        id: 'teacher-global-seat',
+        kind: 'global',
+        globalId: 'seat_deployment',
+        label: 'Despliegue de asientos',
+        icon: 'event_seat',
+        desc: seatDesc,
+        status: taskStatus(seatDeploymentDone, seatActive)
+    });
 
-        timeline.push({
-            id: 'teacher-global-headphones',
-            kind: 'global',
-            globalId: 'headphones_setup',
-            label: 'Configura audifonos',
-            icon: 'headphones',
-            desc: headphonesDesc,
-            status: taskStatus(headphonesDone, headphonesActive)
-        });
+    const headphonesProgress = getGlobalHeadphonesProgress(meta);
+    const headphonesActive =
+        missionState === 'seat_deployment' &&
+        seatDeploymentDone &&
+        !headphonesDone;
+    const headphonesDoneBy = getGlobalTaskDoneByName(meta, 'headphones_setup');
+    const headphonesDesc = headphonesDone
+        ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
+        : headphonesActive
+            ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
+            : !seatDeploymentDone
+                ? 'Se habilita al terminar despliegue de asientos.'
+                : 'Pendiente de iniciar configuracion de audifonos.';
 
-        const glassesProgress = getGlobalGlassesProgress(meta);
-        const glassesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            headphonesDone &&
-            !glassesDone;
-        const glassesDoneBy = meta.global_glasses_done_by_name || null;
-        const glassesDesc = glassesDone
-            ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
-            : glassesActive
-                ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
-                : 'Se habilita al terminar configuracion de audifonos.';
+    timeline.push({
+        id: 'teacher-global-headphones',
+        kind: 'global',
+        globalId: 'headphones_setup',
+        label: 'Configura audifonos',
+        icon: 'headphones',
+        desc: headphonesDesc,
+        status: taskStatus(headphonesDone, headphonesActive)
+    });
 
-        timeline.push({
-            id: 'teacher-global-glasses',
-            kind: 'global',
-            globalId: 'glasses_setup',
-            label: 'Configuracion de gafas',
-            icon: 'view_in_ar',
-            desc: glassesDesc,
-            status: taskStatus(glassesDone, glassesActive)
-        });
-    }
+    const glassesProgress = getGlobalGlassesProgress(meta);
+    const glassesActive =
+        missionState === 'seat_deployment' &&
+        seatDeploymentDone &&
+        headphonesDone &&
+        !glassesDone;
+    const glassesDoneBy = getGlobalTaskDoneByName(meta, 'glasses_setup');
+    const glassesDesc = glassesDone
+        ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
+        : glassesActive
+            ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
+            : !headphonesDone
+                ? 'Se habilita al terminar configuracion de audifonos.'
+                : 'Pendiente de iniciar configuracion de gafas.';
+
+    timeline.push({
+        id: 'teacher-global-glasses',
+        kind: 'global',
+        globalId: 'glasses_setup',
+        label: 'Configuracion de gafas',
+        icon: 'view_in_ar',
+        desc: glassesDesc,
+        status: taskStatus(glassesDone, glassesActive)
+    });
 
     const teacherReadyChecks =
         meta && typeof meta.teacher_operation_ready_checks === 'object' && !Array.isArray(meta.teacher_operation_ready_checks)
             ? meta.teacher_operation_ready_checks
             : Object.create(null);
-    const kickoffWindow = SEAT_AND_AFTER_STATES.includes(missionState);
     const kickoffUnlocked = glassesDone;
     const batchesReadyDone = teacherReadyChecks.batches_ready === true || missionInOperation;
     const waitingZoneReadyDone = teacherReadyChecks.waiting_zone_ready === true || missionInOperation;
     const teacherReadyDone = meta.teacher_operation_ready === true || missionInOperation;
 
-    if (kickoffWindow) {
-        const batchesActive = missionState === 'seat_deployment' && kickoffUnlocked && !batchesReadyDone;
-        const batchesDesc = batchesReadyDone
-            ? '3 tandas confirmadas (1 en vuelo, 2 en espera).'
-            : kickoffUnlocked
-                ? 'Pide al delegado 3 tandas: 1 en vuelo y 2 en espera.'
-                : 'Se habilita al terminar la configuracion global.';
+    const batchesActive = missionState === 'seat_deployment' && kickoffUnlocked && !batchesReadyDone;
+    const batchesDesc = batchesReadyDone
+        ? '3 tandas confirmadas (1 en vuelo, 2 en espera).'
+        : kickoffUnlocked
+            ? 'Pide al delegado 3 tandas: 1 en vuelo y 2 en espera.'
+            : 'Se habilita al terminar la configuracion global.';
 
-        timeline.push({
-            id: 'teacher-ready-batches',
-            kind: 'role',
-            label: 'Confirmar 3 tandas',
-            icon: 'groups_3',
-            desc: batchesDesc,
-            status: taskStatus(batchesReadyDone, batchesActive)
-        });
+    timeline.push({
+        id: 'teacher-ready-batches',
+        kind: 'role',
+        label: 'Confirmar 3 tandas',
+        icon: 'groups_3',
+        desc: batchesDesc,
+        status: taskStatus(batchesReadyDone, batchesActive)
+    });
 
-        const waitingZoneActive =
-            missionState === 'seat_deployment' &&
-            kickoffUnlocked &&
-            batchesReadyDone &&
-            !waitingZoneReadyDone;
-        const waitingZoneDesc = waitingZoneReadyDone
-            ? 'Zona de espera validada con alumnos sentados y ordenados.'
-            : kickoffUnlocked
-                ? batchesReadyDone
-                    ? 'Confirma zona de espera lista para 2 tandas sentadas.'
-                    : 'Primero confirma 3 tandas para validar la zona de espera.'
-                : 'Se habilita al terminar la configuracion global.';
+    const waitingZoneActive =
+        missionState === 'seat_deployment' &&
+        kickoffUnlocked &&
+        batchesReadyDone &&
+        !waitingZoneReadyDone;
+    const waitingZoneDesc = waitingZoneReadyDone
+        ? 'Zona de espera validada con alumnos sentados y ordenados.'
+        : kickoffUnlocked
+            ? batchesReadyDone
+                ? 'Confirma zona de espera lista para 2 tandas sentadas.'
+                : 'Primero confirma 3 tandas para validar la zona de espera.'
+            : 'Se habilita al terminar la configuracion global.';
 
-        timeline.push({
-            id: 'teacher-ready-waiting-zone',
-            kind: 'role',
-            label: 'Validar zona de espera',
-            icon: 'chair',
-            desc: waitingZoneDesc,
-            status: taskStatus(waitingZoneReadyDone, waitingZoneActive)
-        });
+    timeline.push({
+        id: 'teacher-ready-waiting-zone',
+        kind: 'role',
+        label: 'Validar zona de espera',
+        icon: 'chair',
+        desc: waitingZoneDesc,
+        status: taskStatus(waitingZoneReadyDone, waitingZoneActive)
+    });
 
-        const teacherReadyActive =
-            missionState === 'seat_deployment' &&
-            kickoffUnlocked &&
-            batchesReadyDone &&
-            waitingZoneReadyDone &&
-            !teacherReadyDone;
-        let teacherReadyDesc = teacherReadyDone
-            ? `Docente listo para iniciar${meta.teacher_operation_ready_by_name ? ` (${meta.teacher_operation_ready_by_name})` : ''}.`
-            : kickoffUnlocked
-                ? 'Confirma que el flujo docente esta listo para iniciar operacion.'
-                : 'Pendiente de liberar configuracion global para iniciar operacion.';
+    const teacherReadyActive =
+        missionState === 'seat_deployment' &&
+        kickoffUnlocked &&
+        batchesReadyDone &&
+        waitingZoneReadyDone &&
+        !teacherReadyDone;
+    let teacherReadyDesc = teacherReadyDone
+        ? `Docente listo para iniciar${meta.teacher_operation_ready_by_name ? ` (${meta.teacher_operation_ready_by_name})` : ''}.`
+        : kickoffUnlocked
+            ? 'Confirma que el flujo docente esta listo para iniciar operacion.'
+            : 'Pendiente de liberar configuracion global para iniciar operacion.';
 
-        if (!teacherReadyDone && kickoffUnlocked && meta.pilot_music_ambience_done !== true) {
-            teacherReadyDesc = 'Checklist listo. Esperando ambientacion musical del piloto.';
-        }
-
-        timeline.push({
-            id: 'teacher-operation-ready',
-            kind: 'role',
-            label: 'Docente listo para iniciar',
-            icon: 'fact_check',
-            desc: teacherReadyDesc,
-            readyAt: meta.teacher_operation_ready_at || null,
-            status: taskStatus(teacherReadyDone, teacherReadyActive)
-        });
+    if (!teacherReadyDone && kickoffUnlocked && meta.pilot_music_ambience_done !== true) {
+        teacherReadyDesc = 'Checklist listo. Esperando ambientacion musical del piloto.';
     }
+
+    timeline.push({
+        id: 'teacher-operation-ready',
+        kind: 'role',
+        label: 'Docente listo para iniciar',
+        icon: 'fact_check',
+        desc: teacherReadyDesc,
+        readyAt: meta.teacher_operation_ready_at || null,
+        status: taskStatus(teacherReadyDone, teacherReadyActive)
+    });
 
     return timeline;
 }
@@ -797,22 +1162,16 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
     const timeline = [];
     const nowMs = Number.isFinite(context.nowMs) ? context.nowMs : Date.now();
     const teacherName = context.teacherName || 'Docente';
-    const missionInOperation = OPERATION_STATES.includes(missionState) || CLOSURE_STATES.includes(missionState);
+    const missionInOperation = isMissionPastPrep(missionState);
     const auxReady = Boolean(meta.aux_ready_seat_deployment);
     const parkingEvidence = Boolean(meta.aux_vehicle_evidence_url);
     const adWallEvidence = Boolean(meta.aux_ad_wall_evidence_url);
     const adWallDone =
         meta.aux_ad_wall_done === true ||
         missionInOperation;
-    const seatDeploymentDone =
-        meta.global_seat_deployment_done === true ||
-        missionInOperation;
-    const headphonesDone =
-        meta.global_headphones_done === true ||
-        missionInOperation;
-    const glassesDone =
-        meta.global_glasses_done === true ||
-        missionInOperation;
+    const seatDeploymentDone = getGlobalTaskDone(meta, 'seat_deployment', missionInOperation);
+    const headphonesDone = getGlobalTaskDone(meta, 'headphones_setup', missionInOperation);
+    const glassesDone = getGlobalTaskDone(meta, 'glasses_setup', missionInOperation);
 
     const dropzoneDone = UNLOAD_AND_AFTER_STATES.includes(missionState);
     const dropzoneActive = missionState === 'waiting_dropzone';
@@ -833,20 +1192,24 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
         status: taskStatus(dropzoneDone, dropzoneActive)
     });
 
-    const showTeamUnload = UNLOAD_AND_AFTER_STATES.includes(missionState);
-    if (showTeamUnload) {
-        timeline.push({
-            id: 'assistant-global-unload',
-            kind: 'global',
-            globalId: 'team_unload',
-            label: 'Descarga de equipo',
-            icon: 'inventory_2',
-            desc: missionState === 'unload'
-                ? 'Participa en descarga de equipo y contenedores.'
-                : 'Descarga global completada con el equipo.',
-            status: taskStatus(missionState !== 'unload', missionState === 'unload')
-        });
-    }
+    const unloadDone = getGlobalTaskDone(meta, 'team_unload', UNLOAD_AND_AFTER_STATES.includes(missionState) && missionState !== 'unload');
+    const unloadActive = missionState === 'unload' && !unloadDone;
+    const unloadDoneByName = getGlobalTaskDoneByName(meta, 'team_unload');
+    const unloadDesc = missionState === 'unload'
+        ? 'Participa en descarga de equipo y contenedores.'
+        : unloadDone
+            ? `Descarga global completada${unloadDoneByName ? ` por ${unloadDoneByName}` : ' con el equipo.'}`
+            : 'Se habilita al confirmar zona de descarga.';
+
+    timeline.push({
+        id: 'assistant-global-unload',
+        kind: 'global',
+        globalId: 'team_unload',
+        label: 'Descarga de equipo',
+        icon: 'inventory_2',
+        desc: unloadDesc,
+        status: taskStatus(unloadDone, unloadActive)
+    });
 
     const parkingDone = auxReady || missionInOperation;
     const parkingActive = !parkingDone && ['post_unload_coordination', 'seat_deployment'].includes(missionState);
@@ -885,32 +1248,31 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
     const teacherHasCivic = teacherDecision === 'yes';
     const assistantCivicStatus = meta.civic_parallel_aux_status || null;
     const civicParallelInProgress = meta.civic_parallel_status === 'in_progress';
-    const assistantCivicDone = assistantCivicStatus === 'uploaded';
-    const assistantCivicApplicable = teacherHasCivic && SEAT_AND_AFTER_STATES.includes(missionState);
-    const assistantCivicActive = assistantCivicApplicable && !assistantCivicDone && (
+    const assistantCivicApplicable = teacherHasCivic;
+    const assistantCivicSkipped = teacherDecision === 'no';
+    const assistantCivicDone = assistantCivicSkipped || assistantCivicStatus === 'uploaded' || (assistantCivicApplicable && missionInOperation);
+    const assistantCivicActive = assistantCivicApplicable && !assistantCivicDone && SEAT_AND_AFTER_STATES.includes(missionState) && (
         civicParallelInProgress
         || ['pending_recording', 'recording', 'pending_upload', 'uploading', 'failed'].includes(assistantCivicStatus)
         || Boolean(meta.civic_parallel_aux_started_at)
     );
-    const assistantCivicVisible = assistantCivicApplicable && (
-        assistantCivicActive
-        || assistantCivicDone
-        || Boolean(meta.civic_parallel_aux_video_url)
-        || Boolean(meta.civic_parallel_aux_started_at)
-    );
 
-    if (assistantCivicVisible) {
-        let videoElapsedSec = Math.max(0, Number(meta.civic_parallel_aux_duration_sec) || 0);
-        if (assistantCivicStatus === 'recording' && meta.civic_parallel_aux_started_at) {
-            const startedAtMs = new Date(meta.civic_parallel_aux_started_at).getTime();
-            if (Number.isFinite(startedAtMs) && startedAtMs > 0) {
-                videoElapsedSec = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
-            }
+    let videoElapsedSec = Math.max(0, Number(meta.civic_parallel_aux_duration_sec) || 0);
+    if (assistantCivicStatus === 'recording' && meta.civic_parallel_aux_started_at) {
+        const startedAtMs = new Date(meta.civic_parallel_aux_started_at).getTime();
+        if (Number.isFinite(startedAtMs) && startedAtMs > 0) {
+            videoElapsedSec = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
         }
+    }
 
-        let civicVideoLabel = 'Evidencia de acto civico';
-        let civicVideoDesc = `Espera a que ${teacherName} empiece a hablar y comienza a grabar (1-2 min).`;
+    let civicVideoLabel = 'Evidencia de acto civico';
+    let civicVideoDesc = 'Se habilita cuando el Docente confirma acto civico.';
 
+    if (assistantCivicSkipped) {
+        civicVideoLabel = 'Evidencia de acto civico - no requerida';
+        civicVideoDesc = 'No aplica para esta sede.';
+    } else if (teacherDecision === 'yes') {
+        civicVideoDesc = `Espera a que ${teacherName} empiece a hablar y comienza a grabar (1-2 min).`;
         if (assistantCivicStatus === 'recording') {
             civicVideoLabel = 'Evidencia de acto civico - grabando video';
             civicVideoDesc = `Grabando evidencia de video (${fmtMMSS(videoElapsedSec)}).`;
@@ -927,92 +1289,96 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
             civicVideoLabel = 'Evidencia de acto civico - video enviado';
             civicVideoDesc = 'Evidencia de video enviada correctamente.';
         }
-
-        timeline.push({
-            id: 'assistant-civic-video',
-            kind: 'role',
-            label: civicVideoLabel,
-            icon: 'videocam',
-            desc: civicVideoDesc,
-            videoUrl: meta.civic_parallel_aux_video_url || null,
-            videoDurationSec: Number(meta.civic_parallel_aux_duration_sec) || null,
-            videoUploadedAt: meta.civic_parallel_aux_uploaded_at || null,
-            countAsBlock: false,
-            status: taskStatus(assistantCivicDone, assistantCivicActive)
-        });
     }
 
-    const showSeatDeployment = auxReady && SEAT_AND_AFTER_STATES.includes(missionState);
-    if (showSeatDeployment) {
-        const seatActive =
-            missionState === 'seat_deployment' &&
-            adWallDone &&
-            (!assistantCivicVisible || assistantCivicDone) &&
-            !seatDeploymentDone;
-        const seatDesc = seatDeploymentDone
-            ? 'Despliegue de asientos completado con el equipo.'
-            : !adWallDone
-                ? 'Completa primero la instalacion de la lona publicitaria.'
+    timeline.push({
+        id: 'assistant-civic-video',
+        kind: 'role',
+        label: civicVideoLabel,
+        icon: 'videocam',
+        desc: civicVideoDesc,
+        videoUrl: meta.civic_parallel_aux_video_url || null,
+        videoDurationSec: Number(meta.civic_parallel_aux_duration_sec) || null,
+        videoUploadedAt: meta.civic_parallel_aux_uploaded_at || null,
+        countAsBlock: false,
+        status: taskStatus(assistantCivicDone, assistantCivicActive)
+    });
+
+    const civicSatisfied = !assistantCivicApplicable || assistantCivicDone || assistantCivicStatus === 'failed' || missionInOperation;
+    const seatActive =
+        missionState === 'seat_deployment' &&
+        adWallDone &&
+        civicSatisfied &&
+        !seatDeploymentDone;
+    const seatDesc = seatDeploymentDone
+        ? 'Despliegue de asientos completado con el equipo.'
+        : !adWallDone
+            ? 'Completa primero la instalacion de la lona publicitaria.'
+            : assistantCivicApplicable && !civicSatisfied
+                ? 'En evidencia de acto civico antes de liberar operacion.'
                 : seatActive
-                ? 'Participa en despliegue de asientos para liberar operacion.'
-                : 'En evidencia de acto civico antes de liberar operacion.';
-        timeline.push({
-            id: 'assistant-global-seat',
-            kind: 'global',
-            globalId: 'seat_deployment',
-            label: 'Despliegue de asientos',
-            icon: 'event_seat',
-            desc: seatDesc,
-            status: taskStatus(seatDeploymentDone, seatActive)
-        });
+                    ? 'Participa en despliegue de asientos para liberar operacion.'
+                    : 'Pendiente de condiciones globales para desplegar asientos.';
 
-        const headphonesProgress = getGlobalHeadphonesProgress(meta);
-        const headphonesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            !headphonesDone;
-        const headphonesDoneBy = meta.global_headphones_done_by_name || null;
-        const headphonesDesc = headphonesDone
-            ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
-            : headphonesActive
-                ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
-                : 'Se habilita al terminar despliegue de asientos.';
+    timeline.push({
+        id: 'assistant-global-seat',
+        kind: 'global',
+        globalId: 'seat_deployment',
+        label: 'Despliegue de asientos',
+        icon: 'event_seat',
+        desc: seatDesc,
+        status: taskStatus(seatDeploymentDone, seatActive)
+    });
 
-        timeline.push({
-            id: 'assistant-global-headphones',
-            kind: 'global',
-            globalId: 'headphones_setup',
-            label: 'Configura audifonos',
-            icon: 'headphones',
-            desc: headphonesDesc,
-            status: taskStatus(headphonesDone, headphonesActive)
-        });
+    const headphonesProgress = getGlobalHeadphonesProgress(meta);
+    const headphonesActive =
+        missionState === 'seat_deployment' &&
+        seatDeploymentDone &&
+        !headphonesDone;
+    const headphonesDoneBy = getGlobalTaskDoneByName(meta, 'headphones_setup');
+    const headphonesDesc = headphonesDone
+        ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
+        : headphonesActive
+            ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
+            : !seatDeploymentDone
+                ? 'Se habilita al terminar despliegue de asientos.'
+                : 'Pendiente de iniciar configuracion de audifonos.';
 
-        const glassesProgress = getGlobalGlassesProgress(meta);
-        const glassesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            headphonesDone &&
-            !glassesDone;
-        const glassesDoneBy = meta.global_glasses_done_by_name || null;
-        const glassesDesc = glassesDone
-            ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
-            : glassesActive
-                ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
-                : 'Se habilita al terminar configuracion de audifonos.';
+    timeline.push({
+        id: 'assistant-global-headphones',
+        kind: 'global',
+        globalId: 'headphones_setup',
+        label: 'Configura audifonos',
+        icon: 'headphones',
+        desc: headphonesDesc,
+        status: taskStatus(headphonesDone, headphonesActive)
+    });
 
-        timeline.push({
-            id: 'assistant-global-glasses',
-            kind: 'global',
-            globalId: 'glasses_setup',
-            label: 'Configuracion de gafas',
-            icon: 'view_in_ar',
-            desc: glassesDesc,
-            status: taskStatus(glassesDone, glassesActive)
-        });
-    }
+    const glassesProgress = getGlobalGlassesProgress(meta);
+    const glassesActive =
+        missionState === 'seat_deployment' &&
+        seatDeploymentDone &&
+        headphonesDone &&
+        !glassesDone;
+    const glassesDoneBy = getGlobalTaskDoneByName(meta, 'glasses_setup');
+    const glassesDesc = glassesDone
+        ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
+        : glassesActive
+            ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
+            : !headphonesDone
+                ? 'Se habilita al terminar configuracion de audifonos.'
+                : 'Pendiente de iniciar configuracion de gafas.';
 
-    const kickoffWindow = SEAT_AND_AFTER_STATES.includes(missionState);
+    timeline.push({
+        id: 'assistant-global-glasses',
+        kind: 'global',
+        globalId: 'glasses_setup',
+        label: 'Configuracion de gafas',
+        icon: 'view_in_ar',
+        desc: glassesDesc,
+        status: taskStatus(glassesDone, glassesActive)
+    });
+
     const kickoffUnlocked = glassesDone;
     const standPhotoDone = Boolean(meta.aux_operation_stand_photo_url) || missionInOperation;
     const standPhotoActive = missionState === 'seat_deployment' && kickoffUnlocked && !standPhotoDone;
@@ -1022,46 +1388,44 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
             ? 'Toma y guarda la foto final del stand.'
             : 'Se habilita al terminar la configuracion global.';
 
-    if (kickoffWindow) {
-        timeline.push({
-            id: 'assistant-stand-photo',
-            kind: 'role',
-            label: 'Foto final del stand',
-            icon: 'add_a_photo',
-            desc: standPhotoDesc,
-            photoUrl: meta.aux_operation_stand_photo_url || null,
-            photoAt: meta.aux_operation_stand_photo_at || null,
-            status: taskStatus(standPhotoDone, standPhotoActive)
-        });
+    timeline.push({
+        id: 'assistant-stand-photo',
+        kind: 'role',
+        label: 'Foto final del stand',
+        icon: 'add_a_photo',
+        desc: standPhotoDesc,
+        photoUrl: meta.aux_operation_stand_photo_url || null,
+        photoAt: meta.aux_operation_stand_photo_at || null,
+        status: taskStatus(standPhotoDone, standPhotoActive)
+    });
 
-        const auxOperationReadyDone = meta.aux_operation_ready === true || missionInOperation;
-        const auxOperationReadyActive =
-            missionState === 'seat_deployment' &&
-            kickoffUnlocked &&
-            standPhotoDone &&
-            !auxOperationReadyDone;
-        let auxOperationReadyDesc = auxOperationReadyDone
-            ? `Auxiliar listo para iniciar${meta.aux_operation_ready_by_name ? ` (${meta.aux_operation_ready_by_name})` : ''}.`
-            : kickoffUnlocked
-                ? standPhotoDone
-                    ? 'Confirma el montaje final para iniciar operacion.'
-                    : 'Primero registra la foto final del stand.'
-                : 'Pendiente de liberar configuracion global para iniciar operacion.';
+    const auxOperationReadyDone = meta.aux_operation_ready === true || missionInOperation;
+    const auxOperationReadyActive =
+        missionState === 'seat_deployment' &&
+        kickoffUnlocked &&
+        standPhotoDone &&
+        !auxOperationReadyDone;
+    let auxOperationReadyDesc = auxOperationReadyDone
+        ? `Auxiliar listo para iniciar${meta.aux_operation_ready_by_name ? ` (${meta.aux_operation_ready_by_name})` : ''}.`
+        : kickoffUnlocked
+            ? standPhotoDone
+                ? 'Confirma el montaje final para iniciar operacion.'
+                : 'Primero registra la foto final del stand.'
+            : 'Pendiente de liberar configuracion global para iniciar operacion.';
 
-        if (!auxOperationReadyDone && kickoffUnlocked && meta.pilot_music_ambience_done !== true) {
-            auxOperationReadyDesc = 'Checklist listo. Esperando ambientacion musical del piloto.';
-        }
-
-        timeline.push({
-            id: 'assistant-operation-ready',
-            kind: 'role',
-            label: 'Auxiliar listo para iniciar',
-            icon: 'task_alt',
-            desc: auxOperationReadyDesc,
-            readyAt: meta.aux_operation_ready_at || null,
-            status: taskStatus(auxOperationReadyDone, auxOperationReadyActive)
-        });
+    if (!auxOperationReadyDone && kickoffUnlocked && meta.pilot_music_ambience_done !== true) {
+        auxOperationReadyDesc = 'Checklist listo. Esperando ambientacion musical del piloto.';
     }
+
+    timeline.push({
+        id: 'assistant-operation-ready',
+        kind: 'role',
+        label: 'Auxiliar listo para iniciar',
+        icon: 'task_alt',
+        desc: auxOperationReadyDesc,
+        readyAt: meta.aux_operation_ready_at || null,
+        status: taskStatus(auxOperationReadyDone, auxOperationReadyActive)
+    });
 
     return timeline;
 }
@@ -1086,16 +1450,10 @@ function buildPilotGlobalTaskFlow(missionState, meta = {}, postArrivalEnabled) {
         controllerConnectedForCurrentSpot &&
         meta.pilot_audio_configured === true &&
         (!Number.isFinite(audioAtMs) || audioAtMs >= (Number.isFinite(controllerAtMs) ? controllerAtMs : prepAtMs));
-    const missionInOperation = OPERATION_STATES.includes(missionState) || CLOSURE_STATES.includes(missionState);
-    const seatDeploymentDone =
-        meta.global_seat_deployment_done === true ||
-        missionInOperation;
-    const headphonesDone =
-        meta.global_headphones_done === true ||
-        missionInOperation;
-    const glassesDone =
-        meta.global_glasses_done === true ||
-        missionInOperation;
+    const missionInOperation = isMissionPastPrep(missionState);
+    const seatDeploymentDone = getGlobalTaskDone(meta, 'seat_deployment', missionInOperation);
+    const headphonesDone = getGlobalTaskDone(meta, 'headphones_setup', missionInOperation);
+    const glassesDone = getGlobalTaskDone(meta, 'glasses_setup', missionInOperation);
 
     const audioChecksRaw = Array.isArray(meta.pilot_audio_checks) ? meta.pilot_audio_checks : [false, false, false];
     const audioChecksDone = [Boolean(audioChecksRaw[0]), Boolean(audioChecksRaw[1]), Boolean(audioChecksRaw[2])].filter(Boolean).length;
@@ -1120,6 +1478,106 @@ function buildPilotGlobalTaskFlow(missionState, meta = {}, postArrivalEnabled) {
         status: taskStatus(audioConfiguredForCurrentSpot, audioTaskActive)
     });
 
+    const pilotReadyForGlobal = audioConfiguredForCurrentSpot;
+
+    const unloadDone = getGlobalTaskDone(meta, 'team_unload', UNLOAD_AND_AFTER_STATES.includes(missionState) && missionState !== 'unload');
+    const unloadActive = pilotReadyForGlobal && missionState === 'unload' && !unloadDone;
+    const unloadDoneByName = getGlobalTaskDoneByName(meta, 'team_unload');
+    const unloadDesc = !pilotReadyForGlobal
+        ? 'Se habilita al completar audio piloto.'
+        : missionState === 'unload'
+            ? 'Participa en descarga de equipo y contenedores.'
+            : unloadDone
+                ? `Descarga global completada${unloadDoneByName ? ` por ${unloadDoneByName}` : ' con el equipo.'}`
+                : 'Pendiente de iniciar descarga global.';
+
+    timeline.push({
+        id: 'pilot-global-unload',
+        kind: 'global',
+        globalId: 'team_unload',
+        label: 'Descarga de equipo',
+        icon: 'inventory_2',
+        desc: unloadDesc,
+        status: taskStatus(unloadDone, unloadActive)
+    });
+
+    const seatActive =
+        pilotReadyForGlobal &&
+        ['post_unload_coordination', 'seat_deployment'].includes(missionState) &&
+        !seatDeploymentDone;
+    const seatDesc = !pilotReadyForGlobal
+        ? 'Se habilita al completar audio piloto.'
+        : seatDeploymentDone
+            ? 'Despliegue de asientos completado con el equipo.'
+            : seatActive
+                ? 'Participa en despliegue de asientos para liberar operacion.'
+                : 'Pendiente de fase de coordinacion para iniciar despliegue.';
+
+    timeline.push({
+        id: 'pilot-global-seat',
+        kind: 'global',
+        globalId: 'seat_deployment',
+        label: 'Despliegue de asientos',
+        icon: 'event_seat',
+        desc: seatDesc,
+        status: taskStatus(seatDeploymentDone, seatActive)
+    });
+
+    const headphonesProgress = getGlobalHeadphonesProgress(meta);
+    const headphonesActive =
+        missionState === 'seat_deployment' &&
+        pilotReadyForGlobal &&
+        seatDeploymentDone &&
+        !headphonesDone;
+    const headphonesDoneBy = getGlobalTaskDoneByName(meta, 'headphones_setup');
+    const headphonesDesc = headphonesDone
+        ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
+        : headphonesActive
+            ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
+            : !pilotReadyForGlobal
+                ? 'Se habilita al completar audio piloto.'
+                : !seatDeploymentDone
+                    ? 'Se habilita al terminar despliegue de asientos.'
+                    : 'Pendiente de iniciar configuracion de audifonos.';
+
+    timeline.push({
+        id: 'pilot-global-headphones',
+        kind: 'global',
+        globalId: 'headphones_setup',
+        label: 'Configura audifonos',
+        icon: 'headphones',
+        desc: headphonesDesc,
+        status: taskStatus(headphonesDone, headphonesActive)
+    });
+
+    const glassesProgress = getGlobalGlassesProgress(meta);
+    const glassesActive =
+        missionState === 'seat_deployment' &&
+        pilotReadyForGlobal &&
+        seatDeploymentDone &&
+        headphonesDone &&
+        !glassesDone;
+    const glassesDoneBy = getGlobalTaskDoneByName(meta, 'glasses_setup');
+    const glassesDesc = glassesDone
+        ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
+        : glassesActive
+            ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
+            : !pilotReadyForGlobal
+                ? 'Se habilita al completar audio piloto.'
+                : !headphonesDone
+                    ? 'Se habilita al terminar configuracion de audifonos.'
+                    : 'Pendiente de iniciar configuracion de gafas.';
+
+    timeline.push({
+        id: 'pilot-global-glasses',
+        kind: 'global',
+        globalId: 'glasses_setup',
+        label: 'Configuracion de gafas',
+        icon: 'view_in_ar',
+        desc: glassesDesc,
+        status: taskStatus(glassesDone, glassesActive)
+    });
+
     const musicChecksRaw =
         meta && typeof meta.pilot_music_ambience_checks === 'object' && !Array.isArray(meta.pilot_music_ambience_checks)
             ? meta.pilot_music_ambience_checks
@@ -1137,99 +1595,19 @@ function buildPilotGlobalTaskFlow(missionState, meta = {}, postArrivalEnabled) {
         ? `Ambientacion musical confirmada${meta.pilot_music_ambience_done_by_name ? ` por ${meta.pilot_music_ambience_done_by_name}` : ''}.`
         : musicUnlocked
             ? `Activa musica y confirma ambientacion (${musicChecksDone}/3 pasos).`
-            : 'Se habilita al terminar configuracion global de gafas.';
+            : !pilotReadyForGlobal
+                ? 'Se habilita al completar audio piloto.'
+                : 'Se habilita al terminar configuracion global de gafas.';
 
-    if (SEAT_AND_AFTER_STATES.includes(missionState)) {
-        timeline.push({
-            id: 'pilot-music-ambience',
-            kind: 'role',
-            label: 'Ambientación musical',
-            icon: 'music_note',
-            desc: musicDesc,
-            doneAt: meta.pilot_music_ambience_done_at || null,
-            status: taskStatus(musicDone, musicActive)
-        });
-    }
-
-    const pilotReadyForGlobal =
-        audioConfiguredForCurrentSpot;
-
-    if (pilotReadyForGlobal && UNLOAD_AND_AFTER_STATES.includes(missionState)) {
-        timeline.push({
-            id: 'pilot-global-unload',
-            kind: 'global',
-            globalId: 'team_unload',
-            label: 'Descarga de equipo',
-            icon: 'inventory_2',
-            desc: missionState === 'unload'
-                ? 'Participa en descarga de equipo y contenedores.'
-                : 'Descarga global completada con el equipo.',
-            status: taskStatus(missionState !== 'unload', missionState === 'unload')
-        });
-    }
-
-    const pilotSeatWindow = ['post_unload_coordination', ...SEAT_AND_AFTER_STATES];
-    if (pilotReadyForGlobal && pilotSeatWindow.includes(missionState)) {
-        const seatActive =
-            ['post_unload_coordination', 'seat_deployment'].includes(missionState) &&
-            !seatDeploymentDone;
-        timeline.push({
-            id: 'pilot-global-seat',
-            kind: 'global',
-            globalId: 'seat_deployment',
-            label: 'Despliegue de asientos',
-            icon: 'event_seat',
-            desc: seatActive
-                ? 'Participa en despliegue de asientos para liberar operacion.'
-                : 'Despliegue de asientos completado con el equipo.',
-            status: taskStatus(seatDeploymentDone, seatActive)
-        });
-
-        const headphonesProgress = getGlobalHeadphonesProgress(meta);
-        const headphonesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            !headphonesDone;
-        const headphonesDoneBy = meta.global_headphones_done_by_name || null;
-        const headphonesDesc = headphonesDone
-            ? `Audifonos configurados${headphonesDoneBy ? ` por ${headphonesDoneBy}` : ''}.`
-            : headphonesActive
-                ? `Checklist colaborativo en curso (${headphonesProgress.done}/${headphonesProgress.total} confirmados).`
-                : 'Se habilita al terminar despliegue de asientos.';
-
-        timeline.push({
-            id: 'pilot-global-headphones',
-            kind: 'global',
-            globalId: 'headphones_setup',
-            label: 'Configura audifonos',
-            icon: 'headphones',
-            desc: headphonesDesc,
-            status: taskStatus(headphonesDone, headphonesActive)
-        });
-
-        const glassesProgress = getGlobalGlassesProgress(meta);
-        const glassesActive =
-            missionState === 'seat_deployment' &&
-            seatDeploymentDone &&
-            headphonesDone &&
-            !glassesDone;
-        const glassesDoneBy = meta.global_glasses_done_by_name || null;
-        const glassesDesc = glassesDone
-            ? `Gafas configuradas${glassesDoneBy ? ` por ${glassesDoneBy}` : ''}.`
-            : glassesActive
-                ? `Checklist colaborativo en curso (${glassesProgress.done}/${glassesProgress.total} confirmados).`
-                : 'Se habilita al terminar configuracion de audifonos.';
-
-        timeline.push({
-            id: 'pilot-global-glasses',
-            kind: 'global',
-            globalId: 'glasses_setup',
-            label: 'Configuracion de gafas',
-            icon: 'view_in_ar',
-            desc: glassesDesc,
-            status: taskStatus(glassesDone, glassesActive)
-        });
-    }
+    timeline.push({
+        id: 'pilot-music-ambience',
+        kind: 'role',
+        label: 'Ambientación musical',
+        icon: 'music_note',
+        desc: musicDesc,
+        doneAt: meta.pilot_music_ambience_done_at || null,
+        status: taskStatus(musicDone, musicActive)
+    });
 
     return timeline;
 }
@@ -1272,7 +1650,7 @@ function cardTitleIcon(card) {
 
 const EVENT_HISTORY = {
     checkin: { emoji: '✅', label: 'Check-in completado' },
-    prep_complete: { emoji: '🎯', label: 'Preparación completada' },
+    prep_complete: { emoji: '🎯', label: 'Montaje completado' },
     dropzone_ready: { emoji: '🅿️', label: 'Zona de descarga confirmada' },
     departure_force: { emoji: '⚡', label: 'Salida forzada por docente' },
     ROUTE_STARTED: { emoji: '🚀', label: 'Ruta iniciada' },
@@ -1288,9 +1666,9 @@ function fmtAgo(iso, nowMs) {
 
 function stateChipText(state) {
     const map = {
-        prep: 'Preparación', PILOT_PREP: 'Preparación', MISSION_BRIEF: 'Check-in', CHECKIN_DONE: 'Preparación',
-        PREP_DONE: 'Preparación', AUX_PREP_DONE: 'Preparación', TEACHER_SUPPORTING_PILOT: 'Preparación',
-        PILOT_READY_FOR_LOAD: 'Preparación', WAITING_AUX_VEHICLE_CHECK: 'Preparación', AUX_CONTAINERS_DONE: 'Preparación',
+        prep: 'Montaje', PILOT_PREP: 'Montaje', MISSION_BRIEF: 'Check-in', CHECKIN_DONE: 'Montaje',
+        PREP_DONE: 'Montaje', AUX_PREP_DONE: 'Montaje', TEACHER_SUPPORTING_PILOT: 'Montaje',
+        PILOT_READY_FOR_LOAD: 'Montaje', WAITING_AUX_VEHICLE_CHECK: 'Montaje', AUX_CONTAINERS_DONE: 'Montaje',
         ROUTE_READY: 'Listos para salir', ROUTE_IN_PROGRESS: 'En ruta', IN_ROUTE: 'En ruta',
         ARRIVAL_PHOTO_DONE: 'En operación', waiting_unload_assignment: 'En operación', waiting_dropzone: 'En operación',
         unload: 'En operación', post_unload_coordination: 'En operación', seat_deployment: 'En operación',
@@ -1325,11 +1703,11 @@ function getRoleStatusChip(role, roleSummary, missionState) {
         return null;
     }
     if (role === 'assistant') {
-        // Assistant has 2 blocks: vehicle prep + load
         const blocks = roleSummary.blocks || 0;
         const completedBlocks = roleSummary.completedBlocks || 0;
-        if (completedBlocks >= 2 || (allDone && isPostLoad)) return { emoji: '✅', text: 'Carga verificada · Listo', color: 'text-emerald-400 bg-emerald-400/10' };
-        if (isLoading && completedBlocks >= 1) return { emoji: '🟦', text: 'Carga activa · Verificando contenedores', color: 'text-sky-400 bg-sky-400/10' };
+        const hasAllBlocksDone = blocks > 0 && completedBlocks >= blocks;
+        if (hasAllBlocksDone || (allDone && isPostLoad)) return { emoji: '✅', text: 'Carga verificada · Listo', color: 'text-emerald-400 bg-emerald-400/10' };
+        if (isLoading && completedBlocks >= Math.max(1, blocks - 1)) return { emoji: '🟦', text: 'Carga activa · Verificando contenedores', color: 'text-sky-400 bg-sky-400/10' };
         if (completedBlocks >= 1) return { emoji: '✅', text: 'Vehículo listo · Apoyando en bodega', color: 'text-emerald-400 bg-emerald-400/10' };
         if (inProgress) return { emoji: '🟦', text: 'Checklist en progreso', color: 'text-sky-400 bg-sky-400/10' };
         return null;
@@ -1338,19 +1716,19 @@ function getRoleStatusChip(role, roleSummary, missionState) {
 }
 
 /* ═══ TIMELINE VOICE PLAYER ═══ */
-function TimelineVoicePlayer({ url, duration }) {
-    const [playing, setPlaying] = useState(false);
-    const audioRef = useRef(null);
-    const toggle = () => {
-        if (!audioRef.current) { audioRef.current = new Audio(url); audioRef.current.onended = () => setPlaying(false); }
-        if (playing) { audioRef.current.pause(); setPlaying(false); }
-        else { audioRef.current.play().then(() => setPlaying(true)).catch(() => { }); }
+function TimelineVoicePlayer({ url, duration, onOpenViewer = null, label = 'Nota de voz' }) {
+    if (!url) return null;
+
+    const openVoice = () => {
+        if (typeof onOpenViewer !== 'function') return;
+        onOpenViewer(url, { label, typeHint: 'audio' });
     };
+
     const dur = duration ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, '0')}` : '0:00';
     return (
-        <button onClick={toggle} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-xs">
-            <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>{playing ? 'pause' : 'play_arrow'}</span>
-            <span className="text-slate-300 font-medium">Nota de voz · {dur}</span>
+        <button type="button" onClick={openVoice} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/85 hover:bg-slate-700 transition-colors text-xs">
+            <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>graphic_eq</span>
+            <span className="text-slate-200 font-semibold">Nota de voz · {dur}</span>
         </button>
     );
 }
@@ -1387,6 +1765,11 @@ export default function SupervisorDashboard() {
     const [historySchoolLookupMap, setHistorySchoolLookupMap] = useState({});
     const [historyFlightSnapshotLookup, setHistoryFlightSnapshotLookup] = useState({});
     const [historyNameLookupLoading, setHistoryNameLookupLoading] = useState(false);
+    const [activeEvidence, setActiveEvidence] = useState(null);
+    const [deleteMissionTarget, setDeleteMissionTarget] = useState(null);
+    const [deleteMissionPassword, setDeleteMissionPassword] = useState('');
+    const [deleteMissionError, setDeleteMissionError] = useState('');
+    const [deleteMissionSubmitting, setDeleteMissionSubmitting] = useState(false);
     const hadIssue = useRef(false);
     const knownIds = useRef(new Set());
     const knownMissionIds = useRef(new Set());
@@ -1397,6 +1780,35 @@ export default function SupervisorDashboard() {
     const eventRefreshInFlightRef = useRef(false);
     const lastRealtimePulseRef = useRef(0);
     const lastWatchdogRecoveryRef = useRef(0);
+
+    const openEvidenceViewer = useCallback((url, options = {}) => {
+        const normalizedUrl = String(url || '').trim();
+        if (!normalizedUrl) return;
+
+        setActiveEvidence({
+            url: normalizedUrl,
+            label: String(options.label || 'Evidencia operativa').trim() || 'Evidencia operativa',
+            typeHint: String(options.typeHint || '').trim().toLowerCase() || null
+        });
+    }, []);
+
+    const closeEvidenceViewer = useCallback(() => {
+        setActiveEvidence(null);
+    }, []);
+
+    const openDeleteMissionModal = useCallback((mission) => {
+        if (!mission) return;
+        setDeleteMissionTarget(mission);
+        setDeleteMissionPassword('');
+        setDeleteMissionError('');
+    }, []);
+
+    const closeDeleteMissionModal = useCallback(() => {
+        if (deleteMissionSubmitting) return;
+        setDeleteMissionTarget(null);
+        setDeleteMissionPassword('');
+        setDeleteMissionError('');
+    }, [deleteMissionSubmitting]);
 
     const markRealtimePulse = useCallback(() => {
         lastRealtimePulseRef.current = Date.now();
@@ -2039,35 +2451,52 @@ export default function SupervisorDashboard() {
             const missionConfirmDone = Boolean(missionChips.school && missionChips.address);
             const missionConfirmAt = [missionChipsAt.school, missionChipsAt.address].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] || null;
             const selfieEv = photosByItem.group_selfie || [];
-            const teacherBlock = buildBlock('teacher', 'teacher-main', 'Preparación docente', [
+            const teacherBlock = buildBlock('teacher', 'teacher-main', 'Montaje docente', [
                 ...teacherTeamItems,
                 { id: 'teacher-mission-confirm', label: 'Confirmación de misión', done: missionConfirmDone, at: missionConfirmAt, reqEvidence: false, evidence: [] },
                 { id: 'group_selfie', label: LABEL_MAP.group_selfie || 'Selfie de verificación', done: selfieEv.length > 0, at: selfieEv[0]?.created_at || null, reqEvidence: true, evidence: selfieEv },
             ]);
 
             /* assistant blocks */
-            const aGroups = getGroupedItems('assistant');
-            const vehGroup = aGroups.find(g => g.name.toLowerCase().includes('veh')) || aGroups[0] || { name: 'Preparación del vehículo', items: [] };
-            const loadGroup = aGroups.find(g => g.name.toLowerCase().includes('carga')) || aGroups[1] || { name: 'Checklist de carga', items: [] };
-            const aVehBlock = buildBlock('assistant', 'assistant-veh', vehGroup.name, vehGroup.items.map(mapItem));
-            const loadItems = [
-                ...loadGroup.items.map(mapItem),
-                ...(AUX_LOAD.items || []).map(it => {
-                    const st = aux2Check[it.id];
-                    return { id: it.id, label: it.label, done: st?.value === true, at: st?.at || null, reqEvidence: false, evidence: [] };
-                }),
-                ...(AUX_LOAD.photos || []).map(it => {
-                    const fromTable = photosByItem[it.id] || [];
-                    const fromEvent = aux2Photo[it.id];
-                    const merged = [...fromTable];
-                    if (fromEvent?.filePath && !merged.some(r => r.file_path === fromEvent.filePath))
-                        merged.unshift({ id: `aux2-ph-${it.id}`, file_path: fromEvent.filePath, created_at: fromEvent.at, item_id: it.id });
-                    return { id: it.id, label: it.label, done: merged.length > 0 || fromEvent?.done === true, at: merged[0]?.created_at || fromEvent?.at || null, reqEvidence: true, evidence: merged };
-                }),
-            ];
-            const aLoadBlock = buildBlock('assistant', 'assistant-load', loadGroup.name || 'Checklist de carga', loadItems);
+            const assistantPrepBlocks = getGroupedItems('assistant').map((group, idx) => {
+                const groupItems = Array.isArray(group?.items) ? group.items : [];
+                const blockName = String(group?.name || '').trim() || `Checklist auxiliar ${idx + 1}`;
+                return buildBlock('assistant', `assistant-prep-${idx}-${blockName}`, blockName, groupItems.map(mapItem));
+            });
 
-            const roleBlocks = { pilot: pilotBlocks, teacher: [teacherBlock], assistant: [aVehBlock, aLoadBlock] };
+            const assistantLoadBlocks = AUX_LOADS.map((group, idx) => {
+                const loadItems = [
+                    ...((group?.items || []).map((it) => {
+                        const st = aux2Check[it.id];
+                        return { id: it.id, label: it.label, done: st?.value === true, at: st?.at || null, reqEvidence: false, evidence: [] };
+                    })),
+                    ...((group?.photos || []).map((it) => {
+                        const fromTable = photosByItem[it.id] || [];
+                        const fromEvent = aux2Photo[it.id];
+                        const merged = [...fromTable];
+                        if (fromEvent?.filePath && !merged.some((r) => r.file_path === fromEvent.filePath)) {
+                            merged.unshift({ id: `aux2-ph-${it.id}`, file_path: fromEvent.filePath, created_at: fromEvent.at, item_id: it.id });
+                        }
+                        return {
+                            id: it.id,
+                            label: it.label,
+                            done: merged.length > 0 || fromEvent?.done === true,
+                            at: merged[0]?.created_at || fromEvent?.at || null,
+                            reqEvidence: true,
+                            evidence: merged
+                        };
+                    })),
+                ];
+
+                const blockLabel = String(group?.label || group?.name || '').trim() || `Carga auxiliar ${idx + 1}`;
+                return buildBlock('assistant', `assistant-load-${group?.id || idx}`, blockLabel, loadItems);
+            });
+
+            const roleBlocks = {
+                pilot: pilotBlocks,
+                teacher: [teacherBlock],
+                assistant: [...assistantPrepBlocks, ...assistantLoadBlocks]
+            };
             const roleSummary = ROLE_ORDER.reduce((acc, role) => {
                 const blocks = roleBlocks[role] || [];
                 const total = blocks.reduce((s, b) => s + b.total, 0);
@@ -2229,11 +2658,18 @@ export default function SupervisorDashboard() {
             };
 
             /* ══ ROLE CARDS ══ */
-            const stateCards = STATE_ROLE_CARDS[j.mission_state] || {};
+            const normalizedMissionState = normalizeMissionState(j.mission_state);
+            const stateCards =
+                STATE_ROLE_CARDS[normalizedMissionState]
+                || STATE_ROLE_CARDS[normalizedMissionState.toUpperCase()]
+                || STATE_ROLE_CARDS[normalizedMissionState.toLowerCase()]
+                || {};
+            const missionInFlightOperation = isMissionPastPrep(j.mission_state);
             const roleCards = ROLE_ORDER.map(role => {
-                const card = stateCards[role] || { emoji: '⏳', title: 'En espera', desc: 'Esperando siguiente fase.', next: null };
+                const card = stateCards[role] || { emoji: '⏳', title: 'Sin estado sincronizado', desc: 'Sin información de tareas para este estado.', next: null };
                 const person = rolePeople[role]?.name || ROLE_META[role].label;
-                const postArrivalEnabled = arrivalAnchor.confirmed;
+                const shouldForcePrepCompletion = isMissionPastPrep(j.mission_state);
+                const postArrivalEnabled = arrivalAnchor.confirmed || shouldForcePrepCompletion;
                 const data = {};
                 // Attach evidence for roles that have showData
                 if (card.showData) {
@@ -2370,7 +2806,7 @@ export default function SupervisorDashboard() {
                         desc: 'Esperando foto de llegada del Docente.'
                     };
 
-                const taskFlow = role === 'teacher'
+                const taskFlowBase = role === 'teacher'
                     ? buildTeacherTaskFlow(j.mission_state, meta, postArrivalEnabled, {
                         assistantName: rolePeople.assistant?.name || 'Auxiliar',
                         nowMs: now
@@ -2384,8 +2820,29 @@ export default function SupervisorDashboard() {
                             ? buildPilotGlobalTaskFlow(j.mission_state, meta, postArrivalEnabled)
                             : (!postArrivalEnabled ? buildInactiveRoleRoadmap(role) : []);
 
+                const taskFlow = shouldForcePrepCompletion
+                    ? taskFlowBase.map((task) => ({ ...task, status: 'completed' }))
+                    : taskFlowBase;
+
                 const activeTask = taskFlow.find((task) => task.status === 'active') || null;
                 const activeGlobalTask = activeTask?.kind === 'global' ? activeTask : null;
+
+                if (shouldForcePrepCompletion && prepProgress) {
+                    prepProgress = {
+                        ...prepProgress,
+                        done: prepProgress.total,
+                        checks: Array.isArray(prepProgress.checks) ? prepProgress.checks.map(() => true) : prepProgress.checks,
+                        audioDone: Number.isFinite(prepProgress.audioTotal) ? prepProgress.audioTotal : prepProgress.audioDone,
+                        audioChecks: Array.isArray(prepProgress.audioChecks) ? prepProgress.audioChecks.map(() => true) : prepProgress.audioChecks,
+                        spot: {
+                            ...(prepProgress.spot || {}),
+                            confirmed: true
+                        },
+                        checklistDone: true,
+                        controllerConnected: true,
+                        audioConfigured: true
+                    };
+                }
 
                 if (postArrivalEnabled && activeTask?.id === 'teacher-civic-audio') {
                     rTitle = `${person} en acto cívico`;
@@ -2412,6 +2869,20 @@ export default function SupervisorDashboard() {
                     if (nextPendingTask) displayNext = nextPendingTask.label;
                 }
 
+                if (missionInFlightOperation) {
+                    if (role === 'teacher') {
+                        rTitle = 'Operación en curso';
+                        rDesc = 'Operación en curso: Registro de vuelos.';
+                        displayEmoji = '🎓';
+                        displayNext = 'Bitácora de vuelos';
+                    } else {
+                        rTitle = 'Operación en curso';
+                        rDesc = 'Operación: Pantalla en construcción.';
+                        displayEmoji = '🛠️';
+                        displayNext = 'Operación en sede';
+                    }
+                }
+
                 return {
                     role,
                     person,
@@ -2434,6 +2905,318 @@ export default function SupervisorDashboard() {
                     updatedAt: j.updated_at || j.created_at
                 };
             });
+
+            const missionStateUpper = normalizeMissionState(j.mission_state).toUpperCase();
+            const closureFlags = getDismantlingFlags(meta);
+            const checkoutStatusFromMeta = getCheckoutStatusFromMeta(meta);
+            const checkoutCommentsFromMeta = getCheckoutCommentsFromMeta(meta);
+
+            const checkoutEventsByRole = {};
+            jPrep.forEach((ev) => {
+                if (ev.event_type !== 'checkout') return;
+
+                const inferredRole = normalizeRoleKey(
+                    roleOf(ev, profileMap)
+                    || profileMap[ev.user_id]?.role
+                    || ev.payload?.role
+                );
+                if (!ROLE_ORDER.includes(inferredRole)) return;
+
+                const prev = checkoutEventsByRole[inferredRole];
+                if (!prev || new Date(ev.created_at) > new Date(prev.created_at)) {
+                    checkoutEventsByRole[inferredRole] = ev;
+                }
+            });
+
+            const checkoutByRole = ROLE_ORDER.reduce((acc, role) => {
+                const eventRow = checkoutEventsByRole[role] || null;
+                const commentFromEvent = typeof eventRow?.payload?.checkout_comment === 'string'
+                    ? eventRow.payload.checkout_comment.trim()
+                    : '';
+                const fallbackComment = checkoutCommentsFromMeta[role] || '';
+                const doneByMeta = checkoutStatusFromMeta[role] === true;
+                const doneAtFromMeta = getMetaTimestamp(meta, [
+                    `closure_checkout_${role}_done_at`,
+                    `checkout_${role}_done_at`
+                ]);
+
+                acc[role] = {
+                    done: Boolean(eventRow) || doneByMeta,
+                    at: eventRow?.created_at || doneAtFromMeta || null,
+                    comment: commentFromEvent || fallbackComment || ''
+                };
+
+                return acc;
+            }, {});
+
+            const hasAnyCheckout = ROLE_ORDER.some((role) => checkoutByRole[role].done);
+            const lifecycleTerminal = TERMINAL_REPORT_STATES.has(missionStateUpper) || meta.closure_checkout_done === true;
+            const allCheckedOut = lifecycleTerminal || ROLE_ORDER.every((role) => checkoutByRole[role].done);
+
+            const checkoutAtValues = ROLE_ORDER
+                .map((role) => checkoutByRole[role].at)
+                .filter(Boolean);
+            const firstCheckoutAt = getEarliestTimestamp(checkoutAtValues);
+            const allCheckoutAt = allCheckedOut
+                ? (getLatestTimestamp(checkoutAtValues) || j.updated_at || j.created_at)
+                : null;
+            const finalCheckoutAt = allCheckedOut
+                ? (getLatestTimestamp([
+                    allCheckoutAt,
+                    getMetaTimestamp(meta, ['closure_checkout_done_at'])
+                ]) || allCheckoutAt)
+                : null;
+            const finalCheckoutAtMs = toMs(finalCheckoutAt) || 0;
+            const liveGraceEndsAtMs = allCheckedOut && finalCheckoutAtMs > 0
+                ? finalCheckoutAtMs + LIVE_COMPLETION_GRACE_MS
+                : 0;
+            const isInCompletionGrace = allCheckedOut && liveGraceEndsAtMs > now;
+            const completionGraceRemainingMs = isInCompletionGrace
+                ? Math.max(0, liveGraceEndsAtMs - now)
+                : 0;
+
+            const returnStartedRawAt = getMetaTimestamp(meta, [
+                'aux_return_route_started_at',
+                'closure_return_route_done_at',
+                'global_equipment_loaded_at',
+                'global_container_loading_done_at'
+            ]);
+            const returnStarted = closureFlags.auxReturnRouteStarted || Boolean(returnStartedRawAt);
+
+            const arrivalNotifiedRawAt = getMetaTimestamp(meta, [
+                'aux_arrival_notified_at',
+                'arrival_notified_at',
+                'closure_arrival_notification_done_at'
+            ]);
+            const arrivalNotified = closureFlags.auxArrivalNotified || Boolean(arrivalNotifiedRawAt);
+
+            const closureHasStarted =
+                missionStateUpper === 'DISMANTLING'
+                || Boolean(meta.closure_started_at)
+                || returnStarted
+                || arrivalNotified
+                || hasAnyCheckout
+                || lifecycleTerminal;
+
+            let lifecycleStage = 0;
+            if (closureHasStarted) lifecycleStage = 4;
+            if (returnStarted || arrivalNotified || hasAnyCheckout || lifecycleTerminal) lifecycleStage = 5;
+            if (arrivalNotified || hasAnyCheckout || lifecycleTerminal) lifecycleStage = 6;
+            if (hasAnyCheckout || lifecycleTerminal) lifecycleStage = 7;
+
+            const phase4ForceComplete = lifecycleStage > 4 || lifecycleTerminal;
+            const phase5ForceComplete = lifecycleStage > 5 || lifecycleTerminal;
+            const phase6ForceComplete = lifecycleStage > 6 || lifecycleTerminal;
+            const phase7ForceComplete = lifecycleTerminal;
+
+            const stepEvidenceById = {
+                [CLOSURE_STEPS.CONTAINER_LOADING]: [
+                    {
+                        url: meta.global_equipment_loaded_photo_containers_url || null,
+                        label: 'Foto contenedores cargados',
+                        typeHint: 'image'
+                    },
+                    {
+                        url: meta.global_equipment_loaded_photo_roof_url || null,
+                        label: 'Foto carga en techo',
+                        typeHint: 'image'
+                    }
+                ].filter((item) => item.url),
+                [CLOSURE_STEPS.FINAL_PARKING]: [
+                    {
+                        url: meta.closure_final_parking_photo_url || null,
+                        label: 'Foto estacionamiento final',
+                        typeHint: 'image'
+                    }
+                ].filter((item) => item.url)
+            };
+
+            const buildStepTask = (stepId, phaseLabel) => ({
+                id: `${phaseLabel}-${stepId}`,
+                stepId,
+                label: getClosureTaskLabel(stepId),
+                desc: phaseLabel === 'desmontaje'
+                    ? 'Seguimiento en tiempo real del desmontaje y preparación de retorno.'
+                    : 'Seguimiento en tiempo real del cierre en base.',
+                done: getClosureStepDone(closureFlags, stepId),
+                at: getClosureStepTimestamp(meta, stepId),
+                global: GLOBAL_CLOSURE_TASKS.has(stepId),
+                evidence: stepEvidenceById[stepId] || []
+            });
+
+            const phase4Cards = ROLE_ORDER.map((role) => {
+                const stepFilter = PHASE4_ROLE_STEP_FILTERS[role] || new Set();
+                const roleStepIds = SCHOOL_TEARDOWN_STEP_IDS.filter((stepId) => stepFilter.has(stepId));
+                const tasks = roleStepIds.map((stepId) => buildStepTask(stepId, 'desmontaje'));
+
+                return buildLifecycleRoleCard({
+                    role,
+                    person: rolePeople[role]?.name || ROLE_META[role].label,
+                    blockLabel: 'Desmontaje escolar',
+                    tasks,
+                    forceComplete: phase4ForceComplete,
+                    activePhase: lifecycleStage === 4 && !phase4ForceComplete,
+                    updatedAt: j.updated_at || j.created_at
+                });
+            });
+
+            const pilotSupportDone = closureFlags.pilotReturnInventoryDone && closureFlags.pilotElectronicsCharged;
+            const assistantSupportDone = closureFlags.auxRecordingCharged && closureFlags.auxFinalParkingDone && closureFlags.auxKeyDropDone;
+
+            const teacherSupportTask = {
+                id: 'cierre-apoyo-bodega-teacher',
+                label: 'Apoyo en bodega',
+                desc: 'Coordina recepción de equipo y validaciones finales del equipo.',
+                done: pilotSupportDone && assistantSupportDone,
+                at: (pilotSupportDone && assistantSupportDone)
+                    ? getLatestTimestamp([
+                        getMetaTimestamp(meta, ['pilot_return_inventory_done_at', 'closure_return_inventory_done_at']),
+                        getMetaTimestamp(meta, ['pilot_electronics_charged_at', 'closure_electronics_charging_done_at']),
+                        getMetaTimestamp(meta, ['aux_recording_charging_done_at', 'closure_recording_charging_done_at']),
+                        getMetaTimestamp(meta, ['aux_final_parking_done_at', 'closure_final_parking_done_at']),
+                        getMetaTimestamp(meta, ['aux_key_drop_done_at', 'closure_key_drop_done_at'])
+                    ])
+                    : null,
+                global: false,
+                evidence: []
+            };
+
+            const assistantSupportTask = {
+                id: 'cierre-apoyo-bodega-assistant',
+                label: 'Apoyo en bodega',
+                desc: 'Apoya acomodo de bodega mientras el piloto cierra inventario y estación de carga.',
+                done: pilotSupportDone,
+                at: pilotSupportDone
+                    ? getLatestTimestamp([
+                        getMetaTimestamp(meta, ['pilot_return_inventory_done_at', 'closure_return_inventory_done_at']),
+                        getMetaTimestamp(meta, ['pilot_electronics_charged_at', 'closure_electronics_charging_done_at'])
+                    ])
+                    : null,
+                global: false,
+                evidence: []
+            };
+
+            const auxRecordingTask = {
+                id: 'cierre-aux-recording-charging',
+                label: 'Carga de Audiovisuales',
+                desc: 'Conecta cámara y equipo de grabación en su estación de carga.',
+                done: closureFlags.auxRecordingCharged,
+                at: getMetaTimestamp(meta, ['aux_recording_charging_done_at', 'closure_recording_charging_done_at']),
+                global: false,
+                evidence: []
+            };
+
+            const keyDropTask = {
+                id: 'cierre-key-drop',
+                label: 'Resguardo de llaves',
+                desc: 'Confirma entrega de llaves en sitio asignado con evidencia.',
+                done: closureFlags.auxKeyDropDone,
+                at: getMetaTimestamp(meta, ['aux_key_drop_done_at', 'closure_key_drop_done_at']),
+                global: false,
+                evidence: [
+                    {
+                        url: meta.aux_key_drop_photo_url || null,
+                        label: 'Foto resguardo de llaves',
+                        typeHint: 'image'
+                    }
+                ].filter((item) => item.url)
+            };
+
+            const phase6Cards = ROLE_ORDER.map((role) => {
+                const stepFilter = PHASE6_ROLE_STEP_FILTERS[role] || new Set();
+                const roleStepIds = BASE_CLOSURE_STEP_IDS.filter((stepId) => stepFilter.has(stepId));
+                const tasks = roleStepIds.map((stepId) => buildStepTask(stepId, 'cierre'));
+
+                if (role === 'teacher') {
+                    tasks.push(teacherSupportTask);
+                }
+
+                if (role === 'assistant') {
+                    tasks.push(assistantSupportTask, auxRecordingTask, keyDropTask);
+                }
+
+                return buildLifecycleRoleCard({
+                    role,
+                    person: rolePeople[role]?.name || ROLE_META[role].label,
+                    blockLabel: 'Cierre en base',
+                    tasks,
+                    forceComplete: phase6ForceComplete,
+                    activePhase: lifecycleStage === 6 && !phase6ForceComplete,
+                    updatedAt: j.updated_at || j.created_at
+                });
+            });
+
+            const teardownStepTimes = SCHOOL_TEARDOWN_STEP_IDS
+                .map((stepId) => getClosureStepTimestamp(meta, stepId))
+                .filter(Boolean);
+
+            const dismantlingStartedAt = closureHasStarted
+                ? (
+                    getMetaTimestamp(meta, ['closure_started_at'])
+                    || getEarliestTimestamp([
+                        ...teardownStepTimes,
+                        returnStartedRawAt,
+                        arrivalNotifiedRawAt,
+                        firstCheckoutAt,
+                        j.updated_at,
+                        j.created_at
+                    ])
+                )
+                : null;
+
+            const returnStartedAt = lifecycleStage >= 5
+                ? (returnStartedRawAt || getEarliestTimestamp([arrivalNotifiedRawAt, firstCheckoutAt, j.updated_at]))
+                : null;
+            const arrivalNotifiedAt = lifecycleStage >= 6
+                ? (arrivalNotifiedRawAt || getEarliestTimestamp([firstCheckoutAt, j.updated_at]))
+                : null;
+
+            const closureLifecycleTimers = {
+                dismantling: buildPhaseTimer(toMs(dismantlingStartedAt) || 0, toMs(returnStartedAt) || 0, now),
+                returnTransit: buildPhaseTimer(toMs(returnStartedAt) || 0, toMs(arrivalNotifiedAt) || 0, now),
+                baseClosure: buildPhaseTimer(toMs(arrivalNotifiedAt) || 0, toMs(firstCheckoutAt) || 0, now),
+                checkout: buildPhaseTimer(toMs(firstCheckoutAt) || 0, toMs(allCheckoutAt) || 0, now)
+            };
+
+            const closureLifecycle = {
+                enabled: closureHasStarted || lifecycleTerminal,
+                stage: lifecycleStage,
+                phases: {
+                    dismantling: {
+                        forceComplete: phase4ForceComplete,
+                        active: lifecycleStage === 4 && !phase4ForceComplete,
+                        completed: phase4ForceComplete,
+                        cards: phase4Cards,
+                        timer: closureLifecycleTimers.dismantling
+                    },
+                    returnTransit: {
+                        started: lifecycleStage >= 5,
+                        forceComplete: phase5ForceComplete,
+                        active: lifecycleStage === 5 && !phase5ForceComplete,
+                        completed: phase5ForceComplete,
+                        startedAt: returnStartedAt,
+                        arrivedAt: arrivalNotifiedAt,
+                        timer: closureLifecycleTimers.returnTransit
+                    },
+                    baseClosure: {
+                        forceComplete: phase6ForceComplete,
+                        active: lifecycleStage === 6 && !phase6ForceComplete,
+                        completed: phase6ForceComplete,
+                        cards: phase6Cards,
+                        timer: closureLifecycleTimers.baseClosure
+                    },
+                    checkout: {
+                        started: lifecycleStage >= 7,
+                        forceComplete: phase7ForceComplete,
+                        active: lifecycleStage === 7 && !allCheckedOut,
+                        completed: allCheckedOut,
+                        byRole: checkoutByRole,
+                        firstAt: firstCheckoutAt,
+                        endAt: allCheckoutAt,
+                        timer: closureLifecycleTimers.checkout
+                    }
+                }
+            };
 
             // Recent steps (from events) for "Últimos pasos" section
             const recentSteps = [];
@@ -2468,8 +3251,14 @@ export default function SupervisorDashboard() {
                 phaseTimers,
                 roleCards, recentSteps,
                 assistantOperation,
+                closureLifecycle,
+                finalCheckoutAt,
+                finalCheckoutAtMs,
+                liveGraceEndsAtMs,
+                isInCompletionGrace,
+                completionGraceRemainingMs,
             };
-        }).filter(m => !m.isClosed).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        }).filter((m) => !m.isClosed || m.isInCompletionGrace).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     }, [journeys, schoolMap, prepByJ, photosByJ, staffByJ, presByJ, closures, profileMap, staffProfiles, flightLogs, now]);
 
     /* — auto-select — */
@@ -2521,6 +3310,7 @@ export default function SupervisorDashboard() {
             return {
                 key,
                 missionId,
+                journeyId: closure?.journey_id ? String(closure.journey_id) : null,
                 schoolName,
                 date,
                 time,
@@ -2532,8 +3322,139 @@ export default function SupervisorDashboard() {
                 checklistVerified: closure?.checklist_verified === true,
                 signatureUrl: closure?.signature_url || null,
                 groupPhotoUrl: closure?.group_photo_url || null,
+                preloadedLogs: Array.isArray(closure?.flight_logs)
+                    ? closure.flight_logs
+                    : (Array.isArray(closure?.logs) ? closure.logs : []),
                 raw: closure
             };
+        });
+
+        const existingMissionIds = new Set(
+            rows
+                .map((item) => String(item?.missionId || '').trim())
+                .filter(Boolean)
+        );
+
+        (missions || []).forEach((mission) => {
+            if (!mission?.closureLifecycle?.phases?.checkout?.completed) return;
+
+            const missionId = String(mission?.journey?.school_id || '').trim();
+            if (!missionId) return;
+
+            const missionDateTime =
+                mission.finalCheckoutAt
+                || mission.updatedAt
+                || mission?.journey?.updated_at
+                || mission?.journey?.created_at
+                || null;
+            const { date, time } = formatDateAndTime(missionDateTime);
+
+            const journeyMeta = (() => {
+                if (!mission?.journey?.meta) return Object.create(null);
+                if (typeof mission.journey.meta === 'string') {
+                    try {
+                        const parsed = JSON.parse(mission.journey.meta);
+                        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+                            ? parsed
+                            : Object.create(null);
+                    } catch {
+                        return Object.create(null);
+                    }
+                }
+
+                if (typeof mission.journey.meta === 'object' && !Array.isArray(mission.journey.meta)) {
+                    return mission.journey.meta;
+                }
+
+                return Object.create(null);
+            })();
+
+            const checkinAt = getEarliestTimestamp(
+                ROLE_ORDER.map((role) => mission?.checkins?.[role]?.at).filter(Boolean)
+            );
+            const operationStartedAt =
+                Number.isFinite(mission?.assistantOperation?.operationStartedAtMs) && mission.assistantOperation.operationStartedAtMs > 0
+                    ? new Date(mission.assistantOperation.operationStartedAtMs).toISOString()
+                    : null;
+            const dismantlingStartedAt =
+                Number.isFinite(mission?.closureLifecycle?.phases?.dismantling?.timer?.startedAtMs) && mission.closureLifecycle.phases.dismantling.timer.startedAtMs > 0
+                    ? new Date(mission.closureLifecycle.phases.dismantling.timer.startedAtMs).toISOString()
+                    : null;
+            const baseClosureStartedAt =
+                Number.isFinite(mission?.closureLifecycle?.phases?.baseClosure?.timer?.startedAtMs) && mission.closureLifecycle.phases.baseClosure.timer.startedAtMs > 0
+                    ? new Date(mission.closureLifecycle.phases.baseClosure.timer.startedAtMs).toISOString()
+                    : null;
+            const checkoutStartedAt = mission?.closureLifecycle?.phases?.checkout?.firstAt || null;
+            const checkoutEndedAt = mission?.closureLifecycle?.phases?.checkout?.endAt || mission.finalCheckoutAt || null;
+
+            const timelineSnapshot = {
+                checkinAt,
+                prepAt: checkinAt,
+                operationAt: operationStartedAt,
+                dismantlingAt: dismantlingStartedAt,
+                baseClosureAt: baseClosureStartedAt,
+                checkoutAt: checkoutStartedAt,
+                checkoutEndAt: checkoutEndedAt
+            };
+
+            const existingIdx = rows.findIndex((row) => String(row?.missionId || '').trim() === missionId);
+            if (existingIdx >= 0) {
+                const existingRow = rows[existingIdx] || Object.create(null);
+                const mergedPreloadedLogs = [
+                    ...(Array.isArray(existingRow.preloadedLogs) ? existingRow.preloadedLogs : []),
+                    ...(Array.isArray(mission?.assistantOperation?.flights) ? mission.assistantOperation.flights : [])
+                ];
+
+                rows[existingIdx] = {
+                    ...existingRow,
+                    journeyId: existingRow.journeyId || String(mission.id),
+                    preloadedLogs: mergedPreloadedLogs,
+                    checkoutByRole: mission?.closureLifecycle?.phases?.checkout?.byRole || existingRow.checkoutByRole || Object.create(null),
+                    timelineSnapshot,
+                    raw: {
+                        ...(existingRow.raw || Object.create(null)),
+                        journey_id: existingRow?.raw?.journey_id || mission.id,
+                        mission_state: mission?.journey?.mission_state || existingRow?.raw?.mission_state || null,
+                        meta: {
+                            ...parseObject(existingRow?.raw?.meta),
+                            ...journeyMeta
+                        }
+                    }
+                };
+
+                existingMissionIds.add(missionId);
+                return;
+            }
+
+            rows.push({
+                key: `journey-${mission.id}-v2`,
+                missionId,
+                journeyId: String(mission.id),
+                schoolName: mission.schoolName || 'Escuela no vinculada',
+                date,
+                time,
+                missionDateTime,
+                endTime: missionDateTime,
+                createdAt: mission?.journey?.created_at || null,
+                totalFlights: Number(mission?.assistantOperation?.totalFlights || mission?.assistantOperation?.flights?.length || 0),
+                totalStudents: Number(mission?.assistantOperation?.totalStudents || 0),
+                checklistVerified: true,
+                signatureUrl: null,
+                groupPhotoUrl: null,
+                preloadedLogs: Array.isArray(mission?.assistantOperation?.flights)
+                    ? mission.assistantOperation.flights
+                    : [],
+                checkoutByRole: mission?.closureLifecycle?.phases?.checkout?.byRole || Object.create(null),
+                timelineSnapshot,
+                raw: {
+                    source: 'journey_fallback',
+                    journey_id: mission.id,
+                    mission_state: mission?.journey?.mission_state || null,
+                    meta: journeyMeta
+                }
+            });
+
+            existingMissionIds.add(missionId);
         });
 
         rows.sort((a, b) => {
@@ -2543,7 +3464,7 @@ export default function SupervisorDashboard() {
         });
 
         return rows;
-    }, [closures, historySchoolMapById, historyFlightSnapshotMap]);
+    }, [closures, historySchoolMapById, historyFlightSnapshotMap, missions]);
 
     const filteredMissionHistory = useMemo(() => {
         const term = String(historySearch || '').trim().toLowerCase();
@@ -2574,29 +3495,92 @@ export default function SupervisorDashboard() {
         }
     }, [filteredMissionHistory, selectedHistoryMissionKey]);
 
-    const fetchHistoryMissionLogs = useCallback(async (missionId) => {
-        const missionKey = String(missionId || '').trim();
+    const fetchHistoryMissionLogs = useCallback(async (mission) => {
+        const missionKey = String(mission?.key || '').trim();
         if (!missionKey) return;
         if (historyLogsByMission[missionKey] || historyLogsLoadingMission === missionKey) return;
 
         setHistoryLogsLoadingMission(missionKey);
         try {
-            const { data, error } = await supabase
-                .from('bitacora_vuelos')
-                .select('*')
-                .eq('mission_id', missionKey)
-                .order('start_time', { ascending: true });
+            const missionIdCandidates = [
+                mission?.missionId,
+                mission?.raw?.mission_id,
+                mission?.raw?.missionId
+            ]
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+            const journeyIdCandidates = [
+                mission?.journeyId,
+                mission?.raw?.journey_id,
+                mission?.raw?.journeyId
+            ]
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
 
-            if (error) throw error;
+            const missionIds = [...new Set(missionIdCandidates)];
+            const journeyIds = [...new Set(journeyIdCandidates)];
+            const preloadedLogs = Array.isArray(mission?.preloadedLogs) ? mission.preloadedLogs : [];
+
+            const queries = [];
+            if (missionIds.length > 0) {
+                queries.push(
+                    supabase
+                        .from('bitacora_vuelos')
+                        .select('*')
+                        .in('mission_id', missionIds)
+                        .order('start_time', { ascending: true })
+                );
+            }
+            if (journeyIds.length > 0) {
+                queries.push(
+                    supabase
+                        .from('bitacora_vuelos')
+                        .select('*')
+                        .in('journey_id', journeyIds)
+                        .order('start_time', { ascending: true })
+                );
+            }
+
+            const responses = queries.length > 0 ? await Promise.all(queries) : [];
+            const logsByMission = missionIds.length > 0 ? (responses[0]?.data || []) : [];
+            const missionError = missionIds.length > 0 ? responses[0]?.error : null;
+            const logsByJourney = journeyIds.length > 0 ? (responses[missionIds.length > 0 ? 1 : 0]?.data || []) : [];
+            const journeyError = journeyIds.length > 0 ? responses[missionIds.length > 0 ? 1 : 0]?.error : null;
+
+            if (missionError) {
+                console.warn('SV history logs mission_id query error:', missionError);
+            }
+            if (journeyError) {
+                console.warn('SV history logs journey_id query error:', journeyError);
+            }
+
+            const mergedByKey = new Map();
+            [...preloadedLogs, ...logsByMission, ...logsByJourney].forEach((row, idx) => {
+                const rowId = String(row?.id || '').trim();
+                const rowJourneyId = String(row?.journey_id || row?.journeyId || '').trim();
+                const rowMissionId = String(row?.mission_id || row?.missionId || '').trim();
+                const rowStart = row?.start_time || row?.startTime || row?.startedAt || row?.created_at || `idx-${idx}`;
+                const dedupeKey = rowId || `${rowJourneyId}|${rowMissionId}|${rowStart}`;
+                if (!mergedByKey.has(dedupeKey)) {
+                    mergedByKey.set(dedupeKey, row);
+                }
+            });
+
+            const mergedLogs = Array.from(mergedByKey.values()).sort((a, b) => {
+                const aMs = toMs(a?.start_time || a?.startTime || a?.startedAt || a?.created_at) || 0;
+                const bMs = toMs(b?.start_time || b?.startTime || b?.startedAt || b?.created_at) || 0;
+                return aMs - bMs;
+            });
+
             setHistoryLogsByMission((prev) => ({
                 ...prev,
-                [missionKey]: data || []
+                [missionKey]: mergedLogs
             }));
         } catch (error) {
             console.error('SV history logs error:', error);
             setHistoryLogsByMission((prev) => ({
                 ...prev,
-                [missionKey]: []
+                [missionKey]: Array.isArray(mission?.preloadedLogs) ? mission.preloadedLogs : []
             }));
         } finally {
             setHistoryLogsLoadingMission((prev) => (prev === missionKey ? null : prev));
@@ -2612,19 +3596,21 @@ export default function SupervisorDashboard() {
         }
 
         setSelectedHistoryMissionKey(mission.key);
-        if (mission.missionId) {
-            fetchHistoryMissionLogs(mission.missionId);
+        if (mission.missionId || mission.journeyId || (Array.isArray(mission.preloadedLogs) && mission.preloadedLogs.length > 0)) {
+            fetchHistoryMissionLogs(mission);
         }
     }, [fetchHistoryMissionLogs, selectedHistoryMissionKey]);
 
-    const getHistoryMissionLogs = useCallback((missionId) => {
-        const missionKey = String(missionId || '').trim();
-        if (!missionKey) return [];
-        return historyLogsByMission[missionKey] || [];
+    const getHistoryMissionLogs = useCallback((mission) => {
+        const missionKey = String(mission?.key || '').trim();
+        if (!missionKey) {
+            return Array.isArray(mission?.preloadedLogs) ? mission.preloadedLogs : [];
+        }
+        return historyLogsByMission[missionKey] || (Array.isArray(mission?.preloadedLogs) ? mission.preloadedLogs : []);
     }, [historyLogsByMission]);
 
     const getHistoryMissionMetrics = useCallback((mission) => {
-        const logs = getHistoryMissionLogs(mission?.missionId);
+        const logs = getHistoryMissionLogs(mission);
         const totalStaff = logs.reduce((acc, log) => acc + Number(log?.staff_count ?? log?.staffCount ?? 0), 0);
         const totalDurationSec = logs.reduce((acc, log) => acc + Number(log?.duration_seconds ?? log?.durationSeconds ?? 0), 0);
         const totalStudentsFromLogs = logs.reduce((acc, log) => acc + Number(log?.student_count ?? log?.studentCount ?? 0), 0);
@@ -2633,6 +3619,29 @@ export default function SupervisorDashboard() {
             return acc + incidents.length;
         }, 0);
         const averageDurationSec = logs.length > 0 ? Math.round(totalDurationSec / logs.length) : 0;
+        const sortedLogs = logs
+            .map((log) => {
+                const startMs = toMs(log?.start_time || log?.startTime || log?.startedAt || log?.created_at) || 0;
+                const endMs = toMs(log?.end_time || log?.endTime || log?.endedAt) || 0;
+                const durationSec = Number(log?.duration_seconds ?? log?.durationSeconds ?? log?.durationSec ?? 0) || 0;
+                return {
+                    startMs,
+                    endMs: endMs > 0 ? endMs : (startMs > 0 ? startMs + (durationSec * 1000) : 0),
+                };
+            })
+            .filter((row) => row.startMs > 0)
+            .sort((a, b) => a.startMs - b.startMs);
+        const interFlightGaps = [];
+        for (let idx = 1; idx < sortedLogs.length; idx += 1) {
+            const prevEndMs = sortedLogs[idx - 1].endMs || sortedLogs[idx - 1].startMs;
+            const nextStartMs = sortedLogs[idx].startMs;
+            if (nextStartMs > prevEndMs) {
+                interFlightGaps.push(Math.floor((nextStartMs - prevEndMs) / 1000));
+            }
+        }
+        const averageGapSec = interFlightGaps.length > 0
+            ? Math.round(interFlightGaps.reduce((sum, gap) => sum + gap, 0) / interFlightGaps.length)
+            : 0;
         const flightsFromClosure = Number(mission?.totalFlights || 0);
         const studentsFromClosure = Number(mission?.totalStudents || 0);
 
@@ -2641,10 +3650,82 @@ export default function SupervisorDashboard() {
             totalStudents: studentsFromClosure > 0 ? studentsFromClosure : totalStudentsFromLogs,
             totalStaff,
             averageDurationSec,
+            averageGapSec,
             totalIncidents,
             logs,
         };
     }, [getHistoryMissionLogs]);
+
+    const confirmDeleteHistoryMission = useCallback(async () => {
+        if (!deleteMissionTarget) return;
+
+        const password = String(deleteMissionPassword || '').trim();
+        if (!password) {
+            setDeleteMissionError('Ingresa tu contrasena para confirmar.');
+            return;
+        }
+
+        const journeyId = String(
+            deleteMissionTarget?.journeyId ||
+            deleteMissionTarget?.raw?.journey_id ||
+            deleteMissionTarget?.raw?.journeyId ||
+            ''
+        ).trim();
+
+        if (!journeyId) {
+            setDeleteMissionError('Esta mision no tiene un journey_id vinculado para eliminar.');
+            return;
+        }
+
+        setDeleteMissionSubmitting(true);
+        setDeleteMissionError('');
+
+        try {
+            const { data: authData, error: authReadError } = await supabase.auth.getUser();
+            if (authReadError) throw authReadError;
+
+            const email = String(authData?.user?.email || '').trim();
+            if (!email) {
+                throw new Error('No fue posible validar la cuenta actual. Inicia sesion nuevamente.');
+            }
+
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            if (authError) {
+                throw new Error('Contrasena incorrecta. Verifica e intenta nuevamente.');
+            }
+
+            const { error: deleteError } = await supabase
+                .from('staff_journeys')
+                .delete()
+                .eq('id', journeyId);
+
+            if (deleteError) throw deleteError;
+
+            setJourneys((prev) => prev.filter((journey) => String(journey?.id || '') !== journeyId));
+            setClosures((prev) => prev.filter((closure) => String(closure?.journey_id || '') !== journeyId));
+            setHistoryLogsByMission((prev) => {
+                const next = { ...prev };
+                delete next[deleteMissionTarget.key];
+                return next;
+            });
+            setSelectedHistoryMissionKey((prev) => (prev === deleteMissionTarget.key ? null : prev));
+
+            setDeleteMissionTarget(null);
+            setDeleteMissionPassword('');
+            setDeleteMissionError('');
+
+            fetchData();
+        } catch (error) {
+            console.error('SV delete mission error:', error);
+            setDeleteMissionError(error?.message || 'No se pudo eliminar la mision.');
+        } finally {
+            setDeleteMissionSubmitting(false);
+        }
+    }, [deleteMissionPassword, deleteMissionTarget, fetchData, supabase]);
 
     const historyOverview = useMemo(() => {
         return missionHistory.reduce((acc, mission) => {
@@ -2660,7 +3741,8 @@ export default function SupervisorDashboard() {
     }, [missionHistory]);
 
     const hasLiveMission = Boolean(sel);
-    const effectiveTab = hasLiveMission ? dashboardTab : 'history';
+    const effectiveTab = dashboardTab;
+    const canDeleteHistoryMission = ['admin', 'supervisor'].includes(String(profile?.role || '').toLowerCase());
 
     /* ═══════════ RENDER ═══════════ */
 
@@ -2765,8 +3847,7 @@ export default function SupervisorDashboard() {
                                 const selected = selectedHistoryMissionKey === mission.key;
                                 const missionMetrics = selected ? getHistoryMissionMetrics(mission) : null;
                                 const missionLogs = missionMetrics?.logs || [];
-                                const missionIdKey = String(mission.missionId || '').trim();
-                                const loadingMissionLogs = selected && Boolean(missionIdKey) && historyLogsLoadingMission === missionIdKey;
+                                const loadingMissionLogs = selected && historyLogsLoadingMission === mission.key;
 
                                 return (
                                     <article
@@ -2803,111 +3884,31 @@ export default function SupervisorDashboard() {
                                         </button>
 
                                         {selected && (
-                                            <div className="px-3 pb-3 border-t border-primary/25 bg-slate-900/35 space-y-3">
-                                                <div className="pt-3 grid grid-cols-2 gap-2">
-                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2">
-                                                        <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Vuelos</p>
-                                                        <p className="text-lg font-black text-white">{missionMetrics.totalFlights}</p>
-                                                    </div>
-                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2">
-                                                        <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Alumnos</p>
-                                                        <p className="text-lg font-black text-emerald-300">{missionMetrics.totalStudents}</p>
-                                                    </div>
-                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2">
-                                                        <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Docentes</p>
-                                                        <p className="text-lg font-black text-sky-300">{missionMetrics.totalStaff}</p>
-                                                    </div>
-                                                    <div className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2">
-                                                        <p className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Promedio vuelo</p>
-                                                        <p className="text-lg font-black text-amber-300 tabular-nums">{fmtMMSS(missionMetrics.averageDurationSec)}</p>
-                                                    </div>
-                                                </div>
+                                            <div className="px-3 pb-3 border-t border-primary/25 bg-slate-900/35">
+                                                <V2MissionDetails
+                                                    mission={mission}
+                                                    missionMetrics={missionMetrics}
+                                                    flightLogs={missionLogs}
+                                                    loadingLogs={loadingMissionLogs}
+                                                    onOpenEvidence={openEvidenceViewer}
+                                                />
 
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${mission.checklistVerified ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
-                                                        {mission.checklistVerified ? 'Checklist de cierre verificado' : 'Checklist de cierre pendiente'}
-                                                    </span>
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${mission.groupPhotoUrl ? 'bg-indigo-500/15 text-indigo-300' : 'bg-slate-700/60 text-slate-400'}`}>
-                                                        {mission.groupPhotoUrl ? 'Foto grupal: disponible' : 'Foto grupal: no registrada'}
-                                                    </span>
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${mission.signatureUrl ? 'bg-fuchsia-500/15 text-fuchsia-300' : 'bg-slate-700/60 text-slate-400'}`}>
-                                                        {mission.signatureUrl ? 'Firma: disponible' : 'Firma: no registrada'}
-                                                    </span>
-                                                    {missionMetrics.totalIncidents > 0 && (
-                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-300">Incidencias: {missionMetrics.totalIncidents}</span>
-                                                    )}
-                                                </div>
-
-                                                {(mission.groupPhotoUrl || mission.signatureUrl) && (
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {mission.groupPhotoUrl && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => window.open(mission.groupPhotoUrl, '_blank')}
-                                                                className="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-900/50"
-                                                            >
-                                                                <img src={mission.groupPhotoUrl} alt="Foto grupal" className="h-24 w-full object-cover" />
-                                                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-bold text-white">Foto grupal</span>
-                                                            </button>
-                                                        )}
-                                                        {mission.signatureUrl && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => window.open(mission.signatureUrl, '_blank')}
-                                                                className="relative rounded-lg overflow-hidden border border-slate-700 bg-white"
-                                                            >
-                                                                <img src={mission.signatureUrl} alt="Firma docente" className="h-24 w-full object-contain" />
-                                                                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-bold text-white">Firma</span>
-                                                            </button>
+                                                {canDeleteHistoryMission && (
+                                                    <div className="pt-3">
+                                                        <button
+                                                            type="button"
+                                                            disabled={!mission?.journeyId}
+                                                            onClick={() => openDeleteMissionModal(mission)}
+                                                            className={`w-full inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-black uppercase tracking-wide ${mission?.journeyId ? 'border-rose-500/50 bg-rose-600/15 text-rose-200 hover:bg-rose-600/25' : 'border-slate-700 bg-slate-800/60 text-slate-500 cursor-not-allowed'}`}
+                                                        >
+                                                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                            Eliminar Mision
+                                                        </button>
+                                                        {!mission?.journeyId && (
+                                                            <p className="mt-1 text-[10px] text-slate-500 text-center">No hay journey vinculado para esta mision.</p>
                                                         )}
                                                     </div>
                                                 )}
-
-                                                <div>
-                                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Bitácora de vuelos</p>
-                                                    {loadingMissionLogs ? (
-                                                        <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-3 flex items-center gap-2 text-slate-400 text-xs">
-                                                            <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                                            Cargando vuelos históricos...
-                                                        </div>
-                                                    ) : missionLogs.length > 0 ? (
-                                                        <div className="mt-2 space-y-1.5">
-                                                            {missionLogs.slice(0, 18).map((log, idx) => {
-                                                                const students = Number(log?.student_count ?? log?.studentCount ?? 0);
-                                                                const staff = Number(log?.staff_count ?? log?.staffCount ?? 0);
-                                                                const durationSec = Number(log?.duration_seconds ?? log?.durationSeconds ?? 0);
-                                                                const incidents = Array.isArray(log?.incidents) ? log.incidents : [];
-                                                                const anchorTime = log?.start_time || log?.startTime || log?.created_at;
-
-                                                                return (
-                                                                    <div key={log?.id || `${mission.key}-log-${idx}`} className="rounded-lg border border-slate-800 bg-slate-900/45 px-3 py-2">
-                                                                        <div className="flex items-center justify-between gap-2">
-                                                                            <p className="text-xs font-bold text-slate-200">Vuelo #{idx + 1}</p>
-                                                                            <p className="text-xs font-black text-emerald-300 tabular-nums">{fmtMMSS(durationSec)}</p>
-                                                                        </div>
-                                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
-                                                                            <span>Hora: {fmtClock(anchorTime)}</span>
-                                                                            <span className="text-slate-600">•</span>
-                                                                            <span>Alumnos: {students}</span>
-                                                                            <span className="text-slate-600">•</span>
-                                                                            <span>Docentes: {staff}</span>
-                                                                            {incidents.length > 0 && (
-                                                                                <>
-                                                                                    <span className="text-slate-600">•</span>
-                                                                                    <span className="text-rose-300">Incidencias: {incidents.length}</span>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mt-2 rounded-lg border border-dashed border-slate-700 bg-slate-900/35 px-3 py-3 text-xs text-slate-500">
-                                                            No hay vuelos guardados para esta misión.
-                                                        </div>
-                                                    )}
-                                                </div>
                                             </div>
                                         )}
                                     </article>
@@ -2925,6 +3926,23 @@ export default function SupervisorDashboard() {
                         {conn === 'disconnected' ? 'Sin conexión' : 'Reconectando…'}
                     </div>
                 )}
+
+                <DeleteConfirmationModal
+                    isOpen={Boolean(deleteMissionTarget)}
+                    missionLabel={deleteMissionTarget ? `${deleteMissionTarget.schoolName || 'Mision'} · ID ${deleteMissionTarget.missionId || 'N/A'}` : ''}
+                    password={deleteMissionPassword}
+                    onPasswordChange={setDeleteMissionPassword}
+                    onCancel={closeDeleteMissionModal}
+                    onConfirm={confirmDeleteHistoryMission}
+                    isSubmitting={deleteMissionSubmitting}
+                    errorMessage={deleteMissionError}
+                />
+
+                <EvidenceViewerModal
+                    isOpen={Boolean(activeEvidence)}
+                    evidence={activeEvidence}
+                    onClose={closeEvidenceViewer}
+                />
             </div>
         );
     }
@@ -2966,11 +3984,17 @@ export default function SupervisorDashboard() {
                     <p className="text-sm text-slate-400">Puedes abrir la pestaña de historial para revisar misiones anteriores.</p>
                 </div>
             </div>
+
+            <EvidenceViewerModal
+                isOpen={Boolean(activeEvidence)}
+                evidence={activeEvidence}
+                onClose={closeEvidenceViewer}
+            />
         </div>
     );
 
     const strokeDash = 2 * Math.PI * 45; // ~283
-    const strokeOffset = strokeDash - (strokeDash * sel.progress) / 100;
+    const strokeOffset = strokeDash - (strokeDash * (sel.isInCompletionGrace ? 100 : sel.progress)) / 100;
     const phaseTimers = sel.phaseTimers || {
         prepBase: { started: false, completed: false, seconds: 0 },
         route: { started: false, completed: false, seconds: 0 },
@@ -2997,6 +4021,13 @@ export default function SupervisorDashboard() {
     const operationRoleCard = (sel.roleCards || []).find((card) => card.role === operationRecorderRole) || null;
     const operationDisplayName = operationRoleCard?.person || 'Docente';
     const operationSectionEnabled = sel.phaseIndex >= 2 || Boolean(assistantActiveFlight) || assistantFlights.length > 0;
+    const completionGraceVisible = sel.isInCompletionGrace === true;
+    const completionGraceRemainingMinutes = completionGraceVisible
+        ? Math.max(1, Math.ceil((sel.completionGraceRemainingMs || 0) / 60000))
+        : 0;
+    const completionGraceTimeLabel = sel.finalCheckoutAt ? fmtClock(sel.finalCheckoutAt) : '--:--';
+    const liveProgressPct = completionGraceVisible ? 100 : sel.progress;
+    const liveStateText = completionGraceVisible ? 'Cierre completado' : sel.stateText;
     const assistantInterFlightByNewerId = buildInterFlightItemsByNewerFlightId(assistantFlights);
     const assistantTimelineRows = [];
 
@@ -3036,6 +4067,184 @@ export default function SupervisorDashboard() {
             });
         }
     });
+
+    const closureLifecycle = sel.closureLifecycle || {
+        enabled: false,
+        stage: 0,
+        phases: {
+            dismantling: { cards: [], forceComplete: false, active: false, completed: false, timer: { started: false, seconds: 0 } },
+            returnTransit: { started: false, forceComplete: false, active: false, completed: false, startedAt: null, arrivedAt: null, timer: { started: false, seconds: 0 } },
+            baseClosure: { cards: [], forceComplete: false, active: false, completed: false, timer: { started: false, seconds: 0 } },
+            checkout: { started: false, forceComplete: false, active: false, completed: false, byRole: {}, firstAt: null, endAt: null, timer: { started: false, seconds: 0 } }
+        }
+    };
+
+    const closurePhases = closureLifecycle.phases || {};
+    const closurePhase4 = closurePhases.dismantling || { cards: [], forceComplete: false, active: false, completed: false, timer: { started: false, seconds: 0 } };
+    const closurePhase5 = closurePhases.returnTransit || { started: false, forceComplete: false, active: false, completed: false, startedAt: null, arrivedAt: null, timer: { started: false, seconds: 0 } };
+    const closurePhase6 = closurePhases.baseClosure || { cards: [], forceComplete: false, active: false, completed: false, timer: { started: false, seconds: 0 } };
+    const closurePhase7 = closurePhases.checkout || { started: false, forceComplete: false, active: false, completed: false, byRole: {}, firstAt: null, endAt: null, timer: { started: false, seconds: 0 } };
+
+    const phase4Enabled = closureLifecycle.enabled || closureLifecycle.stage >= 4 || closurePhase4.timer.started;
+    const phase5Enabled = closureLifecycle.stage >= 5 || closurePhase5.started || closurePhase5.timer.started;
+    const phase6Enabled = closureLifecycle.stage >= 6 || closurePhase6.timer.started;
+    const phase7Enabled = closureLifecycle.stage >= 7 || closurePhase7.started || closurePhase7.timer.started || closurePhase7.completed;
+
+    const checkoutPhaseByRole =
+        closurePhase7.byRole && typeof closurePhase7.byRole === 'object' && !Array.isArray(closurePhase7.byRole)
+            ? closurePhase7.byRole
+            : Object.create(null);
+
+    const checkoutRoleEntriesRaw = Object.entries(checkoutPhaseByRole);
+    const checkoutRoleEntries = (checkoutRoleEntriesRaw.length > 0
+        ? checkoutRoleEntriesRaw
+        : ROLE_ORDER.map((role) => [role, Object.create(null)]))
+        .sort((a, b) => {
+            const idxA = ROLE_ORDER.indexOf(a[0]);
+            const idxB = ROLE_ORDER.indexOf(b[0]);
+            if (idxA === -1 && idxB === -1) return String(a[0]).localeCompare(String(b[0]));
+            if (idxA === -1) return 1;
+            if (idxB === -1) return -1;
+            return idxA - idxB;
+        });
+
+    const checkoutDoneCount = checkoutRoleEntries.filter(([, row]) => closurePhase7.forceComplete || row?.done === true).length;
+    const checkoutTotalCount = checkoutRoleEntries.length;
+
+    const closureRoleNameByRole = ROLE_ORDER.reduce((acc, role) => {
+        const fromCheckin = safeSchoolName(sel?.checkins?.[role]?.name);
+        const fromDismantling = safeSchoolName((closurePhase4.cards || []).find((card) => card.role === role)?.person);
+        const fromBaseClosure = safeSchoolName((closurePhase6.cards || []).find((card) => card.role === role)?.person);
+        acc[role] = fromCheckin || fromDismantling || fromBaseClosure || ROLE_META[role]?.label || role;
+        return acc;
+    }, {});
+
+    const renderLifecycleRoleCards = (cards = [], sectionKey = 'closure') => (
+        <div className="flex flex-col gap-3">
+            {cards.map((card) => {
+                const roleMeta = ROLE_META[card.role] || { label: card.role, icon: 'task_alt' };
+                const statusTone = card.forceComplete || card.completed
+                    ? 'text-emerald-300'
+                    : card.activeTask
+                        ? 'text-sky-300'
+                        : 'text-slate-300';
+                const cardTone = card.forceComplete || card.completed
+                    ? 'border-emerald-500/35 shadow-[0_0_14px_-4px_rgba(16,185,129,0.35)]'
+                    : card.activeTask
+                        ? 'border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20'
+                        : 'border-slate-800';
+
+                return (
+                    <div key={`${sectionKey}-${card.role}`} className={`bg-surface-dark rounded-xl overflow-hidden border shadow-sm relative ${cardTone}`}>
+                        <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`material-symbols-outlined text-sm ${card.forceComplete || card.completed ? 'text-emerald-500' : card.activeTask ? 'text-primary animate-pulse' : 'text-slate-400'}`}>
+                                        {roleMeta.icon}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">{roleMeta.label}</h3>
+                                        <p className="text-xs text-slate-400 truncate">{card.person}</p>
+                                    </div>
+                                </div>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${card.forceComplete || card.completed ? 'text-emerald-400 bg-emerald-500/10' : 'text-primary bg-primary/10'}`}>
+                                    {card.doneCount}/{card.totalCount}
+                                </span>
+                            </div>
+                            <p className={`mt-2 text-[11px] font-semibold leading-snug ${statusTone}`}>
+                                {card.statusText}
+                            </p>
+                        </div>
+
+                        <div className="px-4 py-3">
+                            <div className="flex items-center gap-2 px-1">
+                                <div className="flex-1 h-px bg-slate-700/60" />
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{card.blockLabel}</span>
+                                <div className="flex-1 h-px bg-slate-700/60" />
+                            </div>
+
+                            <div className="mt-2 space-y-2">
+                                {card.tasks.map((task, idx) => {
+                                    const done = task.status === 'completed';
+                                    const isNow = task.status === 'active';
+                                    const rowTone = done
+                                        ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                        : isNow
+                                            ? 'bg-sky-500/10 border border-sky-500/30'
+                                            : 'bg-slate-800/40 border border-slate-700/30';
+                                    const dotTone = done
+                                        ? 'bg-emerald-500'
+                                        : isNow
+                                            ? 'bg-sky-500 animate-pulse'
+                                            : 'bg-slate-700';
+                                    return (
+                                        <div key={task.id} className={`rounded-xl px-3 py-2.5 ${rowTone}`}>
+                                            <div className="flex items-start gap-3">
+                                                <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${dotTone}`}>
+                                                    {done ? (
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                    ) : (
+                                                        <span className="text-[9px] font-bold text-white">{idx + 1}</span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`text-[13px] font-bold leading-tight ${done ? 'text-emerald-400 line-through opacity-70' : isNow ? 'text-white' : 'text-slate-300'}`}>
+                                                            {task.label}
+                                                        </span>
+                                                        {task.global && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
+                                                        )}
+                                                        {isNow && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-300">Ahora</span>
+                                                        )}
+                                                    </div>
+                                                    {task.desc && <p className={`text-[11px] leading-snug mt-0.5 ${done ? 'text-emerald-400/55' : 'text-slate-500'}`}>{task.desc}</p>}
+                                                    {task.at && <p className="text-[10px] text-slate-500 mt-0.5">{fmtClock(task.at)}</p>}
+
+                                                    {Array.isArray(task.evidence) && task.evidence.length > 0 && (
+                                                        <div className="mt-1.5 flex flex-wrap gap-2">
+                                                            {task.evidence.map((ev, evIdx) => (
+                                                                <button
+                                                                    key={`${task.id}-evidence-${evIdx}`}
+                                                                    type="button"
+                                                                    onClick={() => openEvidenceViewer(ev.url, { label: ev.label || task.label, typeHint: ev.typeHint || 'image' })}
+                                                                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 bg-slate-800/85 hover:bg-slate-700 transition-colors text-[10px] font-semibold text-slate-200"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[12px]">photo_camera</span>
+                                                                    {ev.label || 'Evidencia'}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mt-3">
+                                <div className="flex items-center justify-between text-[11px] font-semibold">
+                                    <span className="text-slate-400">Progreso</span>
+                                    <span className={card.progressPct >= 100 ? 'text-emerald-300' : 'text-slate-200'}>
+                                        {card.doneCount}/{card.totalCount}
+                                    </span>
+                                </div>
+                                <div className="mt-1.5 h-1.5 rounded-full bg-slate-700/80 overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ${card.progressPct >= 100 ? 'bg-emerald-400' : 'bg-primary'}`}
+                                        style={{ width: `${card.progressPct}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
 
     return (
         <div className="mx-auto max-w-md min-h-screen relative flex flex-col">
@@ -3095,6 +4304,23 @@ export default function SupervisorDashboard() {
 
             <main className="flex-1 flex flex-col gap-6 p-4 pb-20">
 
+                {completionGraceVisible && (
+                    <section className="rounded-2xl border border-emerald-500/50 bg-emerald-900/40 text-emerald-50 p-4 mb-1 shadow-lg shadow-emerald-950/35">
+                        <div className="flex items-start gap-3">
+                            <span className="material-symbols-outlined text-2xl text-emerald-300">verified</span>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-black leading-tight">✅ Jornada terminada a las {completionGraceTimeLabel}.</p>
+                                <p className="mt-1 text-xs leading-relaxed text-emerald-100/90">
+                                    El informe 360° ya está seguro en el Historial. Esta vista en vivo se limpiará automáticamente en {completionGraceRemainingMinutes} minutos.
+                                </p>
+                            </div>
+                            <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-400/20 text-emerald-100 border border-emerald-300/30 tabular-nums">
+                                {completionGraceRemainingMinutes} min
+                            </span>
+                        </div>
+                    </section>
+                )}
+
                 {/* ═══ PROGRESS CIRCLE ═══ */}
                 <section className="flex flex-col items-center justify-center py-4">
                     <div className="relative size-40 flex items-center justify-center mb-4">
@@ -3105,13 +4331,13 @@ export default function SupervisorDashboard() {
                                 strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s ease' }} />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-4xl font-extrabold text-white">{sel.progress}%</span>
+                            <span className="text-4xl font-extrabold text-white">{liveProgressPct}%</span>
                         </div>
                     </div>
                     <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
                             <div className="size-2 rounded-full bg-primary animate-pulse" />
-                            <span className="text-primary text-sm font-bold uppercase tracking-wide">{sel.stateText}</span>
+                            <span className="text-primary text-sm font-bold uppercase tracking-wide">{liveStateText}</span>
                         </div>
                         <p className="text-slate-400 text-sm font-medium mt-2">{sel.elapsed} transcurrido</p>
                     </div>
@@ -3179,7 +4405,7 @@ export default function SupervisorDashboard() {
                 <section>
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                            Preparación en base
+                            Montaje
                             {phaseTimers.prepBase.started && (
                                 <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(phaseTimers.prepBase.seconds)})</span>
                             )}
@@ -3198,7 +4424,7 @@ export default function SupervisorDashboard() {
                             return (
                                     <div key={role} className={`bg-surface-dark rounded-xl overflow-hidden border shadow-sm relative
                                     ${isActive ? 'border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20' : 'border-slate-800'}
-                                    ${noProgress ? 'opacity-50 grayscale-[0.5]' : allDone && !isActive && !(sel.isEnRuta || sel.isPostRoute) ? 'opacity-90' : ''}`}>
+                                    ${noProgress ? 'opacity-95' : allDone && !isActive && !(sel.isEnRuta || sel.isPostRoute) ? 'opacity-90' : ''}`}>
 
                                     {/* glow line for active */}
                                     {isActive && <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />}
@@ -3221,20 +4447,9 @@ export default function SupervisorDashboard() {
                                     {/* blocks */}
                                     {blocks.map((block, bi) => {
                                         const isLast = bi === blocks.length - 1;
-                                        if (noProgress) {
-                                            return (
-                                                <div key={block.id} className={`flex items-center justify-between p-4 cursor-not-allowed ${!isLast ? 'border-b border-slate-800' : ''}`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="size-5 rounded-full border-2 border-slate-600 shrink-0" />
-                                                        <span className="text-sm font-medium text-slate-500">{block.label}</span>
-                                                    </div>
-                                                    <span className="text-xs font-medium text-slate-400">{block.done}/{block.total}</span>
-                                                </div>
-                                            );
-                                        }
                                         return (
                                             <div key={block.id} className={!isLast ? 'border-b border-slate-800' : ''}>
-                                                <details open={block.inProgress || block.activeNow || undefined} className="group">
+                                                <details open={noProgress || block.inProgress || block.activeNow || undefined} className="group">
                                                     <summary className={`flex items-center justify-between p-4 cursor-pointer list-none transition-colors
                                                         ${block.inProgress || block.activeNow ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-white/5'}`}>
                                                         <div className="flex items-center gap-3">
@@ -3277,14 +4492,19 @@ export default function SupervisorDashboard() {
                                                                 {item.evidence?.length > 0 && (
                                                                     <div className="mt-2 ml-6 flex gap-2 flex-wrap">
                                                                         {item.evidence.slice(0, 3).map(ev => (
-                                                                            <div key={ev.id || ev.file_path} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-700">
+                                                                            <button
+                                                                                key={ev.id || ev.file_path}
+                                                                                type="button"
+                                                                                onClick={() => openEvidenceViewer(ev.file_path, { label: `Evidencia: ${item.label}` })}
+                                                                                className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-700"
+                                                                            >
                                                                                 <img src={ev.file_path} alt={`Evidencia ${item.label}`}
                                                                                     className="w-full h-full object-cover"
                                                                                     onError={e => { e.currentTarget.style.display = 'none'; }} />
                                                                                 <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[9px] text-white text-center py-0.5">
                                                                                     {fmtClock(ev.created_at)}
                                                                                 </div>
-                                                                            </div>
+                                                                            </button>
                                                                         ))}
                                                                     </div>
                                                                 )}
@@ -3398,7 +4618,11 @@ export default function SupervisorDashboard() {
                         <div className="p-4">
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Foto de llegada</p>
                             {sel.arrivalPhotoUrl ? (
-                                <div className="relative group cursor-pointer" onClick={() => window.open(sel.arrivalPhotoUrl, '_blank')}>
+                                <button
+                                    type="button"
+                                    className="relative group cursor-pointer w-full text-left"
+                                    onClick={() => openEvidenceViewer(sel.arrivalPhotoUrl, { label: 'Foto de llegada', typeHint: 'image' })}
+                                >
                                     <img
                                         src={sel.arrivalPhotoUrl}
                                         alt="Foto de llegada"
@@ -3412,7 +4636,7 @@ export default function SupervisorDashboard() {
                                         <span className="material-symbols-outlined text-xs">check</span>
                                         Confirmada
                                     </div>
-                                </div>
+                                </button>
                             ) : (
                                 <div className={`flex flex-col items-center justify-center py-6 rounded-xl border-2 border-dashed ${sel.isEnRuta ? 'border-primary/30 bg-primary/5' : 'border-slate-700 bg-slate-800/30'
                                     }`}>
@@ -3437,13 +4661,14 @@ export default function SupervisorDashboard() {
                         <div className="flex items-center justify-between mb-3">
                             <div>
                                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>groups</span>
-                                    Preparación en sede
+                                    👥 Montaje
                                     {phaseTimers.prepOnsite.started && (
                                         <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(phaseTimers.prepOnsite.seconds)})</span>
                                     )}
                                 </h2>
-                                <p className="text-xs text-slate-500 mt-0.5">Pantalla actual y participación global por operativo</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Estado por operativo durante la fase de montaje
+                                </p>
                             </div>
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
                                 <span className="size-1.5 rounded-full bg-primary animate-pulse" />
@@ -3458,7 +4683,10 @@ export default function SupervisorDashboard() {
                                 const isInactive = !card.postArrivalEnabled;
                                 const cardKey = `${sel.id}:${card.role}`;
                                 const isCollapsed = Boolean(collapsedRoleCards[cardKey]);
-                                const currentTask = card.activeTask || (card.taskFlow || []).find((task) => task.status === 'active') || null;
+                                const forcePrepCompletion = isMissionPastPrep(card.missionState);
+                                const currentTask = forcePrepCompletion
+                                    ? null
+                                    : (card.activeTask || (card.taskFlow || []).find((task) => task.status === 'active') || null);
                                 const previewTask = currentTask || (!card.postArrivalEnabled
                                     ? (card.taskFlow || []).find((task) => ['active', 'pending', 'inactive'].includes(task.status))
                                     : null);
@@ -3466,113 +4694,99 @@ export default function SupervisorDashboard() {
                                 const flowTasksForBlocks = flowTasks.filter((task) => task.countAsBlock !== false);
                                 const flowCompleted = flowTasksForBlocks.filter((task) => task.status === 'completed').length;
                                 const flowTotal = flowTasksForBlocks.length;
-                                const globalTasks = flowTasks.filter((task) => task.kind === 'global');
-                                const globalCompleted = globalTasks.filter((task) => task.status === 'completed').length;
-                                const globalTotal = globalTasks.length;
                                 const civicAudioTask = flowTasks.find((task) => task.id === 'teacher-civic-audio' && Boolean(task.audioUrl)) || null;
                                 const civicVideoTask = flowTasks.find((task) => task.id === 'assistant-civic-video' && Boolean(task.videoUrl)) || null;
                                 const prepTotal = card.prepProgress ? 5 : 0;
                                 const prepDone = card.prepProgress
                                     ? (card.prepProgress.spot.confirmed ? 1 : 0) + card.prepProgress.done + (card.prepProgress.controllerConnected ? 1 : 0)
                                     : 0;
-                                const completedTotal = prepDone + flowCompleted;
+                                const completedTotalRaw = prepDone + flowCompleted;
                                 const plannedTotal = prepTotal + flowTotal;
-                                const progressPct = plannedTotal > 0 ? Math.round((completedTotal / plannedTotal) * 100) : 0;
+                                const completedTotal = forcePrepCompletion
+                                    ? (plannedTotal > 0 ? plannedTotal : completedTotalRaw)
+                                    : completedTotalRaw;
+                                const progressPct = forcePrepCompletion
+                                    ? 100
+                                    : (plannedTotal > 0 ? Math.round((completedTotal / plannedTotal) * 100) : 0);
                                 const flowProgressPct = flowTotal > 0 ? Math.round((flowCompleted / flowTotal) * 100) : 0;
-                                const completedLabel = plannedTotal > 0 ? `${completedTotal}/${plannedTotal} completadas` : 'Sin tareas';
-                                const taskActive = previewTask?.status === 'active';
-                                const cardCompleted = card.postArrivalEnabled && plannedTotal > 0 && completedTotal >= plannedTotal;
-                                const taskDone = previewTask?.status === 'completed' || (!taskActive && cardCompleted);
-                                const summaryTitle = previewTask?.label
+                                const progressLabel = forcePrepCompletion
+                                    ? (plannedTotal > 0 ? `${plannedTotal}/${plannedTotal} completado` : 'Montaje finalizado')
+                                    : (plannedTotal > 0 ? `${completedTotal}/${plannedTotal} completado` : 'Sin tareas');
+                                const taskActive = !forcePrepCompletion && previewTask?.status === 'active';
+                                const cardCompleted = forcePrepCompletion || (card.postArrivalEnabled && plannedTotal > 0 && completedTotal >= plannedTotal);
+                                const taskDone = forcePrepCompletion || previewTask?.status === 'completed' || (!taskActive && cardCompleted);
+                                const summaryTitle = forcePrepCompletion
+                                    ? 'Montaje finalizado'
+                                    : previewTask?.label
                                     || (card.postArrivalEnabled
                                         ? (cardCompleted ? 'Bloques completados' : card.title)
                                         : card.preArrivalTitle || card.title);
-                                const summaryDesc = previewTask?.desc
+                                const summaryDesc = forcePrepCompletion
+                                    ? 'Flujo operativo completado para este rol.'
+                                    : previewTask?.desc
                                     || (card.postArrivalEnabled
                                         ? (cardCompleted ? 'Flujo operativo completado para este rol.' : card.desc)
                                         : card.preArrivalDesc || card.desc);
                                 const summaryIsGlobal = previewTask?.kind === 'global';
                                 const summaryIsCivic = previewTask?.accent === 'emerald';
-                                const civicAudioEvidence = flowTasks.some((task) => task.id === 'teacher-civic-audio' && Boolean(task.audioUrl)) ? 1 : 0;
-                                const civicVideoEvidence = flowTasks.some((task) => task.id === 'assistant-civic-video' && Boolean(task.videoUrl)) ? 1 : 0;
-                                const standPhotoEvidence = flowTasks.some((task) => task.id === 'assistant-stand-photo' && Boolean(task.photoUrl)) ? 1 : 0;
-                                const evidenceCount = (card.prepProgress?.spot?.photoUrl ? 1 : 0)
-                                    + (card.parkingProgress?.hasPhoto ? 1 : 0)
-                                    + (card.adWallProgress?.hasPhoto ? 1 : 0)
-                                    + (card.data?.voiceUrl ? 1 : 0)
-                                    + civicAudioEvidence
-                                    + civicVideoEvidence
-                                    + standPhotoEvidence;
                                 const currentTaskIcon = previewTask?.icon || cardTitleIcon(card);
                                 const currentTaskDesc = summaryDesc || card.desc;
-                                const statusChipText = !card.postArrivalEnabled
-                                    ? 'Pendiente de activacion'
-                                    : previewTask?.id === 'teacher-civic-audio' && taskActive
-                                        ? 'Acto civico · Audio en curso'
-                                        : previewTask?.id === 'assistant-civic-video' && taskActive
-                                            ? 'Acto civico · Video en curso'
-                                            : taskActive && summaryIsGlobal
-                                                ? 'Coordinacion global en curso'
-                                            : taskActive
-                                                    ? 'Accion operativa en curso'
-                                                : cardCompleted
-                                                    ? 'Bloques completados'
-                                                : taskDone
-                                                    ? 'Ultima accion completada'
-                                                    : 'Siguiente accion pendiente';
-                                const statusChipTone = !card.postArrivalEnabled
-                                    ? 'bg-slate-700/55 text-slate-300'
+                                const statusText = forcePrepCompletion
+                                    ? 'Montaje finalizado'
+                                    : !card.postArrivalEnabled
+                                    ? '🕓 Pendiente de llegada a sede'
                                     : taskActive
-                                            ? summaryIsCivic
-                                                ? 'bg-emerald-500/15 text-emerald-300'
-                                                : 'bg-sky-500/15 text-sky-300'
-                                        : taskDone
-                                            ? 'bg-emerald-500/15 text-emerald-300'
-                                            : 'bg-slate-700/55 text-slate-300';
-                                const statusDotTone = !card.postArrivalEnabled
-                                    ? 'bg-slate-500'
+                                        ? `📍 Tarea actual: ${summaryTitle}`
+                                        : cardCompleted
+                                            ? '✅ Lista de tareas completada'
+                                            : `📌 Próxima tarea: ${summaryTitle}`;
+                                const statusTextTone = forcePrepCompletion
+                                    ? 'text-emerald-300'
+                                    : !card.postArrivalEnabled
+                                        ? 'text-slate-300'
+                                    : taskActive
+                                        ? (summaryIsCivic ? 'text-emerald-300' : 'text-sky-300')
+                                    : cardCompleted || taskDone
+                                        ? 'text-emerald-300'
+                                        : 'text-slate-300';
+                                const summaryTitleTone = forcePrepCompletion
+                                    ? 'text-emerald-300'
                                     : taskDone
-                                        ? 'bg-emerald-400'
-                                    : taskActive
-                                            ? summaryIsCivic
-                                                ? 'bg-emerald-400 animate-pulse'
-                                                : 'bg-sky-400 animate-pulse'
-                                            : 'bg-slate-500';
-                                const blocksLabel = plannedTotal > 0 ? `${completedTotal}/${plannedTotal} Bloques` : 'Sin bloques';
-                                const blocksTone = cardCompleted
-                                    ? 'bg-emerald-500/12 text-emerald-300'
-                                    : taskActive
-                                        ? 'bg-primary/12 text-primary'
-                                        : 'bg-slate-700/55 text-slate-300';
-                                const summaryTitleTone = taskDone
                                     ? 'text-emerald-300'
                                     : summaryIsCivic
                                         ? 'text-emerald-300'
                                     : taskActive
                                         ? 'text-slate-100'
                                         : 'text-slate-300';
-                                const summaryDescTone = taskDone
+                                const summaryDescTone = forcePrepCompletion
+                                    ? 'text-emerald-300/65'
+                                    : taskDone
                                     ? 'text-emerald-300/65'
                                     : summaryIsCivic
                                         ? 'text-emerald-300/75'
                                     : taskActive
                                         ? 'text-slate-400'
                                         : 'text-slate-500';
-                                const summaryDotTone = taskDone
+                                const summaryDotTone = forcePrepCompletion
+                                    ? 'bg-emerald-500'
+                                    : taskDone
                                     ? 'bg-emerald-500'
                                     : summaryIsCivic
                                         ? 'bg-emerald-500 animate-pulse'
                                     : taskActive
                                         ? 'bg-sky-500 animate-pulse'
                                         : 'bg-slate-700';
-                                const cardNoProgress = completedTotal === 0;
+                                const cardNoProgress = !forcePrepCompletion && completedTotal === 0;
                                 const cardActive = !isInactive && taskActive;
+                                const hidePrepDetails = false;
                                 const cardContainerTone = isInactive
                                     ? 'bg-slate-900/45 border-slate-700/70 opacity-70 grayscale-[0.2]'
+                                    : forcePrepCompletion
+                                        ? 'bg-surface-dark border-emerald-500/35 shadow-[0_0_14px_-4px_rgba(16,185,129,0.35)]'
                                     : cardActive
                                         ? 'bg-surface-dark border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20'
                                         : 'bg-surface-dark border-slate-800';
-                                const cardCompletedTone = !isInactive && cardCompleted && !cardActive ? 'opacity-90' : '';
+                                const cardCompletedTone = !isInactive && cardCompleted && !cardActive ? 'opacity-95' : '';
                                 const roleIconTone = cardActive
                                     ? 'text-primary animate-pulse'
                                     : cardCompleted
@@ -3581,7 +4795,7 @@ export default function SupervisorDashboard() {
                                 const roleTitleTone = cardNoProgress || isInactive ? 'text-slate-400' : 'text-white';
                                 const rolePersonTone = isInactive
                                     ? 'text-slate-600'
-                                    : cardCompleted
+                                    : (cardCompleted || forcePrepCompletion)
                                         ? 'text-emerald-400/70'
                                         : 'text-slate-400';
                                 return (
@@ -3612,21 +4826,22 @@ export default function SupervisorDashboard() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-2 flex items-center gap-2">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${statusChipTone}`}>
-                                                    <span className={`size-1.5 rounded-full ${statusDotTone}`} />
-                                                    {statusChipText}
-                                                </span>
-                                                <span className={`ml-auto px-2.5 py-1 rounded-lg text-[10px] font-bold ${blocksTone}`}>
-                                                    {blocksLabel}
-                                                </span>
-                                            </div>
+                                            {forcePrepCompletion ? (
+                                                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-bold uppercase tracking-wide">
+                                                    <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                                    Montaje finalizado
+                                                </div>
+                                            ) : (
+                                                <p className={`mt-2 text-[11px] font-semibold leading-snug ${statusTextTone}`}>
+                                                    {statusText}
+                                                </p>
+                                            )}
                                         </div>
 
                                         {/* Main content */}
                                         {card.postArrivalEnabled && (
                                             <div className="px-4 pb-3">
-                                                <div className="mt-3 rounded-xl border border-slate-800 bg-surface-darker/55 px-3 py-3">
+                                                <div className="mt-3 rounded-xl border border-slate-800 bg-surface-darker/55 px-3.5 py-3.5">
                                                     <div className="flex items-start gap-3">
                                                         <div className={`size-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${summaryDotTone}`}>
                                                             {taskDone ? (
@@ -3637,56 +4852,52 @@ export default function SupervisorDashboard() {
                                                         </div>
 
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className={`text-[15px] font-bold leading-tight ${summaryTitleTone}`}>{summaryTitle}</span>
-                                                                {summaryIsGlobal && (
-                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
-                                                                )}
-                                                                {previewTask?.status === 'active' && (
-                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-primary/20 text-primary">Ahora</span>
-                                                                )}
-                                                            </div>
-                                                            <p className={`text-[12px] leading-snug mt-1 ${summaryDescTone}`}>{currentTaskDesc}</p>
+                                                            <span className={`text-[15px] font-bold leading-tight ${summaryTitleTone}`}>{summaryTitle}</span>
+                                                            {summaryIsGlobal && (
+                                                                <p className="text-[11px] font-semibold text-sky-300 mt-0.5">Tarea global</p>
+                                                            )}
+                                                            <p className={`text-[12px] leading-snug mt-1.5 ${summaryDescTone}`}>{currentTaskDesc}</p>
                                                         </div>
-
-                                                        <span className={`text-[11px] font-bold ${progressPct >= 100 ? 'text-emerald-400' : 'text-slate-300'}`}>{progressPct}%</span>
                                                     </div>
 
-                                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-700/70 text-slate-300">{completedLabel}</span>
-                                                        {summaryIsGlobal && globalTotal > 0 ? (
-                                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/15 text-sky-300">Global {globalCompleted}/{globalTotal}</span>
-                                                        ) : evidenceCount > 0 ? (
-                                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-300">{evidenceCount} evidencias</span>
-                                                        ) : null}
-                                                    </div>
-
-                                                    <div className="mt-1.5 h-1 rounded-full bg-slate-700/80 overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all duration-500 ${progressPct >= 100 ? 'bg-emerald-400' : 'bg-primary'}`}
-                                                            style={{ width: `${progressPct}%` }}
-                                                        />
+                                                    <div className="mt-3">
+                                                        <div className="flex items-center justify-between text-[11px] font-semibold">
+                                                            <span className="text-slate-400">Progreso</span>
+                                                            <span className={progressPct >= 100 ? 'text-emerald-300' : 'text-slate-200'}>{progressLabel}</span>
+                                                        </div>
+                                                        <div className="mt-1.5 h-1.5 rounded-full bg-slate-700/80 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all duration-500 ${progressPct >= 100 ? 'bg-emerald-400' : 'bg-primary'}`}
+                                                                style={{ width: `${progressPct}%` }}
+                                                            />
+                                                        </div>
                                                     </div>
 
                                                     {isCollapsed && card.role === 'teacher' && civicAudioTask && (
                                                         <div className="mt-2">
-                                                            <TimelineVoicePlayer url={civicAudioTask.audioUrl} duration={civicAudioTask.audioDurationSec} />
+                                                            <TimelineVoicePlayer
+                                                                url={civicAudioTask.audioUrl}
+                                                                duration={civicAudioTask.audioDurationSec}
+                                                                label="Evidencia de audio cívico"
+                                                                onOpenViewer={openEvidenceViewer}
+                                                            />
                                                         </div>
                                                     )}
                                                     {isCollapsed && card.role === 'assistant' && civicVideoTask && (
                                                         <div className="mt-2">
                                                             <button
-                                                                onClick={() => window.open(civicVideoTask.videoUrl, '_blank')}
-                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-xs"
+                                                                type="button"
+                                                                onClick={() => openEvidenceViewer(civicVideoTask.videoUrl, { label: 'Evidencia de video cívico', typeHint: 'video' })}
+                                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/85 hover:bg-slate-700 transition-colors text-xs"
                                                             >
                                                                 <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>videocam</span>
-                                                                <span className="text-slate-300 font-medium">Evidencia video</span>
+                                                                <span className="text-slate-200 font-semibold">Evidencia video</span>
                                                             </button>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                {!isCollapsed && (card.prepProgress ? (
+                                                {!isCollapsed && !hidePrepDetails && (card.prepProgress ? (
                                                 <div className="mt-3 space-y-2">
                                                     {/* ── Paso previo: Pista confirmada ── */}
                                                     <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 ${card.prepProgress.spot.confirmed
@@ -3713,13 +4924,17 @@ export default function SupervisorDashboard() {
                                                                 <p className="text-[11px] text-slate-400 mt-1 italic">Ref: &quot;{card.prepProgress.spot.note}&quot;</p>
                                                             )}
                                                             {card.prepProgress.spot.photoUrl ? (
-                                                                <div className="mt-1.5 relative group cursor-pointer inline-block" onClick={() => window.open(card.prepProgress.spot.photoUrl, '_blank')}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="mt-1.5 relative group cursor-pointer inline-block"
+                                                                    onClick={() => openEvidenceViewer(card.prepProgress.spot.photoUrl, { label: 'Foto de pista', typeHint: 'image' })}
+                                                                >
                                                                     <img src={card.prepProgress.spot.photoUrl} alt="Foto de pista" className="w-28 h-20 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
                                                                     <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white font-bold inline-flex items-center gap-1">
                                                                         <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                                                                         Pista
                                                                     </div>
-                                                                </div>
+                                                                </button>
                                                             ) : card.prepProgress.spot.confirmed ? (
                                                                 <p className="text-[10px] text-slate-600 mt-1">Foto de pista: no enviada</p>
                                                             ) : null}
@@ -3728,7 +4943,7 @@ export default function SupervisorDashboard() {
                                                     {/* ── Separador visual ── */}
                                                     <div className="flex items-center gap-2 px-1">
                                                         <div className="flex-1 h-px bg-slate-700/60" />
-                                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Preparación de vuelo</span>
+                                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Montaje de vuelo</span>
                                                         <div className="flex-1 h-px bg-slate-700/60" />
                                                     </div>
                                                     {[{ icon: 'visibility', title: 'Reconocimiento del entorno', desc: 'Revisa riesgos alrededor del área de vuelo.' },
@@ -4032,7 +5247,12 @@ export default function SupervisorDashboard() {
 
                                                                     {task.id === 'teacher-civic-audio' && task.audioUrl && (
                                                                         <div className="mt-2">
-                                                                            <TimelineVoicePlayer url={task.audioUrl} duration={task.audioDurationSec} />
+                                                                            <TimelineVoicePlayer
+                                                                                url={task.audioUrl}
+                                                                                duration={task.audioDurationSec}
+                                                                                label="Evidencia de audio cívico"
+                                                                                onOpenViewer={openEvidenceViewer}
+                                                                            />
                                                                         </div>
                                                                     )}
 
@@ -4047,11 +5267,12 @@ export default function SupervisorDashboard() {
                                                                     {task.id === 'assistant-civic-video' && task.videoUrl && (
                                                                         <div className="mt-2">
                                                                             <button
-                                                                                onClick={() => window.open(task.videoUrl, '_blank')}
-                                                                                className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-xs"
+                                                                                type="button"
+                                                                                onClick={() => openEvidenceViewer(task.videoUrl, { label: 'Evidencia de video cívico', typeHint: 'video' })}
+                                                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/85 hover:bg-slate-700 transition-colors text-xs"
                                                                             >
                                                                                 <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span>
-                                                                                <span className="text-slate-300 font-medium">Ver evidencia de video</span>
+                                                                                <span className="text-slate-200 font-semibold">Ver evidencia de video</span>
                                                                             </button>
                                                                         </div>
                                                                     )}
@@ -4062,12 +5283,16 @@ export default function SupervisorDashboard() {
 
                                                                     {task.id === 'assistant-parking' && card.parkingProgress?.hasPhoto && (
                                                                         <div className="mt-2 flex items-start gap-2">
-                                                                            <div className="relative group cursor-pointer flex-shrink-0" onClick={() => window.open(card.parkingProgress.photoUrl, '_blank')}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="relative group cursor-pointer flex-shrink-0"
+                                                                                onClick={() => openEvidenceViewer(card.parkingProgress.photoUrl, { label: 'Evidencia de vehículo', typeHint: 'image' })}
+                                                                            >
                                                                                 <img src={card.parkingProgress.photoUrl} alt="Evidencia vehículo" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
                                                                                 <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
                                                                                     <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                                                                                 </div>
-                                                                            </div>
+                                                                            </button>
                                                                             <div className="pt-0.5">
                                                                                 <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
                                                                                 {card.parkingProgress.photoAt && (
@@ -4083,12 +5308,16 @@ export default function SupervisorDashboard() {
 
                                                                     {task.id === 'assistant-ad-wall' && card.adWallProgress?.hasPhoto && (
                                                                         <div className="mt-2 flex items-start gap-2">
-                                                                            <div className="relative group cursor-pointer flex-shrink-0" onClick={() => window.open(card.adWallProgress.photoUrl, '_blank')}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="relative group cursor-pointer flex-shrink-0"
+                                                                                onClick={() => openEvidenceViewer(card.adWallProgress.photoUrl, { label: 'Evidencia lona publicitaria', typeHint: 'image' })}
+                                                                            >
                                                                                 <img src={card.adWallProgress.photoUrl} alt="Evidencia lona publicitaria" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
                                                                                 <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
                                                                                     <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                                                                                 </div>
-                                                                            </div>
+                                                                            </button>
                                                                             <div className="pt-0.5">
                                                                                 <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
                                                                                 {card.adWallProgress.photoAt && (
@@ -4100,12 +5329,16 @@ export default function SupervisorDashboard() {
 
                                                                     {task.id === 'assistant-stand-photo' && task.photoUrl && (
                                                                         <div className="mt-2 flex items-start gap-2">
-                                                                            <div className="relative group cursor-pointer flex-shrink-0" onClick={() => window.open(task.photoUrl, '_blank')}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="relative group cursor-pointer flex-shrink-0"
+                                                                                onClick={() => openEvidenceViewer(task.photoUrl, { label: 'Foto final del stand', typeHint: 'image' })}
+                                                                            >
                                                                                 <img src={task.photoUrl} alt="Foto final del stand" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
                                                                                 <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
                                                                                     <span className="material-symbols-outlined text-[10px]">photo_camera</span>
                                                                                 </div>
-                                                                            </div>
+                                                                            </button>
                                                                             <div className="pt-0.5">
                                                                                 <p className="text-[10px] font-bold text-emerald-400/70">Foto registrada</p>
                                                                                 {task.photoAt && (
@@ -4137,7 +5370,7 @@ export default function SupervisorDashboard() {
                                             </div>
                                         )}
 
-                                        {!card.postArrivalEnabled && (
+                                        {!card.postArrivalEnabled && !hidePrepDetails && (
                                             <div className="px-4 pb-3">
                                                 <h3 className="text-base font-bold text-slate-300 leading-tight">{card.preArrivalTitle}</h3>
                                                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">{card.preArrivalDesc}</p>
@@ -4153,7 +5386,7 @@ export default function SupervisorDashboard() {
                                         )}
 
                                         {/* Ruta de tareas inactiva (solo pre-llegada) */}
-                                        {!card.postArrivalEnabled && !isCollapsed && card.taskFlow?.length > 0 && (
+                                        {!card.postArrivalEnabled && !hidePrepDetails && !isCollapsed && card.taskFlow?.length > 0 && (
                                             <div className={`mx-4 mb-3 p-3 rounded-xl border space-y-2 ${isInactive ? 'bg-slate-900/25 border-slate-700/40' : 'bg-slate-900/35 border-slate-700/50'}`}>
                                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                                     Tareas al llegar
@@ -4215,7 +5448,12 @@ export default function SupervisorDashboard() {
                                                     </p>
                                                 )}
                                                 {card.data.voiceUrl && (
-                                                    <TimelineVoicePlayer url={card.data.voiceUrl} duration={card.data.voiceDuration} />
+                                                    <TimelineVoicePlayer
+                                                        url={card.data.voiceUrl}
+                                                        duration={card.data.voiceDuration}
+                                                        onOpenViewer={openEvidenceViewer}
+                                                        label="Nota de voz operativa"
+                                                    />
                                                 )}
                                             </div>
                                         )}
@@ -4226,7 +5464,7 @@ export default function SupervisorDashboard() {
                                                 <span className="text-[10px] text-slate-600">
                                                     Actualizado {fmtAgo(card.updatedAt, now)}
                                                 </span>
-                                                {!isCollapsed && card.next && (
+                                                {!isCollapsed && card.next && !hidePrepDetails && (
                                                     <span className="text-[10px] text-slate-600">
                                                         Siguiente: <span className="text-slate-500 font-medium">{card.next}</span>
                                                     </span>
@@ -4397,27 +5635,251 @@ export default function SupervisorDashboard() {
                     </div>
                 </section>
 
-                {/* Tareas globales integradas dentro de cada tarjeta por rol */}
+                {/* ═══ FASE 4: DESMONTAJE ═══ */}
+                <section className={phase4Enabled ? '' : 'opacity-30 grayscale pointer-events-none'}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-xl">construction</span>
+                                Desmontaje
+                                {closurePhase4.timer.started && (
+                                    <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(closurePhase4.timer.seconds)})</span>
+                                )}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">Desarme y preparación de retorno del equipo en sede escolar.</p>
+                        </div>
+                        {closurePhase4.completed ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 uppercase tracking-wide">Completado</span>
+                        ) : closurePhase4.active ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                                En curso
+                            </span>
+                        ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 uppercase tracking-wide">Pendiente</span>
+                        )}
+                    </div>
 
-                {/* ═══ FUTURE SECTIONS ═══ */}
-                {sel.phaseIndex < 2 && (
-                    <section className="opacity-30 grayscale pointer-events-none">
-                        {[{ icon: 'cast_for_education', title: 'Operación Educativa', sub: 'Sesiones con alumnos' },
-                        { icon: 'flag', title: 'Cierre de Misión', sub: 'Check-out y reporte final' }].map(card => (
-                            <div key={card.title} className="bg-surface-dark rounded-xl p-4 border border-dashed border-slate-700 shadow-none mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
-                                        <span className="material-symbols-outlined">{card.icon}</span>
+                    {renderLifecycleRoleCards(closurePhase4.cards, 'desmontaje')}
+                </section>
+
+                {/* ═══ FASE 5: RETORNO A BASE ═══ */}
+                <section className={phase5Enabled ? '' : 'opacity-30 grayscale pointer-events-none'}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-xl">local_shipping</span>
+                                Retorno a base
+                                {closurePhase5.timer.started && (
+                                    <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(closurePhase5.timer.seconds)})</span>
+                                )}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">Traslado del equipo desde la escuela al Centro de Distribución.</p>
+                        </div>
+                        {closurePhase5.completed ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 uppercase tracking-wide">Completado</span>
+                        ) : closurePhase5.active || closurePhase5.started ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                                En curso
+                            </span>
+                        ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 uppercase tracking-wide">Pendiente</span>
+                        )}
+                    </div>
+
+                    <div className="bg-surface-dark rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+                        <div className="p-4 border-b border-slate-800">
+                            <div className="flex items-start gap-3">
+                                <div className="flex flex-col items-center gap-0.5 pt-1">
+                                    <div className="size-3 rounded-full border-2 border-sky-400 bg-sky-400/20" />
+                                    <div className="w-0.5 h-8 bg-gradient-to-b from-sky-400/40 to-emerald-400/40" />
+                                    <div className="size-3 rounded-full border-2 border-emerald-400 bg-emerald-400/20" />
+                                </div>
+                                <div className="flex-1 flex flex-col gap-3">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Origen</p>
+                                        <p className="text-sm font-bold text-white">{sel.schoolName}</p>
+                                        {sel.neighborhood && <p className="text-xs text-slate-400">{sel.neighborhood}</p>}
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-400">{card.title}</h3>
-                                        <p className="text-xs text-slate-500">{card.sub}</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Destino</p>
+                                        <p className="text-sm font-bold text-white">Centro de Distribución</p>
                                     </div>
                                 </div>
                             </div>
-                        ))}
-                    </section>
-                )}
+                        </div>
+
+                        <div className="p-4 border-b border-slate-800">
+                            {closurePhase5.completed ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-400">check_circle</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-emerald-400">Arribo a base confirmado</p>
+                                        {closurePhase5.arrivedAt && <p className="text-xs text-slate-400">{fmtExactDateTime(closurePhase5.arrivedAt)}</p>}
+                                    </div>
+                                </div>
+                            ) : closurePhase5.active || closurePhase5.started ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-full bg-primary/15 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary animate-pulse">navigation</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">En traslado al Centro de Distribución</p>
+                                        <p className="text-xs text-slate-400">Monitoreando confirmación de arribo.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3">
+                                    <div className="size-10 rounded-full bg-slate-800 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-slate-500">schedule</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-400">Pendiente</p>
+                                        <p className="text-xs text-slate-500">Se activa cuando finaliza desmontaje.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Cronología</p>
+                            <div className="space-y-2">
+                                <div className={`rounded-lg border px-3 py-2 ${closurePhase5.startedAt ? 'border-sky-500/30 bg-sky-500/10' : 'border-slate-700/50 bg-slate-800/35'}`}>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Salida de escuela</p>
+                                    <p className={`text-xs mt-1 ${closurePhase5.startedAt ? 'text-slate-100' : 'text-slate-500'}`}>
+                                        {closurePhase5.startedAt ? fmtExactDateTime(closurePhase5.startedAt) : 'Pendiente de registro'}
+                                    </p>
+                                </div>
+                                <div className={`rounded-lg border px-3 py-2 ${closurePhase5.arrivedAt ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-slate-700/50 bg-slate-800/35'}`}>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Arribo a base</p>
+                                    <p className={`text-xs mt-1 ${closurePhase5.arrivedAt ? 'text-slate-100' : 'text-slate-500'}`}>
+                                        {closurePhase5.arrivedAt ? fmtExactDateTime(closurePhase5.arrivedAt) : 'Pendiente de registro'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ═══ FASE 6: CIERRE EN BASE ═══ */}
+                <section className={phase6Enabled ? '' : 'opacity-30 grayscale pointer-events-none'}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-xl">warehouse</span>
+                                Cierre en base
+                                {closurePhase6.timer.started && (
+                                    <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(closurePhase6.timer.seconds)})</span>
+                                )}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">Validaciones finales, resguardo y cierre operativo en Centro de Distribución.</p>
+                        </div>
+                        {closurePhase6.completed ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 uppercase tracking-wide">Completado</span>
+                        ) : closurePhase6.active ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                                En curso
+                            </span>
+                        ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 uppercase tracking-wide">Pendiente</span>
+                        )}
+                    </div>
+
+                    {renderLifecycleRoleCards(closurePhase6.cards, 'cierre')}
+                </section>
+
+                {/* ═══ FASE 7: CHECK-OUT ═══ */}
+                <section className={phase7Enabled ? '' : 'opacity-30 grayscale pointer-events-none'}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-xl">flag</span>
+                                Check-out
+                                {closurePhase7.timer.started && (
+                                    <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(closurePhase7.timer.seconds)})</span>
+                                )}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-0.5">Confirmación final individual de cierre por cada operativo.</p>
+                        </div>
+                        {closurePhase7.completed ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 uppercase tracking-wide">Completado</span>
+                        ) : closurePhase7.active || closurePhase7.started ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                                En curso
+                            </span>
+                        ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 uppercase tracking-wide">Pendiente</span>
+                        )}
+                    </div>
+
+                    <div className="bg-surface-dark rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+                        <div className="px-4 py-3 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-800/70 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="material-symbols-outlined text-base text-emerald-400">verified</span>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-300">Cierre operativo final</p>
+                                    <p className="text-[11px] text-slate-500 truncate">Registro por rol con hora exacta y observaciones.</p>
+                                </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-700/60 text-slate-200">
+                                {checkoutDoneCount}/{checkoutTotalCount}
+                            </span>
+                        </div>
+
+                        <div className="p-4 grid grid-cols-1 gap-3">
+                            {checkoutRoleEntries.map(([role, row]) => {
+                                const roleMeta = ROLE_META[role] || { label: role, icon: 'task_alt' };
+                                const done = closurePhase7.forceComplete || row?.done === true;
+                                const comment = typeof row?.comment === 'string' && row.comment.trim().length > 0
+                                    ? row.comment.trim()
+                                    : 'Sin comentarios';
+                                const operativeName = closureRoleNameByRole[role] || roleMeta.label;
+                                const checkoutAt = row?.at ? fmtExactDateTime(row.at) : '--';
+
+                                return (
+                                    <div
+                                        key={`checkout-${role}`}
+                                        className={`rounded-xl border px-3.5 py-3 ${done ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-slate-700/60 bg-slate-900/40'}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className={`text-[10px] font-bold uppercase tracking-wider ${done ? 'text-emerald-300' : 'text-slate-500'}`}>
+                                                    {roleMeta.label}
+                                                </p>
+                                                <p className="text-sm font-bold text-white truncate">{operativeName}</p>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${done ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-700/60 text-slate-300'}`}>
+                                                {done ? 'Confirmado' : 'Pendiente'}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-2 rounded-lg border border-slate-700/60 bg-slate-800/35 px-2.5 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Hora de check-out</p>
+                                            <p className={`mt-1 text-xs tabular-nums ${done ? 'text-slate-100' : 'text-slate-400'}`}>{checkoutAt}</p>
+                                        </div>
+
+                                        <div className="mt-2 rounded-lg border border-slate-700/60 bg-slate-800/35 px-2.5 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Comentario</p>
+                                            <p className={`mt-1 text-xs leading-relaxed ${comment === 'Sin comentarios' ? 'text-slate-500 italic' : 'text-slate-200'}`}>
+                                                {comment}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="px-4 py-3 border-t border-slate-800 bg-surface-darker/55 flex items-center justify-between gap-2 text-[11px]">
+                            <span className="text-slate-500">Primer check-out: <span className="text-slate-300 tabular-nums">{closurePhase7.firstAt ? fmtExactDateTime(closurePhase7.firstAt) : '--'}</span></span>
+                            <span className="text-slate-500">Cierre total: <span className="text-slate-300 tabular-nums">{closurePhase7.endAt ? fmtExactDateTime(closurePhase7.endAt) : '--'}</span></span>
+                        </div>
+                    </div>
+                </section>
             </main>
 
             {/* ═══ CONN STATUS ═══ */}
@@ -4428,6 +5890,12 @@ export default function SupervisorDashboard() {
                     {conn === 'disconnected' ? 'Sin conexión' : 'Reconectando…'}
                 </div>
             )}
+
+            <EvidenceViewerModal
+                isOpen={Boolean(activeEvidence)}
+                evidence={activeEvidence}
+                onClose={closeEvidenceViewer}
+            />
         </div>
     );
 }

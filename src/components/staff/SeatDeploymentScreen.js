@@ -198,13 +198,10 @@ export default function SeatDeploymentScreen({
         setSeatDoneByName((prev) => (prev === nextDoneBy ? prev : nextDoneBy));
     }, [missionMetaSafe, missionState]);
 
-    const seatMeta = parseMeta(missionMetaSafe);
-    const auxReady = seatMeta.aux_ready_seat_deployment === true;
-    const teacherReady = seatMeta.teacher_civic_notified === true;
-    const prerequisitesReady = auxReady && teacherReady;
+    const seatChecklistReady = true;
 
     const handleConfirmSeatDeployment = async () => {
-        if (seatDone || isSaving || !prerequisitesReady || !journeyId) return;
+        if (seatDone || isSaving || !seatChecklistReady || !journeyId) return;
 
         setIsSaving(true);
         try {
@@ -221,13 +218,6 @@ export default function SeatDeploymentScreen({
             if (readError) throw readError;
 
             const currentMeta = parseMeta(currentData?.meta);
-            const latestAuxReady = currentMeta.aux_ready_seat_deployment === true;
-            const latestTeacherReady = currentMeta.teacher_civic_notified === true;
-
-            if (!latestAuxReady || !latestTeacherReady) {
-                alert('Aun falta que el equipo cierre sus tareas previas para iniciar esta tarea global.');
-                return;
-            }
 
             const nextMeta = {
                 ...currentMeta,
@@ -380,17 +370,17 @@ export default function SeatDeploymentScreen({
                 <div style={{ maxWidth: 380, margin: '0 auto' }}>
                     <button
                         onClick={handleConfirmSeatDeployment}
-                        disabled={seatDone || isSaving || !prerequisitesReady}
+                        disabled={seatDone || isSaving || !seatChecklistReady}
                         style={{
                             width: '100%', padding: '14px',
-                            backgroundColor: (seatDone || !prerequisitesReady) ? '#E5E7EB' : '#2563EB',
-                            color: (seatDone || !prerequisitesReady) ? '#9CA3AF' : 'white',
+                            backgroundColor: (seatDone || !seatChecklistReady) ? '#E5E7EB' : '#2563EB',
+                            color: (seatDone || !seatChecklistReady) ? '#9CA3AF' : 'white',
                             borderRadius: 14, border: 'none',
                             fontSize: 16, fontWeight: 700,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             gap: 8,
-                            boxShadow: (!seatDone && prerequisitesReady) ? '0 10px 25px -5px rgba(37,99,235,0.3)' : 'none',
-                            cursor: (seatDone || isSaving || !prerequisitesReady) ? 'not-allowed' : 'pointer',
+                            boxShadow: (!seatDone && seatChecklistReady) ? '0 10px 25px -5px rgba(37,99,235,0.3)' : 'none',
+                            cursor: (seatDone || isSaving || !seatChecklistReady) ? 'not-allowed' : 'pointer',
                             transition: 'opacity 0.2s, transform 0.15s',
                         }}
                     >
@@ -398,12 +388,12 @@ export default function SeatDeploymentScreen({
                         <span>
                             {seatDone
                                 ? 'Despliegue confirmado'
-                                : prerequisitesReady
+                                : seatChecklistReady
                                     ? 'Confirmar instalacion'
                                     : 'Pendiente del equipo'
                             }
                         </span>
-                        {!seatDone && prerequisitesReady && !isSaving && (
+                        {!seatDone && seatChecklistReady && !isSaving && (
                             <span className="material-symbols-outlined" style={{
                                 fontSize: 20, color: 'white',
                                 fontVariationSettings: "'FILL' 0, 'wght' 500"
@@ -415,9 +405,9 @@ export default function SeatDeploymentScreen({
                         <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 600 }}>
                             {seatDone
                                 ? `Global confirmado${seatDoneByName ? ` · ${seatDoneByName}` : ''}`
-                                : prerequisitesReady
+                                : seatChecklistReady
                                     ? 'Listo para iniciar Configura audifonos'
-                                    : 'Esperando cierre de tareas previas del equipo'
+                                    : 'Pendiente por completar'
                             }
                         </span>
                     </div>
