@@ -548,6 +548,7 @@ export default function StaffDashboard() {
     const [assistantCivicPanelDismissed, setAssistantCivicPanelDismissed] = useState(false);
     const [civicModalVisible, setCivicModalVisible] = useState(false);
     const prevCivicNotifiedRef = useRef(false);
+    const civicModalDismissedRef = useRef(false);
 
     const profileRef = useRef(profile);
     const missionStateRef = useRef(missionState);
@@ -662,8 +663,18 @@ export default function StaffDashboard() {
         const meta = parseMeta(todaySchool?.meta);
         const isNotified = meta.teacher_civic_notified === true;
 
-        if (isNotified && !prevCivicNotifiedRef.current) {
-            // Set ref FIRST to prevent re-triggers from meta flicker
+        // GUARD: Never show modal if recording is already complete
+        const auxStatus = meta.civic_parallel_aux_status;
+        const isRecordingComplete = auxStatus === 'uploaded' || auxStatus === 'completed' || auxStatus === 'done';
+        if (isRecordingComplete) return;
+
+        // GUARD: Already shown and dismissed — never re-show (survives re-renders)
+        if (civicModalDismissedRef.current) return;
+
+        // GUARD: Already triggered once this lifecycle — permanent one-shot
+        if (prevCivicNotifiedRef.current) return;
+
+        if (isNotified) {
             prevCivicNotifiedRef.current = true;
             setCivicModalVisible(true);
             // Haptic: double vibration
@@ -687,9 +698,6 @@ export default function StaffDashboard() {
                 let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
                 new Audio('data:audio/wav;base64,' + btoa(bin)).play().catch(() => { });
             } catch { }
-        }
-        if (!isNotified) {
-            prevCivicNotifiedRef.current = false;
         }
     }, [todaySchool?.meta, profile?.role]);
 
@@ -1641,7 +1649,7 @@ export default function StaffDashboard() {
                         }}
                     >
                         <button
-                            onClick={() => setCivicModalVisible(false)}
+                            onClick={() => { civicModalDismissedRef.current = true; setCivicModalVisible(false); }}
                             aria-label="Cerrar"
                             style={{
                                 position: 'absolute', top: 12, right: 12,
@@ -1664,7 +1672,7 @@ export default function StaffDashboard() {
                             El acto cívico comenzará pronto. Ten lista la cámara DJI Osmo para los mejores momentos.
                         </p>
                         <button
-                            onClick={() => setCivicModalVisible(false)}
+                            onClick={() => { civicModalDismissedRef.current = true; setCivicModalVisible(false); }}
                             style={{
                                 width: '100%', padding: '14px 0', borderRadius: 14,
                                 background: '#0f172a', color: 'white', border: 'none',

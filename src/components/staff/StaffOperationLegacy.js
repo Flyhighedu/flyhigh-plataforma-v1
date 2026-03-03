@@ -991,8 +991,6 @@ export default function StaffOperationLegacy({
             return;
         }
 
-        // [FIX #7] Snapshot the current activeFlight before the edit to prevent state-wipe
-        const activeFlightSnapshot = activeFlight;
 
         setIsSavingFlightEdit(true);
 
@@ -1044,23 +1042,10 @@ export default function StaffOperationLegacy({
             setFlightLogs(updatedLogs);
             setFlightEditModal(null);
 
-            // [FIX #7] Restore activeFlight if it was wiped by the re-render cascade
-            // Use a microtask to ensure this runs after any intermediate state updates
-            setTimeout(() => {
-                setActiveFlight((current) => {
-                    if (current === null && activeFlightSnapshot !== null) {
-                        console.log('[FIX #7] Restoring active flight after edit');
-                        persistActiveFlightCache(activeFlightSnapshot);
-                        return activeFlightSnapshot;
-                    }
-                    return current;
-                });
-            }, 50);
-
-            // Defer onRefresh to prevent parent re-render from wiping activeFlight
-            if (onRefresh) {
-                setTimeout(() => onRefresh(), 200);
-            }
+            // [FIX] No longer calling onRefresh() — the local state update above is sufficient.
+            // Calling onRefresh triggers refreshMission in the parent, which re-renders the entire
+            // component tree and wipes activeFlight state. The student count is already updated
+            // in both React state and localStorage, so no parent refresh is needed.
 
             alert('Ajuste de alumnos guardado y sincronizado.');
         } catch (error) {
