@@ -870,9 +870,9 @@ function buildTeacherTaskFlow(missionState, meta = {}, postArrivalEnabled, conte
         ? 'Camina a Direccion para definir zona de descarga.'
         : missionState === 'waiting_unload_assignment'
             ? 'Define descarga dentro/fuera y envia nota al auxiliar.'
-        : missionState === 'waiting_dropzone'
-            ? 'Zona definida y compartida con el equipo.'
-            : 'Zona de descarga confirmada por Direccion.';
+            : missionState === 'waiting_dropzone'
+                ? 'Zona definida y compartida con el equipo.'
+                : 'Zona de descarga confirmada por Direccion.';
 
     timeline.push({
         id: 'teacher-direction',
@@ -1179,7 +1179,7 @@ function buildAssistantTaskFlow(missionState, meta = {}, postArrivalEnabled, con
         ? 'Espera indicacion de Direccion para definir zona de descarga.'
         : missionState === 'waiting_dropzone'
             ? 'Acomoda el vehiculo en la zona de descarga indicada.'
-        : missionState === 'unload'
+            : missionState === 'unload'
                 ? 'Vehiculo acomodado. Participa en descarga global.'
                 : 'Vehiculo acomodado en zona de descarga.';
 
@@ -2624,14 +2624,19 @@ export default function SupervisorDashboard() {
             const arrivalAtMs = toMs(arrivalPhotoAt) || 0;
             const operationEndedAtMs = (() => {
                 const statusKey = String(j.status || '').trim().toLowerCase();
+                const missionStateKey = String(j.mission_state || '').trim().toLowerCase();
                 const isOperationEnded =
                     statusKey === 'report' ||
                     statusKey === 'closed' ||
+                    missionStateKey === 'dismantling' ||
+                    missionStateKey === 'completed' ||
                     CLOSURE_STATES.includes(j.mission_state);
 
                 if (!isOperationEnded) return 0;
 
-                return toMs(j.updated_at) || toMs(closureMatch?.end_time) || now;
+                // Prefer dismantling_started_at from meta as the precise end-of-operation moment
+                const metaDismantlingAt = toMs(meta?.dismantling_started_at);
+                return metaDismantlingAt || toMs(j.updated_at) || toMs(closureMatch?.end_time) || now;
             })();
 
             const phaseTimers = {
@@ -3774,8 +3779,7 @@ export default function SupervisorDashboard() {
                             type="button"
                             onClick={() => hasLiveMission && setDashboardTab('live')}
                             disabled={!hasLiveMission}
-                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
-                                effectiveTab === 'live'
+                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'live'
                                     ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
                                     : hasLiveMission
                                         ? 'text-slate-300 hover:text-white'
@@ -3787,8 +3791,7 @@ export default function SupervisorDashboard() {
                         <button
                             type="button"
                             onClick={() => setDashboardTab('history')}
-                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
-                                effectiveTab === 'history'
+                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'history'
                                     ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
                                     : 'text-slate-300 hover:text-white'
                                 }`}
@@ -3852,11 +3855,10 @@ export default function SupervisorDashboard() {
                                 return (
                                     <article
                                         key={mission.key}
-                                        className={`rounded-2xl border transition-all overflow-hidden ${
-                                            selected
+                                        className={`rounded-2xl border transition-all overflow-hidden ${selected
                                                 ? 'border-primary/70 bg-primary/10 shadow-[0_0_18px_-6px_rgba(19,146,236,0.7)]'
                                                 : 'border-slate-800 bg-surface-dark hover:border-slate-700'
-                                        }`}
+                                            }`}
                                     >
                                         <button
                                             type="button"
@@ -3919,9 +3921,8 @@ export default function SupervisorDashboard() {
                 </main>
 
                 {showConnBanner && conn !== 'connected' && (
-                    <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg ${
-                        conn === 'disconnected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white'
-                    }`}>
+                    <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 shadow-lg ${conn === 'disconnected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white'
+                        }`}>
                         <div className={`size-2 rounded-full ${conn === 'disconnected' ? 'bg-white' : 'bg-white animate-pulse'}`} />
                         {conn === 'disconnected' ? 'Sin conexión' : 'Reconectando…'}
                     </div>
@@ -4280,8 +4281,7 @@ export default function SupervisorDashboard() {
                     <button
                         type="button"
                         onClick={() => setDashboardTab('live')}
-                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
-                            effectiveTab === 'live'
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'live'
                                 ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
                                 : 'text-slate-300 hover:text-white'
                             }`}
@@ -4291,8 +4291,7 @@ export default function SupervisorDashboard() {
                     <button
                         type="button"
                         onClick={() => setDashboardTab('history')}
-                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
-                            effectiveTab === 'history'
+                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'history'
                                 ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
                                 : 'text-slate-300 hover:text-white'
                             }`}
@@ -4422,7 +4421,7 @@ export default function SupervisorDashboard() {
                             const missEv = blocks.flatMap(b => b.items).filter(i => i.reqEvidence && !i.done).length;
 
                             return (
-                                    <div key={role} className={`bg-surface-dark rounded-xl overflow-hidden border shadow-sm relative
+                                <div key={role} className={`bg-surface-dark rounded-xl overflow-hidden border shadow-sm relative
                                     ${isActive ? 'border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20' : 'border-slate-800'}
                                     ${noProgress ? 'opacity-95' : allDone && !isActive && !(sel.isEnRuta || sel.isPostRoute) ? 'opacity-90' : ''}`}>
 
@@ -4734,48 +4733,48 @@ export default function SupervisorDashboard() {
                                 const statusText = forcePrepCompletion
                                     ? 'Montaje finalizado'
                                     : !card.postArrivalEnabled
-                                    ? '🕓 Pendiente de llegada a sede'
-                                    : taskActive
-                                        ? `📍 Tarea actual: ${summaryTitle}`
-                                        : cardCompleted
-                                            ? '✅ Lista de tareas completada'
-                                            : `📌 Próxima tarea: ${summaryTitle}`;
+                                        ? '🕓 Pendiente de llegada a sede'
+                                        : taskActive
+                                            ? `📍 Tarea actual: ${summaryTitle}`
+                                            : cardCompleted
+                                                ? '✅ Lista de tareas completada'
+                                                : `📌 Próxima tarea: ${summaryTitle}`;
                                 const statusTextTone = forcePrepCompletion
                                     ? 'text-emerald-300'
                                     : !card.postArrivalEnabled
                                         ? 'text-slate-300'
-                                    : taskActive
-                                        ? (summaryIsCivic ? 'text-emerald-300' : 'text-sky-300')
-                                    : cardCompleted || taskDone
-                                        ? 'text-emerald-300'
-                                        : 'text-slate-300';
+                                        : taskActive
+                                            ? (summaryIsCivic ? 'text-emerald-300' : 'text-sky-300')
+                                            : cardCompleted || taskDone
+                                                ? 'text-emerald-300'
+                                                : 'text-slate-300';
                                 const summaryTitleTone = forcePrepCompletion
                                     ? 'text-emerald-300'
                                     : taskDone
-                                    ? 'text-emerald-300'
-                                    : summaryIsCivic
                                         ? 'text-emerald-300'
-                                    : taskActive
-                                        ? 'text-slate-100'
-                                        : 'text-slate-300';
+                                        : summaryIsCivic
+                                            ? 'text-emerald-300'
+                                            : taskActive
+                                                ? 'text-slate-100'
+                                                : 'text-slate-300';
                                 const summaryDescTone = forcePrepCompletion
                                     ? 'text-emerald-300/65'
                                     : taskDone
-                                    ? 'text-emerald-300/65'
-                                    : summaryIsCivic
-                                        ? 'text-emerald-300/75'
-                                    : taskActive
-                                        ? 'text-slate-400'
-                                        : 'text-slate-500';
+                                        ? 'text-emerald-300/65'
+                                        : summaryIsCivic
+                                            ? 'text-emerald-300/75'
+                                            : taskActive
+                                                ? 'text-slate-400'
+                                                : 'text-slate-500';
                                 const summaryDotTone = forcePrepCompletion
                                     ? 'bg-emerald-500'
                                     : taskDone
-                                    ? 'bg-emerald-500'
-                                    : summaryIsCivic
-                                        ? 'bg-emerald-500 animate-pulse'
-                                    : taskActive
-                                        ? 'bg-sky-500 animate-pulse'
-                                        : 'bg-slate-700';
+                                        ? 'bg-emerald-500'
+                                        : summaryIsCivic
+                                            ? 'bg-emerald-500 animate-pulse'
+                                            : taskActive
+                                                ? 'bg-sky-500 animate-pulse'
+                                                : 'bg-slate-700';
                                 const cardNoProgress = !forcePrepCompletion && completedTotal === 0;
                                 const cardActive = !isInactive && taskActive;
                                 const hidePrepDetails = false;
@@ -4783,9 +4782,9 @@ export default function SupervisorDashboard() {
                                     ? 'bg-slate-900/45 border-slate-700/70 opacity-70 grayscale-[0.2]'
                                     : forcePrepCompletion
                                         ? 'bg-surface-dark border-emerald-500/35 shadow-[0_0_14px_-4px_rgba(16,185,129,0.35)]'
-                                    : cardActive
-                                        ? 'bg-surface-dark border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20'
-                                        : 'bg-surface-dark border-slate-800';
+                                        : cardActive
+                                            ? 'bg-surface-dark border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20'
+                                            : 'bg-surface-dark border-slate-800';
                                 const cardCompletedTone = !isInactive && cardCompleted && !cardActive ? 'opacity-95' : '';
                                 const roleIconTone = cardActive
                                     ? 'text-primary animate-pulse'
@@ -4898,475 +4897,475 @@ export default function SupervisorDashboard() {
                                                 </div>
 
                                                 {!isCollapsed && !hidePrepDetails && (card.prepProgress ? (
-                                                <div className="mt-3 space-y-2">
-                                                    {/* ── Paso previo: Pista confirmada ── */}
-                                                    <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 ${card.prepProgress.spot.confirmed
-                                                        ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                                        : 'bg-amber-500/10 border border-amber-500/20'
-                                                        }`}>
-                                                        <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${card.prepProgress.spot.confirmed ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+                                                    <div className="mt-3 space-y-2">
+                                                        {/* ── Paso previo: Pista confirmada ── */}
+                                                        <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 ${card.prepProgress.spot.confirmed
+                                                            ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                                            : 'bg-amber-500/10 border border-amber-500/20'
                                                             }`}>
-                                                            {card.prepProgress.spot.confirmed ? (
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                            ) : (
-                                                                <span className="material-symbols-outlined text-[12px] text-white">location_on</span>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <span className={`text-[13px] font-bold leading-tight ${card.prepProgress.spot.confirmed ? 'text-emerald-400' : 'text-amber-300'
+                                                            <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${card.prepProgress.spot.confirmed ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
                                                                 }`}>
-                                                                {card.prepProgress.spot.confirmed ? 'Pista confirmada' : 'Confirmando pista...'}
-                                                            </span>
-                                                            {card.prepProgress.spot.confirmed && card.prepProgress.spot.at && (
-                                                                <p className="text-[10px] text-emerald-400/60 mt-0.5">a las {fmtClock(card.prepProgress.spot.at)}</p>
-                                                            )}
-                                                            {card.prepProgress.spot.note && (
-                                                                <p className="text-[11px] text-slate-400 mt-1 italic">Ref: &quot;{card.prepProgress.spot.note}&quot;</p>
-                                                            )}
-                                                            {card.prepProgress.spot.photoUrl ? (
-                                                                <button
-                                                                    type="button"
-                                                                    className="mt-1.5 relative group cursor-pointer inline-block"
-                                                                    onClick={() => openEvidenceViewer(card.prepProgress.spot.photoUrl, { label: 'Foto de pista', typeHint: 'image' })}
-                                                                >
-                                                                    <img src={card.prepProgress.spot.photoUrl} alt="Foto de pista" className="w-28 h-20 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
-                                                                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white font-bold inline-flex items-center gap-1">
-                                                                        <span className="material-symbols-outlined text-[10px]">photo_camera</span>
-                                                                        Pista
-                                                                    </div>
-                                                                </button>
-                                                            ) : card.prepProgress.spot.confirmed ? (
-                                                                <p className="text-[10px] text-slate-600 mt-1">Foto de pista: no enviada</p>
-                                                            ) : null}
-                                                        </div>
-                                                    </div>
-                                                    {/* ── Separador visual ── */}
-                                                    <div className="flex items-center gap-2 px-1">
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Montaje de vuelo</span>
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                    </div>
-                                                    {[{ icon: 'visibility', title: 'Reconocimiento del entorno', desc: 'Revisa riesgos alrededor del área de vuelo.' },
-                                                    { icon: 'flight', title: 'Vuelo de prueba', desc: 'Valida señal, estabilidad y altura segura.' },
-                                                    { icon: 'map', title: 'Ruta óptima', desc: 'Define la ruta con mejor señal y visibilidad.' }
-                                                    ].map((step, i) => {
-                                                        const done = card.prepProgress.checks[i];
-                                                        const canStartPrep = card.prepProgress.spot.confirmed;
-                                                        const isNow = canStartPrep && !done && card.prepProgress.checks.slice(0, i).every(Boolean);
-                                                        return (
-                                                            <div key={i} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${done ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                                                : isNow ? 'bg-sky-500/10 border border-sky-500/30'
-                                                                    : 'bg-slate-800/40 border border-slate-700/30'
-                                                                }`}>
-                                                                <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${done ? 'bg-emerald-500'
-                                                                    : isNow ? 'bg-sky-500 animate-pulse'
-                                                                        : 'bg-slate-700'
+                                                                {card.prepProgress.spot.confirmed ? (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                ) : (
+                                                                    <span className="material-symbols-outlined text-[12px] text-white">location_on</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className={`text-[13px] font-bold leading-tight ${card.prepProgress.spot.confirmed ? 'text-emerald-400' : 'text-amber-300'
                                                                     }`}>
-                                                                    {done ? (
-                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    ) : (
-                                                                        <span className="text-[9px] font-bold text-white">{i + 1}</span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[13px] font-bold leading-tight ${done ? 'text-emerald-400 line-through opacity-70'
-                                                                            : isNow ? 'text-white'
-                                                                                : 'text-slate-500'
-                                                                            }`}>
-                                                                            <span className="inline-flex items-center gap-1.5">
-                                                                                <span className="material-symbols-outlined text-[14px] align-middle">{step.icon}</span>
-                                                                                {step.title}
-                                                                            </span>
-                                                                        </span>
-                                                                        {isNow && (
-                                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-300 flex-shrink-0">Ahora</span>
+                                                                    {card.prepProgress.spot.confirmed ? 'Pista confirmada' : 'Confirmando pista...'}
+                                                                </span>
+                                                                {card.prepProgress.spot.confirmed && card.prepProgress.spot.at && (
+                                                                    <p className="text-[10px] text-emerald-400/60 mt-0.5">a las {fmtClock(card.prepProgress.spot.at)}</p>
+                                                                )}
+                                                                {card.prepProgress.spot.note && (
+                                                                    <p className="text-[11px] text-slate-400 mt-1 italic">Ref: &quot;{card.prepProgress.spot.note}&quot;</p>
+                                                                )}
+                                                                {card.prepProgress.spot.photoUrl ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="mt-1.5 relative group cursor-pointer inline-block"
+                                                                        onClick={() => openEvidenceViewer(card.prepProgress.spot.photoUrl, { label: 'Foto de pista', typeHint: 'image' })}
+                                                                    >
+                                                                        <img src={card.prepProgress.spot.photoUrl} alt="Foto de pista" className="w-28 h-20 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
+                                                                        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white font-bold inline-flex items-center gap-1">
+                                                                            <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                                                                            Pista
+                                                                        </div>
+                                                                    </button>
+                                                                ) : card.prepProgress.spot.confirmed ? (
+                                                                    <p className="text-[10px] text-slate-600 mt-1">Foto de pista: no enviada</p>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                        {/* ── Separador visual ── */}
+                                                        <div className="flex items-center gap-2 px-1">
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Montaje de vuelo</span>
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                        </div>
+                                                        {[{ icon: 'visibility', title: 'Reconocimiento del entorno', desc: 'Revisa riesgos alrededor del área de vuelo.' },
+                                                        { icon: 'flight', title: 'Vuelo de prueba', desc: 'Valida señal, estabilidad y altura segura.' },
+                                                        { icon: 'map', title: 'Ruta óptima', desc: 'Define la ruta con mejor señal y visibilidad.' }
+                                                        ].map((step, i) => {
+                                                            const done = card.prepProgress.checks[i];
+                                                            const canStartPrep = card.prepProgress.spot.confirmed;
+                                                            const isNow = canStartPrep && !done && card.prepProgress.checks.slice(0, i).every(Boolean);
+                                                            return (
+                                                                <div key={i} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${done ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                                                    : isNow ? 'bg-sky-500/10 border border-sky-500/30'
+                                                                        : 'bg-slate-800/40 border border-slate-700/30'
+                                                                    }`}>
+                                                                    <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${done ? 'bg-emerald-500'
+                                                                        : isNow ? 'bg-sky-500 animate-pulse'
+                                                                            : 'bg-slate-700'
+                                                                        }`}>
+                                                                        {done ? (
+                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                        ) : (
+                                                                            <span className="text-[9px] font-bold text-white">{i + 1}</span>
                                                                         )}
                                                                     </div>
-                                                                    <p className={`text-[11px] leading-snug mt-0.5 ${done ? 'text-emerald-400/50' : isNow ? 'text-slate-400' : 'text-slate-600'
-                                                                        }`}>{step.desc}</p>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`text-[13px] font-bold leading-tight ${done ? 'text-emerald-400 line-through opacity-70'
+                                                                                : isNow ? 'text-white'
+                                                                                    : 'text-slate-500'
+                                                                                }`}>
+                                                                                <span className="inline-flex items-center gap-1.5">
+                                                                                    <span className="material-symbols-outlined text-[14px] align-middle">{step.icon}</span>
+                                                                                    {step.title}
+                                                                                </span>
+                                                                            </span>
+                                                                            {isNow && (
+                                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-300 flex-shrink-0">Ahora</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className={`text-[11px] leading-snug mt-0.5 ${done ? 'text-emerald-400/50' : isNow ? 'text-slate-400' : 'text-slate-600'
+                                                                            }`}>{step.desc}</p>
+                                                                    </div>
                                                                 </div>
+                                                            );
+                                                        })}
+                                                        <div className="flex items-center gap-2 mt-1 px-1">
+                                                            <div className="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden">
+                                                                <div className={`h-full rounded-full transition-all duration-500 ${card.prepProgress.done >= 3 ? 'bg-emerald-400' : 'bg-sky-400'}`} style={{ width: `${(card.prepProgress.done / card.prepProgress.total) * 100}%` }} />
                                                             </div>
-                                                        );
-                                                    })}
-                                                    <div className="flex items-center gap-2 mt-1 px-1">
-                                                        <div className="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden">
-                                                            <div className={`h-full rounded-full transition-all duration-500 ${card.prepProgress.done >= 3 ? 'bg-emerald-400' : 'bg-sky-400'}`} style={{ width: `${(card.prepProgress.done / card.prepProgress.total) * 100}%` }} />
+                                                            <span className={`text-[10px] font-bold ${card.prepProgress.done >= 3 ? 'text-emerald-400' : 'text-slate-500'}`}>{card.prepProgress.done} de {card.prepProgress.total}</span>
                                                         </div>
-                                                        <span className={`text-[10px] font-bold ${card.prepProgress.done >= 3 ? 'text-emerald-400' : 'text-slate-500'}`}>{card.prepProgress.done} de {card.prepProgress.total}</span>
-                                                    </div>
 
-                                                    {/* ── Separador: Conexión del mando (siempre visible) ── */}
-                                                    <div className="flex items-center gap-2 px-1">
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Conexión del mando</span>
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                    </div>
-                                                    {(() => {
-                                                        const connected = card.prepProgress.controllerConnected;
-                                                        const active = card.prepProgress.checklistDone && !connected;
-                                                        return (
-                                                            <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${connected
+                                                        {/* ── Separador: Conexión del mando (siempre visible) ── */}
+                                                        <div className="flex items-center gap-2 px-1">
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Conexión del mando</span>
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                        </div>
+                                                        {(() => {
+                                                            const connected = card.prepProgress.controllerConnected;
+                                                            const active = card.prepProgress.checklistDone && !connected;
+                                                            return (
+                                                                <div className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${connected
                                                                     ? 'bg-emerald-500/10 border border-emerald-500/20'
                                                                     : active
                                                                         ? 'bg-sky-500/10 border border-sky-500/30'
                                                                         : 'bg-slate-800/40 border border-slate-700/30'
-                                                                }`}>
-                                                                <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${connected ? 'bg-emerald-500'
+                                                                    }`}>
+                                                                    <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${connected ? 'bg-emerald-500'
                                                                         : active ? 'bg-sky-500 animate-pulse'
                                                                             : 'bg-slate-700'
-                                                                    }`}>
-                                                                    {connected ? (
-                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    ) : (
-                                                                        <span className="material-symbols-outlined text-[11px] text-white">sports_esports</span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[13px] font-bold leading-tight ${connected ? 'text-emerald-400'
-                                                                                : active ? 'text-white'
-                                                                                    : 'text-slate-500'
-                                                                            }`}>
-                                                                            {connected ? 'Mando conectado' : active ? 'Conectando mando al gabinete...' : 'Conectar mando al gabinete'}
-                                                                        </span>
-                                                                        {active && (
-                                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-300 flex-shrink-0">Ahora</span>
+                                                                        }`}>
+                                                                        {connected ? (
+                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                        ) : (
+                                                                            <span className="material-symbols-outlined text-[11px] text-white">sports_esports</span>
                                                                         )}
                                                                     </div>
-                                                                    <p className={`text-[11px] leading-snug mt-0.5 ${connected ? 'text-emerald-400/50'
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`text-[13px] font-bold leading-tight ${connected ? 'text-emerald-400'
+                                                                                : active ? 'text-white'
+                                                                                    : 'text-slate-500'
+                                                                                }`}>
+                                                                                {connected ? 'Mando conectado' : active ? 'Conectando mando al gabinete...' : 'Conectar mando al gabinete'}
+                                                                            </span>
+                                                                            {active && (
+                                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-300 flex-shrink-0">Ahora</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className={`text-[11px] leading-snug mt-0.5 ${connected ? 'text-emerald-400/50'
                                                                             : active ? 'text-slate-400'
                                                                                 : 'text-slate-600'
-                                                                        }`}>
-                                                                        {connected
-                                                                            ? 'Control remoto conectado correctamente.'
-                                                                            : active
-                                                                                ? 'Conectando el control remoto al gabinete.'
-                                                                                : 'Pendiente: se realizará al terminar el checklist.'}
-                                                                    </p>
-                                                                    {card.prepProgress.controllerConnectedAt && (
-                                                                        <p className="text-[10px] text-emerald-400/60 mt-0.5">a las {fmtClock(card.prepProgress.controllerConnectedAt)}</p>
-                                                                    )}
+                                                                            }`}>
+                                                                            {connected
+                                                                                ? 'Control remoto conectado correctamente.'
+                                                                                : active
+                                                                                    ? 'Conectando el control remoto al gabinete.'
+                                                                                    : 'Pendiente: se realizará al terminar el checklist.'}
+                                                                        </p>
+                                                                        {card.prepProgress.controllerConnectedAt && (
+                                                                            <p className="text-[10px] text-emerald-400/60 mt-0.5">a las {fmtClock(card.prepProgress.controllerConnectedAt)}</p>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        );
-                                                    })()}
+                                                            );
+                                                        })()}
 
-                                                    {card.taskFlow?.length > 0 && (
-                                                        <>
-                                                            <div className="flex items-center gap-2 px-1 mt-1">
-                                                                <div className="flex-1 h-px bg-slate-700/60" />
-                                                                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Linea operativa</span>
-                                                                <div className="flex-1 h-px bg-slate-700/60" />
-                                                            </div>
-                                                            {card.taskFlow.map((task, i) => {
-                                                                const done = task.status === 'completed';
-                                                                const isNow = task.status === 'active';
-                                                                const isGlobal = task.kind === 'global';
-                                                                const icon = task.icon || 'task_alt';
-                                                                const rowTone = done
+                                                        {card.taskFlow?.length > 0 && (
+                                                            <>
+                                                                <div className="flex items-center gap-2 px-1 mt-1">
+                                                                    <div className="flex-1 h-px bg-slate-700/60" />
+                                                                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Linea operativa</span>
+                                                                    <div className="flex-1 h-px bg-slate-700/60" />
+                                                                </div>
+                                                                {card.taskFlow.map((task, i) => {
+                                                                    const done = task.status === 'completed';
+                                                                    const isNow = task.status === 'active';
+                                                                    const isGlobal = task.kind === 'global';
+                                                                    const icon = task.icon || 'task_alt';
+                                                                    const rowTone = done
+                                                                        ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                                                        : isNow
+                                                                            ? 'bg-sky-500/10 border border-sky-500/30'
+                                                                            : 'bg-slate-800/40 border border-slate-700/30';
+                                                                    const dotTone = done
+                                                                        ? 'bg-emerald-500'
+                                                                        : isNow
+                                                                            ? 'bg-sky-500 animate-pulse'
+                                                                            : 'bg-slate-700';
+                                                                    const titleTone = done
+                                                                        ? 'text-emerald-400 line-through opacity-70'
+                                                                        : isNow
+                                                                            ? 'text-white'
+                                                                            : 'text-slate-500';
+                                                                    const descTone = done
+                                                                        ? 'text-emerald-400/50'
+                                                                        : isNow
+                                                                            ? 'text-slate-400'
+                                                                            : 'text-slate-600';
+                                                                    return (
+                                                                        <div key={task.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${rowTone}`}>
+                                                                            <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${dotTone}`}>
+                                                                                {done ? (
+                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                                ) : isGlobal ? (
+                                                                                    <span className="material-symbols-outlined text-[11px] text-white">{icon}</span>
+                                                                                ) : (
+                                                                                    <span className="text-[9px] font-bold text-white">{i + 1}</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                                    <span className={`text-[13px] font-bold leading-tight ${titleTone}`}>{task.label}</span>
+                                                                                    {isGlobal && (
+                                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
+                                                                                    )}
+                                                                                    {isNow && (
+                                                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest flex-shrink-0 bg-sky-500/20 text-sky-300">Ahora</span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className={`text-[11px] leading-snug mt-0.5 ${descTone}`}>{task.desc}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                ) : card.role !== 'pilot' ? (
+                                                    <div className="mt-3 space-y-2">
+                                                        <div className="flex items-center gap-2 px-1 pt-1">
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Línea operativa</span>
+                                                            <div className="flex-1 h-px bg-slate-700/60" />
+                                                        </div>
+
+                                                        {(card.taskFlow || []).map((task, i) => {
+                                                            const done = task.status === 'completed';
+                                                            const isNow = task.status === 'active';
+                                                            const isGlobal = task.kind === 'global';
+                                                            const isInactiveTask = task.status === 'inactive';
+                                                            const isCivicTask = task.id === 'teacher-civic' || task.id === 'teacher-civic-audio';
+                                                            const icon = task.icon || 'task_alt';
+                                                            const desc = task.desc || 'Pendiente por ejecutar.';
+
+                                                            let rowTone = isGlobal
+                                                                ? done
                                                                     ? 'bg-emerald-500/10 border border-emerald-500/20'
                                                                     : isNow
                                                                         ? 'bg-sky-500/10 border border-sky-500/30'
-                                                                        : 'bg-slate-800/40 border border-slate-700/30';
-                                                                const dotTone = done
+                                                                        : isInactiveTask
+                                                                            ? 'bg-slate-800/25 border border-slate-700/20'
+                                                                            : 'bg-slate-800/40 border border-slate-700/30'
+                                                                : done
+                                                                    ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                                                    : isNow
+                                                                        ? 'bg-sky-500/10 border border-sky-500/30'
+                                                                        : isInactiveTask
+                                                                            ? 'bg-slate-800/25 border border-slate-700/20'
+                                                                            : 'bg-slate-800/40 border border-slate-700/30';
+
+                                                            let dotTone = isGlobal
+                                                                ? done
+                                                                    ? 'bg-emerald-500'
+                                                                    : isNow
+                                                                        ? 'bg-sky-500 animate-pulse'
+                                                                        : 'bg-slate-700'
+                                                                : done
                                                                     ? 'bg-emerald-500'
                                                                     : isNow
                                                                         ? 'bg-sky-500 animate-pulse'
                                                                         : 'bg-slate-700';
-                                                                const titleTone = done
+
+                                                            let titleTone = isGlobal
+                                                                ? done
+                                                                    ? 'text-emerald-400 line-through opacity-70'
+                                                                    : isNow
+                                                                        ? 'text-white'
+                                                                        : 'text-slate-500'
+                                                                : done
                                                                     ? 'text-emerald-400 line-through opacity-70'
                                                                     : isNow
                                                                         ? 'text-white'
                                                                         : 'text-slate-500';
-                                                                const descTone = done
+
+                                                            let descTone = isGlobal
+                                                                ? done
+                                                                    ? 'text-emerald-400/50'
+                                                                    : isNow
+                                                                        ? 'text-slate-400'
+                                                                        : 'text-slate-600'
+                                                                : done
                                                                     ? 'text-emerald-400/50'
                                                                     : isNow
                                                                         ? 'text-slate-400'
                                                                         : 'text-slate-600';
-                                                                return (
-                                                                    <div key={task.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${rowTone}`}>
-                                                                        <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${dotTone}`}>
-                                                                            {done ? (
-                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                            ) : isGlobal ? (
-                                                                                <span className="material-symbols-outlined text-[11px] text-white">{icon}</span>
-                                                                            ) : (
-                                                                                <span className="text-[9px] font-bold text-white">{i + 1}</span>
+
+                                                            if (isCivicTask) {
+                                                                rowTone = done
+                                                                    ? 'bg-emerald-500/10 border border-emerald-500/20'
+                                                                    : isNow
+                                                                        ? 'bg-emerald-500/10 border border-emerald-500/30'
+                                                                        : isInactiveTask
+                                                                            ? 'bg-slate-800/25 border border-slate-700/20'
+                                                                            : 'bg-slate-800/40 border border-slate-700/30';
+                                                                dotTone = done
+                                                                    ? 'bg-emerald-500'
+                                                                    : isNow
+                                                                        ? 'bg-emerald-500 animate-pulse'
+                                                                        : 'bg-emerald-700/80';
+                                                                titleTone = done
+                                                                    ? 'text-emerald-400 line-through opacity-70'
+                                                                    : isNow
+                                                                        ? 'text-emerald-200'
+                                                                        : 'text-emerald-400';
+                                                                descTone = done
+                                                                    ? 'text-emerald-400/50'
+                                                                    : isNow
+                                                                        ? 'text-emerald-300/80'
+                                                                        : 'text-slate-500';
+                                                            }
+
+                                                            return (
+                                                                <div key={task.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${rowTone}`}>
+                                                                    <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${dotTone}`}>
+                                                                        {done ? (
+                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                        ) : isGlobal ? (
+                                                                            <span className="material-symbols-outlined text-[11px] text-white">{icon}</span>
+                                                                        ) : (
+                                                                            <span className="text-[9px] font-bold text-white">{i + 1}</span>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className={`text-[13px] font-bold leading-tight ${titleTone}`}>
+                                                                                <span className="inline-flex items-center gap-1.5">
+                                                                                    {!isGlobal && <span className="material-symbols-outlined text-[14px] align-middle">{icon}</span>}
+                                                                                    {task.label}
+                                                                                </span>
+                                                                            </span>
+                                                                            {isGlobal && (
+                                                                                <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
+                                                                            )}
+                                                                            {isNow && (
+                                                                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest flex-shrink-0 ${isGlobal ? 'bg-sky-500/20 text-sky-200' : 'bg-sky-500/20 text-sky-300'}`}>Ahora</span>
                                                                             )}
                                                                         </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                                <span className={`text-[13px] font-bold leading-tight ${titleTone}`}>{task.label}</span>
-                                                                                {isGlobal && (
-                                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
-                                                                                )}
-                                                                                {isNow && (
-                                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest flex-shrink-0 bg-sky-500/20 text-sky-300">Ahora</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <p className={`text-[11px] leading-snug mt-0.5 ${descTone}`}>{task.desc}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            ) : card.role !== 'pilot' ? (
-                                                <div className="mt-3 space-y-2">
-                                                    <div className="flex items-center gap-2 px-1 pt-1">
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                        <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Línea operativa</span>
-                                                        <div className="flex-1 h-px bg-slate-700/60" />
-                                                    </div>
 
-                                                    {(card.taskFlow || []).map((task, i) => {
-                                                        const done = task.status === 'completed';
-                                                        const isNow = task.status === 'active';
-                                                        const isGlobal = task.kind === 'global';
-                                                        const isInactiveTask = task.status === 'inactive';
-                                                        const isCivicTask = task.id === 'teacher-civic' || task.id === 'teacher-civic-audio';
-                                                        const icon = task.icon || 'task_alt';
-                                                        const desc = task.desc || 'Pendiente por ejecutar.';
+                                                                        <p className={`text-[11px] leading-snug mt-0.5 ${descTone}`}>{desc}</p>
 
-                                                        let rowTone = isGlobal
-                                                            ? done
-                                                                ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                                                : isNow
-                                                                    ? 'bg-sky-500/10 border border-sky-500/30'
-                                                                    : isInactiveTask
-                                                                        ? 'bg-slate-800/25 border border-slate-700/20'
-                                                                        : 'bg-slate-800/40 border border-slate-700/30'
-                                                            : done
-                                                                ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                                                : isNow
-                                                                    ? 'bg-sky-500/10 border border-sky-500/30'
-                                                                : isInactiveTask
-                                                                        ? 'bg-slate-800/25 border border-slate-700/20'
-                                                                        : 'bg-slate-800/40 border border-slate-700/30';
-
-                                                        let dotTone = isGlobal
-                                                            ? done
-                                                                ? 'bg-emerald-500'
-                                                                : isNow
-                                                                    ? 'bg-sky-500 animate-pulse'
-                                                                    : 'bg-slate-700'
-                                                            : done
-                                                                ? 'bg-emerald-500'
-                                                                : isNow
-                                                                    ? 'bg-sky-500 animate-pulse'
-                                                                    : 'bg-slate-700';
-
-                                                        let titleTone = isGlobal
-                                                            ? done
-                                                                ? 'text-emerald-400 line-through opacity-70'
-                                                                : isNow
-                                                                    ? 'text-white'
-                                                                    : 'text-slate-500'
-                                                            : done
-                                                                ? 'text-emerald-400 line-through opacity-70'
-                                                                : isNow
-                                                                    ? 'text-white'
-                                                                    : 'text-slate-500';
-
-                                                        let descTone = isGlobal
-                                                            ? done
-                                                                ? 'text-emerald-400/50'
-                                                                : isNow
-                                                                    ? 'text-slate-400'
-                                                                    : 'text-slate-600'
-                                                            : done
-                                                                ? 'text-emerald-400/50'
-                                                                : isNow
-                                                                    ? 'text-slate-400'
-                                                                    : 'text-slate-600';
-
-                                                        if (isCivicTask) {
-                                                            rowTone = done
-                                                                ? 'bg-emerald-500/10 border border-emerald-500/20'
-                                                                : isNow
-                                                                    ? 'bg-emerald-500/10 border border-emerald-500/30'
-                                                                    : isInactiveTask
-                                                                        ? 'bg-slate-800/25 border border-slate-700/20'
-                                                                        : 'bg-slate-800/40 border border-slate-700/30';
-                                                            dotTone = done
-                                                                ? 'bg-emerald-500'
-                                                                : isNow
-                                                                    ? 'bg-emerald-500 animate-pulse'
-                                                                    : 'bg-emerald-700/80';
-                                                            titleTone = done
-                                                                ? 'text-emerald-400 line-through opacity-70'
-                                                                : isNow
-                                                                    ? 'text-emerald-200'
-                                                                    : 'text-emerald-400';
-                                                            descTone = done
-                                                                ? 'text-emerald-400/50'
-                                                                : isNow
-                                                                    ? 'text-emerald-300/80'
-                                                                    : 'text-slate-500';
-                                                        }
-
-                                                        return (
-                                                            <div key={task.id} className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-all duration-300 ${rowTone}`}>
-                                                                <div className={`size-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${dotTone}`}>
-                                                                    {done ? (
-                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    ) : isGlobal ? (
-                                                                        <span className="material-symbols-outlined text-[11px] text-white">{icon}</span>
-                                                                    ) : (
-                                                                        <span className="text-[9px] font-bold text-white">{i + 1}</span>
-                                                                    )}
-                                                                </div>
-
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                        <span className={`text-[13px] font-bold leading-tight ${titleTone}`}>
-                                                                            <span className="inline-flex items-center gap-1.5">
-                                                                                {!isGlobal && <span className="material-symbols-outlined text-[14px] align-middle">{icon}</span>}
-                                                                                {task.label}
-                                                                            </span>
-                                                                        </span>
-                                                                        {isGlobal && (
-                                                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest bg-sky-500/20 text-sky-200">Global</span>
+                                                                        {task.id === 'teacher-civic' && done && card.civicProgress?.at && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.civicProgress.at)}</p>
                                                                         )}
-                                                                        {isNow && (
-                                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest flex-shrink-0 ${isGlobal ? 'bg-sky-500/20 text-sky-200' : 'bg-sky-500/20 text-sky-300'}`}>Ahora</span>
+
+                                                                        {task.id === 'teacher-civic-audio' && done && task.audioUploadedAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">audio enviado a las {fmtClock(task.audioUploadedAt)}</p>
+                                                                        )}
+
+                                                                        {task.id === 'teacher-civic-audio' && task.audioUrl && (
+                                                                            <div className="mt-2">
+                                                                                <TimelineVoicePlayer
+                                                                                    url={task.audioUrl}
+                                                                                    duration={task.audioDurationSec}
+                                                                                    label="Evidencia de audio cívico"
+                                                                                    onOpenViewer={openEvidenceViewer}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+
+                                                                        {task.id === 'teacher-operation-ready' && done && task.readyAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">confirmado a las {fmtClock(task.readyAt)}</p>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-civic-video' && done && task.videoUploadedAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">video enviado a las {fmtClock(task.videoUploadedAt)}</p>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-civic-video' && task.videoUrl && (
+                                                                            <div className="mt-2">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => openEvidenceViewer(task.videoUrl, { label: 'Evidencia de video cívico', typeHint: 'video' })}
+                                                                                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/85 hover:bg-slate-700 transition-colors text-xs"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span>
+                                                                                    <span className="text-slate-200 font-semibold">Ver evidencia de video</span>
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-parking' && done && card.parkingProgress?.parkedAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.parkingProgress.parkedAt)}</p>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-parking' && card.parkingProgress?.hasPhoto && (
+                                                                            <div className="mt-2 flex items-start gap-2">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="relative group cursor-pointer flex-shrink-0"
+                                                                                    onClick={() => openEvidenceViewer(card.parkingProgress.photoUrl, { label: 'Evidencia de vehículo', typeHint: 'image' })}
+                                                                                >
+                                                                                    <img src={card.parkingProgress.photoUrl} alt="Evidencia vehículo" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
+                                                                                    <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
+                                                                                        <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                                                                                    </div>
+                                                                                </button>
+                                                                                <div className="pt-0.5">
+                                                                                    <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
+                                                                                    {card.parkingProgress.photoAt && (
+                                                                                        <p className="text-[9px] text-slate-600">a las {fmtClock(card.parkingProgress.photoAt)}</p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-ad-wall' && done && card.adWallProgress?.installedAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.adWallProgress.installedAt)}</p>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-ad-wall' && card.adWallProgress?.hasPhoto && (
+                                                                            <div className="mt-2 flex items-start gap-2">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="relative group cursor-pointer flex-shrink-0"
+                                                                                    onClick={() => openEvidenceViewer(card.adWallProgress.photoUrl, { label: 'Evidencia lona publicitaria', typeHint: 'image' })}
+                                                                                >
+                                                                                    <img src={card.adWallProgress.photoUrl} alt="Evidencia lona publicitaria" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
+                                                                                    <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
+                                                                                        <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                                                                                    </div>
+                                                                                </button>
+                                                                                <div className="pt-0.5">
+                                                                                    <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
+                                                                                    {card.adWallProgress.photoAt && (
+                                                                                        <p className="text-[9px] text-slate-600">a las {fmtClock(card.adWallProgress.photoAt)}</p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-stand-photo' && task.photoUrl && (
+                                                                            <div className="mt-2 flex items-start gap-2">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="relative group cursor-pointer flex-shrink-0"
+                                                                                    onClick={() => openEvidenceViewer(task.photoUrl, { label: 'Foto final del stand', typeHint: 'image' })}
+                                                                                >
+                                                                                    <img src={task.photoUrl} alt="Foto final del stand" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
+                                                                                    <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
+                                                                                        <span className="material-symbols-outlined text-[10px]">photo_camera</span>
+                                                                                    </div>
+                                                                                </button>
+                                                                                <div className="pt-0.5">
+                                                                                    <p className="text-[10px] font-bold text-emerald-400/70">Foto registrada</p>
+                                                                                    {task.photoAt && (
+                                                                                        <p className="text-[9px] text-slate-600">a las {fmtClock(task.photoAt)}</p>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {task.id === 'assistant-operation-ready' && done && task.readyAt && (
+                                                                            <p className="text-[10px] text-slate-600 mt-0.5">confirmado a las {fmtClock(task.readyAt)}</p>
                                                                         )}
                                                                     </div>
-
-                                                                    <p className={`text-[11px] leading-snug mt-0.5 ${descTone}`}>{desc}</p>
-
-                                                                    {task.id === 'teacher-civic' && done && card.civicProgress?.at && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.civicProgress.at)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'teacher-civic-audio' && done && task.audioUploadedAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">audio enviado a las {fmtClock(task.audioUploadedAt)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'teacher-civic-audio' && task.audioUrl && (
-                                                                        <div className="mt-2">
-                                                                            <TimelineVoicePlayer
-                                                                                url={task.audioUrl}
-                                                                                duration={task.audioDurationSec}
-                                                                                label="Evidencia de audio cívico"
-                                                                                onOpenViewer={openEvidenceViewer}
-                                                                            />
-                                                                        </div>
-                                                                    )}
-
-                                                                    {task.id === 'teacher-operation-ready' && done && task.readyAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">confirmado a las {fmtClock(task.readyAt)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-civic-video' && done && task.videoUploadedAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">video enviado a las {fmtClock(task.videoUploadedAt)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-civic-video' && task.videoUrl && (
-                                                                        <div className="mt-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => openEvidenceViewer(task.videoUrl, { label: 'Evidencia de video cívico', typeHint: 'video' })}
-                                                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700/80 bg-slate-800/85 hover:bg-slate-700 transition-colors text-xs"
-                                                                            >
-                                                                                <span className="material-symbols-outlined text-sm text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>play_circle</span>
-                                                                                <span className="text-slate-200 font-semibold">Ver evidencia de video</span>
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-parking' && done && card.parkingProgress?.parkedAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.parkingProgress.parkedAt)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-parking' && card.parkingProgress?.hasPhoto && (
-                                                                        <div className="mt-2 flex items-start gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                className="relative group cursor-pointer flex-shrink-0"
-                                                                                onClick={() => openEvidenceViewer(card.parkingProgress.photoUrl, { label: 'Evidencia de vehículo', typeHint: 'image' })}
-                                                                            >
-                                                                                <img src={card.parkingProgress.photoUrl} alt="Evidencia vehículo" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
-                                                                                <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
-                                                                                    <span className="material-symbols-outlined text-[10px]">photo_camera</span>
-                                                                                </div>
-                                                                            </button>
-                                                                            <div className="pt-0.5">
-                                                                                <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
-                                                                                {card.parkingProgress.photoAt && (
-                                                                                    <p className="text-[9px] text-slate-600">a las {fmtClock(card.parkingProgress.photoAt)}</p>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-ad-wall' && done && card.adWallProgress?.installedAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">a las {fmtClock(card.adWallProgress.installedAt)}</p>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-ad-wall' && card.adWallProgress?.hasPhoto && (
-                                                                        <div className="mt-2 flex items-start gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                className="relative group cursor-pointer flex-shrink-0"
-                                                                                onClick={() => openEvidenceViewer(card.adWallProgress.photoUrl, { label: 'Evidencia lona publicitaria', typeHint: 'image' })}
-                                                                            >
-                                                                                <img src={card.adWallProgress.photoUrl} alt="Evidencia lona publicitaria" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
-                                                                                <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
-                                                                                    <span className="material-symbols-outlined text-[10px]">photo_camera</span>
-                                                                                </div>
-                                                                            </button>
-                                                                            <div className="pt-0.5">
-                                                                                <p className="text-[10px] font-bold text-emerald-400/70">Evidencia recibida</p>
-                                                                                {card.adWallProgress.photoAt && (
-                                                                                    <p className="text-[9px] text-slate-600">a las {fmtClock(card.adWallProgress.photoAt)}</p>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-stand-photo' && task.photoUrl && (
-                                                                        <div className="mt-2 flex items-start gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                className="relative group cursor-pointer flex-shrink-0"
-                                                                                onClick={() => openEvidenceViewer(task.photoUrl, { label: 'Foto final del stand', typeHint: 'image' })}
-                                                                            >
-                                                                                <img src={task.photoUrl} alt="Foto final del stand" className="w-24 h-16 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" />
-                                                                                <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/70 text-[8px] text-white font-bold inline-flex items-center">
-                                                                                    <span className="material-symbols-outlined text-[10px]">photo_camera</span>
-                                                                                </div>
-                                                                            </button>
-                                                                            <div className="pt-0.5">
-                                                                                <p className="text-[10px] font-bold text-emerald-400/70">Foto registrada</p>
-                                                                                {task.photoAt && (
-                                                                                    <p className="text-[9px] text-slate-600">a las {fmtClock(task.photoAt)}</p>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-
-                                                                    {task.id === 'assistant-operation-ready' && done && task.readyAt && (
-                                                                        <p className="text-[10px] text-slate-600 mt-0.5">confirmado a las {fmtClock(task.readyAt)}</p>
-                                                                    )}
                                                                 </div>
+                                                            );
+                                                        })}
+
+                                                        <div className="flex items-center gap-2 mt-1 px-1">
+                                                            <div className="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden">
+                                                                <div className="h-full rounded-full transition-all duration-500 bg-sky-400"
+                                                                    style={{ width: `${flowProgressPct}%` }} />
                                                             </div>
-                                                        );
-                                                    })}
-
-                                                    <div className="flex items-center gap-2 mt-1 px-1">
-                                                        <div className="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden">
-                                                            <div className="h-full rounded-full transition-all duration-500 bg-sky-400"
-                                                                style={{ width: `${flowProgressPct}%` }} />
+                                                            <span className="text-[10px] font-bold text-slate-500">
+                                                                {`${flowCompleted} de ${flowTotal}`}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-[10px] font-bold text-slate-500">
-                                                            {`${flowCompleted} de ${flowTotal}`}
-                                                        </span>
                                                     </div>
-                                                </div>
-                                            ) : null)}
+                                                ) : null)}
                                             </div>
                                         )}
 
@@ -5409,14 +5408,13 @@ export default function SupervisorDashboard() {
                                                                     <span className="material-symbols-outlined text-[14px] text-slate-600">radio_button_unchecked</span>
                                                                 )}
 
-                                                                <span className={`text-[12px] ${
-                                                                    isInactive
+                                                                <span className={`text-[12px] ${isInactive
                                                                         ? 'text-slate-500'
                                                                         : isDone
-                                                                        ? 'text-emerald-300/90'
-                                                                        : isActive
-                                                                            ? 'text-white font-semibold'
-                                                                            : 'text-slate-500'
+                                                                            ? 'text-emerald-300/90'
+                                                                            : isActive
+                                                                                ? 'text-white font-semibold'
+                                                                                : 'text-slate-500'
                                                                     }`}>
                                                                     {task.label}
                                                                 </span>

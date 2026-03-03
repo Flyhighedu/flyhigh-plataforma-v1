@@ -991,6 +991,9 @@ export default function StaffOperationLegacy({
             return;
         }
 
+        // [FIX #7] Snapshot the current activeFlight before the edit to prevent state-wipe
+        const activeFlightSnapshot = activeFlight;
+
         setIsSavingFlightEdit(true);
 
         try {
@@ -1040,7 +1043,25 @@ export default function StaffOperationLegacy({
             localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
             setFlightLogs(updatedLogs);
             setFlightEditModal(null);
-            onRefresh && onRefresh();
+
+            // [FIX #7] Restore activeFlight if it was wiped by the re-render cascade
+            // Use a microtask to ensure this runs after any intermediate state updates
+            setTimeout(() => {
+                setActiveFlight((current) => {
+                    if (current === null && activeFlightSnapshot !== null) {
+                        console.log('[FIX #7] Restoring active flight after edit');
+                        persistActiveFlightCache(activeFlightSnapshot);
+                        return activeFlightSnapshot;
+                    }
+                    return current;
+                });
+            }, 50);
+
+            // Defer onRefresh to prevent parent re-render from wiping activeFlight
+            if (onRefresh) {
+                setTimeout(() => onRefresh(), 200);
+            }
+
             alert('Ajuste de alumnos guardado y sincronizado.');
         } catch (error) {
             console.error('Error editing flight students:', error);

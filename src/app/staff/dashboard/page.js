@@ -546,7 +546,7 @@ export default function StaffDashboard() {
     const [teacherCivicPanelOpen, setTeacherCivicPanelOpen] = useState(false);
     const [teacherCivicPanelDismissed, setTeacherCivicPanelDismissed] = useState(false);
     const [assistantCivicPanelDismissed, setAssistantCivicPanelDismissed] = useState(false);
-    const [civicToastMessage, setCivicToastMessage] = useState('');
+    const [civicModalVisible, setCivicModalVisible] = useState(false);
     const prevCivicNotifiedRef = useRef(false);
 
     const profileRef = useRef(profile);
@@ -656,14 +656,16 @@ export default function StaffDashboard() {
         }
     }, [todaySchool?.meta]);
 
-    // ── Phase 1: Toast notification for Auxiliary when teacher confirms civic act ──
+    // ── Phase 1: Full-screen modal notification for Auxiliary when teacher confirms civic act ──
     useEffect(() => {
         if (profile?.role !== 'assistant') return;
         const meta = parseMeta(todaySchool?.meta);
         const isNotified = meta.teacher_civic_notified === true;
 
         if (isNotified && !prevCivicNotifiedRef.current) {
-            setCivicToastMessage('El acto cívico comenzará pronto. Ten lista la cámara DJI Osmo para los mejores momentos.');
+            // Set ref FIRST to prevent re-triggers from meta flicker
+            prevCivicNotifiedRef.current = true;
+            setCivicModalVisible(true);
             // Haptic: double vibration
             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
             // Audio: notification beep
@@ -686,14 +688,10 @@ export default function StaffDashboard() {
                 new Audio('data:audio/wav;base64,' + btoa(bin)).play().catch(() => { });
             } catch { }
         }
-        prevCivicNotifiedRef.current = isNotified;
+        if (!isNotified) {
+            prevCivicNotifiedRef.current = false;
+        }
     }, [todaySchool?.meta, profile?.role]);
-
-    useEffect(() => {
-        if (!civicToastMessage) return;
-        const timer = setTimeout(() => setCivicToastMessage(''), 5000);
-        return () => clearTimeout(timer);
-    }, [civicToastMessage]);
 
     useEffect(() => {
         setMounted(true);
@@ -1624,28 +1622,61 @@ export default function StaffDashboard() {
         <>
             <DependencyTransitionOverlay overlayData={overlayData} />
             {content}
-            {civicToastMessage && (
+            {civicModalVisible && (
                 <div
-                    className="fixed bottom-6 left-4 right-4 z-[200] max-w-sm mx-auto rounded-2xl bg-white border border-gray-100 p-4 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex items-start gap-3.5"
-                    style={{ animation: 'civicToastSlideUp 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 200,
+                        backgroundColor: 'rgba(0,0,0,0.4)',
+                        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 24
+                    }}
                 >
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#2563EB', fontVariationSettings: "'FILL' 1" }}>photo_camera</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="m-0 text-[13px] font-extrabold text-slate-800 mb-0.5">Acto Cívico</p>
-                        <p className="m-0 text-[12px] text-gray-500 leading-snug">{civicToastMessage}</p>
-                    </div>
-                    <button
-                        onClick={() => setCivicToastMessage('')}
-                        className="shrink-0 mt-0.5 text-gray-300 hover:text-gray-500 transition-colors"
-                        aria-label="Cerrar"
+                    <div
+                        className="animate-in zoom-in-95 duration-300"
+                        style={{
+                            backgroundColor: 'white', borderRadius: 24, padding: 28,
+                            width: '100%', maxWidth: 340, textAlign: 'center',
+                            boxShadow: '0 25px 60px -12px rgba(0,0,0,0.25)'
+                        }}
                     >
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                    </button>
+                        <button
+                            onClick={() => setCivicModalVisible(false)}
+                            aria-label="Cerrar"
+                            style={{
+                                position: 'absolute', top: 12, right: 12,
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: '#94a3b8', padding: 4
+                            }}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+                        </button>
+                        <div style={{
+                            width: 64, height: 64, borderRadius: '50%',
+                            backgroundColor: '#EFF6FF',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 16px'
+                        }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#2563EB', fontVariationSettings: "'FILL' 1" }}>photo_camera</span>
+                        </div>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Acto Cívico</h3>
+                        <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px', lineHeight: 1.5 }}>
+                            El acto cívico comenzará pronto. Ten lista la cámara DJI Osmo para los mejores momentos.
+                        </p>
+                        <button
+                            onClick={() => setCivicModalVisible(false)}
+                            style={{
+                                width: '100%', padding: '14px 0', borderRadius: 14,
+                                background: '#0f172a', color: 'white', border: 'none',
+                                fontWeight: 700, fontSize: 15, cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(15,23,42,0.3)'
+                            }}
+                        >
+                            Entendido
+                        </button>
+                    </div>
                 </div>
             )}
-            <style>{`@keyframes civicToastSlideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </>
     );
 

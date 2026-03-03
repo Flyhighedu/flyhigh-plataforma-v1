@@ -306,13 +306,19 @@ export default function SyncHeader({
         waitingForRole = 'AUXILIAR';
     } else if (effectiveMissionState === 'waiting_unload_assignment') {
         waitingForRole = 'DOCENTE';
+    } else if (['OPERATION', 'operation', 'PILOT_OPERATION'].includes(effectiveMissionState)) {
+        waitingForRole = null; // Operation phase — no waiting, show phase label
+    } else if (effectiveMissionState === 'dismantling') {
+        waitingForRole = null; // Dismantling phase label
     }
 
     const isTeacherGatekeeper = role === 'teacher' && effectiveMissionState === 'IN_ROUTE';
     const isAuxDropzoneGatekeeper = role === 'assistant' && effectiveMissionState === 'waiting_dropzone';
     const isTeacherAssignmentGatekeeper = role === 'teacher' && effectiveMissionState === 'waiting_unload_assignment';
+    const isOperationPhase = ['OPERATION', 'operation', 'PILOT_OPERATION', 'seat_deployment', 'post_unload_coordination', 'unload'].includes(effectiveMissionState);
+    const isDismantlingState = effectiveMissionState === 'dismantling';
 
-    let waitLabel = `ESPERANDO ${waitingForRole}`;
+    let waitLabel = waitingForRole ? `ESPERANDO ${waitingForRole}` : '';
 
     // Strict Chip Logic per Phase 12-B
     if (effectiveMissionState === 'waiting_unload_assignment') {
@@ -325,11 +331,14 @@ export default function SyncHeader({
         waitLabel = 'ESPERANDO TU CONFIRMACIÓN';
     } else if (isPilotGatekeeper || isAuxGatekeeper) {
         waitLabel = 'TE ESPERAN';
+    } else if (isOperationPhase) {
+        waitLabel = 'EN OPERACIÓN';
+    } else if (isDismantlingState && !dismantlingChipText) {
+        waitLabel = 'DESMONTAJE';
     }
 
     // Only show "EN RUTA" if strictly on a wait screen WITHOUT a waitPhase (e.g. Map Screen)
-    // Hide chip entirely for 'unload' state
-    const shouldHideChip = effectiveMissionState === 'unload';
+    const shouldHideChip = false;
     const chipText = shouldHideChip ? null : ((isWaitScreen && !waitPhase) ? 'EN RUTA' : waitLabel);
     const civicChipText =
         role === 'teacher'
@@ -347,6 +356,9 @@ export default function SyncHeader({
         isAuxGatekeeper ||
         isTeacherGatekeeper ||
         isAuxDropzoneGatekeeper ||
+        isTeacherAssignmentGatekeeper ||
+        isOperationPhase ||
+        isDismantlingState ||
         !!waitPhase
     );
     const normalizedChipText = String(finalChipText || '').trim().toUpperCase();
@@ -921,8 +933,8 @@ export default function SyncHeader({
 
                                     {/* Step 1: Notify Osvaldo */}
                                     <div className={`rounded-xl p-4 mb-3 flex items-start gap-3 border transition-all duration-300 ${standbyNotified
-                                            ? 'bg-emerald-50 border-emerald-200'
-                                            : 'bg-gray-50 border-gray-100'
+                                        ? 'bg-emerald-50 border-emerald-200'
+                                        : 'bg-gray-50 border-gray-100'
                                         }`}>
                                         <div className={`p-2 rounded-lg shrink-0 ${standbyNotified ? 'bg-emerald-100' : 'bg-blue-100'
                                             }`}>
@@ -943,8 +955,8 @@ export default function SyncHeader({
 
                                     {/* Step 2: Info */}
                                     <div className={`rounded-xl p-4 mb-6 flex items-start gap-3 border transition-all duration-300 ${standbyNotified
-                                            ? 'bg-gray-50 border-gray-100'
-                                            : 'bg-gray-50/50 border-gray-100/50 opacity-50'
+                                        ? 'bg-gray-50 border-gray-100'
+                                        : 'bg-gray-50/50 border-gray-100/50 opacity-50'
                                         }`}>
                                         <div className={`p-2 rounded-lg shrink-0 ${standbyNotified ? 'bg-blue-100' : 'bg-gray-100'
                                             }`}>
@@ -963,8 +975,8 @@ export default function SyncHeader({
                                         onClick={handleNotifyStandby}
                                         disabled={isNotifyingSaving || standbyNotified}
                                         className={`w-full transition-all font-semibold py-4 rounded-xl flex items-center justify-center gap-2 text-base mb-3 ${standbyNotified
-                                                ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 cursor-default'
-                                                : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white shadow-lg shadow-blue-500/30'
+                                            ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 cursor-default'
+                                            : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white shadow-lg shadow-blue-500/30'
                                             }`}
                                         style={{ opacity: standbyNotified ? 0.85 : (isNotifyingSaving ? 0.65 : 1) }}
                                     >

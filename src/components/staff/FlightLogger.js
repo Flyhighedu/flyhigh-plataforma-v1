@@ -82,6 +82,7 @@ export default function FlightLogger({
         return Number.isFinite(fromProp) && fromProp > 0 ? fromProp : null;
     });
     const [isLanding, setIsLanding] = useState(false);
+    const [showLandConfirm, setShowLandConfirm] = useState(false);
 
     const timerRef = useRef(null);
     const isLandingRef = useRef(false);
@@ -151,6 +152,16 @@ export default function FlightLogger({
         }
     };
 
+    const handleLandRequest = () => {
+        if (status !== 'active' || !startTime) return;
+        if (isLandingRef.current) return;
+        const currentFlightId = activeFlightId || `flight-${startTime}`;
+        if (lastCompletedFlightIdRef.current && String(lastCompletedFlightIdRef.current) === String(currentFlightId)) {
+            return;
+        }
+        setShowLandConfirm(true);
+    };
+
     const handleLandAndSave = () => {
         if (status !== 'active' || !startTime) return;
 
@@ -161,8 +172,7 @@ export default function FlightLogger({
             return;
         }
 
-        if (!confirm("¿Aterrizar y Guardar Vuelo?")) return;
-
+        setShowLandConfirm(false);
         isLandingRef.current = true;
         setIsLanding(true);
 
@@ -204,7 +214,6 @@ export default function FlightLogger({
                 setActiveFlightNumberState(null);
                 setIsLanding(false);
                 isLandingRef.current = false;
-                alert("¡Vuelo Registrado Exitosamente!");
             });
     };
 
@@ -212,6 +221,9 @@ export default function FlightLogger({
         if (isLandingRef.current) return;
 
         if (confirm("¿Cancelar este vuelo? No se guardará nada.")) {
+            // Immediately stop the timer to prevent any lingering ticks
+            clearInterval(timerRef.current);
+
             if (typeof onFlightCancel === 'function') {
                 onFlightCancel({
                     flightId: activeFlightId || null,
@@ -260,8 +272,8 @@ export default function FlightLogger({
             <div className={`transition-all duration-500 rounded-2xl p-6 flex flex-col items-center justify-center shadow-lg relative overflow-hidden ${isIdle ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white'}`}>
                 {!isIdle && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500 animate-pulse"></div>}
                 <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${isIdle
-                        ? 'bg-white border-slate-200 text-slate-600'
-                        : 'bg-white/10 border-white/20 text-blue-100'
+                    ? 'bg-white border-slate-200 text-slate-600'
+                    : 'bg-white/10 border-white/20 text-blue-100'
                     }`}>
                     {isIdle ? `Siguiente vuelo #${safeNextFlightNumber}` : `Vuelo #${safeActiveFlightNumber} en curso`}
                 </div>
@@ -359,12 +371,12 @@ export default function FlightLogger({
 
                             {/* Land Button (Large) */}
                             <button
-                                onClick={handleLandAndSave}
+                                onClick={handleLandRequest}
                                 disabled={isLanding}
                                 className="col-span-3 h-24 rounded-2xl bg-slate-900 text-white font-bold text-xl shadow-xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 <StopCircle size={32} className="text-red-500" />
-                                ATERRIZAR Y GUARDAR
+                                {isLanding ? 'GUARDANDO...' : 'ATERRIZAR Y GUARDAR'}
                             </button>
                         </div>
 
@@ -387,6 +399,33 @@ export default function FlightLogger({
                     onClose={() => setShowIncidentModal(false)}
                     onSave={(inc) => setIncidents([...incidents, inc])}
                 />
+            )}
+
+            {/* Land Confirmation Modal */}
+            {showLandConfirm && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 200, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div className="animate-in zoom-in-95 duration-200" style={{ backgroundColor: 'white', borderRadius: 24, padding: 28, width: '100%', maxWidth: 340, textAlign: 'center' }}>
+                        <div style={{ width: 56, height: 56, borderRadius: '50%', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                            <StopCircle size={28} style={{ color: '#EF4444' }} />
+                        </div>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>¿Aterrizar y Guardar?</h3>
+                        <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 24px' }}>Se cerrará el vuelo actual y se registrará en la bitácora.</p>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button
+                                onClick={() => setShowLandConfirm(false)}
+                                style={{ flex: 1, padding: '14px 0', borderRadius: 14, border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleLandAndSave}
+                                style={{ flex: 1, padding: '14px 0', borderRadius: 14, background: '#0f172a', color: 'white', border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(15,23,42,0.3)' }}
+                            >
+                                Confirmar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

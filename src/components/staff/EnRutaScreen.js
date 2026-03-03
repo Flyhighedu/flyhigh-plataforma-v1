@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Truck, MapPin, Navigation, Camera, QrCode, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { Truck, MapPin, Navigation, Camera, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ArrivalPhotoCapture from './ArrivalPhotoCapture';
-import { QrGenerator, QrScanner } from './QrSyncScanner';
 import IncidentReporter from './IncidentReporter';
 import SyncHeader from './SyncHeader';
 import EnRutaStitchLayout from './EnRutaStitchLayout';
@@ -20,10 +19,9 @@ export default function EnRutaScreen({
     onRefresh
 }) {
     const [showCamera, setShowCamera] = useState(false);
-    const [showQrGen, setShowQrGen] = useState(false);
-    const [showQrScan, setShowQrScan] = useState(false);
     const [showIncident, setShowIncident] = useState(false);
     const [loadingAction, setLoadingAction] = useState(false);
+    const [photoUploadFailed, setPhotoUploadFailed] = useState(false);
 
     // Animation state
     const [dotIndex, setDotIndex] = useState(0);
@@ -71,15 +69,12 @@ export default function EnRutaScreen({
     const handleArrivalPhotoDone = async (offline = false) => {
         setShowCamera(false);
         if (offline) {
-            setShowQrGen(true);
+            setPhotoUploadFailed(true);
         }
     };
 
-    const handleQrScanSuccess = async (data) => {
-        setShowQrScan(false);
-        if (data.type === 'ARRIVAL_FACADE_PHOTO_TAKEN') {
-            window.location.reload();
-        }
+    const handleManualRelease = () => {
+        onStateChange('OPERATION');
     };
 
     const handleIncidentSave = async (incidentData) => {
@@ -183,17 +178,17 @@ export default function EnRutaScreen({
                         <AlertTriangle size={14} />
                         REPORTE DE INCIDENTE
                     </button>
-                    {role === 'assistant' && (
+                    {photoUploadFailed && (
                         <button
-                            onClick={() => setShowQrGen(true)}
+                            onClick={handleManualRelease}
                             style={{
                                 flex: 1,
                                 padding: '12px',
-                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                backgroundColor: 'rgba(245,158,11,0.2)',
                                 backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(255,255,255,0.2)',
+                                border: '1px solid rgba(245,158,11,0.4)',
                                 borderRadius: 16,
-                                color: 'white',
+                                color: '#fbbf24',
                                 fontSize: 12,
                                 fontWeight: 700,
                                 display: 'flex',
@@ -202,8 +197,8 @@ export default function EnRutaScreen({
                                 gap: 8
                             }}
                         >
-                            <QrCode size={14} />
-                            SINCRONIZAR (QR)
+                            <AlertTriangle size={14} />
+                            FORZAR LIBERACIÓN MANUAL
                         </button>
                     )}
                 </div>
@@ -231,34 +226,11 @@ export default function EnRutaScreen({
             </footer>
 
             {/* Modals & Overlays */}
-            {showQrScan && (
-                <QrScanner
-                    onScanSuccess={handleQrScanSuccess}
-                    onClose={() => setShowQrScan(false)}
-                />
-            )}
-
             {showIncident && (
                 <IncidentReporter
                     onClose={() => setShowIncident(false)}
                     onSave={handleIncidentSave}
                 />
-            )}
-
-            {showQrGen && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: 'rgba(0,0,0,0.8)', padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ backgroundColor: 'white', borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 }}>
-                        <div style={{ flex: 1 }}>
-                            <QrGenerator journeyId={journeyId} userId={userId} payload={{ type: 'ARRIVAL_FACADE_PHOTO_TAKEN' }} />
-                        </div>
-                        <button
-                            onClick={() => setShowQrGen(false)}
-                            style={{ width: '100%', padding: '16px', backgroundColor: '#3B82F6', color: 'white', borderRadius: 12, fontWeight: 800, border: 'none', marginTop: 16 }}
-                        >
-                            CERRAR
-                        </button>
-                    </div>
-                </div>
             )}
         </div>
     );

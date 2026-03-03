@@ -512,52 +512,62 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
 
                         {/* 2. Mission Confirmation */}
                         {items.filter(i => i.type === 'mission_chips').map(item => {
-                            const chips = [
-                                { id: 'school', label: missionInfo?.school_name || 'Escuela', icon: 'school' },
-                                { id: 'address', label: missionInfo?.colonia || 'Dirección', icon: 'location_on' }
-                            ];
-                            const isAllChipsDone = chips.every(c => missionChips[c.id]);
+                            const isConfirmed = missionChips['school'] && missionChips['address'];
+
+                            const handleToggleMission = () => {
+                                const newVal = !isConfirmed;
+                                setMissionChips({ school: newVal, address: newVal });
+                                if (!preview) {
+                                    const supabase = createClient();
+                                    supabase.from('staff_prep_events').insert({
+                                        journey_id: journeyId, user_id: userId, event_type: 'mission_chip',
+                                        payload: { chip: 'mission_bulk', value: newVal }
+                                    }).then(() => { });
+                                }
+                            };
 
                             return (
-                                <div key={item.id} style={{
-                                    backgroundColor: 'white', borderRadius: 16, padding: '20px',
-                                    border: isAllChipsDone ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                                }}>
-                                    <h4 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span className="material-symbols-outlined" style={{ color: isAllChipsDone ? '#22c55e' : '#64748b' }}>
-                                            {isAllChipsDone ? 'verified' : 'fact_check'}
+                                <button
+                                    key={item.id}
+                                    onClick={handleToggleMission}
+                                    style={{
+                                        width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                                        padding: '16px 18px', borderRadius: 16,
+                                        backgroundColor: isConfirmed ? '#f0fdf4' : 'white',
+                                        border: isConfirmed ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                        cursor: 'pointer', textAlign: 'left',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                                        backgroundColor: isConfirmed ? '#dcfce7' : '#EFF6FF',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 22, color: isConfirmed ? '#22c55e' : '#2563EB', fontVariationSettings: `'FILL' ${isConfirmed ? 1 : 0}` }}>
+                                            {isConfirmed ? 'verified' : 'fact_check'}
                                         </span>
-                                        Confirmación de misión
-                                    </h4>
-
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                                        {chips.map(chip => (
-                                            <button
-                                                key={chip.id}
-                                                onClick={() => toggleMissionChip(chip.id)}
-                                                style={{
-                                                    flex: 1, minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                                    padding: '14px', borderRadius: 12, border: 'none',
-                                                    backgroundColor: missionChips[chip.id] ? '#f0fdf4' : '#f8fafc',
-                                                    color: missionChips[chip.id] ? '#166534' : '#64748b',
-                                                    fontWeight: 600, fontSize: 13,
-                                                    transition: 'all 0.2s', cursor: 'pointer',
-                                                    border: missionChips[chip.id] ? '1px solid #bbf7d0' : '1px solid transparent'
-                                                }}
-                                            >
-                                                <span className="material-symbols-outlined" style={{ fontSize: 18, fontVariationSettings: `\'FILL\' ${missionChips[chip.id] ? 1 : 0}` }}>
-                                                    {chip.icon}
-                                                </span>
-                                                {chip.label}
-                                                {missionChips[chip.id] && <Check size={14} strokeWidth={3} />}
-                                            </button>
-                                        ))}
                                     </div>
-                                    <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12, textAlign: 'center' }}>
-                                        Confirma que el equipo conoce la misión de hoy.
-                                    </p>
-                                </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                                            {missionInfo?.school_name || 'Escuela'}
+                                        </p>
+                                        <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 13, fontVariationSettings: "'FILL' 0, 'wght' 300" }}>location_on</span>
+                                            {missionInfo?.colonia || 'Dirección'}
+                                        </p>
+                                    </div>
+                                    <div style={{
+                                        width: 26, height: 26, borderRadius: 8,
+                                        border: `2px solid ${isConfirmed ? '#22c55e' : '#cbd5e1'}`,
+                                        backgroundColor: isConfirmed ? '#22c55e' : 'transparent',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        transition: 'all 0.2s', flexShrink: 0
+                                    }}>
+                                        {isConfirmed && <Check size={16} color="white" strokeWidth={3} />}
+                                    </div>
+                                </button>
                             );
                         })}
 
@@ -697,48 +707,55 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
 
                                         // --- RENDERIZADO TIPO MISSION CHIPS ---
                                         if (item.type === 'mission_chips') {
-                                            const chips = [
-                                                { id: 'school', label: missionInfo?.school_name || 'Escuela', icon: 'school' },
-                                                { id: 'address', label: missionInfo?.colonia || 'Dirección', icon: 'location_on' }
-                                            ];
-                                            const isAllChipsDone = chips.every(c => missionChips[c.id]);
+                                            const isConfirmed = missionChips['school'] && missionChips['address'];
+
+                                            const handleToggleMission = () => {
+                                                const newVal = !isConfirmed;
+                                                setMissionChips({ school: newVal, address: newVal });
+                                                if (!preview) {
+                                                    const supabase = createClient();
+                                                    supabase.from('staff_prep_events').insert({
+                                                        journey_id: journeyId, user_id: userId, event_type: 'mission_chip',
+                                                        payload: { chip: 'mission_bulk', value: newVal }
+                                                    }).then(() => { });
+                                                }
+                                            };
 
                                             return (
-                                                <div key={item.id} style={{ padding: '16px 0', borderBottom: '1px solid #f8fafc' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: 20, color: isAllChipsDone ? '#22c55e' : '#64748b' }}>
-                                                            {isAllChipsDone ? 'verified_user' : 'info'}
+                                                <button
+                                                    key={item.id}
+                                                    onClick={handleToggleMission}
+                                                    style={{
+                                                        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                                                        padding: '14px 10px', borderRadius: 12,
+                                                        backgroundColor: isConfirmed ? '#f0fdf4' : 'transparent',
+                                                        border: 'none',
+                                                        cursor: 'pointer', textAlign: 'left',
+                                                        borderBottom: '1px solid #f8fafc',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 20, color: isConfirmed ? '#22c55e' : '#64748b' }}>
+                                                        {isConfirmed ? 'verified_user' : 'info'}
+                                                    </span>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', display: 'block' }}>
+                                                            {missionInfo?.school_name || 'Escuela'}
                                                         </span>
-                                                        <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                                                            {item.label}
+                                                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                                                            {missionInfo?.colonia || 'Dirección'}
                                                         </span>
                                                     </div>
-                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                                                        {chips.map(chip => (
-                                                            <button
-                                                                key={chip.id}
-                                                                onClick={() => toggleMissionChip(chip.id)}
-                                                                style={{
-                                                                    flex: 1, minWidth: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                                                                    padding: '12px 10px', borderRadius: 12, border: 'none',
-                                                                    backgroundColor: missionChips[chip.id] ? '#EFF6FF' : '#F1F5F9',
-                                                                    color: missionChips[chip.id] ? '#0066FF' : '#64748b',
-                                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer',
-                                                                    boxShadow: missionChips[chip.id] ? '0 4px 10px -2px rgba(0,102,255,0.2)' : 'none'
-                                                                }}
-                                                            >
-                                                                <span className="material-symbols-outlined" style={{ fontSize: 16, fontVariationSettings: `\'FILL\' ${missionChips[chip.id] ? 1 : 0}` }}>
-                                                                    {chip.icon}
-                                                                </span>
-                                                                <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{chip.label}</span>
-                                                                {missionChips[chip.id] && <Check size={12} strokeWidth={4} />}
-                                                            </button>
-                                                        ))}
+                                                    <div style={{
+                                                        width: 24, height: 24, borderRadius: 8,
+                                                        border: `2px solid ${isConfirmed ? '#22c55e' : '#cbd5e1'}`,
+                                                        backgroundColor: isConfirmed ? '#22c55e' : 'transparent',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        transition: 'all 0.2s'
+                                                    }}>
+                                                        {isConfirmed && <Check size={16} color="white" strokeWidth={3} />}
                                                     </div>
-                                                    <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 12, fontStyle: 'italic', textAlign: 'center' }}>
-                                                        Toca cada chip para confirmar la información de la misión.
-                                                    </p>
-                                                </div>
+                                                </button>
                                             );
                                         }
 
