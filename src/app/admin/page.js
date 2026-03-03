@@ -586,44 +586,38 @@ export default function AdminPage() {
         e.preventDefault();
         setNextSchoolLoading(true);
         try {
-            const schoolData = {
+            const payload = {
                 nombre_escuela: nextSchoolForm.nombre_escuela,
                 colonia: nextSchoolForm.colonia,
                 fecha_programada: nextSchoolForm.fecha_programada,
             };
 
             if (editingSchoolId) {
-                // UPDATE (Editar)
-                const { data, error } = await supabaseNew
-                    .from('proximas_escuelas')
-                    .update(schoolData)
-                    .eq('id', editingSchoolId)
-                    .select()
-                    .single();
+                payload.id = editingSchoolId;
+            }
 
-                if (error) throw error;
+            const res = await fetch('/api/admin/save-school', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
 
-                setNextSchools(prev => prev.map(s => s.id === editingSchoolId ? data : s));
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error del servidor');
+
+            if (editingSchoolId) {
+                setNextSchools(prev => prev.map(s => s.id === editingSchoolId ? result.data : s));
                 setEditingSchoolId(null);
                 alert('Misión actualizada exitosamente');
             } else {
-                // INSERT (Crear)
-                const { data, error } = await supabaseNew
-                    .from('proximas_escuelas')
-                    .insert({ ...schoolData, estatus: 'pendiente' })
-                    .select()
-                    .single();
-
-                if (error) throw error;
-
-                setNextSchools(prev => [...prev, data]);
+                setNextSchools(prev => [...prev, result.data]);
                 alert('Escuela programada exitosamente');
             }
 
             setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '' });
         } catch (err) {
             console.error('Error saving next school:', err);
-            alert('Error al guardar escuela');
+            alert('Error al guardar escuela: ' + (err.message || err));
         } finally {
             setNextSchoolLoading(false);
         }
