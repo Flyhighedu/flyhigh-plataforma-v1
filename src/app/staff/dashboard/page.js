@@ -59,6 +59,8 @@ import ChargingStationScreen from '@/components/staff/ChargingStationScreen';
 import AuxRecordingChargingScreen from '@/components/staff/AuxRecordingChargingScreen';
 import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
 import CheckoutScreen from '@/components/staff/CheckoutScreen';
+import TaskErrorBoundary from '@/components/staff/TaskErrorBoundary';
+import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
@@ -1634,10 +1636,21 @@ export default function StaffDashboard() {
         router.push('/staff/login');
     };
 
+    const contingencyProps = {
+        journeyId,
+        userId,
+        profile,
+        missionState,
+        missionInfo: todaySchool,
+        onRefresh: refreshMission
+    };
+
     const withDependencyOverlay = (content) => (
         <>
             <DependencyTransitionOverlay overlayData={overlayData} />
-            {content}
+            <TaskErrorBoundary>
+                {content}
+            </TaskErrorBoundary>
             {civicModalVisible && (
                 <div
                     style={{

@@ -19,6 +19,7 @@ import PauseMenu from '@/components/staff/PauseMenu';
 import PauseActiveOverlay from '@/components/staff/PauseActiveOverlay';
 import ResumeProtocolModal from '@/components/staff/ResumeProtocolModal';
 import SyncHeader from '@/components/staff/SyncHeader';
+import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 
 const ACTIVE_FLIGHT_KEY = 'flyhigh_active_flight';
@@ -1224,17 +1225,26 @@ export default function StaffOperationLegacy({
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
             {shouldUseSyncHeader && (
-                <SyncHeader
-                    firstName={firstName}
-                    roleName={roleName}
-                    role={currentRole}
+                <ContingencyBypassMenu
                     journeyId={journeyId}
                     userId={userId}
-                    missionInfo={currentMission}
+                    profile={profile}
                     missionState={missionState}
-                    onDemoStart={onRefresh}
-                    onCloseMission={handleCloseDay}
-                />
+                    missionInfo={currentMission}
+                    onRefresh={onRefresh}
+                >
+                    <SyncHeader
+                        firstName={firstName}
+                        roleName={roleName}
+                        role={currentRole}
+                        journeyId={journeyId}
+                        userId={userId}
+                        missionInfo={currentMission}
+                        missionState={missionState}
+                        onDemoStart={onRefresh}
+                        onCloseMission={handleCloseDay}
+                    />
+                </ContingencyBypassMenu>
             )}
 
             {/* Sticky Header (legacy fallback) */}

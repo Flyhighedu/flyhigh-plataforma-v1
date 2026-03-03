@@ -202,6 +202,8 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
             } catch (error) {
                 console.error('Upload failed, keeping offline', error);
                 saveOffline(filename, timestamp);
+                setUploading(false);
+                alert('Error técnico. No te preocupes, guardamos tu foto en el celular. Vuelve a intentarlo o sube una foto diferente.');
             }
         } else {
             saveOffline(filename, timestamp);
