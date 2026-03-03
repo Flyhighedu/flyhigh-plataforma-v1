@@ -346,6 +346,12 @@ function getVisibleTaskKey(snapshot) {
         return 'assistant:civic_parallel';
     }
 
+    // [FIX] Phase-independent fallback: If the assistant hasn't finished the ad wall,
+    // force them back to it regardless of what phase the rest of the team advanced to.
+    if (role === 'assistant' && meta.aux_ready_seat_deployment === true && meta.aux_ad_wall_done !== true) {
+        return 'assistant:ad_wall_install';
+    }
+
     const postGlassesKickoffActive =
         missionState === 'seat_deployment' &&
         meta.global_glasses_done === true;
@@ -2025,6 +2031,17 @@ export default function StaffDashboard() {
                 onBackToTask={() => setAssistantCivicPanelDismissed(true)}
             />
         );
+    }
+
+    // [FIX] Phase-independent fallback: If the assistant hasn't finished the ad wall,
+    // force them back to it regardless of what phase the rest of the team advanced to.
+    // This ensures the Muro task is not skipped when the civic act interrupts and the
+    // Teacher advances the global phase during the interruption.
+    if (profile?.role === 'assistant') {
+        const wallMeta = parseMeta(todaySchool?.meta);
+        if (wallMeta.aux_ready_seat_deployment === true && wallMeta.aux_ad_wall_done !== true) {
+            return withDependencyOverlay(<AuxAdWallInstallScreen {...commonProps} />);
+        }
     }
 
     const operationKickoffMeta = parseMeta(todaySchool?.meta);
