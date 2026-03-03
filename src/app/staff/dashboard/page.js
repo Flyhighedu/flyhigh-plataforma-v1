@@ -1605,7 +1605,9 @@ export default function StaffDashboard() {
             refreshMission();
         } catch (error) {
             console.error('Error iniciando desmontaje y retorno:', error);
-            alert('No se pudo iniciar el flujo de desmontaje y retorno. Intenta nuevamente.');
+            // Re-throw so the awaiting handleCloseDay in StaffOperationLegacy catches it
+            // and shows the error inline in the modal (no orphaned alert)
+            throw error;
         } finally {
             setIsStartingClosureFlow(false);
         }

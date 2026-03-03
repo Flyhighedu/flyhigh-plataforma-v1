@@ -259,6 +259,8 @@ export default function StaffOperationLegacy({
     const [showMenu, setShowMenu] = useState(false);
     const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
     const [closeHoldProgress, setCloseHoldProgress] = useState(0);
+    const [isClosingOperation, setIsClosingOperation] = useState(false);
+    const [closeOperationError, setCloseOperationError] = useState(null);
 
     // Pause State
     const [showPauseMenu, setShowPauseMenu] = useState(false);
@@ -504,13 +506,24 @@ export default function StaffOperationLegacy({
         }
     };
 
-    const handleCloseDay = useCallback(() => {
-        if (onCloseDay) {
-            onCloseDay();
-        } else {
-            router.push('/staff/closure');
+    const handleCloseDay = useCallback(async () => {
+        try {
+            if (onCloseDay) {
+                await onCloseDay();
+            } else {
+                router.push('/staff/closure');
+            }
+            // Only close modal on SUCCESS
+            setShowCloseConfirmModal(false);
+            setShowMenu(false);
+        } catch (err) {
+            // Reset hold state so user can retry
+            closeHoldTriggeredRef.current = false;
+            setCloseHoldProgress(0);
+            setIsClosingOperation(false);
+            setCloseOperationError(err?.message || 'No se pudo finalizar. Intenta nuevamente.');
+            throw err; // Re-throw so finalizeCloseDay also catches
         }
-        setShowMenu(false);
     }, [onCloseDay, router]);
 
     const resetCloseDayHold = useCallback(() => {
@@ -521,6 +534,8 @@ export default function StaffOperationLegacy({
         closeHoldStartedAtRef.current = 0;
         closeHoldTriggeredRef.current = false;
         setCloseHoldProgress(0);
+        setIsClosingOperation(false);
+        setCloseOperationError(null);
     }, []);
 
     const closeCloseConfirmModal = useCallback(() => {
@@ -534,12 +549,17 @@ export default function StaffOperationLegacy({
         resetCloseDayHold();
     }, [resetCloseDayHold]);
 
-    const finalizeCloseDay = useCallback(() => {
+    const finalizeCloseDay = useCallback(async () => {
         if (closeHoldTriggeredRef.current) return;
         closeHoldTriggeredRef.current = true;
         setCloseHoldProgress(100);
-        setShowCloseConfirmModal(false);
-        handleCloseDay();
+        setIsClosingOperation(true);
+        setCloseOperationError(null);
+        try {
+            await handleCloseDay();
+        } catch {
+            // Error already handled inside handleCloseDay (sets closeOperationError)
+        }
     }, [handleCloseDay]);
 
     const handleCloseHoldStart = useCallback((event) => {
@@ -1325,33 +1345,60 @@ export default function StaffOperationLegacy({
                             Esta acción te llevará al flujo de cierre. Para evitar cierres accidentales, mantén presionado 2 segundos.
                         </p>
 
+                        {closeOperationError && (
+                            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+                                <p className="text-xs font-bold text-red-700 m-0">Error de conexión</p>
+                                <p className="text-xs text-red-600 m-0 mt-0.5">{closeOperationError}</p>
+                            </div>
+                        )}
+
                         <div className="mt-5 grid grid-cols-1 gap-2.5">
-                            <button
-                                type="button"
-                                onMouseDown={handleCloseHoldStart}
-                                onMouseUp={handleCloseHoldCancel}
-                                onMouseLeave={handleCloseHoldCancel}
-                                onTouchStart={handleCloseHoldStart}
-                                onTouchEnd={handleCloseHoldCancel}
-                                onTouchCancel={handleCloseHoldCancel}
-                                className="relative overflow-hidden rounded-2xl bg-blue-600 px-4 py-3.5 text-left text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)] transition active:scale-[0.99]"
-                            >
-                                <span className="block text-sm font-extrabold tracking-wide">Operación finalizada</span>
-                                <span className="mt-0.5 block text-xs font-semibold text-blue-100">
-                                    Mantén presionado por 2s para confirmar
-                                </span>
-                                <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
-                                    <span
-                                        className="block h-full rounded-full bg-white transition-[width] duration-75"
-                                        style={{ width: `${closeHoldProgress}%` }}
-                                    />
-                                </span>
-                            </button>
+                            {isClosingOperation ? (
+                                <div className="relative overflow-hidden rounded-2xl bg-blue-700 px-4 py-4 text-center text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)]">
+                                    <span className="inline-flex items-center gap-2 text-sm font-extrabold tracking-wide">
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Procesando...
+                                    </span>
+                                    <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
+                                        <span className="block h-full w-full rounded-full bg-white" />
+                                    </span>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onMouseDown={handleCloseHoldStart}
+                                    onMouseUp={handleCloseHoldCancel}
+                                    onMouseLeave={handleCloseHoldCancel}
+                                    onTouchStart={handleCloseHoldStart}
+                                    onTouchEnd={handleCloseHoldCancel}
+                                    onTouchCancel={handleCloseHoldCancel}
+                                    onTouchMove={(e) => e.preventDefault()}
+                                    style={{ touchAction: 'none' }}
+                                    className="relative overflow-hidden rounded-2xl bg-blue-600 px-4 py-3.5 text-left text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)] transition active:scale-[0.99]"
+                                >
+                                    <span className="block text-sm font-extrabold tracking-wide">
+                                        {closeOperationError ? 'Reintentar' : 'Operación finalizada'}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs font-semibold text-blue-100">
+                                        Mantén presionado por 2s para confirmar
+                                    </span>
+                                    <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
+                                        <span
+                                            className="block h-full rounded-full bg-white transition-[width] duration-75"
+                                            style={{ width: `${closeHoldProgress}%` }}
+                                        />
+                                    </span>
+                                </button>
+                            )}
 
                             <button
                                 type="button"
                                 onClick={closeCloseConfirmModal}
-                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                                disabled={isClosingOperation}
+                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                             >
                                 Cancelar
                             </button>
