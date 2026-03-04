@@ -2064,7 +2064,17 @@ export default function StaffDashboard() {
     if (profile?.role === 'assistant') {
         const wallMeta = parseMeta(todaySchool?.meta);
         if (wallMeta.aux_ready_seat_deployment === true && wallMeta.aux_ad_wall_done !== true) {
-            return withDependencyOverlay(<AuxAdWallInstallScreen {...commonProps} />);
+            return withDependencyOverlay(
+                <AuxAdWallInstallScreen
+                    journeyId={journeyId}
+                    userId={userId}
+                    role={profile?.role}
+                    profile={profile}
+                    missionInfo={todaySchool}
+                    missionState={missionState}
+                    onRefresh={refreshMission}
+                />
+            );
         }
     }
 
