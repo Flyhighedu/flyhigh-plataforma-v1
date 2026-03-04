@@ -1,0 +1,24 @@
+{
+    "name": "FlyHigh Operaciones",
+    "short_name": "FlyHigh Ops",
+    "description": "App de operaciones de campo para el equipo FlyHigh",
+    "icons": [
+        {
+            "src": "/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#2563EB",
+    "background_color": "#f8fafc",
+    "start_url": "/staff/dashboard",
+    "scope": "/staff/",
+    "display": "standalone",
+    "orientation": "portrait"
+}

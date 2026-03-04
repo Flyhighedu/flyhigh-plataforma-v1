@@ -31,6 +31,15 @@ export default function StaffLayout({ children }) {
         };
     }, []);
 
+    // Register Service Worker (staff routes only)
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/staff/' }).catch((err) => {
+                console.warn('[PWA] SW registration failed:', err);
+            });
+        }
+    }, []);
+
     // Cargar perfil de staff
     useEffect(() => {
         if (isLoginPage) {

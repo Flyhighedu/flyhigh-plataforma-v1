@@ -61,10 +61,12 @@ import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
 import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import TaskErrorBoundary from '@/components/staff/TaskErrorBoundary';
 import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
+import PendingSyncBanner from '@/components/staff/PendingSyncBanner';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
 import HeaderHamburgerMenu from '@/components/staff/HeaderHamburgerMenu';
+import useBackgroundSync from '@/hooks/useBackgroundSync';
 
 import { STAFF_STEPS } from '@/constants/staffSteps';
 import { parseMeta, shouldLockPilot, isPilotReady } from '@/utils/metaHelpers';
@@ -557,6 +559,9 @@ export default function StaffDashboard() {
     const [civicModalVisible, setCivicModalVisible] = useState(false);
     const prevCivicNotifiedRef = useRef(false);
     const civicModalDismissedRef = useRef(false);
+
+    // Background sync for offline-first uploads
+    const { pendingCount, isSyncing, lastSyncResult, syncNow } = useBackgroundSync();
 
     const profileRef = useRef(profile);
     const missionStateRef = useRef(missionState);
@@ -1706,6 +1711,12 @@ export default function StaffDashboard() {
                     </div>
                 </div>
             )}
+            <PendingSyncBanner
+                pendingCount={pendingCount}
+                isSyncing={isSyncing}
+                lastSyncResult={lastSyncResult}
+                onSyncNow={syncNow}
+            />
         </>
     );
 

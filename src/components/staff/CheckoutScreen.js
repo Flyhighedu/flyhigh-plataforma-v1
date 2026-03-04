@@ -22,6 +22,7 @@ import HeaderOperativo from './HeaderOperativo';
 import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import { useRouter } from 'next/navigation';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
+import { getPendingUploads, syncAllPending } from '@/utils/offlineSyncManager';
 
 const TEAM_ROLES = ['pilot', 'teacher', 'assistant'];
 
@@ -382,6 +383,9 @@ export default function CheckoutScreen({
     const [checkoutComment, setCheckoutComment] = useState('');
     const [studentsCount, setStudentsCount] = useState(0);
     const [clockNow, setClockNow] = useState(() => new Date());
+    const [syncRequired, setSyncRequired] = useState(false);
+    const [pendingSyncItems, setPendingSyncItems] = useState([]);
+    const [isSyncingCheckout, setIsSyncingCheckout] = useState(false);
 
     const isWithinRange = distance !== null && distance <= STAFF_CONFIG.GEOFENCE_RADIUS_METERS;
     const hasCurrentUserCheckedOut = TEAM_ROLES.includes(normalizedRole) && teamCheckoutStatus[normalizedRole] === true;
@@ -558,6 +562,19 @@ export default function CheckoutScreen({
         if (!isWithinRange) {
             setFeedback('Debes estar en el perímetro de la base para hacer check-out.');
             return;
+        }
+
+        // [SYNC GATE] Check for pending offline uploads before allowing checkout
+        try {
+            const pending = await getPendingUploads();
+            if (pending.length > 0) {
+                setPendingSyncItems(pending);
+                setSyncRequired(true);
+                setFeedback('Tienes evidencia pendiente por sincronizar.');
+                return;
+            }
+        } catch (e) {
+            console.warn('[CheckoutSyncGate] Could not check pending uploads:', e);
         }
 
         setIsSubmitting(true);
@@ -975,16 +992,63 @@ export default function CheckoutScreen({
             <div className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-slate-100 via-slate-100/95 to-transparent px-5 pb-5 pt-4">
                 <div className="mx-auto w-full max-w-[420px]">
                     {feedback ? (
-                        <div className={`mb-2 rounded-xl border px-3 py-2 text-center text-xs font-bold ${feedback.includes('No se pudo') || feedback.includes('perímetro') ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                        <div className={`mb-2 rounded-xl border px-3 py-2 text-center text-xs font-bold ${feedback.includes('No se pudo') || feedback.includes('perímetro') || feedback.includes('pendiente') ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
                             {feedback}
                         </div>
                     ) : null}
 
+                    {/* Sync Gate UI */}
+                    {syncRequired && pendingSyncItems.length > 0 && (
+                        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-amber-600 text-lg">⚠️</span>
+                                <p className="text-xs font-bold text-amber-800">Evidencia pendiente por mala conexión</p>
+                            </div>
+                            <p className="text-[11px] text-amber-700 mb-3 leading-relaxed">
+                                Conéctate al Wi-Fi y presiona Sincronizar para completar el checkout.
+                            </p>
+                            <div className="space-y-1.5 mb-3 max-h-28 overflow-y-auto">
+                                {pendingSyncItems.map((item, i) => (
+                                    <div key={item.key || i} className="flex items-center gap-2 rounded-lg bg-white/80 px-2.5 py-1.5 border border-amber-100">
+                                        <span className="text-xs">{item.contentType?.startsWith('audio') ? '🎤' : '📸'}</span>
+                                        <span className="text-[10px] font-mono text-slate-600 truncate flex-1">{item.label || 'archivo'}</span>
+                                        <span className="text-[9px] font-bold text-amber-600 uppercase">⏳ {item.status}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setIsSyncingCheckout(true);
+                                    try {
+                                        const result = await syncAllPending();
+                                        const remaining = await getPendingUploads();
+                                        setPendingSyncItems(remaining);
+                                        if (remaining.length === 0) {
+                                            setSyncRequired(false);
+                                            setFeedback('✅ Todo sincronizado. Ya puedes hacer check-out.');
+                                        } else {
+                                            setFeedback(`${result.synced} sincronizado(s), ${remaining.length} pendiente(s).`);
+                                        }
+                                    } catch (e) {
+                                        setFeedback('Error al sincronizar. Verifica tu conexión.');
+                                    } finally {
+                                        setIsSyncingCheckout(false);
+                                    }
+                                }}
+                                disabled={isSyncingCheckout}
+                                className="w-full rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-extrabold text-white shadow transition hover:bg-amber-700 disabled:opacity-50"
+                            >
+                                {isSyncingCheckout ? '🔄 Sincronizando...' : '🔄 Sincronizar Ahora'}
+                            </button>
+                        </div>
+                    )}
+
                     <button
                         type="button"
                         onClick={handleFinalizeCheckout}
-                        disabled={finalizeDisabled}
-                        className={getPrimaryCtaClasses(finalizeDisabled)}
+                        disabled={finalizeDisabled || syncRequired}
+                        className={getPrimaryCtaClasses(finalizeDisabled || syncRequired)}
                     >
                         <span className="flex flex-col items-center justify-center gap-0.5">
                             <span className="inline-flex items-center justify-center gap-2 text-base font-extrabold tracking-tight">
