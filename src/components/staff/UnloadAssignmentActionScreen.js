@@ -6,6 +6,8 @@ import { CheckCircle2, ChevronRight, Loader2, Mic, DoorOpen, Truck, ArrowRight, 
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import useVoiceRecorder from '@/hooks/useVoiceRecorder';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { parseMeta } from '@/utils/metaHelpers';
 
 export default function UnloadAssignmentActionScreen({
     journeyId,
@@ -83,35 +85,22 @@ export default function UnloadAssignmentActionScreen({
             const supabase = createClient();
             const now = new Date().toISOString();
 
-            // Upload voice note if exists
-            let voiceUrl = null;
-            let voiceDuration = null;
-            if (audioBlob) {
-                const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
-                const filename = `voice_${journeyId}_${Date.now()}.${ext}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('staff-arrival')
-                    .upload(filename, audioBlob, { contentType: audioBlob.type });
-                if (uploadError) throw uploadError;
-                voiceUrl = supabase.storage.from('staff-arrival').getPublicUrl(filename).data.publicUrl;
-                voiceDuration = duration;
-            }
-
             const { data: currentData } = await supabase
                 .from('staff_journeys')
                 .select('meta')
                 .eq('id', journeyId)
                 .single();
 
-            const currentMeta = currentData?.meta || {};
+            const currentMeta = parseMeta(currentData?.meta);
 
+            // INSTANT: Write DB state first (triggers Realtime for all roles)
             const newMeta = {
                 ...currentMeta,
                 unload_access: selectedOption,
                 unload_note: unloadNote || null,
                 unload_assigned_by: userId,
                 unload_assigned_at: now,
-                ...(voiceUrl && { unload_voice_url: voiceUrl, unload_voice_duration: voiceDuration }),
+                ...(audioBlob && { unload_voice_url: 'uploading', unload_voice_duration: duration }),
             };
 
             const { error } = await supabase
@@ -125,6 +114,45 @@ export default function UnloadAssignmentActionScreen({
 
             if (error) throw error;
             console.log('Unload assignment saved:', newMeta);
+
+            // BACKGROUND: Queue voice upload if present (fire-and-forget)
+            if (audioBlob) {
+                const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+                const storagePath = `voice_${journeyId}_${Date.now()}.${ext}`;
+
+                enqueueOptimisticUpload({
+                    file: audioBlob,
+                    storageBucket: 'staff-arrival',
+                    storagePath,
+                    dbMutation: {
+                        table: 'staff_journeys',
+                        matchColumn: 'id',
+                        matchValue: journeyId,
+                        data: {}
+                    },
+                    label: 'Nota de voz descarga'
+                }).then(async () => {
+                    try {
+                        const supabase2 = createClient();
+                        const voiceUrl = supabase2.storage.from('staff-arrival').getPublicUrl(storagePath).data.publicUrl;
+                        const { data: latest } = await supabase2
+                            .from('staff_journeys')
+                            .select('meta')
+                            .eq('id', journeyId)
+                            .single();
+                        const latestMeta = parseMeta(latest?.meta);
+                        await supabase2
+                            .from('staff_journeys')
+                            .update({
+                                meta: { ...latestMeta, unload_voice_url: voiceUrl },
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', journeyId);
+                    } catch (e) {
+                        console.warn('[OptimisticUpload] voice meta patch failed:', e);
+                    }
+                }).catch(e => console.warn('[OptimisticUpload] voice enqueue failed:', e));
+            }
         } catch (e) {
             console.error('Error saving assignment:', e);
             alert('Error al guardar. Intenta de nuevo.');

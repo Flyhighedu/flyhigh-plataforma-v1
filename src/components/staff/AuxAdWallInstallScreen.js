@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 const MANUAL_CHECK_KEYS = ['deploy_structure', 'place_canvas'];
 
@@ -364,28 +365,48 @@ export default function AuxAdWallInstallScreen({
             const ext = getFileExtension(file);
             const filePath = `${journeyId}/aux-ad-wall/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('staff-arrival')
-                .upload(filePath, file, { upsert: true });
-
-            if (uploadError) throw uploadError;
-
-            const { data: publicData } = supabase.storage
-                .from('staff-arrival')
-                .getPublicUrl(filePath);
-
+            // INSTANT: Write meta to DB immediately (triggers Realtime)
             const currentMeta = await readCurrentMeta(supabase);
             const nextMeta = {
                 ...currentMeta,
-                aux_ad_wall_evidence_url: publicData.publicUrl,
+                aux_ad_wall_evidence_url: 'uploading',
                 aux_ad_wall_evidence_at: now,
                 aux_ad_wall_evidence_by: userId
             };
 
             await writeMeta(supabase, nextMeta, now);
 
-            setEvidenceUrl(publicData.publicUrl || '');
+            setEvidenceUrl('uploading');
             onRefresh && onRefresh();
+
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
+                file,
+                storageBucket: 'staff-arrival',
+                storagePath: filePath,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {}
+                },
+                label: 'Foto evidencia muro publicitario'
+            }).then(async () => {
+                try {
+                    const supabase2 = createClient();
+                    const { data: publicData } = supabase2.storage
+                        .from('staff-arrival')
+                        .getPublicUrl(filePath);
+                    const latestMeta = await readCurrentMeta(supabase2);
+                    await writeMeta(supabase2, {
+                        ...latestMeta,
+                        aux_ad_wall_evidence_url: publicData.publicUrl
+                    }, new Date().toISOString());
+                    setEvidenceUrl(publicData.publicUrl);
+                } catch (e) {
+                    console.warn('[OptimisticUpload] ad wall meta patch failed:', e);
+                }
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
             console.error('Error uploading ad wall evidence:', error);
             alert('No se pudo guardar la foto de evidencia. Intenta de nuevo.');

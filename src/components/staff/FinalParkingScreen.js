@@ -9,6 +9,7 @@ import { ParkTruckIllustration } from './VehiclePositioningScreen';
 import { parseMeta } from '@/utils/metaHelpers';
 import { CLOSURE_STEPS } from '@/constants/closureFlow';
 import { getPrimaryCtaClasses } from './ui/primaryCtaClasses';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 function FinalParkingHero() {
     return (
@@ -151,12 +152,9 @@ export default function FinalParkingScreen({
                 return;
             }
 
-            const photoUrl = await uploadKeyDropEvidence({
-                supabase,
-                journeyId,
-                file: keyDropPhotoFile
-            });
-
+            // INSTANT: Write DB state immediately (triggers Realtime)
+            const extension = getFileExtension(keyDropPhotoFile);
+            const storagePath = `${journeyId}/closure/key-drop/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
             const actorName = String(profile?.full_name || '').trim().split(/\s+/)[0] || 'Auxiliar';
             const nextMeta = {
                 ...currentMeta,
@@ -165,7 +163,7 @@ export default function FinalParkingScreen({
                 aux_key_drop_done_at: now,
                 aux_key_drop_done_by: userId,
                 aux_key_drop_done_by_name: actorName,
-                aux_key_drop_photo_url: photoUrl,
+                aux_key_drop_photo_url: 'uploading',
                 aux_key_drop_photo_at: now,
                 aux_key_drop_photo_by: userId,
                 aux_final_parking_done: true,
@@ -194,9 +192,46 @@ export default function FinalParkingScreen({
 
             if (updateError) throw updateError;
 
+            // UI advances immediately
             setIsKeyDropOpen(false);
             setIsKeyDropDeferred(false);
             onRefresh && onRefresh();
+
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
+                file: keyDropPhotoFile,
+                storageBucket: 'staff-arrival',
+                storagePath,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {}
+                },
+                label: 'Foto resguardo de llaves'
+            }).then(async () => {
+                try {
+                    const supabase2 = createClient();
+                    const { data: publicData } = supabase2.storage
+                        .from('staff-arrival')
+                        .getPublicUrl(storagePath);
+                    const { data: latest } = await supabase2
+                        .from('staff_journeys')
+                        .select('meta')
+                        .eq('id', journeyId)
+                        .single();
+                    const latestMeta = parseMeta(latest?.meta);
+                    await supabase2
+                        .from('staff_journeys')
+                        .update({
+                            meta: { ...latestMeta, aux_key_drop_photo_url: publicData.publicUrl },
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', journeyId);
+                } catch (e) {
+                    console.warn('[OptimisticUpload] key drop meta patch failed:', e);
+                }
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
             console.error('No se pudo confirmar resguardo de llaves:', error);
             alert('No se pudo confirmar el resguardo de llaves. Intenta de nuevo.');

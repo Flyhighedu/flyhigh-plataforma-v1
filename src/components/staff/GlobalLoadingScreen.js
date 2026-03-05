@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import LoadingValidationModal from './LoadingValidationModal';
 import MomentoDeCargarScreen from './MomentoDeCargarScreen';
 import { parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -109,21 +110,11 @@ export default function GlobalLoadingScreen({
                 return;
             }
 
-            const [containersUrl, roofUrl] = await Promise.all([
-                uploadEvidencePhoto({
-                    supabase,
-                    journeyId,
-                    file: containersPhotoFile,
-                    slot: 'containers'
-                }),
-                uploadEvidencePhoto({
-                    supabase,
-                    journeyId,
-                    file: roofPhotoFile,
-                    slot: 'roof'
-                })
-            ]);
+            // Build storage paths for fire-and-forget uploads
+            const containersPath = `${journeyId}/closure/global-loading/containers-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${getFileExtension(containersPhotoFile)}`;
+            const roofPath = `${journeyId}/closure/global-loading/roof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${getFileExtension(roofPhotoFile)}`;
 
+            // INSTANT: Write DB state first (triggers Realtime for all roles)
             const actorName = firstName(profile?.full_name, 'Operativo');
             const nextMeta = {
                 ...currentMeta,
@@ -132,10 +123,10 @@ export default function GlobalLoadingScreen({
                 global_equipment_loaded_at: now,
                 global_equipment_loaded_by: userId,
                 global_equipment_loaded_by_name: actorName,
-                global_equipment_loaded_photo_containers_url: containersUrl,
+                global_equipment_loaded_photo_containers_url: 'uploading',
                 global_equipment_loaded_photo_containers_at: now,
                 global_equipment_loaded_photo_containers_by: userId,
-                global_equipment_loaded_photo_roof_url: roofUrl,
+                global_equipment_loaded_photo_roof_url: 'uploading',
                 global_equipment_loaded_photo_roof_at: now,
                 global_equipment_loaded_photo_roof_by: userId,
                 global_container_loading_done: true,
@@ -165,9 +156,55 @@ export default function GlobalLoadingScreen({
 
             if (updateError) throw updateError;
 
+            // UI advances immediately
             setIsLoaded(true);
             setIsValidationOpen(false);
             onRefresh && onRefresh();
+
+            // BACKGROUND: Queue heavy uploads (fire-and-forget)
+            const enqueueOne = (file, storagePath, label) =>
+                enqueueOptimisticUpload({
+                    file,
+                    storageBucket: 'staff-arrival',
+                    storagePath,
+                    dbMutation: {
+                        table: 'staff_journeys',
+                        matchColumn: 'id',
+                        matchValue: journeyId,
+                        data: {}
+                    },
+                    label
+                }).catch(e => console.warn(`[OptimisticUpload] ${label} enqueue failed:`, e));
+
+            Promise.all([
+                enqueueOne(containersPhotoFile, containersPath, 'Foto contenedores carga'),
+                enqueueOne(roofPhotoFile, roofPath, 'Foto techo carga')
+            ]).then(async () => {
+                try {
+                    const supabase2 = createClient();
+                    const { data: cPub } = supabase2.storage.from('staff-arrival').getPublicUrl(containersPath);
+                    const { data: rPub } = supabase2.storage.from('staff-arrival').getPublicUrl(roofPath);
+                    const { data: latest } = await supabase2
+                        .from('staff_journeys')
+                        .select('meta')
+                        .eq('id', journeyId)
+                        .single();
+                    const latestMeta = parseMeta(latest?.meta);
+                    await supabase2
+                        .from('staff_journeys')
+                        .update({
+                            meta: {
+                                ...latestMeta,
+                                global_equipment_loaded_photo_containers_url: cPub.publicUrl,
+                                global_equipment_loaded_photo_roof_url: rPub.publicUrl
+                            },
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', journeyId);
+                } catch (e) {
+                    console.warn('[OptimisticUpload] global loading meta patch failed:', e);
+                }
+            }).catch(e => console.warn('[OptimisticUpload] batch failed:', e));
         } catch (error) {
             console.error('No se pudo validar la carga global:', error);
             alert('No se pudo validar la carga. Intenta de nuevo.');

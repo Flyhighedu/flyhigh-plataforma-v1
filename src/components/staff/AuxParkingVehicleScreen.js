@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 /* ─── Animated Parking Scene Illustration ─── */
 function ParkTruckIllustration() {
@@ -221,31 +222,64 @@ export default function AuxParkingVehicleScreen({
             const supabase = createClient();
             const extension = file.name.split('.').pop();
             const fileName = `${journeyId}/aux-vehicle/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+            const now = new Date().toISOString();
 
-            const { error: uploadError } = await supabase.storage
-                .from('staff-arrival')
-                .upload(fileName, file, { upsert: true });
+            // INSTANT: Write meta to DB immediately (triggers Realtime for all roles)
+            const { data: currentData } = await supabase
+                .from('staff_journeys')
+                .select('meta')
+                .eq('id', journeyId)
+                .single();
 
-            if (uploadError) throw uploadError;
+            const currentMeta = parseMeta(currentData?.meta);
+            const nextMeta = {
+                ...currentMeta,
+                aux_vehicle_evidence_url: 'uploading',
+                aux_vehicle_evidence_at: now,
+                aux_vehicle_evidence_by: userId
+            };
 
-            const { data: publicData } = supabase.storage
-                .from('staff-arrival')
-                .getPublicUrl(fileName);
+            const { error: updateError } = await supabase
+                .from('staff_journeys')
+                .update({ meta: nextMeta, updated_at: now })
+                .eq('id', journeyId);
 
-            await persistEvidenceUrl(supabase, publicData.publicUrl);
+            if (updateError) throw updateError;
 
-            setPhotoPreview(publicData.publicUrl);
+            // UI unlocks immediately
             setPhotoConfirmed(true);
+
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
+                file,
+                storageBucket: 'staff-arrival',
+                storagePath: fileName,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {} // URL will be patched via meta by the drain
+                },
+                label: 'Foto estacionamiento auxiliar'
+            }).then(async () => {
+                // After upload, patch the meta with the real URL
+                try {
+                    const supabase2 = createClient();
+                    // The drain already uploaded the file, get the public URL
+                    const { data: publicData } = supabase2.storage
+                        .from('staff-arrival')
+                        .getPublicUrl(fileName);
+                    await persistEvidenceUrl(supabase2, publicData.publicUrl);
+                } catch (e) {
+                    console.warn('[OptimisticUpload] meta patch failed:', e);
+                }
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
             console.error('Error uploading parking evidence photo:', error);
             alert('No se pudo guardar la evidencia. Intenta de nuevo.');
             setPhotoPreview(null);
             setPhotoConfirmed(false);
         } finally {
-            if (localPreviewUrlRef.current) {
-                URL.revokeObjectURL(localPreviewUrlRef.current);
-                localPreviewUrlRef.current = null;
-            }
             setIsUploadingPhoto(false);
         }
     };

@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 function safeText(value) {
     if (typeof value === 'string') return value;
@@ -284,20 +285,15 @@ export default function AuxOperationReadyScreen({
             const ext = getFileExtension(file);
             const filePath = `${journeyId}/aux-operation-stand/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('staff-arrival')
-                .upload(filePath, file, { upsert: true });
+            // INSTANT: Show local preview
+            const localUrl = URL.createObjectURL(file);
+            setPhotoUrl(localUrl);
 
-            if (uploadError) throw uploadError;
-
-            const { data: publicData } = supabase.storage
-                .from('staff-arrival')
-                .getPublicUrl(filePath);
-
+            // INSTANT: Write meta to DB immediately (triggers Realtime)
             const currentMeta = await readCurrentMeta(supabase);
             const nextMeta = {
                 ...currentMeta,
-                aux_operation_stand_photo_url: publicData.publicUrl,
+                aux_operation_stand_photo_url: 'uploading',
                 aux_operation_stand_photo_at: now,
                 aux_operation_stand_photo_by: userId,
                 aux_operation_ready: false,
@@ -307,9 +303,36 @@ export default function AuxOperationReadyScreen({
             };
 
             await writeMeta(supabase, nextMeta, now);
-
-            setPhotoUrl(publicData.publicUrl || '');
             onRefresh && onRefresh();
+
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
+                file,
+                storageBucket: 'staff-arrival',
+                storagePath: filePath,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {}
+                },
+                label: 'Foto stand operación'
+            }).then(async () => {
+                try {
+                    const supabase2 = createClient();
+                    const { data: publicData } = supabase2.storage
+                        .from('staff-arrival')
+                        .getPublicUrl(filePath);
+                    const latestMeta = await readCurrentMeta(supabase2);
+                    await writeMeta(supabase2, {
+                        ...latestMeta,
+                        aux_operation_stand_photo_url: publicData.publicUrl
+                    }, new Date().toISOString());
+                    setPhotoUrl(publicData.publicUrl);
+                } catch (e) {
+                    console.warn('[OptimisticUpload] stand photo meta patch failed:', e);
+                }
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
             console.error('Error uploading stand photo evidence:', error);
             alert('No se pudo guardar la foto del stand. Intenta de nuevo.');
