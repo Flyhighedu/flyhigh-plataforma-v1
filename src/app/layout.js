@@ -7,8 +7,10 @@ export const metadata = {
 };
 
 export const viewport = {
-    themeColor: '#0A4FE2',
+    themeColor: '#0185e4',
 };
+
+import CustomSplashScreen from '@/components/CustomSplashScreen';
 
 export default function RootLayout({ children }) {
     return (
@@ -16,6 +18,7 @@ export default function RootLayout({ children }) {
             <head>
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+                <link rel="apple-touch-icon" href="/app-icon.png" />
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
                 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;700;800;900&family=Montserrat:wght@700;900&display=swap" rel="stylesheet" />
@@ -23,7 +26,9 @@ export default function RootLayout({ children }) {
             </head>
             <body className="antialiased bg-[#F5F7FA] text-slate-800" suppressHydrationWarning>
                 <ImpactProvider>
-                    {children}
+                    <CustomSplashScreen>
+                        {children}
+                    </CustomSplashScreen>
                 </ImpactProvider>
             </body>
         </html>
