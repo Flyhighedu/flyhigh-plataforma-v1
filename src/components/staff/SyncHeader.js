@@ -187,7 +187,7 @@ export default function SyncHeader({
     onCloseMission = null
 }) {
     const { waitingCount, resolvedMissionState } = useSyncHeaderState(journeyId, role, missionState);
-    const { pendingCount, failedCount, isSynced } = useUploadQueueStatus();
+    const { pendingCount } = useUploadQueueStatus();
     const effectiveMissionState = resolvedMissionState || missionState;
     const headerRef = useRef(null);
     const [useFixedMobileHeader, setUseFixedMobileHeader] = useState(false);
@@ -849,17 +849,27 @@ export default function SyncHeader({
                     zIndex: useFixedMobileHeader ? 70 : 50,
                     paddingTop: useFixedMobileHeader ? 'calc(env(safe-area-inset-top, 0px) + 1rem)' : '1rem'
                 }}
-                statusSlot={shouldShowChip && !shouldUseBottomStatusLabel ? (
-                    <div className="animate-in fade-in slide-in-from-right-4 flex max-w-[138px] min-w-0 items-center gap-1.5 rounded-full border border-white/12 bg-white/10 px-2 py-1 backdrop-blur-md sm:max-w-[172px]">
-                        <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                        </span>
-                        <span className="truncate text-[8px] font-black uppercase leading-none tracking-wide text-white sm:text-[9px]">
-                            {finalChipText}
-                        </span>
-                    </div>
-                ) : null}
+                statusSlot={
+                    <>
+                        {shouldShowChip && !shouldUseBottomStatusLabel && (
+                            <div className="animate-in fade-in slide-in-from-right-4 flex max-w-[138px] min-w-0 items-center gap-1.5 rounded-full border border-white/12 bg-white/10 px-2 py-1 backdrop-blur-md sm:max-w-[172px]">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                                </span>
+                                <span className="truncate text-[8px] font-black uppercase leading-none tracking-wide text-white sm:text-[9px]">
+                                    {finalChipText}
+                                </span>
+                            </div>
+                        )}
+                        {pendingCount > 0 && (
+                            <div className="flex items-center gap-1 rounded-full bg-white/10 border border-white/12 px-2 py-1 backdrop-blur-md">
+                                <span className="animate-pulse text-[9px]">☁️</span>
+                                <span className="text-[8px] font-bold text-white/80 leading-none tracking-wide">Subiendo...</span>
+                            </div>
+                        )}
+                    </>
+                }
                 actionsSlot={(
                     <HeaderHamburgerMenu
                         journeyId={journeyId}
@@ -871,46 +881,7 @@ export default function SyncHeader({
                 )}
             />
 
-            {/* ── Cloud Sync Indicator ── */}
-            {!isSynced && (
-                <div
-                    style={{
-                        position: useFixedMobileHeader ? 'fixed' : 'sticky',
-                        top: useFixedMobileHeader ? (mobileHeaderOffset || 0) : 0,
-                        left: 0,
-                        right: 0,
-                        zIndex: useFixedMobileHeader ? 69 : 49,
-                        display: 'flex',
-                        justifyContent: 'center',
-                        padding: '4px 0',
-                        pointerEvents: 'none'
-                    }}
-                >
-                    <div
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '5px 14px',
-                            borderRadius: 999,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: '0.01em',
-                            border: failedCount > 0 ? '1px solid #FCD34D' : '1px solid #BFDBFE',
-                            backgroundColor: failedCount > 0 ? '#FFFBEB' : '#EFF6FF',
-                            color: failedCount > 0 ? '#92400E' : '#1D4ED8',
-                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.1)',
-                            animation: pendingCount > 0 ? 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' : 'none'
-                        }}
-                    >
-                        {failedCount > 0 ? (
-                            <>⚠️ {failedCount} fallido{failedCount > 1 ? 's' : ''}</>
-                        ) : (
-                            <>☁️ {pendingCount} pendiente{pendingCount > 1 ? 's' : ''}</>
-                        )}
-                    </div>
-                </div>
-            )}
+
 
             {(showCivicStartModal || showCivicRecorder) && role === 'teacher' && (
                 <div className="fixed inset-0 z-[110] bg-black/60 px-4 py-6 flex items-center justify-center" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>

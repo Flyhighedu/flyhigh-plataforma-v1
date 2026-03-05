@@ -61,7 +61,7 @@ import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
 import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import TaskErrorBoundary from '@/components/staff/TaskErrorBoundary';
 import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
-import PendingSyncBanner from '@/components/staff/PendingSyncBanner';
+
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
@@ -1820,12 +1820,7 @@ export default function StaffDashboard() {
                     </div>
                 </div>
             )}
-            <PendingSyncBanner
-                pendingCount={pendingCount}
-                isSyncing={isSyncing}
-                lastSyncResult={lastSyncResult}
-                onSyncNow={syncNow}
-            />
+
         </>
     );
 
