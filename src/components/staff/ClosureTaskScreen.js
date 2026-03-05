@@ -508,8 +508,8 @@ export default function ClosureTaskScreen({
                 updated_at: now
             });
 
-            // BACKGROUND: Queue heavy upload
-            await enqueueOptimisticUpload({
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
                 file,
                 storageBucket: 'staff-arrival',
                 storagePath: path,
@@ -517,10 +517,10 @@ export default function ClosureTaskScreen({
                     table: 'staff_journeys',
                     matchColumn: 'id',
                     matchValue: journeyId,
-                    data: {} // URL will be patched via meta by syncAllPending
+                    data: {}
                 },
                 label: `Cierre: ${screenKey}`
-            });
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
 
             onRefresh && onRefresh();
         } catch (error) {

@@ -171,9 +171,8 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
             delete nextMeta.operation_start_bridge_by;
             delete nextMeta.operation_started_at;
 
-            // INSTANT: Write journey meta immediately (marks task done, photo uploading)
-            await supabase.from('staff_journeys').update({
-                arrival_photo_status: 'uploading',
+            // INSTANT: Write journey state + meta immediately (triggers Realtime for all roles)
+            const { error: updateError } = await supabase.from('staff_journeys').update({
                 arrival_photo_taken_at: timestamp,
                 arrival_photo_taken_by: userId,
                 mission_state: 'waiting_unload_assignment',
@@ -181,8 +180,16 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
                 updated_at: timestamp
             }).eq('id', journeyId);
 
-            // BACKGROUND: Queue heavy image upload + final URL patching
-            await enqueueOptimisticUpload({
+            if (updateError) {
+                console.error('DB update failed:', updateError);
+                throw updateError;
+            }
+
+            // UI unlocks IMMEDIATELY — don't wait for blob queue
+            onComplete?.();
+
+            // BACKGROUND: Queue heavy image upload (fire-and-forget)
+            enqueueOptimisticUpload({
                 file: compressedFile,
                 storageBucket: 'staff-arrival',
                 storagePath: filename,
@@ -191,8 +198,7 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
                     matchColumn: 'id',
                     matchValue: journeyId,
                     data: {
-                        arrival_photo_url: '{{PUBLIC_URL}}',
-                        arrival_photo_status: 'synced'
+                        arrival_photo_url: '{{PUBLIC_URL}}'
                     }
                 },
                 eventLog: {
@@ -202,10 +208,7 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
                     payload: { url: '{{PUBLIC_URL}}' }
                 },
                 label: 'Foto de fachada'
-            });
-
-            // UI unlocks IMMEDIATELY
-            onComplete?.();
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
             console.error('Optimistic arrival photo failed, trying offline fallback:', error);
             saveOffline(filename, timestamp);

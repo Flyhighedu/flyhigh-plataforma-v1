@@ -289,8 +289,8 @@ export default function PilotPrepareFlightScreen({
                 const normalizedPhoto = await compressPhotoForUpload(spotPhoto);
                 const fileName = `${journeyId}/pilot-spot/${Date.now()}.jpg`;
 
-                // Queue for background upload
-                await enqueueOptimisticUpload({
+                // Queue for background upload (fire-and-forget)
+                enqueueOptimisticUpload({
                     file: normalizedPhoto || spotPhoto,
                     storageBucket: 'staff-arrival',
                     storagePath: fileName,
@@ -298,10 +298,10 @@ export default function PilotPrepareFlightScreen({
                         table: 'staff_journeys',
                         matchColumn: 'id',
                         matchValue: journeyId,
-                        data: {} // URL patched by syncAllPending via meta
+                        data: {}
                     },
                     label: 'Foto pista piloto'
-                });
+                }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
                 // publicUrl stays as local preview
             }
 

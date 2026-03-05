@@ -243,8 +243,8 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
             setPhotoUrls(prev => ({ ...prev, [itemId]: localUrl }));
             if (!checkedItems[itemId]) toggleItem(itemId);
 
-            // BACKGROUND: Queue heavy upload
-            await enqueueOptimisticUpload({
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
                 file,
                 storageBucket: 'prep-evidence',
                 storagePath: filename,
@@ -261,7 +261,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                     payload: { item_id: itemId, file_path: '{{PUBLIC_URL}}' }
                 },
                 label: `Foto evidencia: ${itemId}`
-            });
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
 
         } catch (e) {
             console.error(e);

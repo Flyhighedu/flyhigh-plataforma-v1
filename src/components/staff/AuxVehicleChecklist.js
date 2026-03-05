@@ -213,8 +213,8 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
             const localUrl = URL.createObjectURL(file);
             setPhotos(prev => ({ ...prev, [targetId]: localUrl }));
 
-            // BACKGROUND: Queue heavy upload
-            await enqueueOptimisticUpload({
+            // BACKGROUND: Queue heavy upload (fire-and-forget)
+            enqueueOptimisticUpload({
                 file,
                 storageBucket: 'prep-evidence',
                 storagePath: filename,
@@ -225,7 +225,7 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
                     data: { file_path: '{{PUBLIC_URL}}', item_id: targetId, user_id: userId }
                 },
                 label: `Foto carga: ${targetId}`
-            });
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
 
             saveEvent('photo', { target_id: targetId, file_path: 'uploading' });
 
