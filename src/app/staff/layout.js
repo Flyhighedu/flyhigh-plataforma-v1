@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, LogOut, User, Loader2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import PWAInstallBanner from '@/components/staff/PWAInstallBanner';
 
 export default function StaffLayout({ children }) {
     const pathname = usePathname();
@@ -94,6 +95,7 @@ export default function StaffLayout({ children }) {
                 </div>
             )}
             {children}
+            <PWAInstallBanner />
         </div>
     );
 }
