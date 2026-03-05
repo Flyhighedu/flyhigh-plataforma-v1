@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import { getClosurePhaseForStep, getClosureProgress, normalizeClosureStep } from '@/constants/closureFlow';
 import { getPrimaryCtaClasses } from './ui/primaryCtaClasses';
 
@@ -489,20 +490,15 @@ export default function ClosureTaskScreen({
             const extension = getFileExtension(file);
             const path = `${journeyId}/closure/${screenKey}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('staff-arrival')
-                .upload(path, file, { upsert: true });
+            // INSTANT: Show local preview
+            const localUrl = URL.createObjectURL(file);
+            setPhotoUrl(localUrl);
 
-            if (uploadError) throw uploadError;
-
-            const { data: publicData } = supabase.storage
-                .from('staff-arrival')
-                .getPublicUrl(path);
-
+            // INSTANT: Write meta immediately (marks photo as uploading)
             const currentMeta = await readCurrentMeta(supabase);
             const nextMeta = {
                 ...currentMeta,
-                [photoMetaKey]: publicData.publicUrl,
+                [photoMetaKey]: 'uploading',
                 [photoAtKey]: now,
                 [photoByKey]: userId
             };
@@ -512,7 +508,20 @@ export default function ClosureTaskScreen({
                 updated_at: now
             });
 
-            setPhotoUrl(safeText(publicData.publicUrl));
+            // BACKGROUND: Queue heavy upload
+            await enqueueOptimisticUpload({
+                file,
+                storageBucket: 'staff-arrival',
+                storagePath: path,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {} // URL will be patched via meta by syncAllPending
+                },
+                label: `Cierre: ${screenKey}`
+            });
+
             onRefresh && onRefresh();
         } catch (error) {
             console.error('No se pudo guardar evidencia de cierre:', error);
@@ -1078,10 +1087,10 @@ export default function ClosureTaskScreen({
                             {shouldRenderPilotLockChip
                                 ? 'Solo el piloto puede confirmar esta tarea.'
                                 : taskDone
-                                ? `${doneLabel}${doneByName ? ` - ${doneByName}` : ''}`
-                                : prerequisitesReady
-                                    ? 'No cierres la app (los datos se guardan)'
-                                    : 'Completa pasos previos para habilitar este cierre'}
+                                    ? `${doneLabel}${doneByName ? ` - ${doneByName}` : ''}`
+                                    : prerequisitesReady
+                                        ? 'No cierres la app (los datos se guardan)'
+                                        : 'Completa pasos previos para habilitar este cierre'}
                         </span>
                     </div>
 

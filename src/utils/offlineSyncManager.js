@@ -292,3 +292,138 @@ export async function clearLocalProgress(journeyId) {
         console.warn('[OfflineSync] Failed to clear local progress:', e);
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+//  OPTIMISTIC UPLOAD ENGINE (background queue + pub/sub)
+// ═══════════════════════════════════════════════════════════
+
+/** @type {Set<(status: {pending: number, failed: number, total: number}) => void>} */
+const _subscribers = new Set();
+let _drainInterval = null;
+let _drainBackoffMs = 15_000;
+const DRAIN_MIN_MS = 15_000;
+const DRAIN_MAX_MS = 120_000;
+
+/** Notify all subscribers with latest sync status */
+async function _notifySubscribers() {
+    try {
+        const status = await getSyncStatus();
+        const snapshot = { pending: status.pending, failed: status.failed, total: status.total };
+        _subscribers.forEach(fn => { try { fn(snapshot); } catch { } });
+    } catch { }
+}
+
+/**
+ * Subscribe to sync status changes.
+ * @param {(status: {pending: number, failed: number, total: number}) => void} callback
+ * @returns {() => void} Unsubscribe function
+ */
+export function subscribeSyncStatus(callback) {
+    _subscribers.add(callback);
+    // Immediately fire with current status
+    _notifySubscribers();
+    return () => { _subscribers.delete(callback); };
+}
+
+/**
+ * Start the background drain loop with exponential backoff.
+ * Idempotent — multiple calls are safe.
+ */
+export function startBackgroundDrain() {
+    if (_drainInterval) return; // already running
+
+    const tick = async () => {
+        if (!navigator.onLine) return;
+
+        try {
+            const result = await syncAllPending();
+            if (result.total === 0) {
+                // Nothing left — stop draining
+                stopBackgroundDrain();
+                _notifySubscribers();
+                return;
+            }
+            if (result.failed > 0) {
+                // Exponential backoff on failures
+                _drainBackoffMs = Math.min(_drainBackoffMs * 2, DRAIN_MAX_MS);
+            } else {
+                // Reset backoff on success
+                _drainBackoffMs = DRAIN_MIN_MS;
+            }
+            _notifySubscribers();
+        } catch (err) {
+            console.warn('[OfflineSync] Drain tick error:', err);
+            _drainBackoffMs = Math.min(_drainBackoffMs * 2, DRAIN_MAX_MS);
+        }
+
+        // Re-schedule with current backoff
+        if (_drainInterval) {
+            clearTimeout(_drainInterval);
+            _drainInterval = setTimeout(tick, _drainBackoffMs);
+        }
+    };
+
+    _drainBackoffMs = DRAIN_MIN_MS;
+    _drainInterval = setTimeout(tick, 500); // first tick fast
+}
+
+/** Stop the background drain loop. */
+export function stopBackgroundDrain() {
+    if (_drainInterval) {
+        clearTimeout(_drainInterval);
+        _drainInterval = null;
+    }
+}
+
+/**
+ * Enqueue an optimistic upload: fires an instant DB mutation, saves the blob
+ * to IndexedDB, and starts the background drain loop.
+ *
+ * The instant mutation sets a `_status: 'uploading'` flag so the admin dashboard
+ * can show a skeleton placeholder while the heavy upload is in progress.
+ *
+ * @param {Object} opts
+ * @param {File|Blob} opts.file            - Compressed image blob
+ * @param {string}    opts.storageBucket   - Supabase Storage bucket
+ * @param {string}    opts.storagePath     - File path within bucket
+ * @param {Object}    [opts.instantMutation] - Lightweight DB write to execute NOW
+ * @param {string}    opts.instantMutation.table
+ * @param {string}    opts.instantMutation.matchColumn
+ * @param {*}         opts.instantMutation.matchValue
+ * @param {Object}    opts.instantMutation.data - Data to .update() immediately
+ * @param {Object}    [opts.dbMutation]    - DB write to execute AFTER upload completes
+ * @param {Object}    [opts.eventLog]      - Optional staff_events log entry
+ * @param {string}    [opts.label]         - Human-readable label
+ * @returns {Promise<string>} The IDB key for the queued upload
+ */
+export async function enqueueOptimisticUpload(opts) {
+    const supabase = createClient();
+
+    // 1. Fire instant mutation (lightweight — no blob, just marks 'uploading')
+    if (opts.instantMutation) {
+        const { table, matchColumn, matchValue, data } = opts.instantMutation;
+        try {
+            await supabase.from(table).update(data).eq(matchColumn, matchValue);
+        } catch (err) {
+            console.warn('[OfflineSync] Instant mutation failed (non-blocking):', err);
+        }
+    }
+
+    // 2. Queue the heavy blob upload for background processing
+    const key = await savePendingUpload({
+        file: opts.file,
+        storageBucket: opts.storageBucket,
+        storagePath: opts.storagePath,
+        dbMutation: opts.dbMutation || null,
+        eventLog: opts.eventLog || null,
+        label: opts.label || opts.storagePath
+    });
+
+    // 3. Start background drain (idempotent)
+    startBackgroundDrain();
+
+    // 4. Notify subscribers
+    _notifySubscribers();
+
+    return key;
+}

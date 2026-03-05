@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { AUX_LOAD_GROUPS } from '@/config/operationalChecklists';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 // ── Date helpers ──
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -206,28 +207,27 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
                 console.warn('Compression failed, using original', err);
             }
 
-            const supabase = createClient();
             const filename = `aux2_${journeyId}_${targetId}_${Date.now()}.jpg`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('prep-evidence')
-                .upload(filename, file);
+            // INSTANT: Show local preview immediately
+            const localUrl = URL.createObjectURL(file);
+            setPhotos(prev => ({ ...prev, [targetId]: localUrl }));
 
-            if (uploadError) throw uploadError;
-
-            const { data: publicData } = supabase.storage
-                .from('prep-evidence')
-                .getPublicUrl(filename);
-
-            const url = publicData.publicUrl;
-            setPhotos(prev => ({ ...prev, [targetId]: url }));
-
-            // Log persistence
-            await supabase.from('staff_prep_photos').insert({
-                journey_id: journeyId, user_id: userId, file_path: url, item_id: targetId
+            // BACKGROUND: Queue heavy upload
+            await enqueueOptimisticUpload({
+                file,
+                storageBucket: 'prep-evidence',
+                storagePath: filename,
+                dbMutation: {
+                    table: 'staff_prep_photos',
+                    matchColumn: 'journey_id',
+                    matchValue: journeyId,
+                    data: { file_path: '{{PUBLIC_URL}}', item_id: targetId, user_id: userId }
+                },
+                label: `Foto carga: ${targetId}`
             });
 
-            saveEvent('photo', { target_id: targetId, file_path: url });
+            saveEvent('photo', { target_id: targetId, file_path: 'uploading' });
 
         } catch (err) {
             console.error('Error subiendo foto:', err);

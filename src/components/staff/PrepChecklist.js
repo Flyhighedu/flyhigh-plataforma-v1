@@ -16,6 +16,7 @@ import {
 import { PREP_CHECKLISTS, ROLE_LABELS, ROLE_COLORS } from '@/config/prepChecklistConfig';
 import { createClient } from '@/utils/supabase/client';
 import { validatePhotoDate } from '@/utils/validatePhotoDate';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import PilotPrepChecklist from './PilotPrepChecklist';
 import TeacherTeamChecklist from './TeacherTeamChecklist';
 
@@ -235,44 +236,42 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                 console.warn('Image compression failed, trying original:', compressionErr);
             }
 
-            const supabase = createClient();
-            const filename = `prep_${journeyId}_${itemId}_${Date.now()}.jpg`; // Force jpg extension
+            const filename = `prep_${journeyId}_${itemId}_${Date.now()}.jpg`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('prep-evidence')
-                .upload(filename, file);
-
-            if (uploadError) {
-                console.error('Upload error:', uploadError);
-                // Fallback local visual
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    setPhotoUrls(prev => ({ ...prev, [itemId]: ev.target.result }));
-                    // Auto-check item on photo success
-                    if (!checkedItems[itemId]) toggleItem(itemId);
-                };
-                reader.readAsDataURL(file);
-                return;
-            }
-
-            const { data: publicData } = supabase.storage
-                .from('prep-evidence')
-                .getPublicUrl(filename);
-
-            setPhotoUrls(prev => ({ ...prev, [itemId]: publicData.publicUrl }));
-
-            // Auto-check item on photo success
+            // INSTANT: Show local preview + auto-check item
+            const localUrl = URL.createObjectURL(file);
+            setPhotoUrls(prev => ({ ...prev, [itemId]: localUrl }));
             if (!checkedItems[itemId]) toggleItem(itemId);
 
-            await supabase.from('staff_prep_photos').insert({
-                journey_id: journeyId, user_id: userId, file_path: publicData.publicUrl, item_id: itemId
-            });
-            await supabase.from('staff_prep_events').insert({
-                journey_id: journeyId, user_id: userId, event_type: 'evidence', payload: { item_id: itemId, file_path: publicData.publicUrl }
+            // BACKGROUND: Queue heavy upload
+            await enqueueOptimisticUpload({
+                file,
+                storageBucket: 'prep-evidence',
+                storagePath: filename,
+                dbMutation: {
+                    table: 'staff_prep_photos',
+                    matchColumn: 'journey_id',
+                    matchValue: journeyId,
+                    data: { file_path: '{{PUBLIC_URL}}', item_id: itemId, user_id: userId }
+                },
+                eventLog: {
+                    journey_id: journeyId,
+                    user_id: userId,
+                    event_type: 'evidence',
+                    payload: { item_id: itemId, file_path: '{{PUBLIC_URL}}' }
+                },
+                label: `Foto evidencia: ${itemId}`
             });
 
         } catch (e) {
             console.error(e);
+            // Fallback: show local preview even on queue failure
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                setPhotoUrls(prev => ({ ...prev, [itemId]: ev.target.result }));
+                if (!checkedItems[itemId]) toggleItem(itemId);
+            };
+            reader.readAsDataURL(file);
         } finally {
             setUploadingItem(null);
         }

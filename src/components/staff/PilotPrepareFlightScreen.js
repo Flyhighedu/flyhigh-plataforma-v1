@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { Camera, CheckCircle2, ChevronRight, Loader2, MapPin, Lock, Eye, Gamepad2, Map } from 'lucide-react';
 import SyncHeader from './SyncHeader';
 import { PILOT_READY_SOURCE, parseMeta } from '@/utils/metaHelpers';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 
 function compressPhotoForUpload(file) {
     return new Promise((resolve) => {
@@ -283,27 +284,25 @@ export default function PilotPrepareFlightScreen({
             const currentMeta = parseMeta(currentData?.meta);
             let publicUrl = currentMeta.pilot_spot_photo_url || null;
 
-            // Optional photo upload
+            // Optional photo upload — now OPTIMISTIC
             if (spotPhoto) {
                 const normalizedPhoto = await compressPhotoForUpload(spotPhoto);
                 const fileName = `${journeyId}/pilot-spot/${Date.now()}.jpg`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('staff-arrival') // Reusing existing bucket
-                    .upload(fileName, normalizedPhoto || spotPhoto, {
-                        upsert: true,
-                        contentType: 'image/jpeg'
-                    });
-
-                if (uploadError) {
-                    console.error('Error uploading pilot reference photo:', uploadError);
-                } else {
-                    const { data: urlData } = supabase.storage
-                        .from('staff-arrival')
-                        .getPublicUrl(fileName);
-
-                    publicUrl = urlData.publicUrl;
-                }
+                // Queue for background upload
+                await enqueueOptimisticUpload({
+                    file: normalizedPhoto || spotPhoto,
+                    storageBucket: 'staff-arrival',
+                    storagePath: fileName,
+                    dbMutation: {
+                        table: 'staff_journeys',
+                        matchColumn: 'id',
+                        matchValue: journeyId,
+                        data: {} // URL patched by syncAllPending via meta
+                    },
+                    label: 'Foto pista piloto'
+                });
+                // publicUrl stays as local preview
             }
 
             const cleanedNote = (spotNote || '').trim();

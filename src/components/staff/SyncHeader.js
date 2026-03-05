@@ -115,6 +115,7 @@ import { CheckCircle2, Loader2, Mic, X } from 'lucide-react';
 import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import HeaderOperativo from './HeaderOperativo';
 import { getHeaderPhaseForState } from '../../constants/headerPhases';
+import useUploadQueueStatus from '@/hooks/useUploadQueueStatus';
 
 const CIVIC_REQUIRED_SECONDS = 90;
 const CIVIC_EARLY_FINISH_REASONS = [
@@ -186,6 +187,7 @@ export default function SyncHeader({
     onCloseMission = null
 }) {
     const { waitingCount, resolvedMissionState } = useSyncHeaderState(journeyId, role, missionState);
+    const { pendingCount, failedCount, isSynced } = useUploadQueueStatus();
     const effectiveMissionState = resolvedMissionState || missionState;
     const headerRef = useRef(null);
     const [useFixedMobileHeader, setUseFixedMobileHeader] = useState(false);
@@ -868,6 +870,47 @@ export default function SyncHeader({
                     />
                 )}
             />
+
+            {/* ── Cloud Sync Indicator ── */}
+            {!isSynced && (
+                <div
+                    style={{
+                        position: useFixedMobileHeader ? 'fixed' : 'sticky',
+                        top: useFixedMobileHeader ? (mobileHeaderOffset || 0) : 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: useFixedMobileHeader ? 69 : 49,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        padding: '4px 0',
+                        pointerEvents: 'none'
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '5px 14px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: '0.01em',
+                            border: failedCount > 0 ? '1px solid #FCD34D' : '1px solid #BFDBFE',
+                            backgroundColor: failedCount > 0 ? '#FFFBEB' : '#EFF6FF',
+                            color: failedCount > 0 ? '#92400E' : '#1D4ED8',
+                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.1)',
+                            animation: pendingCount > 0 ? 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' : 'none'
+                        }}
+                    >
+                        {failedCount > 0 ? (
+                            <>⚠️ {failedCount} fallido{failedCount > 1 ? 's' : ''}</>
+                        ) : (
+                            <>☁️ {pendingCount} pendiente{pendingCount > 1 ? 's' : ''}</>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {(showCivicStartModal || showCivicRecorder) && role === 'teacher' && (
                 <div className="fixed inset-0 z-[110] bg-black/60 px-4 py-6 flex items-center justify-center" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>

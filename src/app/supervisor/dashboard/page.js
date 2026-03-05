@@ -4646,6 +4646,21 @@ export default function SupervisorDashboard() {
                                         Confirmada
                                     </div>
                                 </button>
+                            ) : sel.arrivalPhotoAt ? (
+                                /* Skeleton: Photo was captured but blob is still uploading in background */
+                                <div className="flex flex-col items-center justify-center py-6 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                                    <div className="w-full h-32 rounded-lg bg-slate-700/40 animate-pulse mb-3 mx-4" />
+                                    <p className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                                        📸 Evidencia capturada
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        Subiendo en segundo plano…
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+                                        <span className="material-symbols-outlined text-xs">schedule</span>
+                                        {fmtClock(sel.arrivalPhotoAt)}
+                                    </div>
+                                </div>
                             ) : (
                                 <div className={`flex flex-col items-center justify-center py-6 rounded-xl border-2 border-dashed ${sel.isEnRuta ? 'border-primary/30 bg-primary/5' : 'border-slate-700 bg-slate-800/30'
                                     }`}>
