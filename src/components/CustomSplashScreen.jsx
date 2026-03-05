@@ -43,7 +43,7 @@ export default function CustomSplashScreen({ children }) {
                                 ease: 'easeInOut',
                                 delay: 0.8
                             }}
-                            className="absolute w-[45%] aspect-square rounded-full"
+                            className="absolute w-[65%] aspect-square rounded-full"
                             style={{
                                 background: 'radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 70%)'
                             }}
@@ -57,7 +57,7 @@ export default function CustomSplashScreen({ children }) {
                                 duration: 1.0,
                                 ease: [0.22, 1, 0.36, 1] // custom cubic-bezier for premium deceleration
                             }}
-                            className="w-[30%] max-w-sm min-w-[200px] relative flex justify-center items-center"
+                            className="w-[55%] max-w-md min-w-[260px] relative flex justify-center items-center"
                         >
                             <img
                                 src="/img/LOGO OPS.png"

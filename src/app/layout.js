@@ -4,6 +4,10 @@ import { ImpactProvider } from '../context/ImpactContext';
 export const metadata = {
     title: "Fly High Edu",
     description: "Inspirando a través del vuelo. Experiencias educativas inmersivas con drones y realidad virtual en Uruapan.",
+    icons: {
+        icon: '/img/app-icon.png',
+        apple: '/img/app-icon.png',
+    },
 };
 
 export const viewport = {
