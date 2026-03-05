@@ -763,7 +763,40 @@ export default function StaffDashboard() {
                 pilot_id: school.pilot_id,
                 teacher_id: school.teacher_id,
                 aux_id: school.aux_id,
+                presence: [], // will be populated below
             }));
+
+            // Fetch presence for all today's schools
+            if (schools.length > 0) {
+                const schoolIds = schools.map(s => s.id);
+                const { data: journeys } = await supabase
+                    .from('staff_journeys')
+                    .select('id, school_id')
+                    .eq('date', today)
+                    .in('school_id', schoolIds);
+
+                if (journeys && journeys.length > 0) {
+                    const journeyIds = journeys.map(j => j.id);
+                    const { data: presenceData } = await supabase
+                        .from('staff_presence')
+                        .select('journey_id, role, is_online')
+                        .in('journey_id', journeyIds)
+                        .eq('is_online', true);
+
+                    // Map presence to schools
+                    if (presenceData) {
+                        const journeyToSchool = {};
+                        journeys.forEach(j => { journeyToSchool[j.id] = j.school_id; });
+
+                        schools.forEach(school => {
+                            school.presence = presenceData.filter(p => {
+                                const schoolId = journeyToSchool[p.journey_id];
+                                return schoolId === school.id;
+                            });
+                        });
+                    }
+                }
+            }
 
             setTodaySchools(schools);
 
@@ -1876,6 +1909,36 @@ export default function StaffDashboard() {
                                             </svg>
                                         </div>
                                     </div>
+
+                                    {/* Presence Avatars */}
+                                    {school.presence && school.presence.length > 0 && (
+                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                                En misión
+                                            </span>
+                                            <div className="flex flex-row-reverse">
+                                                {school.presence.map((p, pi) => {
+                                                    const roleConfig = {
+                                                        pilot: { bg: 'bg-blue-500', label: 'P', title: 'Piloto' },
+                                                        teacher: { bg: 'bg-purple-500', label: 'D', title: 'Docente' },
+                                                        assistant: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
+                                                        auxiliar: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
+                                                    };
+                                                    const cfg = roleConfig[p.role] || { bg: 'bg-slate-400', label: '?', title: p.role };
+                                                    return (
+                                                        <div
+                                                            key={`${p.role}-${pi}`}
+                                                            title={cfg.title}
+                                                            className={`w-7 h-7 rounded-full ${cfg.bg} border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm -ml-2 first:ml-0`}
+                                                        >
+                                                            {cfg.label}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </button>
                             ))}
                         </div>

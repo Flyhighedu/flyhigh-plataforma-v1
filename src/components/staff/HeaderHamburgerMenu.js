@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X, LogOut, Clock, Plane } from 'lucide-react';
+import { Menu, X, LogOut, Clock, Plane, Repeat } from 'lucide-react';
 import StartDemoFab from './StartDemoFab';
 import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
@@ -116,6 +116,25 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                 <ResetProcessButton journeyId={journeyId} minimal={true} />
                             </div>
                         )}
+
+                        {/* Change Mission (Escape Hatch) */}
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                sessionStorage.removeItem('flyhigh_selected_mission_id');
+                                localStorage.removeItem('flyhigh_staff_mission');
+                                window.location.reload();
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50 transition-colors rounded-lg text-amber-700 group border-t border-slate-50 mt-1"
+                        >
+                            <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                <Repeat size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold">Cambiar de Misión</p>
+                                <p className="text-[10px] text-amber-500/80 font-medium tracking-tight">Volver al lobby de misiones</p>
+                            </div>
+                        </button>
 
                         {/* Logout Option */}
                         <button
