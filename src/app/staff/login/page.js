@@ -172,24 +172,18 @@ export default function StaffLoginPage() {
                     Si no tienes acceso, contacta a tu coordinador.
                 </p>
 
-                {/* ─── PWA Install CTA ─── */}
+                {/* ─── PWA Install — Subtle Chip ─── */}
                 {canInstall && !isInstalled && (
-                    <div className="pt-2">
+                    <div className="flex justify-center pt-1">
                         <button
                             type="button"
                             onClick={install}
-                            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0165b8] to-[#0185e4] text-white font-bold text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 active:scale-[0.98] transition-all"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100/80 border border-slate-200/60 text-slate-500 text-xs font-medium hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 active:scale-[0.97] transition-all"
                         >
-                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-white/20 flex-shrink-0">
-                                <img src="/img/app-icon.png" alt="" className="w-full h-full object-cover" />
-                            </div>
-                            {isIOS ? (
-                                <><Share size={16} /> Instalar Fly High Ops</>
-                            ) : (
-                                <><Download size={16} /> Instalar Fly High Ops</>
-                            )}
+                            <img src="/img/app-icon.png" alt="" className="w-4 h-4 rounded" />
+                            Instalar app
+                            <span className="text-slate-300">›</span>
                         </button>
-                        <p className="text-center text-[10px] text-slate-400 mt-1.5">Acceso directo • Funciona sin internet</p>
                     </div>
                 )}
 
