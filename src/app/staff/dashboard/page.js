@@ -807,7 +807,7 @@ export default function StaffDashboard() {
             } else {
                 setNoSchoolToday(false);
                 // Check if there's a previously selected mission this session
-                const savedId = sessionStorage.getItem('flyhigh_selected_mission_id');
+                const savedId = localStorage.getItem('flyhigh_selected_mission_id');
                 const match = savedId ? schools.find(s => String(s.id) === savedId) : null;
                 if (match) {
                     // Auto-resume the previously selected mission
@@ -827,7 +827,7 @@ export default function StaffDashboard() {
     const selectMission = useCallback(async (school) => {
         setLoading(true);
         setLobbyMode(false);
-        sessionStorage.setItem('flyhigh_selected_mission_id', String(school.id));
+        localStorage.setItem('flyhigh_selected_mission_id', String(school.id));
 
         try {
             const supabase = createClient();
@@ -1976,7 +1976,7 @@ export default function StaffDashboard() {
     // If we haven't checked in OR if we are explicitly showing brief
     if (showBrief && !manualMission && !directOperationMode) {
         const handleBackToLobby = () => {
-            sessionStorage.removeItem('flyhigh_selected_mission_id');
+            localStorage.removeItem('flyhigh_selected_mission_id');
             localStorage.removeItem('flyhigh_staff_mission');
             setTodaySchool(null);
             setJourneyId(null);

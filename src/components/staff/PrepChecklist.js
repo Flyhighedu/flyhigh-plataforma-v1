@@ -11,10 +11,11 @@
 import { useState, useRef } from 'react';
 import {
     Check, Camera, AlertTriangle, ArrowRight, Loader2, X,
-    ChevronDown, ChevronUp, GripHorizontal // Icono para modal de confirmación
+    ChevronDown, ChevronUp, GripHorizontal, ImagePlus
 } from 'lucide-react';
 import { PREP_CHECKLISTS, ROLE_LABELS, ROLE_COLORS } from '@/config/prepChecklistConfig';
 import { createClient } from '@/utils/supabase/client';
+import { validatePhotoDate } from '@/utils/validatePhotoDate';
 import PilotPrepChecklist from './PilotPrepChecklist';
 import TeacherTeamChecklist from './TeacherTeamChecklist';
 
@@ -55,6 +56,8 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
 
     // Referencia dinámica para inputs de archivo
     const fileInputRefs = useRef({});
+    const galleryInputRefs = useRef({});
+    const [photoRejection, setPhotoRejection] = useState(null);
 
     // --- LÓGICA DE PROGRESO (Custom para Auxiliar) ---
     const items = config.items.filter(i => !i.isDeparture);
@@ -206,10 +209,21 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
         });
     };
 
-    const handlePhotoCapture = async (e, itemId) => {
+    const handlePhotoCapture = async (e, itemId, isGallery = false) => {
         if (preview) return;
         let file = e.target.files?.[0];
         if (!file) return;
+
+        // EXIF date validation for gallery picks
+        if (isGallery) {
+            const dateCheck = validatePhotoDate(file);
+            if (!dateCheck.valid) {
+                e.target.value = '';
+                setPhotoRejection(dateCheck.message);
+                setTimeout(() => setPhotoRejection(null), 4000);
+                return;
+            }
+        }
 
         setUploadingItem(itemId);
         try {
@@ -665,41 +679,54 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                                                                 EVIDENCIA CORRECTA
                                                             </div>
                                                         </div>
+                                                    ) : uploadingItem === item.id ? (
+                                                        <div style={{ width: '100%', padding: '24px 20px', borderRadius: 14, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                                                            <Loader2 size={24} className="animate-spin" style={{ color: '#94a3b8' }} />
+                                                            <span style={{ fontWeight: 600, fontSize: 13, color: '#94a3b8' }}>Subiendo...</span>
+                                                        </div>
                                                     ) : (
-                                                        // Botón de carga
-                                                        <button
-                                                            onClick={() => fileInputRefs.current[item.id]?.click()}
-                                                            disabled={uploadingItem === item.id}
-                                                            style={{
-                                                                width: '100%', padding: '24px 20px',
-                                                                border: `2px dashed ${groupHex}40`, borderRadius: 14,
-                                                                backgroundColor: uploadingItem === item.id ? '#f8fafc' : `${groupHex}08`,
-                                                                color: uploadingItem === item.id ? '#94a3b8' : groupHex,
-                                                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                                                                cursor: uploadingItem === item.id ? 'wait' : 'pointer',
-                                                                transition: 'all 0.2s'
-                                                            }}
-                                                        >
-                                                            {uploadingItem === item.id ? (
-                                                                <Loader2 size={24} className="animate-spin" />
-                                                            ) : (
-                                                                <div style={{
-                                                                    width: 48, height: 48, borderRadius: '50%', backgroundColor: `${groupHex}15`,
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                                                }}>
-                                                                    <Camera size={22} />
-                                                                </div>
-                                                            )}
-                                                            <span style={{ fontWeight: 600, fontSize: 13 }}>
-                                                                {uploadingItem === item.id ? 'Subiendo...' : 'Capturar Evidencia'}
-                                                            </span>
-                                                        </button>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                                <button
+                                                                    onClick={() => fileInputRefs.current[item.id]?.click()}
+                                                                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 16px', borderRadius: 12, backgroundColor: '#3B82F6', color: 'white', border: 'none', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s' }}
+                                                                >
+                                                                    <Camera size={16} />
+                                                                    Tomar foto
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => galleryInputRefs.current[item.id]?.click()}
+                                                                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 16px', borderRadius: 12, backgroundColor: 'white', color: '#334155', border: '1px solid #e2e8f0', fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s' }}
+                                                                >
+                                                                    <ImagePlus size={16} />
+                                                                    Galería
+                                                                </button>
+                                                            </div>
+                                                            <p style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', margin: 0 }}>
+                                                                Galería recomendado para celulares de gama baja
+                                                            </p>
+                                                        </div>
                                                     )}
+                                                    {/* Rejection toast */}
+                                                    {photoRejection && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, marginTop: 8 }}>
+                                                            <span style={{ color: '#EF4444', fontSize: 12 }}>⚠️</span>
+                                                            <p style={{ fontSize: 12, fontWeight: 500, color: '#B91C1C', margin: 0 }}>{photoRejection}</p>
+                                                        </div>
+                                                    )}
+                                                    {/* Camera input */}
                                                     <input
                                                         type="file"
                                                         ref={el => fileInputRefs.current[item.id] = el}
                                                         className="hidden" accept="image/*" capture="environment"
-                                                        onChange={(e) => handlePhotoCapture(e, item.id)}
+                                                        onChange={(e) => handlePhotoCapture(e, item.id, false)}
+                                                    />
+                                                    {/* Gallery input (no capture) */}
+                                                    <input
+                                                        type="file"
+                                                        ref={el => galleryInputRefs.current[item.id] = el}
+                                                        className="hidden" accept="image/*"
+                                                        onChange={(e) => handlePhotoCapture(e, item.id, true)}
                                                     />
                                                 </div>
                                             );

@@ -126,7 +126,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                 changeMissionTimerRef.current = setTimeout(() => {
                                     setIsOpen(false);
                                     setChangeMissionProgress(false);
-                                    sessionStorage.removeItem('flyhigh_selected_mission_id');
+                                    localStorage.removeItem('flyhigh_selected_mission_id');
                                     localStorage.removeItem('flyhigh_staff_mission');
                                     window.location.reload();
                                 }, 3000);
@@ -144,7 +144,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                 changeMissionTimerRef.current = setTimeout(() => {
                                     setIsOpen(false);
                                     setChangeMissionProgress(false);
-                                    sessionStorage.removeItem('flyhigh_selected_mission_id');
+                                    localStorage.removeItem('flyhigh_selected_mission_id');
                                     localStorage.removeItem('flyhigh_staff_mission');
                                     window.location.reload();
                                 }, 3000);
