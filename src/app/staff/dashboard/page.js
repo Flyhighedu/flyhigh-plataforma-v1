@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck } from 'lucide-react';
+import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck, School, RefreshCw } from 'lucide-react';
 import PrepChecklist from '@/components/staff/PrepChecklist';
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
 import ClosureLegacy from '@/components/staff/ClosureLegacy';
@@ -539,6 +539,8 @@ export default function StaffDashboard() {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [todaySchool, setTodaySchool] = useState(null);
+    const [todaySchools, setTodaySchools] = useState([]);
+    const [lobbyMode, setLobbyMode] = useState(true);
     const [manualMission, setManualMission] = useState(null);
     const [journeyId, setJourneyId] = useState(null);
     const [userId, setUserId] = useState(null);
@@ -734,328 +736,356 @@ export default function StaffDashboard() {
     }, [journeyId, currentStep, missionState, showBrief, auxFlowState, teacherFlowState, mounted, profile?.role, checkInTimestamp]);
 
     // ── REUSABLE FETCH FUNCTION (For Manual Refresh) ──
+    // ── PHASE A: FETCH ALL TODAY'S SCHOOLS (LOBBY) ──
     const refreshMission = useCallback(async () => {
-        // If we don't have a userId yet, we can't do much (unless we rely on implicit triggers)
-        // But for manual refresh, we expect userId to be set.
         if (!userId) return;
 
         setLoading(true);
-        console.log('🔄 Refreshing Mission Data...');
+        console.log('🔄 Refreshing Mission Data (Lobby)...');
 
         try {
             const supabase = createClient();
             const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
 
-            // 1. Get School
+            // Fetch ALL schools for today (no limit)
             const { data: scheduled } = await supabase
                 .from('proximas_escuelas')
                 .select('*')
                 .eq('fecha_programada', today)
                 .in('estatus', ['pendiente', 'en_progreso'])
-                .order('id', { ascending: false })
-                .limit(1);
+                .order('id', { ascending: true });
 
-            if (scheduled && scheduled.length > 0) {
-                const school = scheduled[0];
-                // Fetch staff names
-                const staffIds = [school.pilot_id, school.teacher_id, school.aux_id].filter(Boolean);
+            const schools = (scheduled || []).map(school => ({
+                id: school.id,
+                school_name: school.nombre_escuela,
+                colonia: school.colonia,
+                fecha: school.fecha_programada,
+                pilot_id: school.pilot_id,
+                teacher_id: school.teacher_id,
+                aux_id: school.aux_id,
+            }));
+
+            setTodaySchools(schools);
+
+            if (schools.length === 0) {
+                setNoSchoolToday(true);
+                setTodaySchool(null);
+                localStorage.removeItem('flyhigh_staff_mission');
+            } else {
+                setNoSchoolToday(false);
+                // Check if there's a previously selected mission this session
+                const savedId = sessionStorage.getItem('flyhigh_selected_mission_id');
+                const match = savedId ? schools.find(s => String(s.id) === savedId) : null;
+                if (match) {
+                    // Auto-resume the previously selected mission
+                    await selectMission(match);
+                    return;
+                }
+                // Otherwise stay in lobby mode — user must pick
+            }
+        } catch (error) {
+            console.error('Error refreshing mission:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [userId, profile]);
+
+    // ── PHASE B: SELECT A SPECIFIC MISSION FROM LOBBY ──
+    const selectMission = useCallback(async (school) => {
+        setLoading(true);
+        setLobbyMode(false);
+        sessionStorage.setItem('flyhigh_selected_mission_id', String(school.id));
+
+        try {
+            const supabase = createClient();
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+            // Fetch staff names for this school
+            const staffIds = [school.pilot_id, school.teacher_id, school.aux_id].filter(Boolean);
+            let staffMap = {};
+
+            if (staffIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('staff_profiles')
+                    .select('user_id, full_name')
+                    .in('user_id', staffIds);
+
+                if (profiles) {
+                    profiles.forEach(p => {
+                        staffMap[p.user_id] = p.full_name;
+                    });
+                }
+            }
+
+            const schoolData = {
+                ...school,
+                pilot_name: staffMap[school.pilot_id] || 'Por asignar',
+                teacher_name: staffMap[school.teacher_id] || 'Por asignar',
+                aux_name: staffMap[school.aux_id] || 'Por asignar',
+            };
+
+            setTodaySchool(schoolData);
+            localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
+            setNoSchoolToday(false);
+
+            // 2. Get Journey (rest of the logic continues from the original function)
+            const { data: journeyData } = await supabase
+                .from('staff_journeys')
+                .select('id, mission_state, meta, status, arrival_photo_taken_at')
+                .eq('date', today)
+                .eq('school_id', school.id)
+                .single();
+
+            if (journeyData) {
+                setJourneyId(journeyData.id);
+                const state = journeyData.mission_state;
+                const meta = parseMeta(journeyData.meta);
+
+                setMissionState(state);
+                setTodaySchool(prev => ({
+                    ...prev,
+                    meta,
+                    arrival_photo_taken_at: journeyData.arrival_photo_taken_at || null
+                }));
+
+                // ── [NEW] Fetch Active Staff Participants (via Check-ins AND Presence) ──
+
+                // 1. Register SELF as Present immediately
+                if (profile && journeyData.id) {
+                    await supabase
+                        .from('staff_presence')
+                        .upsert({
+                            user_id: profile.user_id,
+                            journey_id: journeyData.id,
+                            role: profile.role,
+                            is_online: true,
+                            last_seen_at: new Date().toISOString()
+                        }, { onConflict: 'user_id' });
+                }
+
+                // 2. Fetch Check-ins (for status)
+                const { data: checkIns } = await supabase
+                    .from('staff_prep_events')
+                    .select('user_id, created_at')
+                    .eq('journey_id', journeyData.id)
+                    .eq('event_type', 'checkin');
+
+                // 3. Fetch Presence (for names even before check-in)
+                const { data: presenceList } = await supabase
+                    .from('staff_presence')
+                    .select('user_id, role')
+                    .eq('journey_id', journeyData.id);
+
+                // Combine unique User IDs
+                const checkInIds = checkIns?.map(c => c.user_id) || [];
+                const presenceIds = presenceList?.map(p => p.user_id) || [];
+                const allParticipantIds = [...new Set([...checkInIds, ...presenceIds])];
+
+                // Add CURRENT USER explicitly if not in list (to ensure local display works instantly)
+                if (userId && !allParticipantIds.includes(userId)) {
+                    allParticipantIds.push(userId);
+                }
+
                 let staffMap = {};
 
-                if (staffIds.length > 0) {
+                if (allParticipantIds.length > 0) {
                     const { data: profiles } = await supabase
                         .from('staff_profiles')
-                        .select('user_id, full_name')
-                        .in('user_id', staffIds);
+                        .select('user_id, full_name, role')
+                        .in('user_id', allParticipantIds);
 
                     if (profiles) {
                         profiles.forEach(p => {
-                            staffMap[p.user_id] = p.full_name;
+                            staffMap[p.role] = { name: p.full_name, id: p.user_id };
                         });
                     }
                 }
 
-                const schoolData = {
-                    id: school.id,
-                    school_name: school.nombre_escuela,
-                    colonia: school.colonia,
-                    fecha: school.fecha_programada,
-                    // ID Data for Realtime Logic
-                    pilot_id: school.pilot_id,
-                    teacher_id: school.teacher_id,
-                    aux_id: school.aux_id,
-                    // Name Data for UI
-                    pilot_name: staffMap[school.pilot_id] || 'Por asignar',
-                    teacher_name: staffMap[school.teacher_id] || 'Por asignar',
-                    aux_name: staffMap[school.aux_id] || 'Por asignar',
-                };
+                // Force Self-Correction if staffMap missing current user due to race condition
+                if (profile && !staffMap[profile.role]) {
+                    staffMap[profile.role] = { name: profile.full_name, id: profile.user_id };
+                }
 
-                setTodaySchool(schoolData);
-                localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
-                setNoSchoolToday(false);
+                // Update schoolData with discovered participants
+                setTodaySchool(prev => ({
+                    ...prev,
+                    pilot_name: staffMap.pilot?.name || prev?.pilot_name || 'Por asignar',
+                    teacher_name: staffMap.teacher?.name || prev?.teacher_name || 'Por asignar',
+                    aux_name: staffMap.assistant?.name || prev?.aux_name || 'Por asignar',
+                    pilot_id: staffMap.pilot?.id,
+                    teacher_id: staffMap.teacher?.id,
+                    aux_id: staffMap.assistant?.id || prev?.aux_id
+                }));
 
-                // 2. Get Journey
-                const { data: journeyData } = await supabase
-                    .from('staff_journeys')
-                    .select('id, mission_state, meta, status, arrival_photo_taken_at')
-                    .eq('date', today)
-                    .eq('school_id', school.id)
-                    .single();
+                if (profile?.role === 'pilot') {
+                    const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(state, meta);
 
-                if (journeyData) {
-                    setJourneyId(journeyData.id);
-                    const state = journeyData.mission_state;
-                    const meta = parseMeta(journeyData.meta);
-
-                    setMissionState(state);
-                    setTodaySchool(prev => ({
-                        ...prev,
-                        meta,
-                        arrival_photo_taken_at: journeyData.arrival_photo_taken_at || null
-                    }));
-
-                    // ── [NEW] Fetch Active Staff Participants (via Check-ins AND Presence) ──
-
-                    // 1. Register SELF as Present immediately
-                    if (profile && journeyData.id) {
-                        await supabase
-                            .from('staff_presence')
-                            .upsert({
-                                user_id: profile.user_id,
-                                journey_id: journeyData.id,
-                                role: profile.role,
-                                is_online: true,
-                                last_seen_at: new Date().toISOString()
-                            }, { onConflict: 'user_id' });
-                    }
-
-                    // 2. Fetch Check-ins (for status)
-                    const { data: checkIns } = await supabase
-                        .from('staff_prep_events')
-                        .select('user_id, created_at')
-                        .eq('journey_id', journeyData.id)
-                        .eq('event_type', 'checkin');
-
-                    // 3. Fetch Presence (for names even before check-in)
-                    const { data: presenceList } = await supabase
-                        .from('staff_presence')
-                        .select('user_id, role')
-                        .eq('journey_id', journeyData.id);
-
-                    // Combine unique User IDs
-                    const checkInIds = checkIns?.map(c => c.user_id) || [];
-                    const presenceIds = presenceList?.map(p => p.user_id) || [];
-                    const allParticipantIds = [...new Set([...checkInIds, ...presenceIds])];
-
-                    // Add CURRENT USER explicitly if not in list (to ensure local display works instantly)
-                    if (userId && !allParticipantIds.includes(userId)) {
-                        allParticipantIds.push(userId);
-                    }
-
-                    let staffMap = {};
-
-                    if (allParticipantIds.length > 0) {
-                        const { data: profiles } = await supabase
-                            .from('staff_profiles')
-                            .select('user_id, full_name, role')
-                            .in('user_id', allParticipantIds);
-
-                        if (profiles) {
-                            profiles.forEach(p => {
-                                staffMap[p.role] = { name: p.full_name, id: p.user_id };
-                            });
-                        }
-                    }
-
-                    // Force Self-Correction if staffMap missing current user due to race condition
-                    if (profile && !staffMap[profile.role]) {
-                        staffMap[profile.role] = { name: profile.full_name, id: profile.user_id };
-                    }
-
-                    // Update schoolData with discovered participants
-                    setTodaySchool(prev => ({
-                        ...prev,
-                        pilot_name: staffMap.pilot?.name || prev?.pilot_name || 'Por asignar',
-                        teacher_name: staffMap.teacher?.name || prev?.teacher_name || 'Por asignar',
-                        aux_name: staffMap.assistant?.name || prev?.aux_name || 'Por asignar',
-                        pilot_id: staffMap.pilot?.id,
-                        teacher_id: staffMap.teacher?.id,
-                        aux_id: staffMap.assistant?.id || prev?.aux_id
-                    }));
-
-                    if (profile?.role === 'pilot') {
-                        const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(state, meta);
-
-                        if (pilotNeedsControllerConnect) {
-                            setWaitingForAux(false);
-                        } else if (PILOT_WAITING_FOR_AUX_STATES.has(state)) {
-                            setWaitingForAux(true);
-                        } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed' || state === 'dismantling') {
-                            setWaitingForAux(false);
-                        }
-                    }
-
-                    if (profile?.role === 'assistant') {
-                        if (state === 'WAITING_AUX_VEHICLE_CHECK') {
-                            setAuxFlowState('checklist');
-                        } else if (['AUX_VEHICLE_CHECK_DONE', 'OPERATION', 'ROUTE_READY', 'IN_ROUTE'].includes(state)) {
-                            setAuxFlowState(null);
-                        } else {
-                            setAuxFlowState(null);
-                        }
-                    }
-
-                    // Determine Step based on State (LOCAL GATING APPLIED)
-                    // We must use the just-fetched checkInEvent to decide.
-                    // The variable 'checkInAvailable' will track if this user has checked in.
-                    let checkInAvailable = false;
-
-                    // Logic to find checkInEvent is further down in original code (loop issue),
-                    // but we need it HERE to decide step.
-                    // Let's look at checkIns array fetched above (line 159).
-                    if (checkIns && checkIns.find(c => c.user_id === userId)) {
-                        checkInAvailable = true;
-                    }
-
-                    if (checkInAvailable) {
-                        let serverStep = 0;
-                        if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
-                            serverStep = 0;
-                        } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
-                            serverStep = 1;
-                        } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation', 'dismantling'].includes(state)) {
-                            serverStep = 2;
-                        } else if (['report', 'closed'].includes(state) || journeyData.status === 'report') {
-                            serverStep = 3;
-                        }
-
-                        // [CRASH RECOVERY] Compare server step against IndexedDB local progress
-                        let finalStep = serverStep;
-                        try {
-                            const localProgress = await getLocalProgress(journeyData.id);
-                            if (localProgress && typeof localProgress.currentStep === 'number' && localProgress.currentStep > serverStep) {
-                                console.log(`🛡️ [CrashRecovery] Local step (${localProgress.currentStep}) > server step (${serverStep}). Trusting local.`);
-                                finalStep = localProgress.currentStep;
-                                if (localProgress.missionState) {
-                                    setMissionState(localProgress.missionState);
-                                }
-                                if (localProgress.showBrief === false) {
-                                    setShowBrief(false);
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('[CrashRecovery] Could not read IndexedDB:', e);
-                        }
-
-                        setCurrentStep(finalStep);
-                    } else {
-                        // If NOT checked in, we stay at default (MissionBrief / Prep)
-                        setCurrentStep(0);
-                        console.log('🔒 User not checked in locally. Staying at Step 0/Brief.');
-                    }
-
-                } else {
-                    const { data: newJourney, error: insertError } = await supabase
-                        .from('staff_journeys')
-                        .insert({
-                            date: today,
-                            school_id: school.id,
-                            school_name: school.nombre_escuela,
-                            created_by: userId,
-                            status: 'prep'
-                        })
-                        .select('id')
-                        .single();
-
-                    if (insertError) {
-                        // If it fails for ANY reason (likely race condition or constraint), try fetching existing
-                        console.warn('⚠️ Journey insert failed (Race condition likely). Fetching existing ID...', insertError);
-                        const { data: existing } = await supabase
-                            .from('staff_journeys')
-                            .select('id')
-                            .eq('date', today)
-                            .eq('school_id', school.id)
-                            .single();
-
-                        if (existing) {
-                            setJourneyId(existing.id);
-                        } else {
-                            console.error('❌ Critical: Could not create nor find journey:', insertError);
-                        }
-                    } else if (newJourney) {
-                        setJourneyId(newJourney.id);
+                    if (pilotNeedsControllerConnect) {
+                        setWaitingForAux(false);
+                    } else if (PILOT_WAITING_FOR_AUX_STATES.has(state)) {
+                        setWaitingForAux(true);
+                    } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed' || state === 'dismantling') {
+                        setWaitingForAux(false);
                     }
                 }
 
-                // 3. Check for Check-in
-                if (journeyData || journeyId) {
-                    const jId = journeyData?.id || journeyId;
-                    if (jId) {
-                        const { data: checkInRows, error: checkInError } = await supabase
-                            .from('staff_prep_events')
-                            .select('payload, created_at')
-                            .eq('journey_id', jId)
-                            .eq('event_type', 'checkin')
-                            .eq('user_id', userId) // CRITICAL FIX: Only user's own check-in!
-                            .order('created_at', { ascending: false })
-                            .limit(1);
-
-                        if (checkInError) {
-                            console.warn('Check-in query fallback (non-blocking):', checkInError);
-
-                            const inferredState = journeyData?.mission_state || todaySchoolRef.current?.mission_state || null;
-                            const isOperationalFlowState = LISTENER_STEP_ONE_STATES.has(inferredState) || inferredState === 'dismantling' || inferredState === 'report' || inferredState === 'closed';
-
-                            if (isOperationalFlowState || checkInRef.current) {
-                                setShowBrief(false);
-                            } else {
-                                setCheckInTimestamp(null);
-                                setShowBrief(true);
-                            }
-
-                            return;
-                        }
-
-                        const checkInEvent = Array.isArray(checkInRows) && checkInRows.length > 0
-                            ? checkInRows[0]
-                            : null;
-
-                        if (checkInEvent) {
-                            const checkInTs = checkInEvent?.payload?.timestamp || checkInEvent?.created_at || new Date().toISOString();
-                            setCheckInTimestamp(checkInTs);
-                            setTodaySchool(prev => ({ ...prev, checkInTimestamp: checkInTs }));
-                            setShowBrief(false);
-                        } else {
-                            const inferredState =
-                                journeyData?.mission_state ||
-                                todaySchoolRef.current?.mission_state ||
-                                missionStateRef.current ||
-                                null;
-                            const isOperationalFlowState =
-                                LISTENER_STEP_ONE_STATES.has(inferredState) ||
-                                inferredState === 'OPERATION' ||
-                                inferredState === 'operation' ||
-                                inferredState === 'dismantling' ||
-                                inferredState === 'report' ||
-                                inferredState === 'closed';
-
-                            if (isOperationalFlowState || checkInRef.current) {
-                                setShowBrief(false);
-                            } else {
-                                // Explicitly clear checking state only if user is really still pre-checkin
-                                setCheckInTimestamp(null);
-                                setShowBrief(true);
-                            }
-                        }
+                if (profile?.role === 'assistant') {
+                    if (state === 'WAITING_AUX_VEHICLE_CHECK') {
+                        setAuxFlowState('checklist');
+                    } else if (['AUX_VEHICLE_CHECK_DONE', 'OPERATION', 'ROUTE_READY', 'IN_ROUTE'].includes(state)) {
+                        setAuxFlowState(null);
+                    } else {
+                        setAuxFlowState(null);
                     }
+                }
+
+                // Determine Step based on State (LOCAL GATING APPLIED)
+                // We must use the just-fetched checkInEvent to decide.
+                // The variable 'checkInAvailable' will track if this user has checked in.
+                let checkInAvailable = false;
+
+                // Logic to find checkInEvent is further down in original code (loop issue),
+                // but we need it HERE to decide step.
+                // Let's look at checkIns array fetched above (line 159).
+                if (checkIns && checkIns.find(c => c.user_id === userId)) {
+                    checkInAvailable = true;
+                }
+
+                if (checkInAvailable) {
+                    let serverStep = 0;
+                    if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
+                        serverStep = 0;
+                    } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
+                        serverStep = 1;
+                    } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation', 'dismantling'].includes(state)) {
+                        serverStep = 2;
+                    } else if (['report', 'closed'].includes(state) || journeyData.status === 'report') {
+                        serverStep = 3;
+                    }
+
+                    // [CRASH RECOVERY] Compare server step against IndexedDB local progress
+                    let finalStep = serverStep;
+                    try {
+                        const localProgress = await getLocalProgress(journeyData.id);
+                        if (localProgress && typeof localProgress.currentStep === 'number' && localProgress.currentStep > serverStep) {
+                            console.log(`🛡️ [CrashRecovery] Local step (${localProgress.currentStep}) > server step (${serverStep}). Trusting local.`);
+                            finalStep = localProgress.currentStep;
+                            if (localProgress.missionState) {
+                                setMissionState(localProgress.missionState);
+                            }
+                            if (localProgress.showBrief === false) {
+                                setShowBrief(false);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[CrashRecovery] Could not read IndexedDB:', e);
+                    }
+
+                    setCurrentStep(finalStep);
+                } else {
+                    // If NOT checked in, we stay at default (MissionBrief / Prep)
+                    setCurrentStep(0);
+                    console.log('🔒 User not checked in locally. Staying at Step 0/Brief.');
                 }
 
             } else {
-                setNoSchoolToday(true);
-                localStorage.removeItem('flyhigh_staff_mission');
-                setTodaySchool(null);
+                const { data: newJourney, error: insertError } = await supabase
+                    .from('staff_journeys')
+                    .insert({
+                        date: today,
+                        school_id: school.id,
+                        school_name: school.nombre_escuela,
+                        created_by: userId,
+                        status: 'prep'
+                    })
+                    .select('id')
+                    .single();
+
+                if (insertError) {
+                    // If it fails for ANY reason (likely race condition or constraint), try fetching existing
+                    console.warn('⚠️ Journey insert failed (Race condition likely). Fetching existing ID...', insertError);
+                    const { data: existing } = await supabase
+                        .from('staff_journeys')
+                        .select('id')
+                        .eq('date', today)
+                        .eq('school_id', school.id)
+                        .single();
+
+                    if (existing) {
+                        setJourneyId(existing.id);
+                    } else {
+                        console.error('❌ Critical: Could not create nor find journey:', insertError);
+                    }
+                } else if (newJourney) {
+                    setJourneyId(newJourney.id);
+                }
             }
+
+            // 3. Check for Check-in
+            if (journeyData || journeyId) {
+                const jId = journeyData?.id || journeyId;
+                if (jId) {
+                    const { data: checkInRows, error: checkInError } = await supabase
+                        .from('staff_prep_events')
+                        .select('payload, created_at')
+                        .eq('journey_id', jId)
+                        .eq('event_type', 'checkin')
+                        .eq('user_id', userId) // CRITICAL FIX: Only user's own check-in!
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (checkInError) {
+                        console.warn('Check-in query fallback (non-blocking):', checkInError);
+
+                        const inferredState = journeyData?.mission_state || todaySchoolRef.current?.mission_state || null;
+                        const isOperationalFlowState = LISTENER_STEP_ONE_STATES.has(inferredState) || inferredState === 'dismantling' || inferredState === 'report' || inferredState === 'closed';
+
+                        if (isOperationalFlowState || checkInRef.current) {
+                            setShowBrief(false);
+                        } else {
+                            setCheckInTimestamp(null);
+                            setShowBrief(true);
+                        }
+
+                        return;
+                    }
+
+                    const checkInEvent = Array.isArray(checkInRows) && checkInRows.length > 0
+                        ? checkInRows[0]
+                        : null;
+
+                    if (checkInEvent) {
+                        const checkInTs = checkInEvent?.payload?.timestamp || checkInEvent?.created_at || new Date().toISOString();
+                        setCheckInTimestamp(checkInTs);
+                        setTodaySchool(prev => ({ ...prev, checkInTimestamp: checkInTs }));
+                        setShowBrief(false);
+                    } else {
+                        const inferredState =
+                            journeyData?.mission_state ||
+                            todaySchoolRef.current?.mission_state ||
+                            missionStateRef.current ||
+                            null;
+                        const isOperationalFlowState =
+                            LISTENER_STEP_ONE_STATES.has(inferredState) ||
+                            inferredState === 'OPERATION' ||
+                            inferredState === 'operation' ||
+                            inferredState === 'dismantling' ||
+                            inferredState === 'report' ||
+                            inferredState === 'closed';
+
+                        if (isOperationalFlowState || checkInRef.current) {
+                            setShowBrief(false);
+                        } else {
+                            // Explicitly clear checking state only if user is really still pre-checkin
+                            setCheckInTimestamp(null);
+                            setShowBrief(true);
+                        }
+                    }
+                }
+            }
+
         } catch (error) {
-            console.error('Error refreshing mission:', error);
+            console.error('Error selecting mission:', error);
         } finally {
             setLoading(false);
         }
@@ -1778,65 +1808,101 @@ export default function StaffDashboard() {
         );
     }
 
-    // --- No school today → Fallback mission selector ---
-    if (noSchoolToday && showBrief && !directOperationMode) {
-        return withDependencyOverlay(
-            <div className="min-h-screen bg-slate-50">
-                <MissionBrief
-                    profile={profile}
-                    school={null}
-                    journeyId={null}
-                    userId={userId}
-                    onCheckedIn={() => { }}
-                    onLogout={handleLogout}
-                    onRefresh={refreshMission} // [NEW] Pass refresh handler
-                /* onComplete missing? No, not needed here */
-                />
-                {profile?.role === 'admin' && (
-                    <div className="max-w-lg mx-auto px-5 pb-10">
-                        <button
-                            onClick={() => { setShowBrief(false); }}
-                            className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50 transition-all"
-                        >
-                            Seleccionar misión manualmente
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    // Legacy manual selector (after admin clicks manual selection)
-    if (noSchoolToday && !showBrief && !directOperationMode) {
+    // --- MISSION LOBBY (always shown first until user picks a mission) ---
+    if ((lobbyMode || noSchoolToday) && !todaySchool && !manualMission && !directOperationMode) {
         return withDependencyOverlay(
             <div className="min-h-screen bg-slate-50 p-4">
                 <div className="max-w-md mx-auto space-y-6 pt-6">
+                    {/* Header */}
                     {profile && (
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <User className="w-5 h-5 text-blue-600" />
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center shadow-md">
+                                    <User className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
                                     <p className="font-bold text-slate-800">{profile.full_name}</p>
                                     <p className="text-xs text-slate-500">{ROLE_LABELS[profile.role] || profile.role}</p>
                                 </div>
                             </div>
-                            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500">
+                            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
                                 <LogOut size={20} />
                             </button>
                         </div>
                     )}
 
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                        <Calendar className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                            <p className="font-semibold text-amber-800 text-sm">No hay escuela programada hoy</p>
-                            <p className="text-xs text-amber-600 mt-1">Selecciona una misión manualmente para continuar.</p>
-                        </div>
+                    {/* Today's date banner */}
+                    <div className="text-center">
+                        <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                            {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' })}
+                        </p>
                     </div>
 
-                    <MissionSelector onSelect={handleManualMissionSelect} />
+                    {/* Mission Cards or Empty State */}
+                    {todaySchools.length > 0 ? (
+                        <div className="space-y-3">
+                            <h2 className="text-lg font-extrabold text-slate-800">
+                                Misiones del día
+                                <span className="ml-2 text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                                    {todaySchools.length}
+                                </span>
+                            </h2>
+                            <p className="text-xs text-slate-500 -mt-1">Selecciona una misión para iniciar operaciones.</p>
+
+                            {todaySchools.map((school, idx) => (
+                                <button
+                                    key={school.id}
+                                    onClick={() => selectMission(school)}
+                                    className="w-full text-left bg-white rounded-2xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 active:scale-[0.98] transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                                            <School className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-bold text-slate-800 text-sm truncate group-hover:text-blue-600 transition-colors">
+                                                {school.school_name}
+                                            </p>
+                                            {school.colonia && (
+                                                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                    <MapPin size={10} className="text-slate-400" />
+                                                    {school.colonia}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="text-slate-300 group-hover:text-blue-400 transition-colors">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="9 18 15 12 9 6" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-semibold text-amber-800 text-sm">Sin misiones el día de hoy</p>
+                                <p className="text-xs text-amber-600 mt-1">No hay escuelas programadas. Contacta a tu coordinador.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Refresh button */}
+                    <button
+                        onClick={refreshMission}
+                        disabled={loading}
+                        className="w-full py-2.5 bg-white border border-slate-200 text-slate-500 font-semibold rounded-xl text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        Actualizar
+                    </button>
+
+                    {/* Admin manual selector (legacy) */}
+                    {profile?.role === 'admin' && noSchoolToday && (
+                        <MissionSelector onSelect={handleManualMissionSelect} />
+                    )}
                 </div>
             </div>
         );

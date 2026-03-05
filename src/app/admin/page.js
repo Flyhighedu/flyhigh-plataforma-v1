@@ -656,31 +656,19 @@ export default function AdminPage() {
         setNextSchools(prev => prev.filter(s => s.id !== id));
 
         try {
-            const archivePayload = {
-                estatus: 'archivado',
-                is_archived: true,
-                archived_at: new Date().toISOString()
-            };
+            const res = await fetch('/api/admin/delete-school', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
 
-            let { error } = await supabaseNew
-                .from('proximas_escuelas')
-                .update(archivePayload)
-                .eq('id', id);
-
-            if (error && /column/i.test(error.message || '')) {
-                const fallback = await supabaseNew
-                    .from('proximas_escuelas')
-                    .update({ estatus: 'archivado' })
-                    .eq('id', id);
-                error = fallback.error;
-            }
-
-            if (error) throw error;
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error del servidor');
         } catch (err) {
             console.error('Error deleting school:', err);
             // Revert
             setNextSchools(previousSchools);
-            alert('Error al archivar');
+            alert('Error al archivar: ' + (err.message || err));
         }
     };
 
