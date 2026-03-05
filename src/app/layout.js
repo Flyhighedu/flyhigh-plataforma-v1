@@ -20,6 +20,8 @@ export default function RootLayout({ children }) {
     return (
         <html lang="es">
             <head>
+                {/* Capture PWA install prompt before React hydrates */}
+                <script dangerouslySetInnerHTML={{ __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;});` }} />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
                 <link rel="apple-touch-icon" href="/img/app-icon.png" />

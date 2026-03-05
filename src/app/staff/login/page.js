@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Loader2, AlertCircle, Plane } from 'lucide-react';
+import { Loader2, AlertCircle, Plane, Download, Share } from 'lucide-react';
+import usePWAInstall from '@/hooks/usePWAInstall';
 
 export default function StaffLoginPage() {
     const [email, setEmail] = useState('');
@@ -12,6 +13,7 @@ export default function StaffLoginPage() {
     const [error, setError] = useState(null);
     const [showTestModal, setShowTestModal] = useState(false);
     const router = useRouter();
+    const { canInstall, isInstalled, isIOS, install, showIOSGuide, dismissIOSGuide } = usePWAInstall();
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -170,6 +172,27 @@ export default function StaffLoginPage() {
                     Si no tienes acceso, contacta a tu coordinador.
                 </p>
 
+                {/* ─── PWA Install CTA ─── */}
+                {canInstall && !isInstalled && (
+                    <div className="pt-2">
+                        <button
+                            type="button"
+                            onClick={install}
+                            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0165b8] to-[#0185e4] text-white font-bold text-sm flex items-center justify-center gap-2.5 shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 active:scale-[0.98] transition-all"
+                        >
+                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-white/20 flex-shrink-0">
+                                <img src="/img/app-icon.png" alt="" className="w-full h-full object-cover" />
+                            </div>
+                            {isIOS ? (
+                                <><Share size={16} /> Instalar Fly High Ops</>
+                            ) : (
+                                <><Download size={16} /> Instalar Fly High Ops</>
+                            )}
+                        </button>
+                        <p className="text-center text-[10px] text-slate-400 mt-1.5">Acceso directo • Funciona sin internet</p>
+                    </div>
+                )}
+
                 {/* Test Mode Button */}
                 <div className="pt-6 border-t border-slate-100 mt-6">
                     <button
@@ -181,7 +204,44 @@ export default function StaffLoginPage() {
                     </button>
                 </div>
             </div>
+
             {showTestModal && <TestModeModal onClose={() => setShowTestModal(false)} />}
+
+            {/* ─── iOS Install Guide Overlay ─── */}
+            {showIOSGuide && (
+                <div className="fixed inset-0 z-[9991] bg-black/60 backdrop-blur-sm flex items-end justify-center p-4 animate-in fade-in duration-300">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-in slide-in-from-bottom-5 duration-500 mb-[env(safe-area-inset-bottom)]">
+                        <h3 className="text-lg font-extrabold text-slate-900 text-center">Instalar en iPhone</h3>
+                        <p className="text-slate-500 text-xs text-center mt-1 mb-5">Sigue estos 3 pasos:</p>
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">Toca el botón Compartir</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">El ícono <Share size={12} className="inline text-blue-500" /> en la barra de Safari (abajo).</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">Selecciona &quot;Añadir a Inicio&quot;</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">Desliza hacia abajo en el menú para encontrarlo.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">Toca &quot;Añadir&quot;</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">¡Listo! La app aparecerá en tu pantalla de inicio.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={dismissIOSGuide} className="mt-6 w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-colors">
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
