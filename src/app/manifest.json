@@ -4,13 +4,13 @@
     "description": "App de operaciones de campo para el equipo FlyHigh",
     "icons": [
         {
-            "src": "/app-icon.png",
+            "src": "/img/app-icon.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "/app-icon.png",
+            "src": "/img/app-icon.png",
             "sizes": "512x512",
             "type": "image/png"
         }

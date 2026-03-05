@@ -31,23 +31,36 @@ export default function CustomSplashScreen({ children }) {
                         initial={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.8, ease: 'easeInOut' }}
-                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0185e4]"
+                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0185e4] overflow-hidden"
                     >
-                        {/* Contenedor del logo con animación de levitación simulando un dron */}
+                        {/* Pulse glow ring behind the logo */}
                         <motion.div
-                            animate={{
-                                y: [-15, 15, -15],
-                            }}
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: [0, 0.3, 0], scale: [0.8, 1.6, 0.8] }}
                             transition={{
-                                duration: 3, // ajusta la velocidad según sientas más natural el vuelo
+                                duration: 2.5,
                                 repeat: Infinity,
-                                ease: "easeInOut"
+                                ease: 'easeInOut',
+                                delay: 0.8
+                            }}
+                            className="absolute w-[45%] aspect-square rounded-full"
+                            style={{
+                                background: 'radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 70%)'
+                            }}
+                        />
+
+                        {/* Logo with blur reveal + scale entrance */}
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.6, filter: 'blur(20px)' }}
+                            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                            transition={{
+                                duration: 1.0,
+                                ease: [0.22, 1, 0.36, 1] // custom cubic-bezier for premium deceleration
                             }}
                             className="w-[30%] max-w-sm min-w-[200px] relative flex justify-center items-center"
                         >
-                            {/* Reemplaza la ruta por el logo proporcionado (ej: /logo.png o logo de Vercel/FlyHigh) */}
                             <img
-                                src="/logo.png"
+                                src="/img/LOGO OPS.png"
                                 alt="FlyHigh Logo"
                                 className="w-full h-auto object-contain drop-shadow-2xl"
                             />
