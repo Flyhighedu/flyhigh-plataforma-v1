@@ -22,7 +22,7 @@ import HeaderOperativo from './HeaderOperativo';
 import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import { useRouter } from 'next/navigation';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
-import { getPendingUploads, syncAllPending } from '@/utils/offlineSyncManager';
+import { getPendingUploads, syncAllPending, clearLocalProgress } from '@/utils/offlineSyncManager';
 
 const TEAM_ROLES = ['pilot', 'teacher', 'assistant'];
 
@@ -735,6 +735,7 @@ export default function CheckoutScreen({
 
             if (allTeamCheckedOut) {
                 clearJourneyLocalOperationalData(journeyId);
+                clearLocalProgress(journeyId);
                 if (typeof window !== 'undefined' && window.localStorage) {
                     window.localStorage.removeItem('flyhigh_staff_mission');
                 }
@@ -857,6 +858,7 @@ export default function CheckoutScreen({
             onRefresh && onRefresh();
             if (allTeamCheckedOut) {
                 clearJourneyLocalOperationalData(journeyId);
+                clearLocalProgress(journeyId);
                 if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('flyhigh_staff_mission');
             }
             if (typeof onCheckoutComplete === 'function') onCheckoutComplete({ allTeamCheckedOut, nextStatus, finalizedAt: now });

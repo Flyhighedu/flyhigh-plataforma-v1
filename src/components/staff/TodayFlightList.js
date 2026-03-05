@@ -1,6 +1,7 @@
 'use client';
 
-import { CheckCircle2, Clock, Users, Coffee, AlertTriangle, Pause, Pencil } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Clock, Users, Coffee, AlertTriangle, Pause, Pencil, ChevronDown } from 'lucide-react';
 
 function toEpochMs(value) {
     const asNumber = Number(value);
@@ -41,7 +42,10 @@ function safeCount(value) {
     return Math.floor(parsed);
 }
 
+const VISIBLE_WINDOW = 4; // Max items shown before "show all" toggle
+
 export default function TodayFlightList({ flights, pauses = [], activeFlight = null, onRequestEditFlight = null }) {
+    const [showAll, setShowAll] = useState(false);
     const flightKeyUsage = new Map();
 
     const flightsNormalized = (flights || [])
@@ -163,6 +167,12 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
 
     if (allItems.length === 0) return null;
 
+    // [RAM DIET] Only render recent items by default to reduce DOM nodes
+    const visibleItems = showAll || allItems.length <= VISIBLE_WINDOW
+        ? allItems
+        : allItems.slice(0, VISIBLE_WINDOW);
+    const hiddenCount = allItems.length - visibleItems.length;
+
     const flightCount = flightsWithNumbersAsc.length;
     const pauseCount = pauseItems.filter(p => p.endTime).length; // Only count completed pauses
 
@@ -180,7 +190,7 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
             </h3>
 
             <div className="space-y-2">
-                {allItems.map((item, idx) => {
+                {visibleItems.map((item, idx) => {
                     // PAUSE CARD
                     if (item.itemType === 'pause') {
                         const isReceso = item.type === 'receso';
@@ -195,8 +205,8 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                             <div
                                 key={`pause-${safeText(item.pauseId, 'no-id')}-${idx}`}
                                 className={`border rounded-xl p-4 flex items-center justify-between shadow-sm ${isReceso
-                                        ? 'bg-amber-50 border-amber-200'
-                                        : 'bg-red-50 border-red-200'
+                                    ? 'bg-amber-50 border-amber-200'
+                                    : 'bg-red-50 border-red-200'
                                     }`}
                             >
                                 <div className="flex items-center gap-4">
@@ -283,6 +293,17 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                     );
                 })}
             </div>
+
+            {/* [RAM DIET] Show toggle when items are hidden */}
+            {hiddenCount > 0 && (
+                <button
+                    onClick={() => setShowAll(true)}
+                    className="w-full mt-2 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5 hover:bg-slate-100 transition-colors"
+                >
+                    <ChevronDown size={14} />
+                    Ver todos ({hiddenCount} más)
+                </button>
+            )}
         </div>
     );
 }

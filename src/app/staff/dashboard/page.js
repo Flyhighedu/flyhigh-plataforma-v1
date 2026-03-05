@@ -67,6 +67,7 @@ import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/te
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
 import HeaderHamburgerMenu from '@/components/staff/HeaderHamburgerMenu';
 import useBackgroundSync from '@/hooks/useBackgroundSync';
+import { saveLocalProgress, getLocalProgress } from '@/utils/offlineSyncManager';
 
 import { STAFF_STEPS } from '@/constants/staffSteps';
 import { parseMeta, shouldLockPilot, isPilotReady } from '@/utils/metaHelpers';
@@ -718,6 +719,20 @@ export default function StaffDashboard() {
         setMounted(true);
     }, []);
 
+    // [PERSIST] Save step/state to IndexedDB on every change for crash recovery
+    useEffect(() => {
+        if (!journeyId || !mounted) return;
+        saveLocalProgress(journeyId, {
+            currentStep,
+            missionState,
+            role: profile?.role || null,
+            showBrief,
+            auxFlowState,
+            teacherFlowState,
+            checkInDone: Boolean(checkInTimestamp)
+        });
+    }, [journeyId, currentStep, missionState, showBrief, auxFlowState, teacherFlowState, mounted, profile?.role, checkInTimestamp]);
+
     // ── REUSABLE FETCH FUNCTION (For Manual Refresh) ──
     const refreshMission = useCallback(async () => {
         // If we don't have a userId yet, we can't do much (unless we rely on implicit triggers)
@@ -902,20 +917,38 @@ export default function StaffDashboard() {
                     }
 
                     if (checkInAvailable) {
+                        let serverStep = 0;
                         if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
-                            setCurrentStep(0);
+                            serverStep = 0;
                         } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
-                            setCurrentStep(1); // En Ruta (and Post-Arrival subflow)
+                            serverStep = 1;
                         } else if (['ARRIVAL_PHOTO_DONE', 'OPERATION', 'operation', 'dismantling'].includes(state)) {
-                            setCurrentStep(2); // Operation
+                            serverStep = 2;
                         } else if (['report', 'closed'].includes(state) || journeyData.status === 'report') {
-                            setCurrentStep(3); // Report
+                            serverStep = 3;
                         }
+
+                        // [CRASH RECOVERY] Compare server step against IndexedDB local progress
+                        let finalStep = serverStep;
+                        try {
+                            const localProgress = await getLocalProgress(journeyData.id);
+                            if (localProgress && typeof localProgress.currentStep === 'number' && localProgress.currentStep > serverStep) {
+                                console.log(`🛡️ [CrashRecovery] Local step (${localProgress.currentStep}) > server step (${serverStep}). Trusting local.`);
+                                finalStep = localProgress.currentStep;
+                                if (localProgress.missionState) {
+                                    setMissionState(localProgress.missionState);
+                                }
+                                if (localProgress.showBrief === false) {
+                                    setShowBrief(false);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[CrashRecovery] Could not read IndexedDB:', e);
+                        }
+
+                        setCurrentStep(finalStep);
                     } else {
                         // If NOT checked in, we stay at default (MissionBrief / Prep)
-                        // Actually, if not checked in, showBrief defaults to true?
-                        // We do NOT set currentStep to 1 or 2 here.
-                        // We might set it to 0 as base.
                         setCurrentStep(0);
                         console.log('🔒 User not checked in locally. Staying at Step 0/Brief.');
                     }

@@ -221,3 +221,74 @@ export async function getSyncStatus() {
 
     return { total: items.length, pending, failed, items };
 }
+
+// ═══════════════════════════════════════════════════════════
+//  LOCAL STEP / PROGRESS PERSISTENCE (crash recovery)
+// ═══════════════════════════════════════════════════════════
+
+const STEP_PREFIX = 'flyhigh_step_';
+
+/**
+ * Save the user's current operational progress to IndexedDB.
+ * Called on every step/state advancement for instant crash recovery.
+ *
+ * @param {string} journeyId
+ * @param {Object} progress
+ * @param {number} progress.currentStep - 0-3 stepper index
+ * @param {string} progress.missionState - e.g. 'seat_deployment', 'OPERATION'
+ * @param {string} [progress.role] - user's role
+ * @param {boolean} [progress.showBrief] - brief screen state
+ * @param {string|null} [progress.auxFlowState]
+ * @param {string|null} [progress.teacherFlowState]
+ * @param {boolean} [progress.checkInDone] - whether user has checked in
+ */
+export async function saveLocalProgress(journeyId, progress) {
+    if (!journeyId) return;
+    try {
+        const key = `${STEP_PREFIX}${journeyId}`;
+        await set(key, {
+            ...progress,
+            savedAt: Date.now()
+        });
+    } catch (e) {
+        console.warn('[OfflineSync] Failed to save local progress:', e);
+    }
+}
+
+/**
+ * Retrieve saved progress for crash recovery.
+ * @param {string} journeyId
+ * @returns {Promise<Object|null>}
+ */
+export async function getLocalProgress(journeyId) {
+    if (!journeyId) return null;
+    try {
+        const key = `${STEP_PREFIX}${journeyId}`;
+        const data = await get(key);
+        if (!data) return null;
+
+        // Expire after 24 hours (stale data protection)
+        const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+        if (Date.now() - (data.savedAt || 0) > MAX_AGE_MS) {
+            await del(key);
+            return null;
+        }
+        return data;
+    } catch (e) {
+        console.warn('[OfflineSync] Failed to read local progress:', e);
+        return null;
+    }
+}
+
+/**
+ * Clear saved progress (call on successful checkout or journey end).
+ * @param {string} journeyId
+ */
+export async function clearLocalProgress(journeyId) {
+    if (!journeyId) return;
+    try {
+        await del(`${STEP_PREFIX}${journeyId}`);
+    } catch (e) {
+        console.warn('[OfflineSync] Failed to clear local progress:', e);
+    }
+}
