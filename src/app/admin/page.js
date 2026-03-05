@@ -299,24 +299,14 @@ export default function AdminPage() {
         }
     };
 
-    // Fetch próximas escuelas
+    // Fetch próximas escuelas (via API to bypass RLS)
     const fetchNextSchools = async () => {
         setFetchingNextSchools(true);
         try {
-            const { data, error } = await supabaseNew
-                .from('proximas_escuelas')
-                .select('*')
-                .neq('estatus', 'archivado')
-                .order('fecha_programada', { ascending: true });
-
-            if (error) {
-                if (error.code === '42P01') {
-                    console.warn('Tabla proximas_escuelas no existe.');
-                    return;
-                }
-                throw error;
-            }
-            setNextSchools(data || []);
+            const res = await fetch('/api/admin/list-schools');
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error fetching schools');
+            setNextSchools(result.data || []);
         } catch (err) {
             console.error('Error fetching next schools:', err);
         } finally {
