@@ -2353,6 +2353,16 @@ export default function SupervisorDashboard() {
                 if (ev.event_type === 'mission_chip' && ev.payload?.chip) {
                     const ch = ev.payload.chip, prev = missionChipsAt[ch];
                     if (!prev || new Date(ev.created_at) > new Date(prev)) { missionChipsAt[ch] = ev.created_at; missionChips[ch] = ev.payload?.value === true; }
+                    // Map 'mission_bulk' (sent by teacher as a single toggle) to both 'school' and 'address'
+                    if (ch === 'mission_bulk' && ev.payload?.value === true) {
+                        ['school', 'address'].forEach(k => {
+                            const kPrev = missionChipsAt[k];
+                            if (!kPrev || new Date(ev.created_at) > new Date(kPrev)) {
+                                missionChipsAt[k] = ev.created_at;
+                                missionChips[k] = true;
+                            }
+                        });
+                    }
                 }
                 if (ev.event_type === 'team_check' && ev.payload?.target_user_id && ev.payload?.check_type) {
                     const key = `${ev.payload.target_user_id}|${ev.payload.check_type}`, prev = teamCheckByKey[key];
@@ -3780,10 +3790,10 @@ export default function SupervisorDashboard() {
                             onClick={() => hasLiveMission && setDashboardTab('live')}
                             disabled={!hasLiveMission}
                             className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'live'
-                                    ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
-                                    : hasLiveMission
-                                        ? 'text-slate-300 hover:text-white'
-                                        : 'text-slate-500 cursor-not-allowed'
+                                ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
+                                : hasLiveMission
+                                    ? 'text-slate-300 hover:text-white'
+                                    : 'text-slate-500 cursor-not-allowed'
                                 }`}
                         >
                             Misión actual
@@ -3792,8 +3802,8 @@ export default function SupervisorDashboard() {
                             type="button"
                             onClick={() => setDashboardTab('history')}
                             className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'history'
-                                    ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
-                                    : 'text-slate-300 hover:text-white'
+                                ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
+                                : 'text-slate-300 hover:text-white'
                                 }`}
                         >
                             Historial
@@ -3856,8 +3866,8 @@ export default function SupervisorDashboard() {
                                     <article
                                         key={mission.key}
                                         className={`rounded-2xl border transition-all overflow-hidden ${selected
-                                                ? 'border-primary/70 bg-primary/10 shadow-[0_0_18px_-6px_rgba(19,146,236,0.7)]'
-                                                : 'border-slate-800 bg-surface-dark hover:border-slate-700'
+                                            ? 'border-primary/70 bg-primary/10 shadow-[0_0_18px_-6px_rgba(19,146,236,0.7)]'
+                                            : 'border-slate-800 bg-surface-dark hover:border-slate-700'
                                             }`}
                                     >
                                         <button
@@ -4282,8 +4292,8 @@ export default function SupervisorDashboard() {
                         type="button"
                         onClick={() => setDashboardTab('live')}
                         className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'live'
-                                ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
-                                : 'text-slate-300 hover:text-white'
+                            ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
+                            : 'text-slate-300 hover:text-white'
                             }`}
                     >
                         Misión actual
@@ -4292,8 +4302,8 @@ export default function SupervisorDashboard() {
                         type="button"
                         onClick={() => setDashboardTab('history')}
                         className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${effectiveTab === 'history'
-                                ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
-                                : 'text-slate-300 hover:text-white'
+                            ? 'bg-primary text-white shadow-[0_0_12px_-4px_rgba(19,146,236,0.7)]'
+                            : 'text-slate-300 hover:text-white'
                             }`}
                     >
                         Historial
@@ -5409,12 +5419,12 @@ export default function SupervisorDashboard() {
                                                                 )}
 
                                                                 <span className={`text-[12px] ${isInactive
-                                                                        ? 'text-slate-500'
-                                                                        : isDone
-                                                                            ? 'text-emerald-300/90'
-                                                                            : isActive
-                                                                                ? 'text-white font-semibold'
-                                                                                : 'text-slate-500'
+                                                                    ? 'text-slate-500'
+                                                                    : isDone
+                                                                        ? 'text-emerald-300/90'
+                                                                        : isActive
+                                                                            ? 'text-white font-semibold'
+                                                                            : 'text-slate-500'
                                                                     }`}>
                                                                     {task.label}
                                                                 </span>

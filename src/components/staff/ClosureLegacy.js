@@ -78,12 +78,12 @@ export default function ClosureLegacy({ journeyId, onComplete, preview = false }
         const result = await syncMissionClosure(closureData);
 
         if (result.success) {
+            localStorage.removeItem('flyhigh_selected_mission_id');
             localStorage.removeItem('flyhigh_flight_logs');
             localStorage.removeItem('flyhigh_staff_mission');
             localStorage.removeItem('flyhigh_completed_pauses');
             localStorage.removeItem('flyhigh_active_pause');
             localStorage.removeItem('flyhigh_active_flight');
-
             setShowReport(true);
         } else {
             alert(`Error al sincronizar: ${result.error || 'Intenta nuevamente.'}`);

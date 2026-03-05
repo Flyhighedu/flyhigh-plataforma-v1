@@ -752,7 +752,7 @@ export default function StaffDashboard() {
                 .from('proximas_escuelas')
                 .select('*')
                 .eq('fecha_programada', today)
-                .in('estatus', ['pendiente', 'en_progreso'])
+                .in('estatus', ['pendiente', 'en_progreso', 'completada', 'cerrada'])
                 .order('id', { ascending: true });
 
             const schools = (scheduled || []).map(school => ({
@@ -763,6 +763,7 @@ export default function StaffDashboard() {
                 pilot_id: school.pilot_id,
                 teacher_id: school.teacher_id,
                 aux_id: school.aux_id,
+                estatus: school.estatus,
                 presence: [], // will be populated below
             }));
 
@@ -809,10 +810,15 @@ export default function StaffDashboard() {
                 // Check if there's a previously selected mission this session
                 const savedId = localStorage.getItem('flyhigh_selected_mission_id');
                 const match = savedId ? schools.find(s => String(s.id) === savedId) : null;
-                if (match) {
+                const matchIsCompleted = match && (match.estatus === 'completada' || match.estatus === 'cerrada');
+                if (match && !matchIsCompleted) {
                     // Auto-resume the previously selected mission
                     await selectMission(match);
                     return;
+                }
+                if (matchIsCompleted) {
+                    // Don't auto-resume into a completed mission
+                    localStorage.removeItem('flyhigh_selected_mission_id');
                 }
                 // Otherwise stay in lobby mode — user must pick
             }
@@ -1734,7 +1740,14 @@ export default function StaffDashboard() {
                 console.warn('Error cerrando jornada:', e);
             }
         }
-        router.push('/staff/login');
+        // Clean up all mission state so user returns to a fresh lobby
+        localStorage.removeItem('flyhigh_selected_mission_id');
+        localStorage.removeItem('flyhigh_staff_mission');
+        localStorage.removeItem('flyhigh_flight_logs');
+        localStorage.removeItem('flyhigh_completed_pauses');
+        localStorage.removeItem('flyhigh_active_pause');
+        localStorage.removeItem('flyhigh_active_flight');
+        router.replace('/staff/dashboard');
     };
 
     const contingencyProps = {
@@ -1882,65 +1895,76 @@ export default function StaffDashboard() {
                             </h2>
                             <p className="text-xs text-slate-500 -mt-1">Selecciona una misión para iniciar operaciones.</p>
 
-                            {todaySchools.map((school, idx) => (
-                                <button
-                                    key={school.id}
-                                    onClick={() => selectMission(school)}
-                                    className="w-full text-left bg-white rounded-2xl border border-slate-200 p-4 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 active:scale-[0.98] transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                                            <School className="w-5 h-5 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-slate-800 text-sm truncate group-hover:text-blue-600 transition-colors">
-                                                {school.school_name}
-                                            </p>
-                                            {school.colonia && (
-                                                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                                    <MapPin size={10} className="text-slate-400" />
-                                                    {school.colonia}
+                            {todaySchools.map((school, idx) => {
+                                const isCompleted = school.estatus === 'completada' || school.estatus === 'cerrada';
+                                return (
+                                    <button
+                                        key={school.id}
+                                        onClick={() => !isCompleted && selectMission(school)}
+                                        disabled={isCompleted}
+                                        className={`w-full text-left rounded-2xl border p-4 transition-all group ${isCompleted
+                                            ? 'bg-slate-50 border-slate-200 opacity-60 grayscale-[30%] cursor-not-allowed'
+                                            : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 active:scale-[0.98] cursor-pointer'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                                                <School className="w-5 h-5 text-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-slate-800 text-sm truncate group-hover:text-blue-600 transition-colors">
+                                                    {school.school_name}
                                                 </p>
-                                            )}
-                                        </div>
-                                        <div className="text-slate-300 group-hover:text-blue-400 transition-colors">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="9 18 15 12 9 6" />
-                                            </svg>
-                                        </div>
-                                    </div>
-
-                                    {/* Presence Avatars */}
-                                    {school.presence && school.presence.length > 0 && (
-                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                                En misión
-                                            </span>
-                                            <div className="flex flex-row-reverse">
-                                                {school.presence.map((p, pi) => {
-                                                    const roleConfig = {
-                                                        pilot: { bg: 'bg-blue-500', label: 'P', title: 'Piloto' },
-                                                        teacher: { bg: 'bg-purple-500', label: 'D', title: 'Docente' },
-                                                        assistant: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
-                                                        auxiliar: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
-                                                    };
-                                                    const cfg = roleConfig[p.role] || { bg: 'bg-slate-400', label: '?', title: p.role };
-                                                    return (
-                                                        <div
-                                                            key={`${p.role}-${pi}`}
-                                                            title={cfg.title}
-                                                            className={`w-7 h-7 rounded-full ${cfg.bg} border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm -ml-2 first:ml-0`}
-                                                        >
-                                                            {cfg.label}
-                                                        </div>
-                                                    );
-                                                })}
+                                                {school.colonia && (
+                                                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                                        <MapPin size={10} className="text-slate-400" />
+                                                        {school.colonia}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="text-slate-300 group-hover:text-blue-400 transition-colors">
+                                                {isCompleted ? (
+                                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">✅ Completada</span>
+                                                ) : (
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="9 18 15 12 9 6" />
+                                                    </svg>
+                                                )}
                                             </div>
                                         </div>
-                                    )}
-                                </button>
-                            ))}
+
+                                        {/* Presence Avatars */}
+                                        {school.presence && school.presence.length > 0 && (
+                                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                                    En misión
+                                                </span>
+                                                <div className="flex flex-row-reverse">
+                                                    {school.presence.map((p, pi) => {
+                                                        const roleConfig = {
+                                                            pilot: { bg: 'bg-blue-500', label: 'P', title: 'Piloto' },
+                                                            teacher: { bg: 'bg-purple-500', label: 'D', title: 'Docente' },
+                                                            assistant: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
+                                                            auxiliar: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
+                                                        };
+                                                        const cfg = roleConfig[p.role] || { bg: 'bg-slate-400', label: '?', title: p.role };
+                                                        return (
+                                                            <div
+                                                                key={`${p.role}-${pi}`}
+                                                                title={cfg.title}
+                                                                className={`w-7 h-7 rounded-full ${cfg.bg} border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm -ml-2 first:ml-0`}
+                                                            >
+                                                                {cfg.label}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">

@@ -125,7 +125,7 @@ export default function StaffOperationLegacy({ initialMission = null, onCloseDay
         if (onCloseDay) {
             onCloseDay();
         } else {
-            router.push('/staff/closure');
+            router.push('/staff/dashboard');
         }
         setShowMenu(false);
     };

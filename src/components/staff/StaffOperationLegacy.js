@@ -512,7 +512,7 @@ export default function StaffOperationLegacy({
             if (onCloseDay) {
                 await onCloseDay();
             } else {
-                router.push('/staff/closure');
+                router.push('/staff/dashboard');
             }
             // Only close modal on SUCCESS
             setShowCloseConfirmModal(false);
