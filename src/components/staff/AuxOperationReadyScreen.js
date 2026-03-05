@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import SyncHeader from './SyncHeader';
@@ -231,6 +231,9 @@ export default function AuxOperationReadyScreen({
     const [readyByName, setReadyByName] = useState(() => safeText(initialMeta.aux_operation_ready_by_name));
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [pilotMusicReady, setPilotMusicReady] = useState(initialMeta.pilot_music_ambience_done === true);
+    const [teacherReady, setTeacherReady] = useState(initialMeta.teacher_operation_ready === true);
+    const [bridgeTriggered, setBridgeTriggered] = useState(Boolean(initialMeta.operation_start_bridge_at));
 
     useEffect(() => {
         const meta = parseMeta(missionInfo?.meta);
@@ -241,13 +244,34 @@ export default function AuxOperationReadyScreen({
         setPhotoUrl((prev) => (prev === nextPhotoUrl ? prev : nextPhotoUrl));
         setAuxReady((prev) => (prev === nextReady ? prev : nextReady));
         setReadyByName((prev) => (prev === nextReadyByName ? prev : nextReadyByName));
+        setPilotMusicReady(meta.pilot_music_ambience_done === true);
+        setTeacherReady(meta.teacher_operation_ready === true);
+        setBridgeTriggered(Boolean(meta.operation_start_bridge_at));
     }, [missionInfo?.meta, missionState]);
+
+    // AUTO-TRANSITION: when operation_start_bridge_at appears, route to bridge
+    useEffect(() => {
+        if (bridgeTriggered && auxReady) {
+            onRefresh && onRefresh();
+        }
+    }, [bridgeTriggered, auxReady, onRefresh]);
 
     const firstName = getFirstName(profile?.full_name, 'Auxiliar');
     const roleName = ROLE_LABELS[profile?.role] || 'Auxiliar';
     const isBusy = isUploadingPhoto || isConfirming;
     const hasPhoto = Boolean(photoUrl);
     const ctaDisabled = !hasPhoto || auxReady || isBusy;
+
+    // BARRIER: Waiting room after CTA click
+    const isWaitingForOthers = auxReady && !bridgeTriggered;
+    const waitingNames = useMemo(() => {
+        if (!isWaitingForOthers) return '';
+        const missing = [];
+        if (!pilotMusicReady) missing.push((missionInfo?.pilot_name || 'Piloto').split(' ')[0]);
+        if (!teacherReady) missing.push((missionInfo?.teacher_name || 'Docente').split(' ')[0]);
+        return missing.join(' y ');
+    }, [isWaitingForOthers, pilotMusicReady, teacherReady, missionInfo?.pilot_name, missionInfo?.teacher_name]);
+    const waitingChip = isWaitingForOthers && waitingNames ? `ESPERANDO A ${waitingNames.toUpperCase()}` : null;
 
     const readCurrentMeta = async (supabase) => {
         const { data, error } = await supabase
@@ -411,6 +435,8 @@ export default function AuxOperationReadyScreen({
                 userId={userId}
                 missionInfo={missionInfo}
                 missionState={missionState}
+                chipOverride={waitingChip}
+                isWaitScreen={isWaitingForOthers}
                 onDemoStart={onRefresh}
             />
 
@@ -569,31 +595,62 @@ export default function AuxOperationReadyScreen({
                 background: 'linear-gradient(180deg, rgba(243,244,246,0) 0%, rgba(243,244,246,0.96) 30%, rgba(243,244,246,1) 100%)'
             }}>
                 <div style={{ maxWidth: 390, margin: '0 auto' }}>
-                    <button
-                        type="button"
-                        onClick={handleConfirmReady}
-                        disabled={ctaDisabled}
-                        style={{
+                    {isWaitingForOthers ? (
+                        <div style={{
                             width: '100%',
-                            border: 'none',
+                            backgroundColor: '#EFF6FF',
                             borderRadius: 16,
-                            backgroundColor: ctaDisabled ? '#E5E7EB' : '#2563EB',
-                            color: ctaDisabled ? '#9CA3AF' : '#FFFFFF',
-                            padding: '14px 16px',
-                            fontSize: 16,
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                            cursor: ctaDisabled ? 'not-allowed' : 'pointer',
-                            boxShadow: ctaDisabled ? 'none' : '0 12px 28px -12px rgba(37,99,235,0.5)',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {isConfirming ? <Loader2 size={18} className="animate-spin" /> : null}
-                        {auxReady ? `A volar!${readyByName ? ` - ${readyByName}` : ''}` : 'A volar! ->'}
-                    </button>
+                            padding: '18px 20px',
+                            border: '1px solid #BFDBFE',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 10,
+                                marginBottom: 8
+                            }}>
+                                <Loader2 size={18} className="animate-spin" style={{ color: '#2563EB' }} />
+                                <span style={{
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: '#1E3A8A'
+                                }}>
+                                    {waitingNames ? `Esperando a ${waitingNames}` : 'Esperando al equipo...'}
+                                </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: 12, color: '#6B7280', lineHeight: 1.4 }}>
+                                Tu parte está lista. Avanzamos juntos cuando todos confirmen.
+                            </p>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleConfirmReady}
+                            disabled={ctaDisabled}
+                            style={{
+                                width: '100%',
+                                border: 'none',
+                                borderRadius: 16,
+                                backgroundColor: ctaDisabled ? '#E5E7EB' : '#2563EB',
+                                color: ctaDisabled ? '#9CA3AF' : '#FFFFFF',
+                                padding: '14px 16px',
+                                fontSize: 16,
+                                fontWeight: 800,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                cursor: ctaDisabled ? 'not-allowed' : 'pointer',
+                                boxShadow: ctaDisabled ? 'none' : '0 12px 28px -12px rgba(37,99,235,0.5)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            {isConfirming ? <Loader2 size={18} className="animate-spin" /> : null}
+                            {auxReady ? `A volar!${readyByName ? ` - ${readyByName}` : ''}` : 'A volar! ->'}
+                        </button>
+                    )}
 
                     <div style={{ width: 128, height: 4, borderRadius: 999, backgroundColor: '#D1D5DB', margin: '12px auto 0' }} />
                 </div>

@@ -250,6 +250,8 @@ export default function TeacherOperationReadyScreen({
     const [teacherReady, setTeacherReady] = useState(initialMeta.teacher_operation_ready === true);
     const [readyByName, setReadyByName] = useState(() => safeText(initialMeta.teacher_operation_ready_by_name));
     const [pilotMusicReady, setPilotMusicReady] = useState(initialMeta.pilot_music_ambience_done === true);
+    const [auxReady, setAuxReady] = useState(initialMeta.aux_operation_ready === true);
+    const [bridgeTriggered, setBridgeTriggered] = useState(Boolean(initialMeta.operation_start_bridge_at));
     const [isSavingCheck, setIsSavingCheck] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
 
@@ -264,7 +266,16 @@ export default function TeacherOperationReadyScreen({
         setTeacherReady((prev) => (prev === nextTeacherReady ? prev : nextTeacherReady));
         setReadyByName((prev) => (prev === nextReadyBy ? prev : nextReadyBy));
         setPilotMusicReady((prev) => (prev === nextPilotMusicReady ? prev : nextPilotMusicReady));
+        setAuxReady(meta.aux_operation_ready === true);
+        setBridgeTriggered(Boolean(meta.operation_start_bridge_at));
     }, [missionInfo?.meta, missionState]);
+
+    // AUTO-TRANSITION: when operation_start_bridge_at appears, route to bridge
+    useEffect(() => {
+        if (bridgeTriggered && teacherReady) {
+            onRefresh && onRefresh();
+        }
+    }, [bridgeTriggered, teacherReady, onRefresh]);
 
     const firstName = getFirstName(profile?.full_name, 'Docente');
     const roleName = ROLE_LABELS[profile?.role] || 'Docente';
@@ -272,6 +283,17 @@ export default function TeacherOperationReadyScreen({
     const allChecksDone = useMemo(() => CHECK_KEYS.every((key) => checks[key] === true), [checks]);
     const isBusy = isSavingCheck || isConfirming;
     const ctaDisabled = !pilotMusicReady || !allChecksDone || teacherReady || isBusy;
+
+    // BARRIER: Waiting room after CTA click
+    const isWaitingForOthers = teacherReady && !bridgeTriggered;
+    const waitingNames = useMemo(() => {
+        if (!isWaitingForOthers) return '';
+        const missing = [];
+        if (!pilotMusicReady) missing.push((missionInfo?.pilot_name || 'Piloto').split(' ')[0]);
+        if (!auxReady) missing.push((missionInfo?.aux_name || 'Auxiliar').split(' ')[0]);
+        return missing.join(' y ');
+    }, [isWaitingForOthers, pilotMusicReady, auxReady, missionInfo?.pilot_name, missionInfo?.aux_name]);
+    const waitingChip = isWaitingForOthers && waitingNames ? `ESPERANDO A ${waitingNames.toUpperCase()}` : null;
 
     const readCurrentMeta = async (supabase) => {
         const { data, error } = await supabase
@@ -410,6 +432,8 @@ export default function TeacherOperationReadyScreen({
                 userId={userId}
                 missionInfo={missionInfo}
                 missionState={missionState}
+                chipOverride={waitingChip}
+                isWaitScreen={isWaitingForOthers}
                 onDemoStart={onRefresh}
             />
 
@@ -536,39 +560,72 @@ export default function TeacherOperationReadyScreen({
                 background: 'linear-gradient(180deg, rgba(243,244,246,0) 0%, rgba(243,244,246,0.96) 32%, rgba(243,244,246,1) 100%)'
             }}>
                 <div style={{ maxWidth: 390, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <button
-                        type="button"
-                        onClick={handleConfirmReady}
-                        disabled={ctaDisabled}
-                        style={{
+                    {isWaitingForOthers ? (
+                        <div style={{
                             width: '100%',
-                            border: 'none',
+                            backgroundColor: '#EFF6FF',
                             borderRadius: 18,
-                            padding: '15px 16px',
-                            backgroundColor: ctaDisabled ? '#9CA3AF' : '#2563EB',
-                            color: '#FFFFFF',
-                            fontSize: 16,
-                            fontWeight: 800,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                            cursor: ctaDisabled ? 'not-allowed' : 'pointer',
-                            boxShadow: ctaDisabled ? 'none' : '0 14px 30px -14px rgba(37,99,235,0.5)',
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {isConfirming ? <Loader2 size={18} className="animate-spin" /> : null}
-                        {teacherReady
-                            ? `A volar!${readyByName ? ` - ${readyByName}` : ''}`
-                            : 'A volar!'}
-                        <span style={{ transform: 'translateY(-0.5px)' }}>-&gt;</span>
-                    </button>
+                            padding: '18px 20px',
+                            border: '1px solid #BFDBFE',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 10,
+                                marginBottom: 8
+                            }}>
+                                <Loader2 size={18} className="animate-spin" style={{ color: '#2563EB' }} />
+                                <span style={{
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: '#1E3A8A'
+                                }}>
+                                    {waitingNames ? `Esperando a ${waitingNames}` : 'Esperando al equipo...'}
+                                </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: 12, color: '#6B7280', lineHeight: 1.4 }}>
+                                Tu parte está lista. Avanzamos juntos cuando todos confirmen.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleConfirmReady}
+                                disabled={ctaDisabled}
+                                style={{
+                                    width: '100%',
+                                    border: 'none',
+                                    borderRadius: 18,
+                                    padding: '15px 16px',
+                                    backgroundColor: ctaDisabled ? '#9CA3AF' : '#2563EB',
+                                    color: '#FFFFFF',
+                                    fontSize: 16,
+                                    fontWeight: 800,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8,
+                                    cursor: ctaDisabled ? 'not-allowed' : 'pointer',
+                                    boxShadow: ctaDisabled ? 'none' : '0 14px 30px -14px rgba(37,99,235,0.5)',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                {isConfirming ? <Loader2 size={18} className="animate-spin" /> : null}
+                                {teacherReady
+                                    ? `A volar!${readyByName ? ` - ${readyByName}` : ''}`
+                                    : 'A volar!'}
+                                <span style={{ transform: 'translateY(-0.5px)' }}>-&gt;</span>
+                            </button>
 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#6B7280', opacity: 0.8 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14, fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-                        <span style={{ fontSize: 11 }}>No cierres la app (los datos se guardan)</span>
-                    </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#6B7280', opacity: 0.8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: 14, fontVariationSettings: "'FILL' 1" }}>verified_user</span>
+                                <span style={{ fontSize: 11 }}>No cierres la app (los datos se guardan)</span>
+                            </div>
+                        </>
+                    )}
 
                     <div style={{ width: 128, height: 4, borderRadius: 999, backgroundColor: '#D1D5DB', margin: '2px auto 0' }} />
                 </div>

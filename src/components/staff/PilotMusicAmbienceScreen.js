@@ -99,6 +99,9 @@ export default function PilotMusicAmbienceScreen({
     const [doneByName, setDoneByName] = useState(() => safeText(initialMeta.pilot_music_ambience_done_by_name));
     const [isSavingCheck, setIsSavingCheck] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
+    const [teacherReady, setTeacherReady] = useState(initialMeta.teacher_operation_ready === true);
+    const [auxReady, setAuxReady] = useState(initialMeta.aux_operation_ready === true);
+    const [bridgeTriggered, setBridgeTriggered] = useState(Boolean(initialMeta.operation_start_bridge_at));
 
     useEffect(() => {
         const meta = parseMeta(missionInfo?.meta);
@@ -109,7 +112,17 @@ export default function PilotMusicAmbienceScreen({
         setChecks((prev) => (checksAreEqual(prev, nextChecks) ? prev : nextChecks));
         setTaskDone((prev) => (prev === nextTaskDone ? prev : nextTaskDone));
         setDoneByName((prev) => (prev === nextDoneByName ? prev : nextDoneByName));
+        setTeacherReady(meta.teacher_operation_ready === true);
+        setAuxReady(meta.aux_operation_ready === true);
+        setBridgeTriggered(Boolean(meta.operation_start_bridge_at));
     }, [missionInfo?.meta, missionState]);
+
+    // AUTO-TRANSITION: when operation_start_bridge_at appears, route to bridge
+    useEffect(() => {
+        if (bridgeTriggered && taskDone) {
+            onRefresh && onRefresh();
+        }
+    }, [bridgeTriggered, taskDone, onRefresh]);
 
     const pilotFirstName = firstName(profile?.full_name, 'Piloto');
     const roleName = ROLE_LABELS[profile?.role] || 'Piloto';
@@ -244,6 +257,17 @@ export default function PilotMusicAmbienceScreen({
         ? `Ambientacion lista${doneByName ? ` - ${doneByName}` : ''}`
         : 'Ambientacion lista ->';
 
+    // BARRIER: Waiting room after CTA click
+    const isWaitingForOthers = taskDone && !bridgeTriggered;
+    const waitingNames = useMemo(() => {
+        if (!isWaitingForOthers) return '';
+        const missing = [];
+        if (!teacherReady) missing.push((missionInfo?.teacher_name || 'Docente').split(' ')[0]);
+        if (!auxReady) missing.push((missionInfo?.aux_name || 'Auxiliar').split(' ')[0]);
+        return missing.join(' y ');
+    }, [isWaitingForOthers, teacherReady, auxReady, missionInfo?.teacher_name, missionInfo?.aux_name]);
+    const waitingChip = isWaitingForOthers && waitingNames ? `ESPERANDO A ${waitingNames.toUpperCase()}` : null;
+
     return (
         <div style={{
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -263,6 +287,8 @@ export default function PilotMusicAmbienceScreen({
                 userId={userId}
                 missionInfo={missionInfo}
                 missionState={missionState}
+                chipOverride={waitingChip}
+                isWaitScreen={isWaitingForOthers}
                 onDemoStart={onRefresh}
             />
 
@@ -485,31 +511,62 @@ export default function PilotMusicAmbienceScreen({
                 borderTop: '1px solid #E5E7EB'
             }}>
                 <div style={{ maxWidth: 380, margin: '0 auto' }}>
-                    <button
-                        type="button"
-                        onClick={handleConfirm}
-                        disabled={ctaDisabled}
-                        style={{
+                    {isWaitingForOthers ? (
+                        <div style={{
                             width: '100%',
-                            backgroundColor: ctaDisabled ? 'rgba(37,99,235,0.5)' : '#2563EB',
-                            color: '#FFFFFF',
-                            fontWeight: 700,
-                            fontSize: 16,
-                            padding: '15px 18px',
+                            backgroundColor: '#EFF6FF',
                             borderRadius: 18,
-                            border: 'none',
-                            boxShadow: ctaDisabled ? 'none' : '0 12px 30px -10px rgba(37,99,235,0.45)',
-                            cursor: ctaDisabled ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {isFinalizing ? <Loader2 size={18} className="animate-spin" /> : null}
-                        {ctaLabel}
-                    </button>
+                            padding: '18px 20px',
+                            border: '1px solid #BFDBFE',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 10,
+                                marginBottom: 8
+                            }}>
+                                <Loader2 size={18} className="animate-spin" style={{ color: '#2563EB' }} />
+                                <span style={{
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: '#1E3A8A'
+                                }}>
+                                    {waitingNames ? `Esperando a ${waitingNames}` : 'Esperando al equipo...'}
+                                </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: 12, color: '#6B7280', lineHeight: 1.4 }}>
+                                Tu parte está lista. Avanzamos juntos cuando todos confirmen.
+                            </p>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleConfirm}
+                            disabled={ctaDisabled}
+                            style={{
+                                width: '100%',
+                                backgroundColor: ctaDisabled ? 'rgba(37,99,235,0.5)' : '#2563EB',
+                                color: '#FFFFFF',
+                                fontWeight: 700,
+                                fontSize: 16,
+                                padding: '15px 18px',
+                                borderRadius: 18,
+                                border: 'none',
+                                boxShadow: ctaDisabled ? 'none' : '0 12px 30px -10px rgba(37,99,235,0.45)',
+                                cursor: ctaDisabled ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            {isFinalizing ? <Loader2 size={18} className="animate-spin" /> : null}
+                            {ctaLabel}
+                        </button>
+                    )}
 
                     <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
                         <div style={{ width: 128, height: 4, backgroundColor: '#D1D5DB', borderRadius: 999 }} />
