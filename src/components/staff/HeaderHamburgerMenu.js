@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Menu, X, LogOut, Clock, Plane, Repeat } from 'lucide-react';
 import StartDemoFab from './StartDemoFab';
 import ResetProcessButton from './ResetProcessButton';
@@ -9,6 +9,8 @@ import { useRouter } from 'next/navigation';
 
 export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [changeMissionProgress, setChangeMissionProgress] = useState(false);
+    const changeMissionTimerRef = useRef(null);
     const router = useRouter();
     const normalizedRole = role ? String(role).toLowerCase() : null;
     const canSeeHistory = !normalizedRole || ['pilot', 'teacher', 'assistant', 'auxiliar', 'operativo', 'admin'].includes(normalizedRole);
@@ -117,24 +119,65 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                             </div>
                         )}
 
-                        {/* Change Mission (Escape Hatch) */}
+                        {/* Change Mission (Escape Hatch — 3s long press) */}
                         <button
-                            onClick={() => {
-                                setIsOpen(false);
-                                sessionStorage.removeItem('flyhigh_selected_mission_id');
-                                localStorage.removeItem('flyhigh_staff_mission');
-                                window.location.reload();
+                            onMouseDown={() => {
+                                setChangeMissionProgress(true);
+                                changeMissionTimerRef.current = setTimeout(() => {
+                                    setIsOpen(false);
+                                    setChangeMissionProgress(false);
+                                    sessionStorage.removeItem('flyhigh_selected_mission_id');
+                                    localStorage.removeItem('flyhigh_staff_mission');
+                                    window.location.reload();
+                                }, 3000);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50 transition-colors rounded-lg text-amber-700 group border-t border-slate-50 mt-1"
+                            onMouseUp={() => {
+                                clearTimeout(changeMissionTimerRef.current);
+                                setChangeMissionProgress(false);
+                            }}
+                            onMouseLeave={() => {
+                                clearTimeout(changeMissionTimerRef.current);
+                                setChangeMissionProgress(false);
+                            }}
+                            onTouchStart={() => {
+                                setChangeMissionProgress(true);
+                                changeMissionTimerRef.current = setTimeout(() => {
+                                    setIsOpen(false);
+                                    setChangeMissionProgress(false);
+                                    sessionStorage.removeItem('flyhigh_selected_mission_id');
+                                    localStorage.removeItem('flyhigh_staff_mission');
+                                    window.location.reload();
+                                }, 3000);
+                            }}
+                            onTouchEnd={() => {
+                                clearTimeout(changeMissionTimerRef.current);
+                                setChangeMissionProgress(false);
+                            }}
+                            className="relative w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50 transition-colors rounded-lg text-amber-700 group border-t border-slate-50 mt-1 overflow-hidden select-none"
                         >
-                            <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                                <Repeat size={18} />
+                            {/* Progress bar fill */}
+                            {changeMissionProgress && (
+                                <div
+                                    className="absolute inset-0 bg-amber-100/70 origin-left"
+                                    style={{ animation: 'changeMissionFill 3s linear forwards' }}
+                                />
+                            )}
+                            <div className="relative p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                <Repeat size={18} className={changeMissionProgress ? 'animate-spin' : ''} />
                             </div>
-                            <div>
+                            <div className="relative">
                                 <p className="text-sm font-semibold">Cambiar de Misión</p>
-                                <p className="text-[10px] text-amber-500/80 font-medium tracking-tight">Volver al lobby de misiones</p>
+                                <p className="text-[10px] text-amber-500/80 font-medium tracking-tight">
+                                    {changeMissionProgress ? 'Mantén presionado 3s...' : 'Mantener presionado para cambiar'}
+                                </p>
                             </div>
                         </button>
+                        <style jsx>{`
+                            @keyframes changeMissionFill {
+                                from { transform: scaleX(0); }
+                                to { transform: scaleX(1); }
+                            }
+                        `}</style>
 
                         {/* Logout Option */}
                         <button
