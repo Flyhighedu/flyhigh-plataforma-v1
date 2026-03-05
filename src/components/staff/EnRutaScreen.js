@@ -71,6 +71,10 @@ export default function EnRutaScreen({
         if (offline) {
             setPhotoUploadFailed(true);
         }
+        // Immediately update parent routing state so we advance past EnRutaScreen.
+        // ArrivalPhotoCapture already wrote mission_state='waiting_unload_assignment' to DB,
+        // but the parent's React state is stale until the realtime subscription fires.
+        onStateChange('waiting_unload_assignment');
     };
 
     const handleManualRelease = () => {
