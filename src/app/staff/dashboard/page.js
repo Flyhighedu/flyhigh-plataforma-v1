@@ -1975,21 +1975,37 @@ export default function StaffDashboard() {
     // --- Mission Brief (first screen) ---
     // If we haven't checked in OR if we are explicitly showing brief
     if (showBrief && !manualMission && !directOperationMode) {
+        const handleBackToLobby = () => {
+            sessionStorage.removeItem('flyhigh_selected_mission_id');
+            localStorage.removeItem('flyhigh_staff_mission');
+            setTodaySchool(null);
+            setJourneyId(null);
+            setLobbyMode(true);
+            setShowBrief(true);
+            refreshMission();
+        };
+
         return withDependencyOverlay(
-            <>
+            <div className="relative">
+                {/* Back to lobby button — top-left */}
+                <button
+                    onClick={handleBackToLobby}
+                    className="fixed top-4 left-4 z-50 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-md border border-slate-200 rounded-full text-xs font-semibold text-slate-600 shadow-sm hover:bg-white hover:shadow-md active:scale-95 transition-all"
+                >
+                    <ChevronLeft size={14} />
+                    Cambiar misión
+                </button>
                 <MissionBrief
                     profile={profile}
                     school={todaySchool}
                     journeyId={journeyId}
                     userId={userId}
-                    // If we found a journey with check-in event, pass timestamp
                     existingCheckIn={todaySchool?.checkInTimestamp}
                     onCheckedIn={() => setShowBrief(false)}
                     onLogout={handleLogout}
-                    onRefresh={refreshMission} // [NEW] Pass refresh handler
-                /* onComplete? */
+                    onRefresh={refreshMission}
                 />
-            </>
+            </div>
         );
     }
 
