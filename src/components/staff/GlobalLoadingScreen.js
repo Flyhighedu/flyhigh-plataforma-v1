@@ -6,6 +6,7 @@ import LoadingValidationModal from './LoadingValidationModal';
 import MomentoDeCargarScreen from './MomentoDeCargarScreen';
 import { parseMeta } from '@/utils/metaHelpers';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -162,9 +163,10 @@ export default function GlobalLoadingScreen({
             onRefresh && onRefresh();
 
             // BACKGROUND: Queue heavy uploads (fire-and-forget)
-            const enqueueOne = (file, storagePath, label) =>
-                enqueueOptimisticUpload({
-                    file,
+            const enqueueOne = async (file, storagePath, label) => {
+                const compressed = await compressPhotoForUpload(file);
+                return enqueueOptimisticUpload({
+                    file: compressed || file,
                     storageBucket: 'staff-arrival',
                     storagePath,
                     dbMutation: {
@@ -175,6 +177,7 @@ export default function GlobalLoadingScreen({
                     },
                     label
                 }).catch(e => console.warn(`[OptimisticUpload] ${label} enqueue failed:`, e));
+            };
 
             Promise.all([
                 enqueueOne(containersPhotoFile, containersPath, 'Foto contenedores carga'),

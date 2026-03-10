@@ -269,11 +269,24 @@ export default function SyncHeader({
         : null;
     const dismantlingChipText = String(dismantlingSyncBadge?.chipText || '').trim() || null;
 
-    const handleTeacherCivicFabClick = () => {
+    const handleTeacherCivicFabClick = async () => {
         setShowCivicStartModal(true);
         setMicPermissionBlocked(false);
         setCivicError('');
         setStandbyNotified(false);
+
+        // Write stage lock immediately so Realtime updates from Pilot
+        // don't displace the teacher while the modal is open
+        try {
+            const lockValue = teacherCivicStageLock ||
+                resolveTeacherCivicStageLock(headerMeta, effectiveMissionState) ||
+                'seat';
+            await updateJourneyMeta({
+                civic_parallel_teacher_stage_lock: lockValue
+            });
+        } catch (e) {
+            console.warn('[SyncHeader] Could not pre-set stage lock:', e);
+        }
     };
 
     const handleNotifyStandby = async () => {
@@ -890,7 +903,12 @@ export default function SyncHeader({
                         {/* Close button — only when NOT recording */}
                         {!showCivicRecorder && (
                             <button
-                                onClick={() => setShowCivicStartModal(false)}
+                                onClick={() => {
+                                    setShowCivicStartModal(false);
+                                    // Clear stage lock since teacher dismissed without recording
+                                    updateJourneyMeta({ civic_parallel_teacher_stage_lock: null })
+                                        .catch(e => console.warn('[SyncHeader] Could not clear stage lock:', e));
+                                }}
                                 className="absolute top-4 right-4 z-50 text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100"
                                 aria-label="Cerrar"
                             >

@@ -7,6 +7,7 @@ import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 import { getClosurePhaseForStep, getClosureProgress, normalizeClosureStep } from '@/constants/closureFlow';
 import { getPrimaryCtaClasses } from './ui/primaryCtaClasses';
 
@@ -509,8 +510,9 @@ export default function ClosureTaskScreen({
             });
 
             // BACKGROUND: Queue heavy upload (fire-and-forget)
+            const compressedFile = await compressPhotoForUpload(file);
             enqueueOptimisticUpload({
-                file,
+                file: compressedFile || file,
                 storageBucket: 'staff-arrival',
                 storagePath: path,
                 dbMutation: {
@@ -520,6 +522,28 @@ export default function ClosureTaskScreen({
                     data: {}
                 },
                 label: `Cierre: ${screenKey}`
+            }).then(async () => {
+                try {
+                    const supabase2 = createClient();
+                    const { data: publicData } = supabase2.storage
+                        .from('staff-arrival')
+                        .getPublicUrl(path);
+                    const { data: latest } = await supabase2
+                        .from('staff_journeys')
+                        .select('meta')
+                        .eq('id', journeyId)
+                        .single();
+                    const latestMeta = parseMeta(latest?.meta);
+                    await supabase2
+                        .from('staff_journeys')
+                        .update({
+                            meta: { ...latestMeta, [photoMetaKey]: publicData.publicUrl },
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', journeyId);
+                } catch (e) {
+                    console.warn(`[OptimisticUpload] ${screenKey} meta patch failed:`, e);
+                }
             }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
 
             onRefresh && onRefresh();

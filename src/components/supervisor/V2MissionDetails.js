@@ -420,6 +420,67 @@ export default function V2MissionDetails({
                 </div>
             )}
 
+            {(() => {
+                const EVIDENCE_DEFS = [
+                    { key: 'pilot_spot_photo_url', label: 'Foto pista de aterrizaje', role: 'Piloto', type: 'image', color: 'sky' },
+                    { key: 'civic_parallel_teacher_audio_url', label: 'Audio acto cívico', role: 'Docente', type: 'audio', color: 'amber' },
+                    { key: 'unload_voice_url', label: 'Nota de voz estacionamiento', role: 'Docente', type: 'audio', color: 'amber' },
+                    { key: 'aux_vehicle_evidence_url', label: 'Foto estacionamiento vehículo', role: 'Auxiliar', type: 'image', color: 'emerald' },
+                    { key: 'aux_operation_stand_photo_url', label: 'Foto stand operación', role: 'Auxiliar', type: 'image', color: 'emerald' },
+                ];
+
+                const items = EVIDENCE_DEFS
+                    .map((def) => {
+                        const url = typeof missionMeta?.[def.key] === 'string' && missionMeta[def.key].trim() ? missionMeta[def.key].trim() : null;
+                        return url ? { ...def, url } : null;
+                    })
+                    .filter(Boolean);
+
+                if (items.length === 0) return null;
+
+                const ROLE_COLORS = {
+                    sky: { border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-300', badge: 'bg-sky-500/20 text-sky-200' },
+                    amber: { border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-300', badge: 'bg-amber-500/20 text-amber-200' },
+                    emerald: { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300', badge: 'bg-emerald-500/20 text-emerald-200' },
+                };
+
+                return (
+                    <section className="rounded-xl border border-slate-800 bg-slate-900/45 px-3 py-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Evidencias Operativas</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            {items.map((item) => {
+                                const palette = ROLE_COLORS[item.color] || ROLE_COLORS.sky;
+                                const isAudio = item.type === 'audio';
+
+                                return (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => typeof onOpenEvidence === 'function' && onOpenEvidence(item.url, { label: `${item.label} — ${item.role}`, typeHint: item.type })}
+                                        className={`relative rounded-lg overflow-hidden border ${palette.border} ${isAudio ? palette.bg : 'bg-slate-900/50'} text-left transition-transform active:scale-[0.97]`}
+                                    >
+                                        {isAudio ? (
+                                            <div className="flex flex-col items-center justify-center gap-1.5 px-3 py-4">
+                                                <span className="material-symbols-outlined text-[28px]" style={{ color: 'inherit', fontVariationSettings: "'FILL' 1, 'wght' 600" }}>
+                                                    graphic_eq
+                                                </span>
+                                                <p className={`text-[10px] font-black uppercase tracking-wide ${palette.text}`}>Audio</p>
+                                            </div>
+                                        ) : (
+                                            <img src={item.url} alt={item.label} className="h-24 w-full object-cover" loading="lazy" />
+                                        )}
+                                        <div className="px-1.5 py-1 flex items-center gap-1 bg-slate-950/70">
+                                            <span className={`shrink-0 px-1 py-px rounded text-[8px] font-black uppercase tracking-wide ${palette.badge}`}>{item.role}</span>
+                                            <p className="text-[9px] font-bold text-slate-300 truncate">{item.label}</p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                );
+            })()}
+
             <section>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Bitacora de Vuelos</p>
                 {loadingLogs ? (

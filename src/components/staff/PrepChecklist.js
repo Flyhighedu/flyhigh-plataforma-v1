@@ -250,9 +250,10 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                 storagePath: filename,
                 dbMutation: {
                     table: 'staff_prep_photos',
+                    operation: 'insert',
                     matchColumn: 'journey_id',
                     matchValue: journeyId,
-                    data: { file_path: '{{PUBLIC_URL}}', item_id: itemId, user_id: userId }
+                    data: { journey_id: journeyId, file_path: '{{PUBLIC_URL}}', item_id: itemId, user_id: userId }
                 },
                 eventLog: {
                     journey_id: journeyId,

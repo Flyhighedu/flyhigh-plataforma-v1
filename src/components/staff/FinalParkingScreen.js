@@ -10,6 +10,7 @@ import { parseMeta } from '@/utils/metaHelpers';
 import { CLOSURE_STEPS } from '@/constants/closureFlow';
 import { getPrimaryCtaClasses } from './ui/primaryCtaClasses';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 
 function FinalParkingHero() {
     return (
@@ -198,8 +199,9 @@ export default function FinalParkingScreen({
             onRefresh && onRefresh();
 
             // BACKGROUND: Queue heavy upload (fire-and-forget)
+            const compressedKeyDropPhoto = await compressPhotoForUpload(keyDropPhotoFile);
             enqueueOptimisticUpload({
-                file: keyDropPhotoFile,
+                file: compressedKeyDropPhoto || keyDropPhotoFile,
                 storageBucket: 'staff-arrival',
                 storagePath,
                 dbMutation: {

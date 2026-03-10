@@ -131,10 +131,9 @@ async function syncOne(key, record) {
                 resolvedData[k] = v === '{{PUBLIC_URL}}' ? publicUrl : v;
             }
 
-            const { error: dbError } = await supabase
-                .from(table)
-                .update(resolvedData)
-                .eq(matchColumn, matchValue);
+            const { error: dbError } = record.dbMutation.operation === 'insert'
+                ? await supabase.from(table).insert(resolvedData)
+                : await supabase.from(table).update(resolvedData).eq(matchColumn, matchValue);
 
             if (dbError) throw dbError;
         }
@@ -145,7 +144,7 @@ async function syncOne(key, record) {
             if (logEntry.payload?.url === '{{PUBLIC_URL}}') {
                 logEntry.payload = { ...logEntry.payload, url: publicUrl };
             }
-            await supabase.from('staff_events').insert(logEntry).catch(() => { });
+            try { await supabase.from('staff_events').insert(logEntry); } catch (_) { /* non-fatal */ }
         }
 
         // 4. Remove from IndexedDB on success

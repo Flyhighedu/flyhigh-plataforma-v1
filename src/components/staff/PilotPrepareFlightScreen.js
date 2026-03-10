@@ -301,8 +301,29 @@ export default function PilotPrepareFlightScreen({
                         data: {}
                     },
                     label: 'Foto pista piloto'
+                }).then(async () => {
+                    try {
+                        const supabase2 = createClient();
+                        const { data: publicData } = supabase2.storage
+                            .from('staff-arrival')
+                            .getPublicUrl(fileName);
+                        const { data: latest } = await supabase2
+                            .from('staff_journeys')
+                            .select('meta')
+                            .eq('id', journeyId)
+                            .single();
+                        const latestMeta = parseMeta(latest?.meta);
+                        await supabase2
+                            .from('staff_journeys')
+                            .update({
+                                meta: { ...latestMeta, pilot_spot_photo_url: publicData.publicUrl },
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', journeyId);
+                    } catch (e) {
+                        console.warn('[OptimisticUpload] pilot spot meta patch failed:', e);
+                    }
                 }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
-                // publicUrl stays as local preview
             }
 
             const cleanedNote = (spotNote || '').trim();

@@ -220,9 +220,10 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
                 storagePath: filename,
                 dbMutation: {
                     table: 'staff_prep_photos',
+                    operation: 'insert',
                     matchColumn: 'journey_id',
                     matchValue: journeyId,
-                    data: { file_path: '{{PUBLIC_URL}}', item_id: targetId, user_id: userId }
+                    data: { journey_id: journeyId, file_path: '{{PUBLIC_URL}}', item_id: targetId, user_id: userId }
                 },
                 label: `Foto carga: ${targetId}`
             }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));

@@ -7,6 +7,7 @@ import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 
 /* ─── Animated Parking Scene Illustration ─── */
 function ParkTruckIllustration() {
@@ -250,8 +251,9 @@ export default function AuxParkingVehicleScreen({
             setPhotoConfirmed(true);
 
             // BACKGROUND: Queue heavy upload (fire-and-forget)
+            const compressedFile = await compressPhotoForUpload(file);
             enqueueOptimisticUpload({
-                file,
+                file: compressedFile || file,
                 storageBucket: 'staff-arrival',
                 storagePath: fileName,
                 dbMutation: {

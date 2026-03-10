@@ -7,6 +7,7 @@ import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 
 const MANUAL_CHECK_KEYS = ['deploy_structure', 'place_canvas'];
 
@@ -380,8 +381,9 @@ export default function AuxAdWallInstallScreen({
             onRefresh && onRefresh();
 
             // BACKGROUND: Queue heavy upload (fire-and-forget)
+            const compressedFile = await compressPhotoForUpload(file);
             enqueueOptimisticUpload({
-                file,
+                file: compressedFile || file,
                 storageBucket: 'staff-arrival',
                 storagePath: filePath,
                 dbMutation: {
@@ -580,20 +582,6 @@ export default function AuxAdWallInstallScreen({
                             );
                         })}
 
-                        <div style={{ height: 1, backgroundColor: '#F3F4F6' }} />
-
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                            <ChecklistCircle checked={evidenceDone} />
-                            <span style={{
-                                fontSize: 14,
-                                fontWeight: 500,
-                                color: '#374151',
-                                lineHeight: 1.35,
-                                paddingTop: 2
-                            }}>
-                                Tomar foto de evidencia
-                            </span>
-                        </div>
                     </div>
 
                     <button
@@ -606,20 +594,25 @@ export default function AuxAdWallInstallScreen({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: 8,
-                            padding: '12px 14px',
-                            backgroundColor: '#EFF6FF',
-                            color: '#2563EB',
-                            borderRadius: 12,
-                            border: '1px solid #DBEAFE',
+                            gap: 10,
+                            padding: '14px 16px',
+                            backgroundColor: evidenceDone ? '#F0FDF4' : '#EFF6FF',
+                            color: evidenceDone ? '#16A34A' : '#2563EB',
+                            borderRadius: 14,
+                            border: evidenceDone ? '1.5px solid #BBF7D0' : '1px solid #DBEAFE',
                             fontWeight: 600,
                             fontSize: 14,
                             cursor: taskDone || isBusy ? 'not-allowed' : 'pointer',
                             opacity: taskDone ? 0.65 : 1,
-                            transition: 'background-color 0.2s ease, opacity 0.2s ease'
+                            transition: 'all 0.2s ease'
                         }}
                     >
-                        {isUploadingPhoto ? <Loader2 size={18} className="animate-spin" /> : <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>photo_camera</span>}
+                        {isUploadingPhoto
+                            ? <Loader2 size={18} className="animate-spin" />
+                            : evidenceDone
+                                ? <ChecklistCircle checked={true} />
+                                : <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>photo_camera</span>
+                        }
                         {cameraButtonLabel}
                     </button>
 

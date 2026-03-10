@@ -7,6 +7,7 @@ import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
+import { compressPhotoForUpload } from '@/utils/compressPhoto';
 
 function safeText(value) {
     if (typeof value === 'string') return value;
@@ -330,8 +331,9 @@ export default function AuxOperationReadyScreen({
             onRefresh && onRefresh();
 
             // BACKGROUND: Queue heavy upload (fire-and-forget)
+            const compressedFile = await compressPhotoForUpload(file);
             enqueueOptimisticUpload({
-                file,
+                file: compressedFile || file,
                 storageBucket: 'staff-arrival',
                 storagePath: filePath,
                 dbMutation: {

@@ -157,6 +157,7 @@ const TEACHER_WAITING_ROUTE_RELEASE_STATES = new Set([
 ]);
 
 const TEACHER_CIVIC_LOCK_AUDIO_STATUSES = new Set([
+    'idle',
     'recording',
     'uploading',
     'pending_upload',
