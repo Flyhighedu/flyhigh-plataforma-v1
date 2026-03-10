@@ -22,7 +22,7 @@ import HeaderOperativo from './HeaderOperativo';
 import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import { useRouter } from 'next/navigation';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
-import { getPendingUploads, syncAllPending, clearLocalProgress } from '@/utils/offlineSyncManager';
+import { getPendingUploads, syncAllPending, clearLocalProgress, removePendingUpload } from '@/utils/offlineSyncManager';
 
 const TEAM_ROLES = ['pilot', 'teacher', 'assistant'];
 
@@ -1043,6 +1043,31 @@ export default function CheckoutScreen({
                             >
                                 {isSyncingCheckout ? '🔄 Sincronizando...' : '🔄 Sincronizar Ahora'}
                             </button>
+                            {pendingSyncItems.some(item => item.status === 'failed') && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const failedItems = pendingSyncItems.filter(item => item.status === 'failed');
+                                        for (const item of failedItems) {
+                                            if (item.key) {
+                                                await removePendingUpload(item.key);
+                                            }
+                                        }
+                                        const remaining = await getPendingUploads();
+                                        setPendingSyncItems(remaining);
+                                        if (remaining.length === 0) {
+                                            setSyncRequired(false);
+                                            setFeedback('✅ Fotos descartadas. Ya puedes hacer check-out.');
+                                        } else {
+                                            setFeedback(`${failedItems.length} descartado(s), ${remaining.length} pendiente(s).`);
+                                        }
+                                    }}
+                                    disabled={isSyncingCheckout}
+                                    className="w-full mt-2 rounded-xl bg-slate-500 px-4 py-2.5 text-xs font-extrabold text-white shadow transition hover:bg-slate-600 disabled:opacity-50"
+                                >
+                                    🗑️ Descartar fotos fallidas
+                                </button>
+                            )}
                         </div>
                     )}
 
