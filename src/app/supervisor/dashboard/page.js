@@ -4064,7 +4064,7 @@ export default function SupervisorDashboard() {
         }
     }
 
-    assistantFlights.slice(0, 8).forEach((flight, idx) => {
+    assistantFlights.forEach((flight, idx) => {
         assistantTimelineRows.push({
             itemType: 'flight',
             key: `flight-${flight.id}-${idx}`,
