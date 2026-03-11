@@ -1099,7 +1099,8 @@ export default function StaffOperationLegacy({
         lastMissionFlight?.end_time ??
         lastMissionFlight?.created_at
     );
-    const showInterFlightTimer = !activeFlight && missionFlights.length > 0 && lastMissionFlightEndMs > 0;
+    // [BUG-FIX] Only show inter-flight timer when operation phase is still active
+    const showInterFlightTimer = !activeFlight && missionFlights.length > 0 && lastMissionFlightEndMs > 0 && isOperationPhaseActive;
     const interFlightElapsedSeconds = showInterFlightTimer
         ? Math.max(0, Math.floor((nowMs - lastMissionFlightEndMs) / 1000))
         : 0;

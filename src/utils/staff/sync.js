@@ -183,12 +183,14 @@ export async function syncMissionClosure(closureData) {
         const photoUrl = await uploadImage(closureData.photo, 'staff-evidence', 'group');
 
         const missionId = closureData.mission_id?.toString();
+        const journeyId = closureData.journey_id?.toString() || null;
         const missionDateTime = closureData.mission_datetime || new Date().toISOString();
         const schoolId = closureData.school_id ?? parseSchoolId(missionId);
         const schoolNameSnapshot = resolveSchoolSnapshotName(closureData);
 
         const basePayload = {
             mission_id: missionId,
+            journey_id: journeyId,
             total_flights: closureData.stats.flights.length,
             total_students: closureData.stats.totalStudents,
             checklist_verified: closureData.checklistVerified,

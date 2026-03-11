@@ -18,11 +18,37 @@ export default function DailyImpactReport({ missionId, journeyId, onExit, allowD
     useEffect(() => {
         const fetchStats = async () => {
             const supabase = createClient();
-            const { data: flights, error } = await supabase
+            let { data: flights, error } = await supabase
                 .from('bitacora_vuelos')
                 .select('*')
                 .eq('mission_id', missionId)
                 .order('created_at', { ascending: true });
+
+            // [BUG-FIX] Fallback: if no flights by mission_id, try journey_id
+            if (!error && (!flights || flights.length === 0) && journeyId) {
+                const fb1 = await supabase
+                    .from('bitacora_vuelos')
+                    .select('*')
+                    .eq('journey_id', journeyId)
+                    .order('created_at', { ascending: true });
+                if (!fb1.error && fb1.data?.length > 0) {
+                    flights = fb1.data;
+                    error = fb1.error;
+                }
+            }
+
+            // [BUG-FIX] Fallback 2: try mission_id matching the journeyId value
+            if (!error && (!flights || flights.length === 0) && journeyId && journeyId !== missionId) {
+                const fb2 = await supabase
+                    .from('bitacora_vuelos')
+                    .select('*')
+                    .eq('mission_id', journeyId)
+                    .order('created_at', { ascending: true });
+                if (!fb2.error && fb2.data?.length > 0) {
+                    flights = fb2.data;
+                    error = fb2.error;
+                }
+            }
 
             if (error) {
                 console.error("Error fetching report:", error);

@@ -25,12 +25,23 @@ export default function ClosureLegacy({ journeyId, onComplete, preview = false }
 
     useEffect(() => {
         const logs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
-        const totalStudents = logs.reduce((acc, log) => acc + (log.studentCount || 0), 0);
-        const totalDuration = logs.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
-
-        setStats({ flights: logs, totalStudents, totalDuration });
-
         const currentMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
+        const mid = String(currentMission.id || '');
+        const jid = String(currentMission.journey_id || currentMission.journeyId || '');
+
+        // [BUG-FIX] Filter logs by mission_id or journey_id to get correct stats
+        const missionLogs = logs.filter(log => {
+            const logMid = String(log.mission_id || '');
+            const logJid = String(log.journey_id || '');
+            if (mid && logMid === mid) return true;
+            if (jid && (logJid === jid || logMid === jid)) return true;
+            return false;
+        });
+        const filtered = missionLogs.length > 0 ? missionLogs : logs;
+        const totalStudents = filtered.reduce((acc, log) => acc + (log.studentCount || 0), 0);
+        const totalDuration = filtered.reduce((acc, log) => acc + (log.durationSeconds || 0), 0);
+
+        setStats({ flights: filtered, totalStudents, totalDuration });
         setMissionId(currentMission.id);
     }, []);
 
@@ -59,6 +70,7 @@ export default function ClosureLegacy({ journeyId, onComplete, preview = false }
 
         const closureData = {
             mission_id: currentMission.id,
+            journey_id: currentMission.journey_id || currentMission.journeyId || null,
             stats: stats,
             checklistVerified: Object.values(checks).every(Boolean),
             photo: photo,

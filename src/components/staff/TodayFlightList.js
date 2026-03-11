@@ -42,10 +42,10 @@ function safeCount(value) {
     return Math.floor(parsed);
 }
 
-const VISIBLE_WINDOW = 4; // Max items shown before "show all" toggle
+const VISIBLE_WINDOW = 8; // Max items shown before "show all" toggle
 
 export default function TodayFlightList({ flights, pauses = [], activeFlight = null, onRequestEditFlight = null }) {
-    const [showAll, setShowAll] = useState(false);
+    const [showAll, setShowAll] = useState(true);
     const flightKeyUsage = new Map();
 
     const flightsNormalized = (flights || [])

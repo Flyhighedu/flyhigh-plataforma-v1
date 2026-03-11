@@ -2586,10 +2586,6 @@ export default function SupervisorDashboard() {
                 };
 
             const lastClosedFlight = operationHistory[0] || null;
-            const showInterFlightLive = !activeAuxFlight && operationHistory.length > 0 && (lastClosedFlight?.endAtMs || 0) > 0;
-            const interFlightElapsedSec = showInterFlightLive
-                ? Math.max(0, Math.floor((now - lastClosedFlight.endAtMs) / 1000))
-                : 0;
 
             const operationAnchorFromMetaMs = toMs(meta.operation_started_at) || toMs(meta.aux_operation_started_at);
             const operationAnchorFromFlightsMs = operationHistoryAsc[0]?.startedAtMs || activeAuxFlight?.startedAtMs || 0;
@@ -2657,6 +2653,13 @@ export default function SupervisorDashboard() {
             };
 
             const operationElapsedSec = phaseTimers.operation.seconds;
+
+            // [BUG-FIX] Only show inter-flight timer when operation phase is still active
+            const showInterFlightLive = !activeAuxFlight && operationHistory.length > 0 && (lastClosedFlight?.endAtMs || 0) > 0 && operationEndedAtMs <= 0;
+            const interFlightElapsedSec = showInterFlightLive
+                ? Math.max(0, Math.floor((now - lastClosedFlight.endAtMs) / 1000))
+                : 0;
+
             const assistantOperation = {
                 activeFlight: activeAuxFlight,
                 flights: operationHistory,
