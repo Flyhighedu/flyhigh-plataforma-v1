@@ -50,6 +50,16 @@ function fmtClock(iso) {
     });
 }
 
+function fmtTime(iso) {
+    if (!iso) return '--:--';
+    return new Date(iso).toLocaleTimeString('es-MX', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Mexico_City'
+    });
+}
+
 function fmtExactDateTime(iso) {
     if (!iso) return '--';
     return new Date(iso).toLocaleString('es-MX', {
@@ -62,6 +72,17 @@ function fmtExactDateTime(iso) {
         hour12: false,
         timeZone: 'America/Mexico_City'
     });
+}
+
+function fmtDuration(startIso, endIso) {
+    const startMs = toMs(startIso);
+    const endMs = toMs(endIso);
+    if (!startMs || !endMs || endMs <= startMs) return null;
+    const totalMin = Math.round((endMs - startMs) / 60000);
+    if (totalMin < 60) return `${totalMin} min`;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return m > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : `${h}h`;
 }
 
 function fmtMMSS(seconds) {
@@ -187,10 +208,12 @@ function extractCheckoutComments(meta = {}, mission) {
     return byRole;
 }
 
-function buildPhaseTimeline(mission, meta, normalizedLogs) {
+function buildPhaseTimeline(mission, meta, normalizedLogs, checkinEvents) {
     const snapshot = parseObject(mission?.timelineSnapshot);
 
     const firstFlightStart = normalizedLogs[0]?.startIso || null;
+    const lastFlight = normalizedLogs.length > 0 ? normalizedLogs[normalizedLogs.length - 1] : null;
+    const lastFlightEnd = lastFlight?.endIso || lastFlight?.startIso || null;
 
     const checkinAt =
         snapshot.checkinAt ||
@@ -206,6 +229,8 @@ function buildPhaseTimeline(mission, meta, normalizedLogs) {
     const dismantlingAt =
         snapshot.dismantlingAt ||
         pickFirstTimestamp(meta, ['closure_started_at', 'dismantling_started_at']);
+    const returnRouteAt =
+        pickFirstTimestamp(meta, ['aux_return_route_started_at', 'closure_return_route_done_at']);
     const baseClosureAt =
         snapshot.baseClosureAt ||
         pickFirstTimestamp(meta, ['closure_base_started_at', 'arrival_notified_at', 'aux_arrival_notified_at', 'closure_arrival_notification_done_at']);
@@ -219,13 +244,53 @@ function buildPhaseTimeline(mission, meta, normalizedLogs) {
         mission?.missionDateTime ||
         null;
 
+    // Per-person check-in details
+    const checkinDetails = Array.isArray(checkinEvents) && checkinEvents.length > 0
+        ? checkinEvents.map(e => ({
+            name: e.full_name || e.name || 'Desconocido',
+            role: ROLE_LABELS[normalizeRole(e.role)] || e.role,
+            at: e.created_at || e.at
+        })).sort((a, b) => toMs(a.at) - toMs(b.at))
+        : null;
+
+    // Per-person checkout details
+    const checkoutDetails = [];
+    const pilotCheckoutAt = pickFirstTimestamp(meta, ['closure_checkout_pilot_done_at']);
+    const teacherCheckoutAt = pickFirstTimestamp(meta, ['closure_checkout_teacher_done_at']);
+    const auxCheckoutAt = pickFirstTimestamp(meta, ['closure_checkout_assistant_done_at']);
+    if (pilotCheckoutAt) checkoutDetails.push({ name: meta.closure_checkout_pilot_done_by_name || 'Piloto', role: 'Piloto', at: pilotCheckoutAt });
+    if (teacherCheckoutAt) checkoutDetails.push({ name: meta.closure_checkout_teacher_done_by_name || 'Docente', role: 'Docente', at: teacherCheckoutAt });
+    if (auxCheckoutAt) checkoutDetails.push({ name: meta.closure_checkout_assistant_done_by_name || 'Auxiliar', role: 'Auxiliar', at: auxCheckoutAt });
+    checkoutDetails.sort((a, b) => toMs(a.at) - toMs(b.at));
+
     return [
-        { id: 'checkin', label: 'Check-in', at: checkinAt, icon: 'how_to_reg' },
-        { id: 'prep', label: 'Montaje', at: prepAt, icon: 'construction' },
-        { id: 'operation', label: 'Operacion', at: operationAt, icon: 'flight_takeoff' },
-        { id: 'dismantling', label: 'Desmontaje', at: dismantlingAt, icon: 'handyman' },
+        {
+            id: 'checkin', label: 'Check-in', at: checkinAt, icon: 'how_to_reg',
+            details: checkinDetails,
+        },
+        {
+            id: 'prep', label: 'Montaje', at: prepAt, icon: 'construction',
+            startAt: prepAt,
+            endAt: operationAt,
+            duration: fmtDuration(prepAt, operationAt),
+        },
+        {
+            id: 'operation', label: 'Operación', at: operationAt, icon: 'flight_takeoff',
+            firstFlightAt: firstFlightStart,
+            lastFlightAt: lastFlightEnd,
+            totalDuration: fmtDuration(firstFlightStart, lastFlightEnd),
+        },
+        {
+            id: 'dismantling', label: 'Desmontaje', at: dismantlingAt, icon: 'handyman',
+            startAt: dismantlingAt,
+            endAt: returnRouteAt,
+            duration: fmtDuration(dismantlingAt, returnRouteAt),
+        },
         { id: 'base_closure', label: 'Cierre', at: baseClosureAt, icon: 'warehouse' },
-        { id: 'checkout', label: 'Check-out', at: checkoutEndAt || checkoutAt, icon: 'flag' },
+        {
+            id: 'checkout', label: 'Check-out', at: checkoutEndAt || checkoutAt, icon: 'flag',
+            details: checkoutDetails.length > 0 ? checkoutDetails : null,
+        },
     ];
 }
 
@@ -234,7 +299,8 @@ export default function V2MissionDetails({
     missionMetrics,
     flightLogs,
     loadingLogs = false,
-    onOpenEvidence = null
+    onOpenEvidence = null,
+    checkinEvents = null
 }) {
     const mergedLogs = useMemo(() => {
         return mergeFlightRows(
@@ -280,7 +346,7 @@ export default function V2MissionDetails({
         : normalizedLogs.reduce((acc, row) => acc + row.incidents.length, 0);
 
     const missionMeta = useMemo(() => extractMissionMeta(mission), [mission]);
-    const phaseTimeline = useMemo(() => buildPhaseTimeline(mission, missionMeta, normalizedLogs), [mission, missionMeta, normalizedLogs]);
+    const phaseTimeline = useMemo(() => buildPhaseTimeline(mission, missionMeta, normalizedLogs, checkinEvents), [mission, missionMeta, normalizedLogs, checkinEvents]);
     const checkoutComments = useMemo(() => extractCheckoutComments(missionMeta, mission), [missionMeta, mission]);
     const bitacoraRows = useMemo(() => {
         const rows = [];
@@ -356,23 +422,91 @@ export default function V2MissionDetails({
 
             <section className="rounded-xl border border-slate-800 bg-slate-900/45 px-3 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Linea de Tiempo Operativa</p>
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 space-y-1">
                     {phaseTimeline.map((phase, idx) => {
                         const hasTimestamp = Boolean(phase.at);
                         const isLast = idx === phaseTimeline.length - 1;
+                        const hasDetails = Array.isArray(phase.details) && phase.details.length > 0;
+                        const hasDuration = Boolean(phase.duration);
+                        const isOperation = phase.id === 'operation';
+                        const hasSubInfo = hasDetails || hasDuration || isOperation;
+
                         return (
                             <div key={phase.id} className="flex items-start gap-2.5">
                                 <div className="flex flex-col items-center pt-0.5">
                                     <div className={`size-4 rounded-full border-2 ${hasTimestamp ? 'border-emerald-400 bg-emerald-400/20' : 'border-slate-600 bg-slate-800'}`} />
-                                    {!isLast && <div className="w-0.5 h-7 bg-slate-700/80" />}
+                                    {!isLast && <div className={`w-0.5 bg-slate-700/80 ${hasSubInfo ? 'min-h-[2.5rem]' : 'h-5'}`} style={hasSubInfo ? { flexGrow: 1 } : {}} />}
                                 </div>
-                                <div className="flex-1 min-w-0 pb-1">
+                                <div className="flex-1 min-w-0 pb-2">
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="text-xs font-black text-slate-200 uppercase tracking-wide">{phase.label}</p>
-                                        <span className={`text-[11px] font-semibold tabular-nums ${hasTimestamp ? 'text-emerald-300' : 'text-slate-500'}`}>
-                                            {hasTimestamp ? fmtExactDateTime(phase.at) : 'Pendiente'}
-                                        </span>
+                                        {!hasSubInfo && (
+                                            <span className={`text-[11px] font-semibold tabular-nums ${hasTimestamp ? 'text-emerald-300' : 'text-slate-500'}`}>
+                                                {hasTimestamp ? fmtTime(phase.at) : 'Pendiente'}
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {/* Per-person details (check-in, checkout) */}
+                                    {hasDetails && (
+                                        <div className="mt-1 space-y-0.5">
+                                            {phase.details.map((d, dIdx) => (
+                                                <div key={dIdx} className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400">{d.name} <span className="text-slate-600">({d.role})</span></span>
+                                                    <span className="font-semibold text-emerald-300/80 tabular-nums">{fmtTime(d.at)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Duration phases (montaje, desmontaje) */}
+                                    {hasDuration && !isOperation && (
+                                        <div className="mt-1 space-y-0.5">
+                                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                <span className="text-slate-400">Inicio</span>
+                                                <span className="font-semibold text-emerald-300/80 tabular-nums">{fmtTime(phase.startAt)}</span>
+                                            </div>
+                                            {phase.endAt && (
+                                                <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400">Fin</span>
+                                                    <span className="font-semibold text-emerald-300/80 tabular-nums">{fmtTime(phase.endAt)}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                <span className="text-slate-400">Duración</span>
+                                                <span className="font-bold text-amber-300 tabular-nums">{phase.duration}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Operation stats (first/last flight, total time) */}
+                                    {isOperation && hasTimestamp && (
+                                        <div className="mt-1 space-y-0.5">
+                                            {phase.firstFlightAt && (
+                                                <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400">Primer vuelo</span>
+                                                    <span className="font-semibold text-emerald-300/80 tabular-nums">{fmtTime(phase.firstFlightAt)}</span>
+                                                </div>
+                                            )}
+                                            {phase.lastFlightAt && (
+                                                <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400">Último vuelo</span>
+                                                    <span className="font-semibold text-emerald-300/80 tabular-nums">{fmtTime(phase.lastFlightAt)}</span>
+                                                </div>
+                                            )}
+                                            {phase.totalDuration && (
+                                                <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                    <span className="text-slate-400">Tiempo total</span>
+                                                    <span className="font-bold text-amber-300 tabular-nums">{phase.totalDuration}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Fallback: show Pendiente for phases without sub-info that have no timestamp */}
+                                    {!hasTimestamp && !hasDetails && !hasDuration && !isOperation && (
+                                        <span className="text-[11px] text-slate-500">Pendiente</span>
+                                    )}
                                 </div>
                             </div>
                         );

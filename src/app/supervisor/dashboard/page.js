@@ -1761,6 +1761,7 @@ export default function SupervisorDashboard() {
     const [historySearch, setHistorySearch] = useState('');
     const [selectedHistoryMissionKey, setSelectedHistoryMissionKey] = useState(null);
     const [historyLogsByMission, setHistoryLogsByMission] = useState({});
+    const [historyCheckinsByMission, setHistoryCheckinsByMission] = useState({});
     const [historyLogsLoadingMission, setHistoryLogsLoadingMission] = useState(null);
     const [historySchoolLookupMap, setHistorySchoolLookupMap] = useState({});
     const [historyFlightSnapshotLookup, setHistoryFlightSnapshotLookup] = useState({});
@@ -3594,6 +3595,38 @@ export default function SupervisorDashboard() {
                 ...prev,
                 [missionKey]: mergedLogs
             }));
+
+            // [ENRICHMENT] Fetch check-in events for timeline (read-only)
+            if (journeyIds.length > 0) {
+                try {
+                    const { data: checkinRows } = await supabase
+                        .from('staff_prep_events')
+                        .select('user_id, created_at')
+                        .in('journey_id', journeyIds)
+                        .eq('event_type', 'checkin')
+                        .order('created_at', { ascending: true });
+                    if (checkinRows && checkinRows.length > 0) {
+                        const userIds = [...new Set(checkinRows.map(r => r.user_id).filter(Boolean))];
+                        const { data: profiles } = await supabase
+                            .from('staff_profiles')
+                            .select('user_id, full_name, role')
+                            .in('user_id', userIds);
+                        const profileMap = {};
+                        (profiles || []).forEach(p => { profileMap[p.user_id] = p; });
+                        const enriched = checkinRows.map(r => ({
+                            ...r,
+                            full_name: profileMap[r.user_id]?.full_name || 'Desconocido',
+                            role: profileMap[r.user_id]?.role || 'unknown'
+                        }));
+                        setHistoryCheckinsByMission((prev) => ({
+                            ...prev,
+                            [missionKey]: enriched
+                        }));
+                    }
+                } catch (checkinErr) {
+                    console.warn('SV history checkin events error (non-blocking):', checkinErr);
+                }
+            }
         } catch (error) {
             console.error('SV history logs error:', error);
             setHistoryLogsByMission((prev) => ({
@@ -3906,7 +3939,8 @@ export default function SupervisorDashboard() {
                                                     flightLogs={missionLogs}
                                                     loadingLogs={loadingMissionLogs}
                                                     onOpenEvidence={openEvidenceViewer}
-                                                />
+                                                                                                    checkinEvents={historyCheckinsByMission[mission?.key] || null}
+                                                    />
 
                                                 {canDeleteHistoryMission && (
                                                     <div className="pt-3">
