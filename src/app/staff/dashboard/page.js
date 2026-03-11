@@ -865,6 +865,17 @@ export default function StaffDashboard() {
             };
 
             setTodaySchool(schoolData);
+            // [BUG-FIX] Clear stale flight logs if mission changed
+            try {
+                const prevMission = JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}');
+                if (prevMission.id && String(prevMission.id) !== String(schoolData.id)) {
+                    console.warn('[KPI-FIX] Mission changed — clearing stale flight logs');
+                    localStorage.removeItem('flyhigh_flight_logs');
+                    localStorage.removeItem('flyhigh_active_flight');
+                    localStorage.removeItem('flyhigh_active_pause');
+                    localStorage.removeItem('flyhigh_completed_pauses');
+                }
+            } catch (e) { /* ignore */ }
             localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
             setNoSchoolToday(false);
 

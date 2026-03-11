@@ -18,6 +18,35 @@ export default function DailyImpactReport({ missionId, journeyId, onExit, allowD
     useEffect(() => {
         const fetchStats = async () => {
             const supabase = createClient();
+
+            // [BUG-FIX] Auto-discover journey_id from closure or journey table if not passed
+            let resolvedJourneyId = journeyId || null;
+            if (!resolvedJourneyId && missionId) {
+                // Try cierres_mision first
+                const { data: closure } = await supabase
+                    .from('cierres_mision')
+                    .select('journey_id')
+                    .eq('mission_id', missionId)
+                    .not('journey_id', 'is', null)
+                    .limit(1)
+                    .single();
+                if (closure?.journey_id) {
+                    resolvedJourneyId = closure.journey_id;
+                } else {
+                    // Try staff_journeys by school_id (if missionId is numeric)
+                    if (/^\d+$/.test(String(missionId))) {
+                        const { data: journey } = await supabase
+                            .from('staff_journeys')
+                            .select('id')
+                            .eq('school_id', Number(missionId))
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .single();
+                        if (journey?.id) resolvedJourneyId = journey.id;
+                    }
+                }
+            }
+
             let { data: flights, error } = await supabase
                 .from('bitacora_vuelos')
                 .select('*')
@@ -25,11 +54,11 @@ export default function DailyImpactReport({ missionId, journeyId, onExit, allowD
                 .order('created_at', { ascending: true });
 
             // [BUG-FIX] Fallback: if no flights by mission_id, try journey_id
-            if (!error && (!flights || flights.length === 0) && journeyId) {
+            if (!error && (!flights || flights.length === 0) && resolvedJourneyId) {
                 const fb1 = await supabase
                     .from('bitacora_vuelos')
                     .select('*')
-                    .eq('journey_id', journeyId)
+                    .eq('journey_id', resolvedJourneyId)
                     .order('created_at', { ascending: true });
                 if (!fb1.error && fb1.data?.length > 0) {
                     flights = fb1.data;
@@ -38,11 +67,11 @@ export default function DailyImpactReport({ missionId, journeyId, onExit, allowD
             }
 
             // [BUG-FIX] Fallback 2: try mission_id matching the journeyId value
-            if (!error && (!flights || flights.length === 0) && journeyId && journeyId !== missionId) {
+            if (!error && (!flights || flights.length === 0) && resolvedJourneyId && resolvedJourneyId !== missionId) {
                 const fb2 = await supabase
                     .from('bitacora_vuelos')
                     .select('*')
-                    .eq('mission_id', journeyId)
+                    .eq('mission_id', resolvedJourneyId)
                     .order('created_at', { ascending: true });
                 if (!fb2.error && fb2.data?.length > 0) {
                     flights = fb2.data;
