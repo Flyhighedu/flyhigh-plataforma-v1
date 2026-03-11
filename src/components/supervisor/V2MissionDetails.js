@@ -145,7 +145,7 @@ function normalizeFlightRows(rows = []) {
         .sort((a, b) => a.startMs - b.startMs);
 }
 
-function extractMissionMeta(mission) {
+function extractMissionMeta(mission, extraJourneyMeta) {
     const raw = mission?.raw || Object.create(null);
     const payload = parseObject(raw?.payload);
 
@@ -156,6 +156,7 @@ function extractMissionMeta(mission) {
         ...parseObject(raw?.journeyMeta),
         ...parseObject(payload?.meta),
         ...payload,
+        ...parseObject(extraJourneyMeta),
     };
 
     return merged;
@@ -220,8 +221,7 @@ function buildPhaseTimeline(mission, meta, normalizedLogs, checkinEvents) {
         pickFirstTimestamp(meta, ['first_checkin_at', 'checkin_at', 'checkin_started_at', 'check_in_at']);
     const prepAt =
         snapshot.prepAt ||
-        pickFirstTimestamp(meta, ['prep_started_at', 'montaje_started_at', 'prep_base_started_at']) ||
-        checkinAt;
+        pickFirstTimestamp(meta, ['prep_started_at', 'montaje_started_at', 'prep_base_started_at', 'pilot_prep_complete_at', 'teacher_operation_ready_at', 'aux_operation_ready_at']);
     const operationAt =
         snapshot.operationAt ||
         pickFirstTimestamp(meta, ['operation_started_at', 'aux_operation_started_at']) ||
@@ -300,7 +300,8 @@ export default function V2MissionDetails({
     flightLogs,
     loadingLogs = false,
     onOpenEvidence = null,
-    checkinEvents = null
+    checkinEvents = null,
+    journeyMeta = null
 }) {
     const mergedLogs = useMemo(() => {
         return mergeFlightRows(
@@ -345,7 +346,7 @@ export default function V2MissionDetails({
         ? asNumber(missionMetrics.totalIncidents)
         : normalizedLogs.reduce((acc, row) => acc + row.incidents.length, 0);
 
-    const missionMeta = useMemo(() => extractMissionMeta(mission), [mission]);
+    const missionMeta = useMemo(() => extractMissionMeta(mission, journeyMeta), [mission, journeyMeta]);
     const phaseTimeline = useMemo(() => buildPhaseTimeline(mission, missionMeta, normalizedLogs, checkinEvents), [mission, missionMeta, normalizedLogs, checkinEvents]);
     const checkoutComments = useMemo(() => extractCheckoutComments(missionMeta, mission), [missionMeta, mission]);
     const bitacoraRows = useMemo(() => {

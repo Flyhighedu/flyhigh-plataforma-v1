@@ -3626,6 +3626,25 @@ export default function SupervisorDashboard() {
                 } catch (checkinErr) {
                     console.warn('SV history checkin events error (non-blocking):', checkinErr);
                 }
+
+                // [ENRICHMENT] Fetch journey meta for timeline phases
+                try {
+                    const { data: journeyRows } = await supabase
+                        .from('staff_journeys')
+                        .select('meta')
+                        .in('id', journeyIds)
+                        .limit(1)
+                        .single();
+                    if (journeyRows?.meta) {
+                        const jm = typeof journeyRows.meta === 'string' ? JSON.parse(journeyRows.meta) : journeyRows.meta;
+                        setHistoryJourneyMetaByMission((prev) => ({
+                            ...prev,
+                            [missionKey]: jm
+                        }));
+                    }
+                } catch (jmErr) {
+                    console.warn('SV journey meta fetch error (non-blocking):', jmErr);
+                }
             }
         } catch (error) {
             console.error('SV history logs error:', error);
@@ -3792,7 +3811,7 @@ export default function SupervisorDashboard() {
     }, [missionHistory]);
 
     const hasLiveMission = Boolean(sel);
-    const effectiveTab = dashboardTab;
+    const effectiveTab = (!hasLiveMission && dashboardTab === 'live') ? 'history' : dashboardTab;
     const canDeleteHistoryMission = ['admin', 'supervisor'].includes(String(profile?.role || '').toLowerCase());
 
     /* ═══════════ RENDER ═══════════ */
@@ -3940,6 +3959,7 @@ export default function SupervisorDashboard() {
                                                     loadingLogs={loadingMissionLogs}
                                                     onOpenEvidence={openEvidenceViewer}
                                                                                                     checkinEvents={historyCheckinsByMission[mission?.key] || null}
+                                                                                                        journeyMeta={historyJourneyMetaByMission?.[mission?.key] || null}
                                                     />
 
                                                 {canDeleteHistoryMission && (
