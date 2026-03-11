@@ -1762,6 +1762,7 @@ export default function SupervisorDashboard() {
     const [selectedHistoryMissionKey, setSelectedHistoryMissionKey] = useState(null);
     const [historyLogsByMission, setHistoryLogsByMission] = useState({});
     const [historyCheckinsByMission, setHistoryCheckinsByMission] = useState({});
+    const [historyJourneyMetaByMission, setHistoryJourneyMetaByMission] = useState({});
     const [historyLogsLoadingMission, setHistoryLogsLoadingMission] = useState(null);
     const [historySchoolLookupMap, setHistorySchoolLookupMap] = useState({});
     const [historyFlightSnapshotLookup, setHistoryFlightSnapshotLookup] = useState({});
