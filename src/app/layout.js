@@ -1,5 +1,6 @@
 import "./globals.css";
 import { ImpactProvider } from '../context/ImpactContext';
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata = {
     title: "Fly High Edu",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }) {
                         {children}
                     </CustomSplashScreen>
                 </ImpactProvider>
+                <Toaster richColors position="top-right" />
             </body>
         </html>
     );
