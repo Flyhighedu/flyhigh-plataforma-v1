@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
+  getExpandedRowModel,
   flexRender,
 } from "@tanstack/react-table";
 import {
@@ -19,20 +20,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export function DataTable({ columns, data, onUpdateRow }) {
+export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubComponent }) {
   const [globalFilter, setGlobalFilter] = useState("");
+  const [expanded, setExpanded] = useState({});
 
   const table = useReactTable({
     data,
     columns,
-    state: { globalFilter },
+    state: { globalFilter, expanded },
     onGlobalFilterChange: setGlobalFilter,
+    onExpandedChange: setExpanded,
+    getRowCanExpand: () => !!renderSubComponent,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
     globalFilterFn: "includesString",
     meta: {
       updateData: onUpdateRow,
+      deleteRow: onDeleteRow,
     },
   });
 
@@ -58,7 +64,7 @@ export function DataTable({ columns, data, onUpdateRow }) {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -73,16 +79,25 @@ export function DataTable({ columns, data, onUpdateRow }) {
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <Fragment key={row.id}>
+                  <TableRow className={row.getIsExpanded() ? "bg-muted/30 border-b-0" : ""}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {row.getIsExpanded() && renderSubComponent && (
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                      <TableCell colSpan={row.getVisibleCells().length} className="p-0">
+                        {renderSubComponent({ row })}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))
             ) : (
               <TableRow>
