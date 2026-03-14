@@ -135,7 +135,118 @@ function DeleteActionCell({ row, table }) {
   );
 }
 
+// Inline dropdown for tipo_escuela (Pública / Privada)
+function TipoEscuelaCell({ getValue, row, column, table }) {
+  const initialValue = getValue();
+  const [value, setValue] = useState(initialValue || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue || "");
+  }, [initialValue]);
+
+  const handleChange = async (e) => {
+    const newValue = e.target.value || null;
+    if (newValue === value) return;
+
+    setValue(newValue || "");
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(row.original.id, column.id, newValue);
+    } catch {
+      setValue(initialValue || "");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <select
+      value={value}
+      onChange={handleChange}
+      disabled={isSaving}
+      className={`appearance-none cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium border border-slate-200 outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 bg-white transition-all ${isSaving ? "opacity-50" : ""}`}
+      title="Tipo de escuela"
+    >
+      <option value="">—</option>
+      <option value="Pública">Pública</option>
+      <option value="Privada">Privada</option>
+    </select>
+  );
+}
+
+// Inline currency input for costo_por_nino ($ prefix)
+function CostoPorNinoCell({ getValue, row, column, table }) {
+  const initialValue = getValue();
+  const [value, setValue] = useState(initialValue);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  const onSave = async () => {
+    setIsEditing(false);
+    if (value === initialValue) return;
+
+    const numValue = value === "" || value === null ? null : Number(value);
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(row.original.id, column.id, numValue);
+    } catch {
+      setValue(initialValue);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground font-medium">$</span>
+        <input
+          autoFocus
+          type="number"
+          min={0}
+          value={value ?? ""}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={onSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+            if (e.key === "Escape") { setValue(initialValue); setIsEditing(false); }
+          }}
+          className="h-8 w-20 text-sm border rounded-md px-1 outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => setIsEditing(true)}
+      className={`cursor-pointer rounded px-1 py-0.5 hover:bg-muted/70 transition-colors min-h-[28px] flex items-center ${isSaving ? "opacity-50" : ""}`}
+      title="Clic para editar"
+    >
+      {value !== null && value !== undefined && value !== ""
+        ? <span className="text-sm font-medium">${Number(value).toLocaleString("es-MX")}</span>
+        : <span className="text-muted-foreground italic text-sm">—</span>}
+    </div>
+  );
+}
+
 export const journeyColumns = [
+  {
+    id: "row_number",
+    header: "#",
+    cell: ({ row }) => (
+      <span className="text-xs text-muted-foreground/60 font-mono select-none">
+        {row.index + 1}
+      </span>
+    ),
+    size: 36,
+    enableGlobalFilter: false,
+  },
   {
     id: "expander",
     header: () => null,
@@ -170,12 +281,12 @@ export const journeyColumns = [
   {
     accessorKey: "tipo_escuela",
     header: "Tipo",
-    cell: (props) => <EditableCell {...props} />,
+    cell: (props) => <TipoEscuelaCell {...props} />,
   },
   {
     accessorKey: "costo_por_nino",
     header: "Costo/Niño",
-    cell: (props) => <EditableCell {...props} />,
+    cell: (props) => <CostoPorNinoCell {...props} />,
   },
   {
     accessorKey: "total_students",
