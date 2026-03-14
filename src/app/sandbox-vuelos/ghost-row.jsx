@@ -38,14 +38,22 @@ export function GhostRow({ columnCount, onCreateRow }) {
 
   const inputCls = "h-8 text-sm bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 focus:ring-emerald-500";
 
+  // Column order must match journey-columns.jsx exactly:
+  // 0: row_number | 1: expander | 2: date | 3: school_name | 4: status
+  // 5: tipo_escuela | 6: costo_por_nino | 7: total_students | 8: becados
+  // 9: total_flights | 10: actions
+
   return (
     <TableRow className="bg-emerald-50/30 dark:bg-emerald-950/10 border-t-2 border-dashed border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20">
-      {/* Expander placeholder */}
+      {/* Col 0: # (row_number) — empty placeholder */}
       <TableCell>
         <span className="text-emerald-500 text-lg font-bold" title="Nueva misión">＋</span>
       </TableCell>
 
-      {/* Date */}
+      {/* Col 1: Expander — empty placeholder */}
+      <TableCell />
+
+      {/* Col 2: Fecha */}
       <TableCell>
         <Input
           type="date"
@@ -56,7 +64,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
         />
       </TableCell>
 
-      {/* School — free text input (Excel-style) */}
+      {/* Col 3: Escuela (texto libre) */}
       <TableCell>
         <Input
           ref={firstRef}
@@ -69,14 +77,14 @@ export function GhostRow({ columnCount, onCreateRow }) {
         />
       </TableCell>
 
-      {/* Status — auto */}
+      {/* Col 4: Estado — auto "closed" */}
       <TableCell>
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
           → closed
         </span>
       </TableCell>
 
-      {/* Tipo Escuela */}
+      {/* Col 5: Tipo Escuela (select) */}
       <TableCell>
         <select
           value={form.tipo_escuela}
@@ -90,20 +98,23 @@ export function GhostRow({ columnCount, onCreateRow }) {
         </select>
       </TableCell>
 
-      {/* Costo/Niño */}
+      {/* Col 6: Costo/Niño ($) */}
       <TableCell>
-        <Input
-          type="number"
-          placeholder="$"
-          min={0}
-          value={form.costo_por_nino}
-          onChange={(e) => setForm((f) => ({ ...f, costo_por_nino: e.target.value }))}
-          onKeyDown={handleKeyDown}
-          className={inputCls}
-        />
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground font-medium">$</span>
+          <Input
+            type="number"
+            placeholder="0"
+            min={0}
+            value={form.costo_por_nino}
+            onChange={(e) => setForm((f) => ({ ...f, costo_por_nino: e.target.value }))}
+            onKeyDown={handleKeyDown}
+            className={`${inputCls} w-20`}
+          />
+        </div>
       </TableCell>
 
-      {/* Niños */}
+      {/* Col 7: Niños */}
       <TableCell>
         <Input
           type="number"
@@ -116,7 +127,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
         />
       </TableCell>
 
-      {/* Becados */}
+      {/* Col 8: Becados */}
       <TableCell>
         <Input
           type="number"
@@ -129,7 +140,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
         />
       </TableCell>
 
-      {/* Vuelos */}
+      {/* Col 9: Vuelos */}
       <TableCell>
         <Input
           type="number"
@@ -142,7 +153,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
         />
       </TableCell>
 
-      {/* Action: Save button */}
+      {/* Col 10: Acción — Botón Sellar */}
       <TableCell>
         <button
           onClick={handleSave}
