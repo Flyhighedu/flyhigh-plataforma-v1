@@ -5,7 +5,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 
 export function GhostRow({ columnCount, onCreateRow }) {
-  const emptyForm = { school_name: "", date: "", total_students: "", total_flights: "", tipo_escuela: "", costo_por_nino: "" };
+  const emptyForm = { school_name: "", date: "", total_students: "", becados: "", total_flights: "", tipo_escuela: "", costo_por_nino: "" };
   const [form, setForm] = useState(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
   const firstRef = useRef(null);
@@ -111,6 +111,19 @@ export function GhostRow({ columnCount, onCreateRow }) {
           min={0}
           value={form.total_students}
           onChange={(e) => setForm((f) => ({ ...f, total_students: e.target.value }))}
+          onKeyDown={handleKeyDown}
+          className={inputCls}
+        />
+      </TableCell>
+
+      {/* Becados */}
+      <TableCell>
+        <Input
+          type="number"
+          placeholder="0"
+          min={0}
+          value={form.becados}
+          onChange={(e) => setForm((f) => ({ ...f, becados: e.target.value }))}
           onKeyDown={handleKeyDown}
           className={inputCls}
         />

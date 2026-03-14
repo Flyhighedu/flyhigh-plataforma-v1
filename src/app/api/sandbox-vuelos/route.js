@@ -79,7 +79,7 @@ export async function GET(request) {
         // Get totals from cierres_mision (total_students, total_flights)
         const { data: cierres } = await supabase
             .from('cierres_mision')
-            .select('journey_id, total_students, total_flights');
+            .select('journey_id, total_students, total_flights, becados');
 
         const cierreMap = {};
         if (cierres) {
@@ -102,6 +102,7 @@ export async function GET(request) {
                 vuelo_count: countsMap[j.id] || 0,
                 total_students: cierre?.total_students || 0,
                 total_flights: cierre?.total_flights || 0,
+                becados: cierre?.becados || 0,
             };
         });
 
@@ -132,7 +133,7 @@ export async function PATCH(request) {
         const supabase = getAdminSupabase();
 
         // Special path: Niños/Vuelos → UPSERT cierres_mision + seal journey
-        if (targetTable === 'staff_journeys' && (field === 'total_students' || field === 'total_flights')) {
+        if (targetTable === 'staff_journeys' && (field === 'total_students' || field === 'total_flights' || field === 'becados')) {
             const numValue = parseInt(value) || 0;
 
             // Get journey data for cierre fields
@@ -242,7 +243,7 @@ export async function PATCH(request) {
 // POST — Ghost Row: auto-create school in catalog + double INSERT (staff_journeys + cierres_mision)
 export async function POST(request) {
     try {
-        const { school_name, date, total_students, total_flights, tipo_escuela, costo_por_nino } = await request.json();
+        const { school_name, date, total_students, total_flights, becados, tipo_escuela, costo_por_nino } = await request.json();
 
         if (!school_name?.trim() || !date) {
             return NextResponse.json(
@@ -307,6 +308,7 @@ export async function POST(request) {
                 school_id: schoolId,
                 total_students: parseInt(total_students) || 0,
                 total_flights: parseInt(total_flights) || 0,
+                becados: parseInt(becados) || 0,
                 checklist_verified: false,
                 end_time: new Date().toISOString(),
             });
@@ -319,6 +321,7 @@ export async function POST(request) {
                 school_name: trimmedName,
                 total_students: parseInt(total_students) || 0,
                 total_flights: parseInt(total_flights) || 0,
+                becados: parseInt(becados) || 0,
                 vuelo_count: 0,
             },
         });

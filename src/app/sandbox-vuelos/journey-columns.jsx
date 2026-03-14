@@ -184,6 +184,12 @@ export const journeyColumns = [
     enableGlobalFilter: false,
   },
   {
+    accessorKey: "becados",
+    header: "Becados",
+    cell: (props) => <EditableCell {...props} />,
+    enableGlobalFilter: false,
+  },
+  {
     accessorKey: "total_flights",
     header: "Vuelos",
     cell: (props) => <EditableCell {...props} />,

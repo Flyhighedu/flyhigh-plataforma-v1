@@ -47,7 +47,7 @@ export function EditableCell({ getValue, row, column, table }) {
   };
 
   // Determine input type based on column
-  const isNumeric = ["costo_por_nino", "total_students", "total_flights"].includes(column.id);
+  const isNumeric = ["costo_por_nino", "total_students", "total_flights", "becados"].includes(column.id);
 
   if (isEditing) {
     return (

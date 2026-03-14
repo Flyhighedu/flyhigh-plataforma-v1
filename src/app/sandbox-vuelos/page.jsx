@@ -38,10 +38,10 @@ export default function SandboxVuelosPage() {
   // For total_students / total_flights: triggers UPSERT-cierre + seal
   const handleUpdateRow = useCallback(
     async (rowId, columnId, newValue) => {
-      const isCierreField = columnId === "total_students" || columnId === "total_flights";
+      const isCierreField = columnId === "total_students" || columnId === "total_flights" || columnId === "becados";
       let castValue = newValue;
 
-      if (["costo_por_nino", "total_students", "total_flights"].includes(columnId)) {
+      if (["costo_por_nino", "total_students", "total_flights", "becados"].includes(columnId)) {
         castValue = newValue === "" || newValue === null ? (isCierreField ? 0 : null) : Number(newValue);
         if (castValue !== null && isNaN(castValue)) {
           toast.error("Valor inválido", { description: `"${newValue}" no es un número válido.` });
@@ -69,7 +69,7 @@ export default function SandboxVuelosPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al guardar");
 
-        const label = isCierreField ? `${columnId === "total_students" ? "Niños" : "Vuelos"} → cierres_mision` : columnId;
+        const label = isCierreField ? `${columnId === "total_students" ? "Niños" : columnId === "becados" ? "Becados" : "Vuelos"} → cierres_mision` : columnId;
         toast.success("Guardado", { description: `${label} actualizado.` });
       } catch (err) {
         toast.error("Error al guardar", { description: err.message });
