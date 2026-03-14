@@ -29,44 +29,66 @@ export async function GET(request) {
             return NextResponse.json({ data: data || [] });
         }
 
-        // Master: fetch all journeys with vuelo counts
-        const { data: journeys, error: jError } = await supabase
+        // Master: fetch journeys with resolved school names + vuelo counts
+        const { data: rawJourneys, error: rawError } = await supabase
             .from('staff_journeys')
-            .select('id, date, school_name, status, tipo_escuela, costo_por_nino, created_at')
+            .select('id, date, school_name, school_id, status, tipo_escuela, costo_por_nino, created_at')
             .order('created_at', { ascending: false });
 
-        if (jError) throw jError;
+        if (rawError) throw rawError;
 
-        // Get vuelo counts per journey in one query
-        const { data: vueloCounts, error: vError } = await supabase
-            .rpc('get_vuelo_counts_by_journey')
-            .select('*');
+        // Fetch the school catalog for name resolution
+        const { data: schools } = await supabase
+            .from('proximas_escuelas')
+            .select('id, nombre_escuela, colonia');
 
-        // If RPC doesn't exist, fallback to a manual count
-        let countsMap = {};
-        if (vError || !vueloCounts) {
-            const { data: allVuelos } = await supabase
-                .from('bitacora_vuelos')
-                .select('journey_id');
-
-            if (allVuelos) {
-                for (const v of allVuelos) {
-                    if (v.journey_id) {
-                        countsMap[v.journey_id] = (countsMap[v.journey_id] || 0) + 1;
-                    }
-                }
-            }
-        } else {
-            for (const row of vueloCounts) {
-                countsMap[row.journey_id] = row.count;
+        const schoolMap = {};
+        if (schools) {
+            for (const s of schools) {
+                schoolMap[s.id] = s;
             }
         }
 
-        // Enrich journeys with vuelo_count
-        const enriched = (journeys || []).map(j => ({
-            ...j,
-            vuelo_count: countsMap[j.id] || 0,
-        }));
+        // Get vuelo counts per journey
+        let countsMap = {};
+        const { data: allVuelos } = await supabase
+            .from('bitacora_vuelos')
+            .select('journey_id');
+
+        if (allVuelos) {
+            for (const v of allVuelos) {
+                if (v.journey_id) {
+                    countsMap[v.journey_id] = (countsMap[v.journey_id] || 0) + 1;
+                }
+            }
+        }
+
+        // Get totals from cierres_mision (total_students, total_flights)
+        const { data: cierres } = await supabase
+            .from('cierres_mision')
+            .select('journey_id, total_students, total_flights');
+
+        const cierreMap = {};
+        if (cierres) {
+            for (const c of cierres) {
+                if (c.journey_id) {
+                    cierreMap[c.journey_id] = c;
+                }
+            }
+        }
+
+        // Enrich journeys: resolve school_name via COALESCE logic + add vuelo_count
+        const enriched = (rawJourneys || []).map(j => {
+            const school = schoolMap[j.school_id];
+            return {
+                ...j,
+                school_name: j.school_name || (school?.nombre_escuela) || null,
+                colonia: school?.colonia || null,
+                vuelo_count: countsMap[j.id] || 0,
+                total_students: cierreMap[j.id]?.total_students || 0,
+                total_flights: cierreMap[j.id]?.total_flights || 0,
+            };
+        });
 
         return NextResponse.json({ data: enriched });
     } catch (err) {

@@ -138,6 +138,19 @@ export const journeyColumns = [
     cell: (props) => <EditableCell {...props} />,
   },
   {
+    accessorKey: "total_students",
+    header: "Niños",
+    cell: ({ getValue }) => {
+      const v = getValue();
+      return (
+        <span className={`font-mono text-sm ${v > 0 ? "text-emerald-600 font-semibold" : "text-muted-foreground"}`}>
+          {v > 0 ? v.toLocaleString() : "—"}
+        </span>
+      );
+    },
+    enableGlobalFilter: false,
+  },
+  {
     accessorKey: "vuelo_count",
     header: "Vuelos",
     cell: ({ getValue }) => {
