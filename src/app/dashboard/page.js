@@ -408,74 +408,153 @@ const SchoolsMap = ({ flights }) => {
     );
 };
 
-// --- COMPONENTE: Próximas Misiones (Glassmorphism) ---
+// --- COMPONENTE: Cronograma de Misiones (Tabs: Pendientes / Historial) ---
+const TRASH_PATTERNS = /demo|prueba|test|ejemplo|sandbox|asdf/i;
+const TRASH_IDS = new Set([999999, 44, 45, 46, 48]); // Duplicates/demo IDs from audit
+
 const NextMissions = ({ missions }) => {
-    // Filtrar solo las pendientes o futuras si se desea, aunque el prompt dice "Solo muestra ... que NO hayan sido borradas" (que ya lo hace el backend query si usamos soft delete, o si es hard delete ya no existen).
-    // Asumiremos que el backend devuelve todo lo que existe.
-    // Opcional: filtrar por fecha > hoy? Prompt no especifica.
+    const [activeTab, setActiveTab] = useState('pendientes');
 
     if (!missions || missions.length === 0) return null;
+
+    // Filter out trash: name patterns, known trash IDs, archived status
+    const cleanMissions = missions.filter((m) => {
+        if (TRASH_IDS.has(m.id)) return false;
+        if (m.estatus === 'archivado') return false;
+        if (TRASH_PATTERNS.test(m.nombre_escuela || '')) return false;
+        return true;
+    });
+
+    // Split into tabs: Pendientes = NOT completado, Historial = completado
+    const pendientes = cleanMissions.filter((m) => m.estatus !== 'completado');
+    const historial = cleanMissions.filter((m) => m.estatus === 'completado');
+
+    const activeMissions = activeTab === 'pendientes' ? pendientes : historial;
 
     return (
         <section className="w-full py-12 px-4 bg-slate-50/50">
             <div className="max-w-5xl mx-auto">
-                <div className="flex items-center gap-3 mb-8">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-sm">
                         <Calendar className="w-6 h-6 text-amber-500" />
                     </div>
                     <div>
                         <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-                            Próximas Misiones
+                            Cronograma de Misiones
                         </h2>
-                        <p className="text-slate-500 text-sm font-medium">Cronograma de visitas programadas</p>
+                        <p className="text-slate-500 text-sm font-medium">
+                            {cleanMissions.length} misiones · {pendientes.length} pendientes · {historial.length} realizadas
+                        </p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {missions.map((mission, index) => (
-                        <motion.div
-                            key={mission.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: index * 0.1 }}
-                            className="group relative bg-white rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 border border-white overflow-hidden hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300"
-                        >
-                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <School size={80} className="text-amber-500" />
-                            </div>
-
-                            <div className="relative z-10">
-                                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border ${mission.estatus === 'completado' ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                    {mission.estatus === 'completado' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                                    {mission.estatus === 'completado' ? 'Realizada' : 'Programada'}
-                                </div>
-
-                                <h3 className={`text-xl font-bold mb-2 line-clamp-2 ${mission.estatus === 'completado' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                                    {mission.nombre_escuela}
-                                </h3>
-
-                                <div className="space-y-3 mt-4">
-                                    <div className="flex items-start gap-3 text-slate-500">
-                                        <MapPin size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                                        <span className="text-sm font-medium">{mission.colonia}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-slate-500">
-                                        <Calendar size={18} className="text-amber-500 shrink-0" />
-                                        <span className="text-sm font-bold text-slate-700">
-                                            {new Date(mission.fecha_programada + 'T12:00:00').toLocaleDateString('es-MX', {
-                                                weekday: 'long',
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            })}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
+                {/* Tabs */}
+                <div className="flex gap-2 mb-8">
+                    <button
+                        onClick={() => setActiveTab('pendientes')}
+                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold tracking-wide transition-all duration-200 ${
+                            activeTab === 'pendientes'
+                                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Clock size={14} />
+                        Pendientes
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
+                            activeTab === 'pendientes' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                            {pendientes.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('historial')}
+                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold tracking-wide transition-all duration-200 ${
+                            activeTab === 'historial'
+                                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                        <CheckCircle size={14} />
+                        Historial
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
+                            activeTab === 'historial' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                            {historial.length}
+                        </span>
+                    </button>
                 </div>
+
+                {/* Grid */}
+                {activeMissions.length === 0 ? (
+                    <div className="text-center py-16">
+                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            {activeTab === 'pendientes' ? <Calendar size={28} className="text-slate-300" /> : <CheckCircle size={28} className="text-slate-300" />}
+                        </div>
+                        <p className="text-slate-400 font-medium">
+                            {activeTab === 'pendientes' ? 'No hay misiones pendientes' : 'Aún no hay misiones completadas'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {activeMissions.map((mission, index) => (
+                            <motion.div
+                                key={mission.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: index * 0.06 }}
+                                className={`group relative rounded-[2rem] p-6 shadow-xl border overflow-hidden transition-all duration-300 ${
+                                    mission.estatus === 'completado'
+                                        ? 'bg-gradient-to-br from-emerald-50 to-white shadow-emerald-100/50 border-emerald-100 hover:shadow-emerald-200/60'
+                                        : 'bg-white shadow-slate-200/50 border-white hover:shadow-2xl hover:shadow-amber-500/10'
+                                }`}
+                            >
+                                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <School size={80} className={mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} />
+                                </div>
+
+                                <div className="relative z-10">
+                                    {/* Automated Status Badge */}
+                                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border ${
+                                        mission.estatus === 'completado'
+                                            ? 'bg-emerald-100 text-emerald-600 border-emerald-200'
+                                            : 'bg-amber-50 text-amber-600 border-amber-100'
+                                    }`}>
+                                        {mission.estatus === 'completado' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                                        {mission.estatus === 'completado' ? 'Realizada' : 'Programada'}
+                                    </div>
+
+                                    <h3 className={`text-xl font-bold mb-2 line-clamp-2 ${
+                                        mission.estatus === 'completado' ? 'text-emerald-800' : 'text-slate-800'
+                                    }`}>
+                                        {mission.nombre_escuela}
+                                    </h3>
+
+                                    <div className="space-y-3 mt-4">
+                                        {mission.colonia && (
+                                            <div className="flex items-start gap-3 text-slate-500">
+                                                <MapPin size={18} className={`${mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} shrink-0 mt-0.5`} />
+                                                <span className="text-sm font-medium">{mission.colonia}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-3 text-slate-500">
+                                            <Calendar size={18} className={`${mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} shrink-0`} />
+                                            <span className="text-sm font-bold text-slate-700">
+                                                {new Date(mission.fecha_programada + 'T12:00:00').toLocaleDateString('es-MX', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                )}
             </div>
         </section>
     );
@@ -915,6 +994,30 @@ export default function DashboardPage({ previewMode = false }) {
         };
 
         fetchData();
+    }, []);
+
+    // ── Real-time: proximas_escuelas updates → auto-move Pendientes↔Historial ──
+    useEffect(() => {
+        const channel = supabaseNew
+            .channel('cronograma-realtime')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'proximas_escuelas'
+            }, (payload) => {
+                if (payload.eventType === 'UPDATE' && payload.new) {
+                    setNextMissions((prev) =>
+                        prev.map((m) => m.id === payload.new.id ? { ...m, ...payload.new } : m)
+                    );
+                } else if (payload.eventType === 'INSERT' && payload.new) {
+                    setNextMissions((prev) => [...prev, payload.new]);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabaseNew.removeChannel(channel);
+        };
     }, []);
 
     // Mostrar pantalla de carga mientras se verifica autenticación

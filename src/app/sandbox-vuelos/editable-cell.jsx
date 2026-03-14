@@ -46,18 +46,23 @@ export function EditableCell({ getValue, row, column, table }) {
     setIsEditing(false);
   };
 
+  // Determine input type based on column
+  const isNumeric = ["costo_por_nino", "total_students", "total_flights"].includes(column.id);
+
   if (isEditing) {
     return (
       <Input
         ref={inputRef}
+        type={isNumeric ? "number" : "text"}
         value={value ?? ""}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setValue(isNumeric ? e.target.value : e.target.value)}
         onBlur={onSave}
         onKeyDown={(e) => {
           if (e.key === "Enter") onSave();
           if (e.key === "Escape") onCancel();
         }}
         className="h-8 w-full min-w-[60px] text-sm"
+        min={isNumeric ? 0 : undefined}
       />
     );
   }

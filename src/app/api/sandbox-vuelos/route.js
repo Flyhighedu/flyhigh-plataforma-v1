@@ -11,11 +11,24 @@ function getAdminSupabase() {
 }
 
 // GET — fetch journeys (master) with nested vuelos count, or vuelos for a specific journey
+// Also supports ?schools=1 to return the school catalog for ghost row
 export async function GET(request) {
     try {
         const supabase = getAdminSupabase();
         const { searchParams } = new URL(request.url);
         const journeyId = searchParams.get('journey_id');
+        const schoolsCatalog = searchParams.get('schools');
+
+        // School catalog for ghost row select
+        if (schoolsCatalog) {
+            const { data, error } = await supabase
+                .from('proximas_escuelas')
+                .select('id, nombre_escuela, colonia')
+                .order('nombre_escuela', { ascending: true });
+
+            if (error) throw error;
+            return NextResponse.json({ data: data || [] });
+        }
 
         // Detail: fetch vuelos for a specific journey
         if (journeyId) {
@@ -80,13 +93,15 @@ export async function GET(request) {
         // Enrich journeys: resolve school_name via COALESCE logic + add vuelo_count
         const enriched = (rawJourneys || []).map(j => {
             const school = schoolMap[j.school_id];
+            const cierre = cierreMap[j.id];
+            // Fallback: show cierre totals if available, otherwise sum from bitacora
             return {
                 ...j,
                 school_name: j.school_name || (school?.nombre_escuela) || null,
                 colonia: school?.colonia || null,
                 vuelo_count: countsMap[j.id] || 0,
-                total_students: cierreMap[j.id]?.total_students || 0,
-                total_flights: cierreMap[j.id]?.total_flights || 0,
+                total_students: cierre?.total_students || 0,
+                total_flights: cierre?.total_flights || 0,
             };
         });
 
@@ -100,7 +115,8 @@ export async function GET(request) {
     }
 }
 
-// PATCH — update a single field on a single row (journeys OR vuelos)
+// PATCH — update a single field on a single row
+// For total_students / total_flights: UPSERT into cierres_mision + set status=closed
 export async function PATCH(request) {
     try {
         const { id, field, value, table } = await request.json();
@@ -113,7 +129,74 @@ export async function PATCH(request) {
             );
         }
 
-        // Allowlist of editable fields per table
+        const supabase = getAdminSupabase();
+
+        // Special path: Niños/Vuelos → UPSERT cierres_mision + seal journey
+        if (targetTable === 'staff_journeys' && (field === 'total_students' || field === 'total_flights')) {
+            const numValue = parseInt(value) || 0;
+
+            // Get journey data for cierre fields
+            const { data: journey, error: jErr } = await supabase
+                .from('staff_journeys')
+                .select('id, school_id, school_name, date')
+                .eq('id', id)
+                .single();
+
+            if (jErr) throw jErr;
+
+            // Resolve school name
+            let schoolName = journey.school_name;
+            if (!schoolName && journey.school_id) {
+                const { data: school } = await supabase
+                    .from('proximas_escuelas')
+                    .select('nombre_escuela')
+                    .eq('id', journey.school_id)
+                    .single();
+                schoolName = school?.nombre_escuela || null;
+            }
+
+            // Check if cierre already exists
+            const { data: existing } = await supabase
+                .from('cierres_mision')
+                .select('id')
+                .eq('journey_id', id)
+                .maybeSingle();
+
+            if (existing) {
+                // UPDATE existing cierre
+                const { error: upErr } = await supabase
+                    .from('cierres_mision')
+                    .update({ [field]: numValue })
+                    .eq('journey_id', id);
+                if (upErr) throw upErr;
+            } else {
+                // INSERT new cierre
+                const { error: insErr } = await supabase
+                    .from('cierres_mision')
+                    .insert({
+                        journey_id: id,
+                        mission_id: journey.school_id ? String(journey.school_id) : null,
+                        school_name_snapshot: schoolName,
+                        school_id: journey.school_id,
+                        [field]: numValue,
+                        // Set the other field to 0 so they don't start null
+                        ...(field === 'total_students' ? { total_flights: 0 } : { total_students: 0 }),
+                        checklist_verified: false,
+                        end_time: new Date().toISOString(),
+                    });
+                if (insErr) throw insErr;
+            }
+
+            // Seal journey status to 'closed'
+            await supabase
+                .from('staff_journeys')
+                .update({ status: 'closed' })
+                .eq('id', id);
+
+            return NextResponse.json({ data: { id, [field]: numValue, status: 'closed' } });
+        }
+
+        // Standard path: update a field on the target table
         const editableFields = {
             bitacora_vuelos: ['mission_id', 'student_count', 'duration_seconds', 'start_time', 'end_time'],
             staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino'],
@@ -127,8 +210,6 @@ export async function PATCH(request) {
             );
         }
 
-        const supabase = getAdminSupabase();
-
         const { data, error } = await supabase
             .from(targetTable)
             .update({ [field]: value })
@@ -140,6 +221,98 @@ export async function PATCH(request) {
         return NextResponse.json({ data: data?.[0] || null });
     } catch (err) {
         console.error('[API] sandbox-vuelos PATCH error:', err);
+        return NextResponse.json(
+            { error: err.message || 'Error interno del servidor' },
+            { status: 500 }
+        );
+    }
+}
+
+// POST — Ghost Row: auto-create school in catalog + double INSERT (staff_journeys + cierres_mision)
+export async function POST(request) {
+    try {
+        const { school_name, date, total_students, total_flights, tipo_escuela, costo_por_nino } = await request.json();
+
+        if (!school_name?.trim() || !date) {
+            return NextResponse.json(
+                { error: 'school_name and date are required' },
+                { status: 400 }
+            );
+        }
+
+        const supabase = getAdminSupabase();
+        const trimmedName = school_name.trim();
+
+        // Auto-catalog: check if school already exists in proximas_escuelas
+        const { data: existing } = await supabase
+            .from('proximas_escuelas')
+            .select('id, nombre_escuela')
+            .ilike('nombre_escuela', trimmedName)
+            .limit(1)
+            .maybeSingle();
+
+        let schoolId = existing?.id || null;
+
+        // If not found, create it in the catalog
+        if (!existing) {
+            const { data: newSchool, error: schoolErr } = await supabase
+                .from('proximas_escuelas')
+                .insert({
+                    nombre_escuela: trimmedName,
+                    colonia: '',
+                    fecha_programada: date,
+                    estatus: 'completado',
+                })
+                .select('id')
+                .single();
+
+            if (schoolErr) throw schoolErr;
+            schoolId = newSchool.id;
+        }
+
+        // Step 1: INSERT into staff_journeys
+        const { data: newJourney, error: jErr } = await supabase
+            .from('staff_journeys')
+            .insert({
+                date,
+                school_id: schoolId,
+                school_name: trimmedName,
+                status: 'closed',
+                tipo_escuela: tipo_escuela || null,
+                costo_por_nino: costo_por_nino ? Number(costo_por_nino) : null,
+            })
+            .select()
+            .single();
+
+        if (jErr) throw jErr;
+
+        // Step 2: INSERT into cierres_mision
+        const { error: cErr } = await supabase
+            .from('cierres_mision')
+            .insert({
+                journey_id: newJourney.id,
+                mission_id: schoolId ? String(schoolId) : null,
+                school_name_snapshot: trimmedName,
+                school_id: schoolId,
+                total_students: parseInt(total_students) || 0,
+                total_flights: parseInt(total_flights) || 0,
+                checklist_verified: false,
+                end_time: new Date().toISOString(),
+            });
+
+        if (cErr) throw cErr;
+
+        return NextResponse.json({
+            data: {
+                ...newJourney,
+                school_name: trimmedName,
+                total_students: parseInt(total_students) || 0,
+                total_flights: parseInt(total_flights) || 0,
+                vuelo_count: 0,
+            },
+        });
+    } catch (err) {
+        console.error('[API] sandbox-vuelos POST error:', err);
         return NextResponse.json(
             { error: err.message || 'Error interno del servidor' },
             { status: 500 }
@@ -162,27 +335,25 @@ export async function DELETE(request) {
         const supabase = getAdminSupabase();
 
         // Step A: Delete all child vuelos for this journey
-        const { error: vuelosError, count: deletedVuelos } = await supabase
+        const { error: vuelosError } = await supabase
             .from('bitacora_vuelos')
             .delete()
-            .eq('journey_id', journeyId)
-            .select('id', { count: 'exact', head: true });
+            .eq('journey_id', journeyId);
 
         if (vuelosError) {
             throw new Error(`Error eliminando vuelos: ${vuelosError.message}`);
         }
 
-        // Step B: Delete other child tables that reference this journey
-        // staff_prep_events
+        // Step B: Delete cierres_mision for this journey
+        await supabase.from('cierres_mision').delete().eq('journey_id', journeyId);
+
+        // Step C: Delete other child tables that reference this journey
         await supabase.from('staff_prep_events').delete().eq('journey_id', journeyId);
-        // staff_prep_photos
         await supabase.from('staff_prep_photos').delete().eq('journey_id', journeyId);
-        // staff_events
         await supabase.from('staff_events').delete().eq('journey_id', journeyId);
-        // staff_presence (journey_id is nullable, just clear it)
         await supabase.from('staff_presence').update({ journey_id: null }).eq('journey_id', journeyId);
 
-        // Step C: Delete the parent journey
+        // Step D: Delete the parent journey
         const { error: journeyError } = await supabase
             .from('staff_journeys')
             .delete()
@@ -194,7 +365,7 @@ export async function DELETE(request) {
 
         return NextResponse.json({
             success: true,
-            message: `Journey eliminado. Vuelos hijos limpiados.`,
+            message: `Journey eliminado. Vuelos y cierre limpiados.`,
         });
     } catch (err) {
         console.error('[API] sandbox-vuelos DELETE error:', err);

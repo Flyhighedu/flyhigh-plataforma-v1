@@ -12,7 +12,7 @@ import { createClient } from '@/utils/supabase/client';
 import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck, School, RefreshCw } from 'lucide-react';
 import PrepChecklist from '@/components/staff/PrepChecklist';
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
-import ClosureLegacy from '@/components/staff/ClosureLegacy';
+// [REMOVED] ClosureLegacy — closure logic now lives in StaffOperationLegacy.handleCloseDay()
 import WaitingAuxLoad from '@/components/staff/WaitingAuxLoad';
 import AuxWaitingScreen from '@/components/staff/AuxWaitingScreen';
 import AuxVehicleChecklist from '@/components/staff/AuxVehicleChecklist';
@@ -1740,27 +1740,7 @@ export default function StaffDashboard() {
         }
     };
 
-    const handleReportComplete = async () => {
-        if (journeyId) {
-            try {
-                const supabase = createClient();
-                await supabase
-                    .from('staff_journeys')
-                    .update({ status: 'closed', updated_at: new Date().toISOString() })
-                    .eq('id', journeyId);
-            } catch (e) {
-                console.warn('Error cerrando jornada:', e);
-            }
-        }
-        // Clean up all mission state so user returns to a fresh lobby
-        localStorage.removeItem('flyhigh_selected_mission_id');
-        localStorage.removeItem('flyhigh_staff_mission');
-        localStorage.removeItem('flyhigh_flight_logs');
-        localStorage.removeItem('flyhigh_completed_pauses');
-        localStorage.removeItem('flyhigh_active_pause');
-        localStorage.removeItem('flyhigh_active_flight');
-        router.replace('/staff/dashboard');
-    };
+    // [REMOVED] handleReportComplete — closure logic now lives in StaffOperationLegacy.handleCloseDay()
 
     const contingencyProps = {
         journeyId,
@@ -2797,12 +2777,7 @@ export default function StaffDashboard() {
                     </div>
                 )}
 
-                {/* PASO 4: Reporte */}
-                {currentStep === 3 && (
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        <ClosureLegacy journeyId={journeyId} onComplete={handleReportComplete} />
-                    </div>
-                )}
+                {/* [REMOVED] PASO 4: ClosureLegacy — closure logic now lives in StaffOperationLegacy.handleCloseDay() */}
             </div>
         </div>
     );

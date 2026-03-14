@@ -19,8 +19,9 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { GhostRow } from "./ghost-row";
 
-export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubComponent }) {
+export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubComponent, onCreateRow }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [expanded, setExpanded] = useState({});
 
@@ -77,6 +78,14 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
             ))}
           </TableHeader>
           <TableBody>
+            {/* Ghost Row — always on top */}
+            {onCreateRow && (
+              <GhostRow
+                columnCount={columns.length}
+                onCreateRow={onCreateRow}
+              />
+            )}
+
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>

@@ -509,6 +509,79 @@ export default function StaffOperationLegacy({
 
     const handleCloseDay = useCallback(async () => {
         try {
+            // ── GUARD: Block closure if a flight is still active ──
+            if (activeFlight) {
+                setCloseOperationError('Hay un vuelo activo. Finalízalo antes de cerrar la operación.');
+                setIsClosingOperation(false);
+                closeHoldTriggeredRef.current = false;
+                setCloseHoldProgress(0);
+                return;
+            }
+
+            // ── SEAL MISSION: Insert/update closure record with real totals ──
+            if (journeyId && currentMission?.id) {
+                const supabase = createClient();
+                const now = new Date().toISOString();
+
+                // Compute totals from current flight logs
+                const currentMissionFlights = sortFlightsByEndDesc(
+                    dedupeFlightLogs(
+                        (flightLogs || []).filter((log) => isMissionFlightLog(log, currentMission.id, journeyId))
+                    )
+                );
+                const sealTotalFlights = currentMissionFlights.length;
+                const sealTotalStudents = currentMissionFlights.reduce((acc, flight) => {
+                    const students = Number(flight?.studentCount ?? flight?.student_count ?? 0);
+                    return acc + (Number.isFinite(students) ? Math.max(0, Math.floor(students)) : 0);
+                }, 0);
+
+                // 1. UPSERT → cierres_mision (seal with real totals)
+                const { error: cierreError } = await supabase
+                    .from('cierres_mision')
+                    .upsert({
+                        journey_id: journeyId,
+                        mission_id: currentMission.id,
+                        school_name_snapshot: currentMission.school_name || currentMission.nombre_escuela || null,
+                        total_flights: sealTotalFlights,
+                        total_students: sealTotalStudents,
+                        created_by: userId || null,
+                        closed_by_name: profile?.full_name || null,
+                        created_at: now
+                    }, { onConflict: 'journey_id' });
+
+                if (cierreError) {
+                    console.warn('⚠️ cierres_mision upsert failed (non-blocking):', cierreError);
+                }
+
+                // 2. UPDATE → staff_journeys.status = 'closed'
+                const { error: journeyError } = await supabase
+                    .from('staff_journeys')
+                    .update({ status: 'closed', updated_at: now })
+                    .eq('id', journeyId);
+
+                if (journeyError) {
+                    console.warn('⚠️ staff_journeys status update failed (non-blocking):', journeyError);
+                }
+
+                // 3. UPDATE → proximas_escuelas.estatus = 'completado'
+                const { error: escuelaError } = await supabase
+                    .from('proximas_escuelas')
+                    .update({ estatus: 'completado' })
+                    .eq('id', currentMission.id);
+
+                if (escuelaError) {
+                    console.warn('⚠️ proximas_escuelas update failed (non-blocking):', escuelaError);
+                }
+
+                console.log('✅ Mission sealed:', {
+                    journeyId,
+                    missionId: currentMission.id,
+                    totalFlights: sealTotalFlights,
+                    totalStudents: sealTotalStudents
+                });
+            }
+
+            // ── NAVIGATE: Proceed to dismantling flow ──
             if (onCloseDay) {
                 await onCloseDay();
             } else {
@@ -525,7 +598,7 @@ export default function StaffOperationLegacy({
             setCloseOperationError(err?.message || 'No se pudo finalizar. Intenta nuevamente.');
             throw err; // Re-throw so finalizeCloseDay also catches
         }
-    }, [onCloseDay, router]);
+    }, [onCloseDay, router, activeFlight, journeyId, currentMission, flightLogs, userId, profile]);
 
     const resetCloseDayHold = useCallback(() => {
         if (closeHoldRafRef.current !== null) {

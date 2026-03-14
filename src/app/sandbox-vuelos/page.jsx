@@ -28,16 +28,21 @@ export default function SandboxVuelosPage() {
     }
   }, []);
 
+
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   // Inline update for journey fields
+  // For total_students / total_flights: triggers UPSERT-cierre + seal
   const handleUpdateRow = useCallback(
     async (rowId, columnId, newValue) => {
+      const isCierreField = columnId === "total_students" || columnId === "total_flights";
       let castValue = newValue;
-      if (columnId === "costo_por_nino") {
-        castValue = newValue === "" || newValue === null ? null : Number(newValue);
+
+      if (["costo_por_nino", "total_students", "total_flights"].includes(columnId)) {
+        castValue = newValue === "" || newValue === null ? (isCierreField ? 0 : null) : Number(newValue);
         if (castValue !== null && isNaN(castValue)) {
           toast.error("Valor inválido", { description: `"${newValue}" no es un número válido.` });
           throw new Error("Invalid number");
@@ -46,9 +51,13 @@ export default function SandboxVuelosPage() {
 
       // Optimistic update
       setData((prev) =>
-        prev.map((row) =>
-          row.id === rowId ? { ...row, [columnId]: castValue } : row
-        )
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          const updates = { [columnId]: castValue };
+          // If editing Niños/Vuelos, also optimistically set status to closed
+          if (isCierreField) updates.status = "closed";
+          return { ...row, ...updates };
+        })
       );
 
       try {
@@ -60,7 +69,8 @@ export default function SandboxVuelosPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al guardar");
 
-        toast.success("Guardado", { description: `"${columnId}" actualizado.` });
+        const label = isCierreField ? `${columnId === "total_students" ? "Niños" : "Vuelos"} → cierres_mision` : columnId;
+        toast.success("Guardado", { description: `${label} actualizado.` });
       } catch (err) {
         toast.error("Error al guardar", { description: err.message });
         await fetchData();
@@ -68,6 +78,31 @@ export default function SandboxVuelosPage() {
       }
     },
     [fetchData]
+  );
+
+  // Ghost Row: double INSERT (staff_journeys + cierres_mision)
+  const handleCreateRow = useCallback(
+    async (form) => {
+      try {
+        const res = await fetch("/api/sandbox-vuelos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Error al crear misión");
+
+        // Add new row to top of data (optimistic)
+        setData((prev) => [json.data, ...prev]);
+        toast.success("✅ Misión sellada", {
+          description: `${json.data.school_name || "Nueva misión"} — ${json.data.total_students} niños, ${json.data.total_flights} vuelos.`,
+        });
+      } catch (err) {
+        toast.error("Error al crear misión", { description: err.message });
+        throw err;
+      }
+    },
+    []
   );
 
   // Pessimistic delete: only remove row from state after Supabase confirms
@@ -113,8 +148,8 @@ export default function SandboxVuelosPage() {
             🛩️ Bitácora de Vuelos — Maestro-Detalle
           </h1>
           <p className="text-muted-foreground mt-1">
-            Haz clic en ▶ para expandir los vuelos de cada journey. Las celdas
-            de Fecha, Tipo y Costo/Niño son editables.
+            Haz clic en cualquier celda para editar. La fila verde (＋) permite inyectar misiones históricas.
+            Al editar Niños o Vuelos, se ejecuta un UPSERT en <code className="text-xs">cierres_mision</code> y se sella el journey.
           </p>
         </div>
 
@@ -134,6 +169,7 @@ export default function SandboxVuelosPage() {
             data={data}
             onUpdateRow={handleUpdateRow}
             onDeleteRow={handleDeleteRow}
+            onCreateRow={handleCreateRow}
             renderSubComponent={renderSubComponent}
           />
         )}
