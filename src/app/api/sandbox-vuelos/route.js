@@ -199,7 +199,7 @@ export async function PATCH(request) {
         // Standard path: update a field on the target table
         const editableFields = {
             bitacora_vuelos: ['mission_id', 'student_count', 'duration_seconds', 'start_time', 'end_time'],
-            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino'],
+            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino', 'status'],
         };
 
         const allowed = editableFields[targetTable];
@@ -217,6 +217,17 @@ export async function PATCH(request) {
             .select();
 
         if (error) throw error;
+
+        // Sync school_name → cierres_mision.school_name_snapshot
+        if (targetTable === 'staff_journeys' && field === 'school_name' && value) {
+            const { error: syncErr } = await supabase
+                .from('cierres_mision')
+                .update({ school_name_snapshot: value })
+                .eq('journey_id', id);
+            if (syncErr) {
+                console.warn('[API] school_name_snapshot sync failed (non-blocking):', syncErr);
+            }
+        }
 
         return NextResponse.json({ data: data?.[0] || null });
     } catch (err) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { EditableCell } from "./editable-cell";
 import {
   AlertDialog,
@@ -19,8 +19,63 @@ const statusColors = {
   prep: "bg-amber-100 text-amber-800",
   operation: "bg-blue-100 text-blue-800",
   report: "bg-purple-100 text-purple-800",
+  dismantling: "bg-orange-100 text-orange-800",
   closed: "bg-green-100 text-green-800",
+  cancelled: "bg-red-100 text-red-800",
 };
+
+const STATUS_OPTIONS = [
+  { value: "prep", label: "Preparación" },
+  { value: "operation", label: "Operación" },
+  { value: "report", label: "Reporte" },
+  { value: "dismantling", label: "Desmontaje" },
+  { value: "closed", label: "Cerrada" },
+  { value: "cancelled", label: "Cancelada" },
+];
+
+// Inline dropdown for status editing
+function StatusSelectCell({ getValue, row, column, table }) {
+  const initialValue = getValue();
+  const [value, setValue] = useState(initialValue);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
+
+  const handleChange = async (e) => {
+    const newValue = e.target.value;
+    if (newValue === value) return;
+
+    setValue(newValue); // optimistic
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(row.original.id, column.id, newValue);
+    } catch {
+      setValue(initialValue); // revert
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const colors = statusColors[value] || "bg-gray-100 text-gray-800";
+
+  return (
+    <select
+      value={value || ""}
+      onChange={handleChange}
+      disabled={isSaving}
+      className={`appearance-none cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 transition-all ${colors} ${isSaving ? "opacity-50" : ""}`}
+      title="Cambiar estado"
+    >
+      {STATUS_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 // Delete action cell with AlertDialog
 function DeleteActionCell({ row, table }) {
@@ -104,27 +159,12 @@ export const journeyColumns = [
   {
     accessorKey: "school_name",
     header: "Escuela",
-    cell: ({ getValue }) => {
-      const v = getValue();
-      return v ? (
-        <span className="font-medium">{v}</span>
-      ) : (
-        <span className="text-muted-foreground italic">Sin nombre</span>
-      );
-    },
+    cell: (props) => <EditableCell {...props} />,
   },
   {
     accessorKey: "status",
     header: "Estado",
-    cell: ({ getValue }) => {
-      const v = getValue();
-      const colors = statusColors[v] || "bg-gray-100 text-gray-800";
-      return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors}`}>
-          {v || "—"}
-        </span>
-      );
-    },
+    cell: (props) => <StatusSelectCell {...props} />,
     enableGlobalFilter: false,
   },
   {
