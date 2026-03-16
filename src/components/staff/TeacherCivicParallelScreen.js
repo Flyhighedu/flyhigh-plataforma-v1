@@ -202,7 +202,7 @@ export default function TeacherCivicParallelScreen({
                 civic_parallel_teacher_done_at: new Date().toISOString(),
                 civic_parallel_teacher_done_by: userId,
                 civic_parallel_teacher_done_by_name: profile?.full_name || firstName,
-                civic_parallel_teacher_stage_lock: null
+                civic_parallel_teacher_stage_lock: resolveTeacherCivicStageLock(meta, missionState)
             });
 
             if (draftKey) {
@@ -395,7 +395,7 @@ export default function TeacherCivicParallelScreen({
                 civic_parallel_teacher_done_at: meta.civic_parallel_teacher_done_at || now,
                 civic_parallel_teacher_done_by: meta.civic_parallel_teacher_done_by || userId,
                 civic_parallel_teacher_done_by_name: meta.civic_parallel_teacher_done_by_name || profile?.full_name || firstName,
-                civic_parallel_teacher_stage_lock: null
+                civic_parallel_teacher_stage_lock: resolveTeacherCivicStageLock(meta, missionState)
             });
             onRefresh && onRefresh();
         } catch (error) {
