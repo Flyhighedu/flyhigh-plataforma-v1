@@ -41,7 +41,7 @@ export default function SandboxVuelosPage() {
       const isCierreField = columnId === "total_students" || columnId === "total_flights" || columnId === "becados";
       let castValue = newValue;
 
-      if (["costo_por_nino", "total_students", "total_flights", "becados"].includes(columnId)) {
+      if (["costo_por_nino", "total_students", "total_flights", "becados", "tarifa_base", "cuota_alumno", "subsidio_patrocinador"].includes(columnId)) {
         castValue = newValue === "" || newValue === null ? (isCierreField ? 0 : null) : Number(newValue);
         if (castValue !== null && isNaN(castValue)) {
           toast.error("Valor inválido", { description: `"${newValue}" no es un número válido.` });

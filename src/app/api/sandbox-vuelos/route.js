@@ -45,7 +45,7 @@ export async function GET(request) {
         // Master: fetch journeys with resolved school names + vuelo counts
         const { data: rawJourneys, error: rawError } = await supabase
             .from('staff_journeys')
-            .select('id, date, school_name, school_id, status, tipo_escuela, costo_por_nino, created_at')
+            .select('id, date, school_name, school_id, status, tipo_escuela, costo_por_nino, cct, colonia_comunidad, tarifa_base, cuota_alumno, subsidio_patrocinador, created_at')
             .order('created_at', { ascending: false });
 
         if (rawError) throw rawError;
@@ -200,7 +200,7 @@ export async function PATCH(request) {
         // Standard path: update a field on the target table
         const editableFields = {
             bitacora_vuelos: ['mission_id', 'student_count', 'duration_seconds', 'start_time', 'end_time'],
-            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino', 'status'],
+            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino', 'status', 'cct', 'colonia_comunidad', 'tarifa_base', 'cuota_alumno', 'subsidio_patrocinador'],
         };
 
         const allowed = editableFields[targetTable];
@@ -243,7 +243,7 @@ export async function PATCH(request) {
 // POST — Ghost Row: auto-create school in catalog + double INSERT (staff_journeys + cierres_mision)
 export async function POST(request) {
     try {
-        const { school_name, date, total_students, total_flights, becados, tipo_escuela, costo_por_nino } = await request.json();
+        const { school_name, date, total_students, total_flights, becados, tipo_escuela, costo_por_nino, cct, colonia_comunidad, tarifa_base, cuota_alumno, subsidio_patrocinador } = await request.json();
 
         if (!school_name?.trim() || !date) {
             return NextResponse.json(
@@ -292,6 +292,11 @@ export async function POST(request) {
                 status: 'closed',
                 tipo_escuela: tipo_escuela || null,
                 costo_por_nino: costo_por_nino ? Number(costo_por_nino) : null,
+                cct: cct || null,
+                colonia_comunidad: colonia_comunidad || null,
+                tarifa_base: tarifa_base ? Number(tarifa_base) : null,
+                cuota_alumno: cuota_alumno ? Number(cuota_alumno) : null,
+                subsidio_patrocinador: subsidio_patrocinador ? Number(subsidio_patrocinador) : null,
             })
             .select()
             .single();
@@ -323,6 +328,11 @@ export async function POST(request) {
                 total_flights: parseInt(total_flights) || 0,
                 becados: parseInt(becados) || 0,
                 vuelo_count: 0,
+                cct: cct || null,
+                colonia_comunidad: colonia_comunidad || null,
+                tarifa_base: tarifa_base ? Number(tarifa_base) : null,
+                cuota_alumno: cuota_alumno ? Number(cuota_alumno) : null,
+                subsidio_patrocinador: subsidio_patrocinador ? Number(subsidio_patrocinador) : null,
             },
         });
     } catch (err) {

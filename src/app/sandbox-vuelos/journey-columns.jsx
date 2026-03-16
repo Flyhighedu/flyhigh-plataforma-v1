@@ -235,6 +235,73 @@ function CostoPorNinoCell({ getValue, row, column, table }) {
   );
 }
 
+// Auto-suggest Subsidio = Tarifa - Cuota, but editable
+function SubsidioCell({ getValue, row, column, table }) {
+  const initialValue = getValue();
+  const tarifa = row.original.tarifa_base;
+  const cuota = row.original.cuota_alumno;
+  const suggested = (tarifa != null && cuota != null) ? Number(tarifa) - Number(cuota) : null;
+
+  const displayValue = initialValue ?? suggested;
+  const [value, setValue] = useState(displayValue);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(initialValue ?? suggested);
+  }, [initialValue, tarifa, cuota]);
+
+  const onSave = async () => {
+    setIsEditing(false);
+    const numValue = value === "" || value === null ? null : Number(value);
+    if (numValue === initialValue) return;
+
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(row.original.id, column.id, numValue);
+    } catch {
+      setValue(initialValue ?? suggested);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground font-medium">$</span>
+        <input
+          autoFocus
+          type="number"
+          value={value ?? ""}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={onSave}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSave();
+            if (e.key === "Escape") { setValue(initialValue ?? suggested); setIsEditing(false); }
+          }}
+          className="h-8 w-20 text-sm border rounded-md px-1 outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => setIsEditing(true)}
+      className={`cursor-pointer rounded px-1 py-0.5 hover:bg-muted/70 transition-colors min-h-[28px] flex items-center gap-1 ${isSaving ? "opacity-50" : ""}`}
+      title={suggested != null && initialValue == null ? "Auto: Tarifa − Cuota (clic para editar)" : "Clic para editar"}
+    >
+      {displayValue !== null && displayValue !== undefined && displayValue !== ""
+        ? <>
+            <span className="text-sm font-medium">${Number(displayValue).toLocaleString("es-MX")}</span>
+            {initialValue == null && suggested != null && <span className="text-[10px] text-amber-500 font-medium">auto</span>}
+          </>
+        : <span className="text-muted-foreground italic text-sm">—</span>}
+    </div>
+  );
+}
+
 export const journeyColumns = [
   {
     id: "row_number",
@@ -273,6 +340,16 @@ export const journeyColumns = [
     cell: (props) => <EditableCell {...props} />,
   },
   {
+    accessorKey: "cct",
+    header: "CCT",
+    cell: (props) => <EditableCell {...props} />,
+  },
+  {
+    accessorKey: "colonia_comunidad",
+    header: "Colonia",
+    cell: (props) => <EditableCell {...props} />,
+  },
+  {
     accessorKey: "status",
     header: "Estado",
     cell: (props) => <StatusSelectCell {...props} />,
@@ -287,6 +364,21 @@ export const journeyColumns = [
     accessorKey: "costo_por_nino",
     header: "Costo/Niño",
     cell: (props) => <CostoPorNinoCell {...props} />,
+  },
+  {
+    accessorKey: "tarifa_base",
+    header: "Tarifa Base",
+    cell: (props) => <CostoPorNinoCell {...props} />,
+  },
+  {
+    accessorKey: "cuota_alumno",
+    header: "Cuota Alumno",
+    cell: (props) => <CostoPorNinoCell {...props} />,
+  },
+  {
+    accessorKey: "subsidio_patrocinador",
+    header: "Subsidio",
+    cell: (props) => <SubsidioCell {...props} />,
   },
   {
     accessorKey: "total_students",
