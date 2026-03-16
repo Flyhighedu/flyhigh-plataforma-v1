@@ -18,6 +18,19 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const journeyId = searchParams.get('journey_id');
         const schoolsCatalog = searchParams.get('schools');
+        const reqAllVuelos = searchParams.get('all_vuelos');
+
+        // Bulk: fetch ALL vuelos that belong to a journey (for fast Excel grouping)
+        if (reqAllVuelos) {
+            const { data, error } = await supabase
+                .from('bitacora_vuelos')
+                .select('id, mission_id, journey_id, student_count, duration_seconds, start_time, end_time, created_at')
+                .not('journey_id', 'is', null)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return NextResponse.json({ data: data || [] });
+        }
 
         // School catalog for ghost row select
         if (schoolsCatalog) {
@@ -45,7 +58,7 @@ export async function GET(request) {
         // Master: fetch journeys with resolved school names + vuelo counts
         const { data: rawJourneys, error: rawError } = await supabase
             .from('staff_journeys')
-            .select('id, date, school_name, school_id, status, tipo_escuela, costo_por_nino, cct, colonia_comunidad, tarifa_base, cuota_alumno, subsidio_patrocinador, created_at')
+            .select('id, date, school_name, school_id, status, tipo_escuela, cct, direccion, nombre_director, telefono_director, tarifa_base, cuota_alumno, created_at')
             .order('created_at', { ascending: false });
 
         if (rawError) throw rawError;
@@ -133,7 +146,7 @@ export async function PATCH(request) {
         const supabase = getAdminSupabase();
 
         // Special path: Niños/Vuelos → UPSERT cierres_mision + seal journey
-        if (targetTable === 'staff_journeys' && (field === 'total_students' || field === 'total_flights' || field === 'becados')) {
+        if (targetTable === 'staff_journeys' && ['total_students', 'total_flights', 'becados'].includes(field)) {
             const numValue = parseInt(value) || 0;
 
             // Get journey data for cierre fields
@@ -200,7 +213,7 @@ export async function PATCH(request) {
         // Standard path: update a field on the target table
         const editableFields = {
             bitacora_vuelos: ['mission_id', 'student_count', 'duration_seconds', 'start_time', 'end_time'],
-            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'costo_por_nino', 'status', 'cct', 'colonia_comunidad', 'tarifa_base', 'cuota_alumno', 'subsidio_patrocinador'],
+            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'status', 'cct', 'direccion', 'nombre_director', 'telefono_director', 'tarifa_base', 'cuota_alumno'],
         };
 
         const allowed = editableFields[targetTable];
@@ -243,7 +256,7 @@ export async function PATCH(request) {
 // POST — Ghost Row: auto-create school in catalog + double INSERT (staff_journeys + cierres_mision)
 export async function POST(request) {
     try {
-        const { school_name, date, total_students, total_flights, becados, tipo_escuela, costo_por_nino, cct, colonia_comunidad, tarifa_base, cuota_alumno, subsidio_patrocinador } = await request.json();
+        const { school_name, date, total_students, total_flights, becados, tipo_escuela, cct, direccion, nombre_director, telefono_director, tarifa_base, cuota_alumno } = await request.json();
 
         if (!school_name?.trim() || !date) {
             return NextResponse.json(
@@ -291,12 +304,12 @@ export async function POST(request) {
                 school_name: trimmedName,
                 status: 'closed',
                 tipo_escuela: tipo_escuela || null,
-                costo_por_nino: costo_por_nino ? Number(costo_por_nino) : null,
                 cct: cct || null,
-                colonia_comunidad: colonia_comunidad || null,
+                direccion: direccion || null,
+                nombre_director: nombre_director || null,
+                telefono_director: telefono_director || null,
                 tarifa_base: tarifa_base ? Number(tarifa_base) : null,
                 cuota_alumno: cuota_alumno ? Number(cuota_alumno) : null,
-                subsidio_patrocinador: subsidio_patrocinador ? Number(subsidio_patrocinador) : null,
             })
             .select()
             .single();
@@ -329,10 +342,11 @@ export async function POST(request) {
                 becados: parseInt(becados) || 0,
                 vuelo_count: 0,
                 cct: cct || null,
-                colonia_comunidad: colonia_comunidad || null,
+                direccion: direccion || null,
+                nombre_director: nombre_director || null,
+                telefono_director: telefono_director || null,
                 tarifa_base: tarifa_base ? Number(tarifa_base) : null,
                 cuota_alumno: cuota_alumno ? Number(cuota_alumno) : null,
-                subsidio_patrocinador: subsidio_patrocinador ? Number(subsidio_patrocinador) : null,
             },
         });
     } catch (err) {

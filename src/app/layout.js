@@ -48,7 +48,7 @@ import CustomSplashScreen from '@/components/CustomSplashScreen';
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="es" className={`${inter.variable} ${outfit.variable} ${manrope.variable} ${montserrat.variable}`}>
+        <html lang="es" className={`${inter.variable} ${outfit.variable} ${manrope.variable} ${montserrat.variable}`} suppressHydrationWarning>
             <head>
                 {/* Capture PWA install prompt before React hydrates */}
                 <script dangerouslySetInnerHTML={{ __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;});` }} />

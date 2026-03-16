@@ -41,7 +41,7 @@ export default function SandboxVuelosPage() {
       const isCierreField = columnId === "total_students" || columnId === "total_flights" || columnId === "becados";
       let castValue = newValue;
 
-      if (["costo_por_nino", "total_students", "total_flights", "becados", "tarifa_base", "cuota_alumno", "subsidio_patrocinador"].includes(columnId)) {
+      if (["total_students", "total_flights", "becados", "tarifa_base", "cuota_alumno"].includes(columnId)) {
         castValue = newValue === "" || newValue === null ? (isCierreField ? 0 : null) : Number(newValue);
         if (castValue !== null && isNaN(castValue)) {
           toast.error("Valor inválido", { description: `"${newValue}" no es un número válido.` });
@@ -139,6 +139,13 @@ export default function SandboxVuelosPage() {
     []
   );
 
+  // Fetch ALL sub-rows (vuelos) for fast Excel export grouping
+  const fetchAllSubRows = useCallback(async () => {
+    const res = await fetch("/api/sandbox-vuelos?all_vuelos=1");
+    const json = await res.json();
+    return json.data || [];
+  }, []);
+
   return (
     <div className="min-h-screen bg-background p-6 md:p-10">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -171,6 +178,7 @@ export default function SandboxVuelosPage() {
             onDeleteRow={handleDeleteRow}
             onCreateRow={handleCreateRow}
             renderSubComponent={renderSubComponent}
+            fetchAllSubRows={fetchAllSubRows}
           />
         )}
       </div>
