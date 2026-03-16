@@ -905,9 +905,16 @@ export default function SyncHeader({
                             <button
                                 onClick={() => {
                                     setShowCivicStartModal(false);
-                                    // Clear stage lock since teacher dismissed without recording
-                                    updateJourneyMeta({ civic_parallel_teacher_stage_lock: resolveTeacherCivicStageLock(headerMeta, effectiveMissionState) })
-                                        .catch(e => console.warn('[SyncHeader] Could not clear stage lock:', e));
+                                    const now = new Date().toISOString();
+                                    updateJourneyMeta({
+                                        civic_parallel_teacher_skipped: true,
+                                        civic_parallel_teacher_skipped_at: now,
+                                        civic_parallel_teacher_skipped_by: userId,
+                                        civic_parallel_teacher_skipped_by_name: firstName || roleName || 'Docente',
+                                        civic_parallel_teacher_done_at: now,
+                                        civic_parallel_teacher_done_by: userId,
+                                        civic_parallel_teacher_stage_lock: resolveTeacherCivicStageLock(headerMeta, effectiveMissionState)
+                                    }).catch(e => console.warn('[SyncHeader] Could not register skip and clear stage lock:', e));
                                 }}
                                 className="absolute top-4 right-4 z-50 text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100"
                                 aria-label="Cerrar"

@@ -521,7 +521,7 @@ function projectSnapshotForRealtimeUpdate(snapshot, nextState, incomingMeta, arr
             projected.teacherFlowState = null;
         }
 
-        if (nextState === 'OPERATION') {
+        if (nextState === 'operation') {
             projected.currentStep = 2;
         }
 
