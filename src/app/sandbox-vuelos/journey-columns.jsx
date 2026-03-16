@@ -33,6 +33,10 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelada" },
 ];
 
+// Formatters for exact values (no rounding to integers)
+const formatMoneyExact = (val) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(val);
+const formatNumberExact = (val) => new Intl.NumberFormat("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(val);
+
 // --- Shared inline cell components ---
 
 function StatusSelectCell({ getValue, row, column, table }) {
@@ -116,7 +120,7 @@ function CurrencyCell({ getValue, row, column, table }) {
 
   return (
     <div onClick={() => setIsEditing(true)} className={`cursor-pointer rounded px-1 py-0.5 hover:bg-muted/70 transition-colors min-h-[28px] flex items-center ${isSaving ? "opacity-50" : ""}`} title="Clic para editar">
-      {value != null && value !== "" ? <span className="text-sm font-medium">${Number(value).toLocaleString("es-MX")}</span> : <span className="text-muted-foreground italic text-sm">—</span>}
+      {value != null && value !== "" ? <span className="text-sm font-medium">{formatMoneyExact(Number(value))}</span> : <span className="text-muted-foreground italic text-sm">—</span>}
     </div>
   );
 }
@@ -158,7 +162,7 @@ function DeleteActionCell({ row, table }) {
 function CalcCell({ value, prefix = "" }) {
   return (
     <span className="text-sm font-medium text-slate-600">
-      {value != null ? `${prefix}${Number(value).toLocaleString("es-MX")}` : "—"}
+      {value != null ? (prefix === "$" ? formatMoneyExact(Number(value)) : `${prefix}${formatNumberExact(Number(value))}`) : "—"}
     </span>
   );
 }
@@ -249,7 +253,7 @@ export const journeyColumns = [
     size: 120,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("cuota_alumno")) || 0), 0);
-      return <span className="font-bold text-sm">${sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -259,7 +263,7 @@ export const journeyColumns = [
     size: 120,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("tarifa_base")) || 0), 0);
-      return <span className="font-bold text-sm">${sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
     },
   },
   // --- CALCULATED COLUMNS (UI-only, not in DB) ---
@@ -276,7 +280,7 @@ export const journeyColumns = [
     enableColumnFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("subsidio_calc")) || 0), 0);
-      return <span className="font-bold text-sm">${sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -292,7 +296,7 @@ export const journeyColumns = [
     enableColumnFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("recaudacion_calc")) || 0), 0);
-      return <span className="font-bold text-sm">${sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -308,7 +312,42 @@ export const journeyColumns = [
     enableColumnFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("venta_bruta_calc")) || 0), 0);
-      return <span className="font-bold text-sm">${sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "costo_total_becados",
+    header: "Costo Total Becados",
+    accessorFn: (row) => {
+      const b = Number(row.becados) || 0;
+      const t = Number(row.tarifa_base) || 0;
+      return b && t ? b * t : null;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 150,
+    enableColumnFilter: false,
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("costo_total_becados")) || 0), 0);
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "aportacion_patrocinador",
+    header: "Total Aportación Patrocinador",
+    accessorFn: (row) => {
+      const t = Number(row.tarifa_base) || 0;
+      const c = Number(row.cuota_alumno) || 0;
+      const n = Number(row.total_students) || 0;
+      const b = Number(row.becados) || 0;
+      if (!t || !n) return null;
+      return ((t - c) * n) + (b * t);
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 180,
+    enableColumnFilter: false,
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("aportacion_patrocinador")) || 0), 0);
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
     },
   },
   // --- METRIC COLUMNS ---
@@ -320,7 +359,7 @@ export const journeyColumns = [
     enableGlobalFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("total_students")) || 0), 0);
-      return <span className="font-bold text-sm">{sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
   },
   {
@@ -331,7 +370,7 @@ export const journeyColumns = [
     enableGlobalFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("becados")) || 0), 0);
-      return <span className="font-bold text-sm">{sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
   },
   {
@@ -342,7 +381,7 @@ export const journeyColumns = [
     enableGlobalFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("total_flights")) || 0), 0);
-      return <span className="font-bold text-sm">{sum.toLocaleString("es-MX")}</span>;
+      return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
   },
   {

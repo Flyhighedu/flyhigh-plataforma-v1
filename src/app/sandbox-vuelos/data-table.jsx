@@ -228,100 +228,97 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border bg-card">
-        <Table style={{ width: table.getCenterTotalSize() }}>
-          <TableHeader className="sticky top-0 z-20 bg-white dark:bg-slate-900 shadow-[0_1px_3px_0_rgba(0,0,0,0.08)]">
-            {/* Column headers with sort controls */}
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-white dark:bg-slate-900 relative group select-none"
-                    style={{ width: header.getSize() }}>
-                    {header.isPlaceholder ? null : (
-                      <div className={header.column.getCanSort() ? "cursor-pointer flex items-center gap-1" : ""}
-                        onClick={header.column.getToggleSortingHandler()}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() && (
-                          <span className="text-muted-foreground/50 text-xs">
-                            {{ asc: "↑", desc: "↓" }[header.column.getIsSorted()] ?? "↕"}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Resizer handle */}
-                    {header.column.getCanResize() && (
-                      <div
-                        onMouseDown={header.getResizeHandler()}
-                        onTouchStart={header.getResizeHandler()}
-                        className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity ${header.column.getIsResizing() ? "bg-blue-500 opacity-100" : "bg-slate-300"}`}
-                      />
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-            {/* Per-column filter row */}
-            <TableRow className="bg-slate-50/80 dark:bg-slate-800/50">
-              {table.getAllLeafColumns().map((col) => (
-                <TableHead key={col.id} className="py-1 px-1 bg-slate-50/80 dark:bg-slate-800/50" style={{ width: col.getSize() }}>
-                  {col.getCanFilter() ? (
-                    <input
-                      value={(col.getFilterValue() ?? "")}
-                      onChange={(e) => col.setFilterValue(e.target.value || undefined)}
-                      placeholder="Filtrar…"
-                      className="w-full h-6 text-xs border rounded px-1 bg-white dark:bg-slate-900 outline-none focus:ring-1 focus:ring-blue-400"
-                    />
-                  ) : null}
-                </TableHead>
+      {/* Table Wrapper for horizontal scroll background fix */}
+      <div className="rounded-lg border bg-slate-50/50">
+        <div className="min-w-max bg-card pb-2">
+          <Table style={{ width: table.getCenterTotalSize() }}>
+            <TableHeader className="sticky top-0 z-20 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.08)]">
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((header) => (
+                    <TableHead key={header.id} className="bg-white relative group select-none" style={{ width: header.getSize() }}>
+                      {header.isPlaceholder ? null : (
+                        <div className={header.column.getCanSort() ? "cursor-pointer flex items-center gap-1" : ""} onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {header.column.getCanSort() && (
+                            <span className="text-muted-foreground/50 text-xs">
+                              {{ asc: "↑", desc: "↓" }[header.column.getIsSorted()] ?? "↕"}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {header.column.getCanResize() && (
+                        <div
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
+                          className={`absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none opacity-0 group-hover:opacity-100 transition-opacity ${header.column.getIsResizing() ? "bg-blue-500 opacity-100" : "bg-slate-300"}`}
+                        />
+                      )}
+                    </TableHead>
+                  ))}
+                </TableRow>
               ))}
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {onCreateRow && <GhostRow columnCount={columns.length} onCreateRow={onCreateRow} />}
-
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <Fragment key={row.id}>
-                  <TableRow className={row.getIsExpanded() ? "bg-muted/30 border-b-0" : ""}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                  {row.getIsExpanded() && renderSubComponent && (
-                    <TableRow className="bg-muted/20 hover:bg-muted/20">
-                      <TableCell colSpan={row.getVisibleCells().length} className="p-0">
-                        {renderSubComponent({ row })}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  No se encontraron resultados.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-
-          {/* Footer with sums */}
-          <TableFooter className="bg-slate-100 dark:bg-slate-800 border-t-2 border-slate-300 sticky bottom-0 z-10">
-            {table.getFooterGroups().map((fg) => (
-              <TableRow key={fg.id}>
-                {fg.headers.map((header) => (
-                  <TableHead key={header.id} className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100" style={{ width: header.getSize() }}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
+              <TableRow className="bg-slate-50/80">
+                {table.getAllLeafColumns().map((col) => (
+                  <TableHead key={col.id} className="py-1 px-1 bg-slate-50/80" style={{ width: col.getSize() }}>
+                    {col.getCanFilter() ? (
+                      <input
+                        value={(col.getFilterValue() ?? "")}
+                        onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+                        placeholder="Filtrar…"
+                        className="w-full h-6 text-xs border rounded px-1 bg-white outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    ) : null}
                   </TableHead>
                 ))}
               </TableRow>
-            ))}
-          </TableFooter>
-        </Table>
+            </TableHeader>
+
+            <TableBody>
+              {onCreateRow && <GhostRow columnCount={columns.length} onCreateRow={onCreateRow} />}
+
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <TableRow className={row.getIsExpanded() ? "bg-muted/30 border-b-0" : ""}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {row.getIsExpanded() && renderSubComponent && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={row.getVisibleCells().length} className="p-0">
+                          {renderSubComponent({ row })}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                    No se encontraron resultados.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+
+            {/* Sticky Total Footer */}
+            <TableFooter className="sticky bottom-0 z-20 bg-slate-100 shadow-[0_-1px_3px_0_rgba(0,0,0,0.08)]">
+              {table.getFooterGroups().map((fg) => (
+                <TableRow key={fg.id}>
+                  {fg.headers.map((header) => (
+                    <TableCell key={header.id} style={{ width: header.getSize() }} className="py-2.5 font-semibold text-slate-800 border-t border-slate-200">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableFooter>
+          </Table>
+        </div>
       </div>
     </div>
   );

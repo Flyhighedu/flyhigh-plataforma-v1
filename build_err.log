@@ -1,0 +1,72 @@
+[@serwist/next] WARNING: You are using '@serwist/next' with `next dev --turbopack`, but it doesn't support Turbopack. Do one of the following:
+
+- Set `disable` to `process.env.NODE_ENV !== "production"`.
+
+- Use webpack by running `next dev --webpack` instead of `next dev --turbopack`.
+
+- Migrate to '@serwist/turbopack' which has experimental support for Turbopack. See https://serwist.pages.dev/docs/next/turbo for more information.
+
+- Migrate to configurator mode which has support for Turbopack. See https://serwist.pages.dev/docs/next/config for more information. 
+
+Follow https://github.com/serwist/serwist/issues/54 for progress on Serwist + Turbopack. You can also suppress this warning by setting SERWIST_SUPPRESS_TURBOPACK_WARNING=1.
+
+▲ Next.js 16.1.0 (Turbopack)
+- Environments: .env.local
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.6s
+  Running TypeScript ...
+  Collecting page data using 19 workers ...
+  Generating static pages using 19 workers (0/38) ...
+  Generating static pages using 19 workers (9/38) 
+  Generating static pages using 19 workers (18/38) 
+  Generating static pages using 19 workers (28/38) 
+✓ Generating static pages using 19 workers (38/38) in 784.8ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /~offline
+├ ○ /admin
+├ ƒ /api/admin/delete-school
+├ ƒ /api/admin/list-schools
+├ ƒ /api/admin/save-school
+├ ƒ /api/create-payment-intent
+├ ƒ /api/debug/reset-journey
+├ ƒ /api/sandbox-vuelos
+├ ƒ /api/staff/create-user
+├ ƒ /api/staff/deploy-demo
+├ ƒ /api/staff/edit-user
+├ ƒ /api/staff/list
+├ ƒ /api/staff/preview-profile
+├ ƒ /api/staff/reset-password
+├ ƒ /api/staff/set-active
+├ ƒ /api/staff/update-flight-students
+├ ƒ /api/test/ensure-journey
+├ ○ /apple-icon.png
+├ ○ /dashboard
+├ ○ /escuelas
+├ ○ /icon.png
+├ ○ /maestros
+├ ○ /manifest.json
+├ ○ /patrocinadores
+├ ○ /sandbox-vuelos
+├ ○ /staff-v2/closure
+├ ○ /staff-v2/dashboard
+├ ○ /staff-v2/history
+├ ○ /staff-v2/login
+├ ○ /staff-v2/preview
+├ ○ /staff/dashboard
+├ ○ /staff/history
+├ ○ /staff/login
+├ ○ /staff/preview
+└ ○ /supervisor/dashboard
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

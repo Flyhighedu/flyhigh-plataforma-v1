@@ -148,7 +148,7 @@ export default function SandboxVuelosPage() {
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6 pb-4">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
@@ -171,15 +171,17 @@ export default function SandboxVuelosPage() {
             </div>
           </div>
         ) : (
-          <DataTable
-            columns={journeyColumns}
-            data={data}
-            onUpdateRow={handleUpdateRow}
-            onDeleteRow={handleDeleteRow}
-            onCreateRow={handleCreateRow}
-            renderSubComponent={renderSubComponent}
-            fetchAllSubRows={fetchAllSubRows}
-          />
+          <div>
+            <DataTable
+              columns={journeyColumns}
+              data={data}
+              onUpdateRow={handleUpdateRow}
+              onDeleteRow={handleDeleteRow}
+              onCreateRow={handleCreateRow}
+              renderSubComponent={renderSubComponent}
+              fetchAllSubRows={fetchAllSubRows}
+            />
+          </div>
         )}
       </div>
     </div>
