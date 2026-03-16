@@ -764,6 +764,71 @@ export default function StaffOperationLegacy({
         console.warn('No se pudo sincronizar vuelo activo en journey meta:', lastError);
     }, [journeyId, preview]);
 
+    const currentRole = profile?.role || null;
+    const firstName = profile?.full_name?.split(' ')[0] || 'Auxiliar';
+    const roleName = ROLE_LABELS[currentRole] || currentRole || 'Auxiliar';
+    const shouldUseSyncHeader = useSyncHeader && !hideMenu;
+    const canEditCompletedFlights = currentRole === 'assistant' || currentRole === 'auxiliar' || currentRole === 'teacher';
+
+    const missionMeta = parseMetaLike(currentMission?.meta || initialMission?.meta);
+    const missionStateKey = String(missionState || '').trim();
+    const isOperationPhaseActive = OPERATION_PHASE_STATES.has(missionStateKey);
+
+    const missionFlights = sortFlightsByEndDesc(
+        dedupeFlightLogs(
+            (flightLogs || []).filter((log) => isMissionFlightLog(log, currentMission?.id, journeyId))
+        )
+    );
+
+    const nextFlightNumber = missionFlights.length + 1;
+    const activeFlightNumber = normalizePositiveInt(activeFlight?.flightNumber) || nextFlightNumber;
+    const lastMissionFlight = missionFlights[0] || null;
+    const lastMissionFlightEndMs = toIsoEpochMs(
+        lastMissionFlight?.endTime ??
+        lastMissionFlight?.end_time ??
+        lastMissionFlight?.created_at
+    );
+    // [BUG-FIX] Only show inter-flight timer when operation phase is still active
+    const showInterFlightTimer = !activeFlight && missionFlights.length > 0 && lastMissionFlightEndMs > 0 && isOperationPhaseActive;
+    const interFlightElapsedSeconds = showInterFlightTimer
+        ? Math.max(0, Math.floor((nowMs - lastMissionFlightEndMs) / 1000))
+        : 0;
+
+    const totalStudentsFlown = missionFlights.reduce((acc, flight) => {
+        const students = Number(flight?.studentCount ?? flight?.student_count ?? 0);
+        return acc + (Number.isFinite(students) ? Math.max(0, Math.floor(students)) : 0);
+    }, 0);
+
+    const missionFirstFlightStartMs = missionFlights.reduce((earliest, flight) => {
+        const startMs = toIsoEpochMs(flight?.startTime ?? flight?.start_time);
+        if (!startMs) return earliest;
+        if (!earliest) return startMs;
+        return Math.min(earliest, startMs);
+    }, 0);
+
+    const activeFlightStartMs = toIsoEpochMs(activeFlight?.startedAt ?? activeFlight?.start_time ?? activeFlight?.startTime);
+    const operationStartedAtMsFromMeta = toIsoEpochMs(missionMeta?.aux_operation_started_at);
+
+    const operationAnchorCandidates = [
+        operationStartedAtMsFromMeta,
+        missionFirstFlightStartMs,
+        activeFlightStartMs,
+        operationAnchorBootstrapMs
+    ].filter((value) => Number.isFinite(value) && value > 0);
+
+    const hasPersistentOperationAnchor =
+        operationStartedAtMsFromMeta > 0 ||
+        missionFirstFlightStartMs > 0 ||
+        activeFlightStartMs > 0;
+
+    const operationStartedAtMs = operationAnchorCandidates.length > 0
+        ? Math.min(...operationAnchorCandidates)
+        : 0;
+
+    const operationElapsedSeconds = operationStartedAtMs > 0
+        ? Math.max(0, Math.floor((nowMs - operationStartedAtMs) / 1000))
+        : 0;
+
     const clearActiveFlight = async (closedFlightId = null) => {
         if (closedFlightId && !preview) {
             rememberClosedFlightId(closedFlightId);
@@ -1149,71 +1214,6 @@ export default function StaffOperationLegacy({
             setIsSavingFlightEdit(false);
         }
     };
-
-    const currentRole = profile?.role || null;
-    const firstName = profile?.full_name?.split(' ')[0] || 'Auxiliar';
-    const roleName = ROLE_LABELS[currentRole] || currentRole || 'Auxiliar';
-    const shouldUseSyncHeader = useSyncHeader && !hideMenu;
-    const canEditCompletedFlights = currentRole === 'assistant' || currentRole === 'auxiliar' || currentRole === 'teacher';
-
-    const missionMeta = parseMetaLike(currentMission?.meta || initialMission?.meta);
-
-    const missionFlights = sortFlightsByEndDesc(
-        dedupeFlightLogs(
-            (flightLogs || []).filter((log) => isMissionFlightLog(log, currentMission?.id, journeyId))
-        )
-    );
-
-    const nextFlightNumber = missionFlights.length + 1;
-    const activeFlightNumber = normalizePositiveInt(activeFlight?.flightNumber) || nextFlightNumber;
-    const lastMissionFlight = missionFlights[0] || null;
-    const lastMissionFlightEndMs = toIsoEpochMs(
-        lastMissionFlight?.endTime ??
-        lastMissionFlight?.end_time ??
-        lastMissionFlight?.created_at
-    );
-    // [BUG-FIX] Only show inter-flight timer when operation phase is still active
-    const showInterFlightTimer = !activeFlight && missionFlights.length > 0 && lastMissionFlightEndMs > 0 && isOperationPhaseActive;
-    const interFlightElapsedSeconds = showInterFlightTimer
-        ? Math.max(0, Math.floor((nowMs - lastMissionFlightEndMs) / 1000))
-        : 0;
-
-    const totalStudentsFlown = missionFlights.reduce((acc, flight) => {
-        const students = Number(flight?.studentCount ?? flight?.student_count ?? 0);
-        return acc + (Number.isFinite(students) ? Math.max(0, Math.floor(students)) : 0);
-    }, 0);
-
-    const missionFirstFlightStartMs = missionFlights.reduce((earliest, flight) => {
-        const startMs = toIsoEpochMs(flight?.startTime ?? flight?.start_time);
-        if (!startMs) return earliest;
-        if (!earliest) return startMs;
-        return Math.min(earliest, startMs);
-    }, 0);
-
-    const activeFlightStartMs = toIsoEpochMs(activeFlight?.startedAt ?? activeFlight?.start_time ?? activeFlight?.startTime);
-    const operationStartedAtMsFromMeta = toIsoEpochMs(missionMeta?.aux_operation_started_at);
-    const missionStateKey = String(missionState || '').trim();
-    const isOperationPhaseActive = OPERATION_PHASE_STATES.has(missionStateKey);
-
-    const operationAnchorCandidates = [
-        operationStartedAtMsFromMeta,
-        missionFirstFlightStartMs,
-        activeFlightStartMs,
-        operationAnchorBootstrapMs
-    ].filter((value) => Number.isFinite(value) && value > 0);
-
-    const hasPersistentOperationAnchor =
-        operationStartedAtMsFromMeta > 0 ||
-        missionFirstFlightStartMs > 0 ||
-        activeFlightStartMs > 0;
-
-    const operationStartedAtMs = operationAnchorCandidates.length > 0
-        ? Math.min(...operationAnchorCandidates)
-        : 0;
-
-    const operationElapsedSeconds = operationStartedAtMs > 0
-        ? Math.max(0, Math.floor((nowMs - operationStartedAtMs) / 1000))
-        : 0;
 
     useEffect(() => {
         if (!journeyId || !isOperationPhaseActive) {
