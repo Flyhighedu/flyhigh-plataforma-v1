@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import { Camera, RefreshCw, CheckCircle, WifiOff } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { saveOfflineEvent } from '@/utils/offlineQueue';
+
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import { parseMeta } from '@/utils/metaHelpers';
 
@@ -172,23 +172,40 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
             delete nextMeta.operation_started_at;
 
             // INSTANT: Write journey state + meta immediately (triggers Realtime for all roles)
-            const { error: updateError } = await supabase.from('staff_journeys').update({
-                arrival_photo_taken_at: timestamp,
-                arrival_photo_taken_by: userId,
-                mission_state: 'waiting_unload_assignment',
-                meta: nextMeta,
-                updated_at: timestamp
-            }).eq('id', journeyId);
+            let instantUpdateOk = false;
+            try {
+                const { error: updateError } = await supabase.from('staff_journeys').update({
+                    arrival_photo_taken_at: timestamp,
+                    arrival_photo_taken_by: userId,
+                    mission_state: 'waiting_unload_assignment',
+                    meta: nextMeta,
+                    updated_at: timestamp
+                }).eq('id', journeyId);
 
-            if (updateError) {
-                console.error('DB update failed:', updateError);
-                throw updateError;
+                if (updateError) {
+                    console.error('[ArrivalPhoto] DB instant update failed:', updateError);
+                } else {
+                    instantUpdateOk = true;
+                }
+            } catch (dbErr) {
+                console.warn('[ArrivalPhoto] DB instant update threw, will queue full payload:', dbErr);
             }
 
             // UI unlocks IMMEDIATELY — don't wait for blob queue
             onComplete?.();
 
             // BACKGROUND: Queue heavy image upload (fire-and-forget)
+            // If the instant DB update failed, include mission_state + meta in the queue
+            // so the sync manager recovers the full state when connectivity returns.
+            const dbMutationData = { arrival_photo_url: '{{PUBLIC_URL}}' };
+            if (!instantUpdateOk) {
+                dbMutationData.arrival_photo_taken_at = timestamp;
+                dbMutationData.arrival_photo_taken_by = userId;
+                dbMutationData.mission_state = 'waiting_unload_assignment';
+                dbMutationData.meta = nextMeta;
+                dbMutationData.updated_at = timestamp;
+            }
+
             enqueueOptimisticUpload({
                 file: compressedFile,
                 storageBucket: 'staff-arrival',
@@ -197,9 +214,7 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
                     table: 'staff_journeys',
                     matchColumn: 'id',
                     matchValue: journeyId,
-                    data: {
-                        arrival_photo_url: '{{PUBLIC_URL}}'
-                    }
+                    data: dbMutationData
                 },
                 eventLog: {
                     journey_id: journeyId,
@@ -210,26 +225,9 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
                 label: 'Foto de fachada'
             }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
         } catch (error) {
-            console.error('Optimistic arrival photo failed, trying offline fallback:', error);
-            saveOffline(filename, timestamp);
+            console.error('[ArrivalPhoto] Full save flow failed:', error);
             setUploading(false);
         }
-    };
-
-    const saveOffline = (filename, timestamp) => {
-        // Save to offline queue
-        const reader = new FileReader();
-        reader.readAsDataURL(compressedFile);
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            saveOfflineEvent({
-                type: 'ARRIVAL_FACADE_PHOTO_TAKEN',
-                journey_id: journeyId,
-                payload: { filename, imageBase64: base64 }, // Store base64 for later upload
-                actor_user_id: userId
-            });
-            onComplete?.(true); // true = offline mode
-        };
     };
 
     if (preview) {

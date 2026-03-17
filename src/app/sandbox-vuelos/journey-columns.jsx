@@ -126,17 +126,23 @@ function CurrencyCell({ getValue, row, column, table }) {
 }
 
 function DeleteActionCell({ row, table }) {
+  const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const journey = row.original;
   const label = journey.school_name || journey.date || journey.id.slice(0, 8);
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    try { await table.options.meta?.deleteRow(journey.id); } catch {} finally { setIsDeleting(false); }
+    try { 
+      await table.options.meta?.deleteRow(journey.id); 
+      setIsOpen(false);
+    } catch {} finally { 
+      setIsDeleting(false); 
+    }
   };
 
   return (
-    <AlertDialog>
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none" disabled={isDeleting} title="Eliminar journey">
         {isDeleting ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-destructive border-t-transparent" /> :
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>}
@@ -161,7 +167,7 @@ function DeleteActionCell({ row, table }) {
 // --- Calculated read-only cell ---
 function CalcCell({ value, prefix = "" }) {
   return (
-    <span className="text-sm font-medium text-slate-600">
+    <span className="text-sm font-medium text-slate-500 italic">
       {value != null ? (prefix === "$" ? formatMoneyExact(Number(value)) : `${prefix}${formatNumberExact(Number(value))}`) : "—"}
     </span>
   );
@@ -278,9 +284,10 @@ export const journeyColumns = [
     cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
     size: 110,
     enableColumnFilter: false,
+    meta: { isCalculated: true },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("subsidio_calc")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -294,9 +301,10 @@ export const journeyColumns = [
     cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
     size: 130,
     enableColumnFilter: false,
+    meta: { isCalculated: true },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("recaudacion_calc")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -310,9 +318,10 @@ export const journeyColumns = [
     cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
     size: 130,
     enableColumnFilter: false,
+    meta: { isCalculated: true },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("venta_bruta_calc")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -326,9 +335,10 @@ export const journeyColumns = [
     cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
     size: 150,
     enableColumnFilter: false,
+    meta: { isCalculated: true },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("costo_total_becados")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
     },
   },
   {
@@ -345,9 +355,10 @@ export const journeyColumns = [
     cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
     size: 180,
     enableColumnFilter: false,
+    meta: { isCalculated: true },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("aportacion_patrocinador")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
     },
   },
   // --- METRIC COLUMNS ---

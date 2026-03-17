@@ -73,6 +73,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
     getExpandedRowModel: getExpandedRowModel(),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: "includesString",
+    getRowId: (row) => row.id,
     meta: {
       updateData: onUpdateRow,
       deleteRow: onDeleteRow,
@@ -235,8 +236,10 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
             <TableHeader className="sticky top-0 z-20 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.08)]">
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
-                  {hg.headers.map((header) => (
-                    <TableHead key={header.id} className="bg-white relative group select-none" style={{ width: header.getSize() }}>
+                  {hg.headers.map((header) => {
+                    const isCalc = header.column.columnDef.meta?.isCalculated;
+                    return (
+                    <TableHead key={header.id} className={`${isCalc ? "bg-slate-100" : "bg-white"} relative group select-none`} style={{ width: header.getSize() }}>
                       {header.isPlaceholder ? null : (
                         <div className={header.column.getCanSort() ? "cursor-pointer flex items-center gap-1" : ""} onClick={header.column.getToggleSortingHandler()}>
                           {flexRender(header.column.columnDef.header, header.getContext())}
@@ -255,7 +258,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
                         />
                       )}
                     </TableHead>
-                  ))}
+                  )})}
                 </TableRow>
               ))}
               <TableRow className="bg-slate-50/80">
@@ -281,11 +284,13 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
                 table.getRowModel().rows.map((row) => (
                   <Fragment key={row.id}>
                     <TableRow className={row.getIsExpanded() ? "bg-muted/30 border-b-0" : ""}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }}>
+                      {row.getVisibleCells().map((cell) => {
+                        const isCalc = cell.column.columnDef.meta?.isCalculated;
+                        return (
+                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }} className={isCalc ? "bg-slate-100/80" : ""}>
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
-                      ))}
+                      )})}
                     </TableRow>
                     {row.getIsExpanded() && renderSubComponent && (
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
@@ -309,11 +314,13 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
             <TableFooter className="sticky bottom-0 z-20 bg-slate-100 shadow-[0_-1px_3px_0_rgba(0,0,0,0.08)]">
               {table.getFooterGroups().map((fg) => (
                 <TableRow key={fg.id}>
-                  {fg.headers.map((header) => (
-                    <TableCell key={header.id} style={{ width: header.getSize() }} className="py-2.5 font-semibold text-slate-800 border-t border-slate-200">
+                  {fg.headers.map((header) => {
+                    const isCalc = header.column.columnDef.meta?.isCalculated;
+                    return (
+                    <TableCell key={header.id} style={{ width: header.getSize() }} className={`py-2.5 font-semibold text-slate-800 border-t border-slate-200 ${isCalc ? "bg-slate-200" : ""}`}>
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
                     </TableCell>
-                  ))}
+                  )})}
                 </TableRow>
               ))}
             </TableFooter>

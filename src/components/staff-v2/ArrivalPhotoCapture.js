@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import { Camera, RefreshCw, CheckCircle, WifiOff } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { saveOfflineEvent } from '@/utils/offlineQueue';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import { parseMeta } from '@/utils/metaHelpers';
 
 export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
@@ -57,171 +57,181 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
         if (!compressedFile) return;
         setUploading(true);
 
-        const isOnline = navigator.onLine;
         const timestamp = new Date().toISOString();
         const filename = `arrival_${journeyId}_${Date.now()}.jpg`;
 
-        if (isOnline) {
+        try {
+            const supabase = createClient();
+
+            // Read current meta for the reset
+            let nextMeta = {};
             try {
-                const supabase = createClient();
-                // 1. Upload
-                const { error: uploadError } = await supabase.storage
-                    .from('staff-arrival')
-                    .upload(filename, compressedFile);
-
-                if (uploadError) throw uploadError;
-
-                const publicUrl = supabase.storage.from('staff-arrival').getPublicUrl(filename).data.publicUrl;
-
-                const { data: journeySnapshot, error: journeyReadError } = await supabase
+                const { data: journeySnapshot } = await supabase
                     .from('staff_journeys')
                     .select('meta')
                     .eq('id', journeyId)
                     .single();
 
-                if (journeyReadError) throw journeyReadError;
-
                 const currentMeta = parseMeta(journeySnapshot?.meta);
-                const nextMeta = { ...currentMeta };
+                nextMeta = { ...currentMeta };
+            } catch (readErr) {
+                console.warn('[ArrivalPhoto] Could not read current meta, proceeding with empty:', readErr);
+            }
 
-                delete nextMeta.pilot_ready;
-                delete nextMeta.pilot_ready_at;
-                delete nextMeta.pilot_ready_source;
-                delete nextMeta.pilot_spot_set_at;
-                delete nextMeta.pilot_spot_photo_url;
-                delete nextMeta.pilot_spot_note;
-                delete nextMeta.pilot_prep_checks;
-                delete nextMeta.pilot_prep_complete_at;
-                delete nextMeta.pilot_controller_connected;
-                delete nextMeta.pilot_controller_connected_at;
-                delete nextMeta.pilot_audio_checks;
-                delete nextMeta.pilot_audio_configured;
-                delete nextMeta.pilot_audio_configured_at;
-                delete nextMeta.global_seat_deployment_done;
-                delete nextMeta.global_seat_deployment_done_at;
-                delete nextMeta.global_seat_deployment_done_by;
-                delete nextMeta.global_seat_deployment_done_by_name;
-                delete nextMeta.global_headphones_checks;
-                delete nextMeta.global_headphones_done;
-                delete nextMeta.global_headphones_done_at;
-                delete nextMeta.global_headphones_done_by;
-                delete nextMeta.global_headphones_done_by_name;
-                delete nextMeta.global_headphones_control_mode;
-                delete nextMeta.global_headphones_controller_user_id;
-                delete nextMeta.global_headphones_controller_name;
-                delete nextMeta.global_headphones_controller_role;
-                delete nextMeta.global_headphones_control_locked_at;
-                delete nextMeta.global_glasses_station_count;
-                delete nextMeta.global_glasses_checks;
-                delete nextMeta.global_glasses_done;
-                delete nextMeta.global_glasses_done_at;
-                delete nextMeta.global_glasses_done_by;
-                delete nextMeta.global_glasses_done_by_name;
-                delete nextMeta.global_glasses_functional_count;
-                delete nextMeta.global_glasses_control_mode;
-                delete nextMeta.global_glasses_controller_user_id;
-                delete nextMeta.global_glasses_controller_name;
-                delete nextMeta.global_glasses_controller_role;
-                delete nextMeta.global_glasses_control_locked_at;
-                delete nextMeta.aux_ad_wall_checks;
-                delete nextMeta.aux_ad_wall_evidence_url;
-                delete nextMeta.aux_ad_wall_evidence_at;
-                delete nextMeta.aux_ad_wall_evidence_by;
-                delete nextMeta.aux_ad_wall_done;
-                delete nextMeta.aux_ad_wall_done_at;
-                delete nextMeta.aux_ad_wall_done_by;
-                delete nextMeta.aux_ad_wall_done_by_name;
-                delete nextMeta.civic_parallel_status;
-                delete nextMeta.civic_parallel_started_at;
-                delete nextMeta.civic_parallel_started_by;
-                delete nextMeta.civic_parallel_teacher_ack_at;
-                delete nextMeta.civic_parallel_aux_status;
-                delete nextMeta.civic_parallel_aux_started_at;
-                delete nextMeta.civic_parallel_aux_stopped_at;
-                delete nextMeta.civic_parallel_aux_duration_sec;
-                delete nextMeta.civic_parallel_aux_video_url;
-                delete nextMeta.civic_parallel_aux_uploaded_at;
-                delete nextMeta.civic_parallel_aux_error;
-                delete nextMeta.civic_parallel_aux_error_code;
-                delete nextMeta.civic_parallel_aux_failed_at;
-                delete nextMeta.civic_parallel_aux_capture_mode;
-                delete nextMeta.civic_parallel_teacher_audio_required_sec;
-                delete nextMeta.civic_parallel_teacher_audio_status;
-                delete nextMeta.civic_parallel_teacher_audio_started_at;
-                delete nextMeta.civic_parallel_teacher_audio_stopped_at;
-                delete nextMeta.civic_parallel_teacher_audio_duration_sec;
-                delete nextMeta.civic_parallel_teacher_audio_url;
-                delete nextMeta.civic_parallel_teacher_audio_uploaded_at;
-                delete nextMeta.civic_parallel_teacher_audio_error;
-                delete nextMeta.civic_parallel_teacher_audio_ended_early;
-                delete nextMeta.civic_parallel_teacher_audio_early_reason;
-                delete nextMeta.civic_parallel_teacher_audio_early_reason_detail;
-                delete nextMeta.civic_parallel_teacher_done_at;
-                delete nextMeta.civic_parallel_teacher_done_by;
-                delete nextMeta.civic_parallel_teacher_done_by_name;
-                delete nextMeta.pilot_music_ambience_checks;
-                delete nextMeta.pilot_music_ambience_done;
-                delete nextMeta.pilot_music_ambience_done_at;
-                delete nextMeta.pilot_music_ambience_done_by;
-                delete nextMeta.pilot_music_ambience_done_by_name;
-                delete nextMeta.teacher_operation_ready_checks;
-                delete nextMeta.teacher_operation_ready;
-                delete nextMeta.teacher_operation_ready_at;
-                delete nextMeta.teacher_operation_ready_by;
-                delete nextMeta.teacher_operation_ready_by_name;
-                delete nextMeta.aux_operation_stand_photo_url;
-                delete nextMeta.aux_operation_stand_photo_at;
-                delete nextMeta.aux_operation_stand_photo_by;
-                delete nextMeta.aux_operation_ready;
-                delete nextMeta.aux_operation_ready_at;
-                delete nextMeta.aux_operation_ready_by;
-                delete nextMeta.aux_operation_ready_by_name;
-                delete nextMeta.operation_start_bridge_at;
-                delete nextMeta.operation_start_bridge_by;
-                delete nextMeta.operation_started_at;
+            // (existing meta reset keys)
+            delete nextMeta.pilot_ready;
+            delete nextMeta.pilot_ready_at;
+            delete nextMeta.pilot_ready_source;
+            delete nextMeta.pilot_spot_set_at;
+            delete nextMeta.pilot_spot_photo_url;
+            delete nextMeta.pilot_spot_note;
+            delete nextMeta.pilot_prep_checks;
+            delete nextMeta.pilot_prep_complete_at;
+            delete nextMeta.pilot_controller_connected;
+            delete nextMeta.pilot_controller_connected_at;
+            delete nextMeta.pilot_audio_checks;
+            delete nextMeta.pilot_audio_configured;
+            delete nextMeta.pilot_audio_configured_at;
+            delete nextMeta.global_seat_deployment_done;
+            delete nextMeta.global_seat_deployment_done_at;
+            delete nextMeta.global_seat_deployment_done_by;
+            delete nextMeta.global_seat_deployment_done_by_name;
+            delete nextMeta.global_headphones_checks;
+            delete nextMeta.global_headphones_done;
+            delete nextMeta.global_headphones_done_at;
+            delete nextMeta.global_headphones_done_by;
+            delete nextMeta.global_headphones_done_by_name;
+            delete nextMeta.global_headphones_control_mode;
+            delete nextMeta.global_headphones_controller_user_id;
+            delete nextMeta.global_headphones_controller_name;
+            delete nextMeta.global_headphones_controller_role;
+            delete nextMeta.global_headphones_control_locked_at;
+            delete nextMeta.global_glasses_station_count;
+            delete nextMeta.global_glasses_checks;
+            delete nextMeta.global_glasses_done;
+            delete nextMeta.global_glasses_done_at;
+            delete nextMeta.global_glasses_done_by;
+            delete nextMeta.global_glasses_done_by_name;
+            delete nextMeta.global_glasses_functional_count;
+            delete nextMeta.global_glasses_control_mode;
+            delete nextMeta.global_glasses_controller_user_id;
+            delete nextMeta.global_glasses_controller_name;
+            delete nextMeta.global_glasses_controller_role;
+            delete nextMeta.global_glasses_control_locked_at;
+            delete nextMeta.aux_ad_wall_checks;
+            delete nextMeta.aux_ad_wall_evidence_url;
+            delete nextMeta.aux_ad_wall_evidence_at;
+            delete nextMeta.aux_ad_wall_evidence_by;
+            delete nextMeta.aux_ad_wall_done;
+            delete nextMeta.aux_ad_wall_done_at;
+            delete nextMeta.aux_ad_wall_done_by;
+            delete nextMeta.aux_ad_wall_done_by_name;
+            delete nextMeta.civic_parallel_status;
+            delete nextMeta.civic_parallel_started_at;
+            delete nextMeta.civic_parallel_started_by;
+            delete nextMeta.civic_parallel_teacher_ack_at;
+            delete nextMeta.civic_parallel_aux_status;
+            delete nextMeta.civic_parallel_aux_started_at;
+            delete nextMeta.civic_parallel_aux_stopped_at;
+            delete nextMeta.civic_parallel_aux_duration_sec;
+            delete nextMeta.civic_parallel_aux_video_url;
+            delete nextMeta.civic_parallel_aux_uploaded_at;
+            delete nextMeta.civic_parallel_aux_error;
+            delete nextMeta.civic_parallel_aux_error_code;
+            delete nextMeta.civic_parallel_aux_failed_at;
+            delete nextMeta.civic_parallel_aux_capture_mode;
+            delete nextMeta.civic_parallel_teacher_audio_required_sec;
+            delete nextMeta.civic_parallel_teacher_audio_status;
+            delete nextMeta.civic_parallel_teacher_audio_started_at;
+            delete nextMeta.civic_parallel_teacher_audio_stopped_at;
+            delete nextMeta.civic_parallel_teacher_audio_duration_sec;
+            delete nextMeta.civic_parallel_teacher_audio_url;
+            delete nextMeta.civic_parallel_teacher_audio_uploaded_at;
+            delete nextMeta.civic_parallel_teacher_audio_error;
+            delete nextMeta.civic_parallel_teacher_audio_ended_early;
+            delete nextMeta.civic_parallel_teacher_audio_early_reason;
+            delete nextMeta.civic_parallel_teacher_audio_early_reason_detail;
+            delete nextMeta.civic_parallel_teacher_done_at;
+            delete nextMeta.civic_parallel_teacher_done_by;
+            delete nextMeta.civic_parallel_teacher_done_by_name;
+            delete nextMeta.pilot_music_ambience_checks;
+            delete nextMeta.pilot_music_ambience_done;
+            delete nextMeta.pilot_music_ambience_done_at;
+            delete nextMeta.pilot_music_ambience_done_by;
+            delete nextMeta.pilot_music_ambience_done_by_name;
+            delete nextMeta.teacher_operation_ready_checks;
+            delete nextMeta.teacher_operation_ready;
+            delete nextMeta.teacher_operation_ready_at;
+            delete nextMeta.teacher_operation_ready_by;
+            delete nextMeta.teacher_operation_ready_by_name;
+            delete nextMeta.aux_operation_stand_photo_url;
+            delete nextMeta.aux_operation_stand_photo_at;
+            delete nextMeta.aux_operation_stand_photo_by;
+            delete nextMeta.aux_operation_ready;
+            delete nextMeta.aux_operation_ready_at;
+            delete nextMeta.aux_operation_ready_by;
+            delete nextMeta.aux_operation_ready_by_name;
+            delete nextMeta.operation_start_bridge_at;
+            delete nextMeta.operation_start_bridge_by;
+            delete nextMeta.operation_started_at;
 
-                // 2. Update Journey
-                await supabase.from('staff_journeys').update({
-                    arrival_photo_url: publicUrl,
+            // INSTANT: Write journey state + meta immediately (triggers Realtime for all roles)
+            let instantUpdateOk = false;
+            try {
+                const { error: updateError } = await supabase.from('staff_journeys').update({
                     arrival_photo_taken_at: timestamp,
                     arrival_photo_taken_by: userId,
-                    mission_state: 'ARRIVAL_PHOTO_DONE', // or straight to OPERATION?
+                    mission_state: 'waiting_unload_assignment',
                     meta: nextMeta,
                     updated_at: timestamp
                 }).eq('id', journeyId);
 
-                // 3. Log Event
-                await supabase.from('staff_events').insert({
+                if (updateError) {
+                    console.error('[ArrivalPhoto] DB instant update failed:', updateError);
+                } else {
+                    instantUpdateOk = true;
+                }
+            } catch (dbErr) {
+                console.warn('[ArrivalPhoto] DB instant update threw, will queue full payload:', dbErr);
+            }
+
+            // UI unlocks IMMEDIATELY — don't wait for blob queue
+            onComplete?.();
+
+            // BACKGROUND: Queue heavy image upload (fire-and-forget)
+            // If the instant DB update failed, include mission_state + meta in the queue
+            // so the sync manager recovers the full state when connectivity returns.
+            const dbMutationData = { arrival_photo_url: '{{PUBLIC_URL}}' };
+            if (!instantUpdateOk) {
+                dbMutationData.arrival_photo_taken_at = timestamp;
+                dbMutationData.arrival_photo_taken_by = userId;
+                dbMutationData.mission_state = 'waiting_unload_assignment';
+                dbMutationData.meta = nextMeta;
+                dbMutationData.updated_at = timestamp;
+            }
+
+            enqueueOptimisticUpload({
+                file: compressedFile,
+                storageBucket: 'staff-arrival',
+                storagePath: filename,
+                dbMutation: {
+                    table: 'staff_journeys',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: dbMutationData
+                },
+                eventLog: {
                     journey_id: journeyId,
                     type: 'ARRIVAL_FACADE_PHOTO_TAKEN',
                     actor_user_id: userId,
-                    payload: { url: publicUrl }
-                });
-
-                onComplete?.();
-            } catch (error) {
-                console.error('Upload failed, keeping offline', error);
-                saveOffline(filename, timestamp);
-            }
-        } else {
-            saveOffline(filename, timestamp);
+                    payload: { url: '{{PUBLIC_URL}}' }
+                },
+                label: 'Foto de fachada'
+            }).catch(e => console.warn('[OptimisticUpload] enqueue failed:', e));
+        } catch (error) {
+            console.error('[ArrivalPhoto] Full save flow failed:', error);
+            setUploading(false);
         }
-    };
-
-    const saveOffline = (filename, timestamp) => {
-        // Save to offline queue
-        const reader = new FileReader();
-        reader.readAsDataURL(compressedFile);
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            saveOfflineEvent({
-                type: 'ARRIVAL_FACADE_PHOTO_TAKEN',
-                journey_id: journeyId,
-                payload: { filename, imageBase64: base64 }, // Store base64 for later upload
-                actor_user_id: userId
-            });
-            onComplete?.(true); // true = offline mode
-        };
     };
 
     if (preview) {
