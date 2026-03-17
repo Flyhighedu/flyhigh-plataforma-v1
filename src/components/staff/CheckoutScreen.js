@@ -382,6 +382,7 @@ export default function CheckoutScreen({
     const [feedback, setFeedback] = useState('');
     const [checkoutComment, setCheckoutComment] = useState('');
     const [studentsCount, setStudentsCount] = useState(0);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [clockNow, setClockNow] = useState(() => new Date());
     const [syncRequired, setSyncRequired] = useState(false);
     const [pendingSyncItems, setPendingSyncItems] = useState([]);
@@ -410,6 +411,8 @@ export default function CheckoutScreen({
         let cancelled = false;
         const localCount = readJourneyStudentsFromLocalLogs(journeyId);
         setStudentsCount(localCount);
+        // [H-03 FIX] Show loading while fetching remote count
+        setIsLoadingStudents(true);
 
         const loadStudentsCount = async () => {
             try {
@@ -420,6 +423,8 @@ export default function CheckoutScreen({
                 if (!cancelled) {
                     setStudentsCount(localCount);
                 }
+            } finally {
+                if (!cancelled) setIsLoadingStudents(false);
             }
         };
 
@@ -905,7 +910,7 @@ export default function CheckoutScreen({
                 <section className="rounded-3xl border border-blue-100 bg-blue-50 p-5 shadow-[0_24px_56px_-34px_rgba(30,64,175,0.32)]">
                     <h2 className="m-0 text-[29px] font-black leading-tight tracking-tight text-slate-900">¡Misión Cumplida!</h2>
                     <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">
-                        Gracias a tu esfuerzo de hoy, le cumpliste el sueño de volar a {studentsCount} niños.
+                        Gracias a tu esfuerzo de hoy, le cumpliste el sueño de volar a {isLoadingStudents ? '...' : studentsCount} niños.
                     </p>
                 </section>
 

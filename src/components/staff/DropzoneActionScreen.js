@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 
 /* ─── Inline Voice Player ─── */
@@ -99,6 +100,17 @@ export default function DropzoneActionScreen({
 
         } catch (e) {
             console.error('Error updating dropzone state:', e);
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'unload', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: unload'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
             setLoading(false);
         }
     };

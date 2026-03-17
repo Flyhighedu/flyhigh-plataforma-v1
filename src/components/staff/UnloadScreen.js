@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 
 /* ─── Inline Voice Player ─── */
@@ -276,7 +277,18 @@ export default function UnloadScreen({
             if (error) throw error;
         } catch (error) {
             console.error('Error moving to seat deployment:', error);
-            alert('No se pudo confirmar la descarga. Intenta de nuevo.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'seat_deployment', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: seat_deployment'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo confirmar la descarga. Se guardó para reintentar.');
             setIsSubmitting(false);
         }
     };

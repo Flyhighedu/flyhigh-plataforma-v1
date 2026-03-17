@@ -419,11 +419,10 @@ export default function StaffOperationLegacy({
         supabase.auth.refreshSession();
 
         const intervalId = setInterval(() => {
-            if (navigator.onLine) {
-                supabase.auth.refreshSession().then(({ error }) => {
-                    if (error) console.warn("Session refresh failed:", error);
-                });
-            }
+            // [H-04 FIX] Always attempt refresh — navigator.onLine is unreliable
+            supabase.auth.refreshSession().then(({ error }) => {
+                if (error) console.warn("Session refresh failed:", error);
+            });
         }, 10 * 60 * 1000);
 
         const handleOnline = () => {

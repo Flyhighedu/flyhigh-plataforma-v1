@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -649,7 +650,18 @@ export default function GlassesSetupScreen({
             onRefresh && onRefresh();
         } catch (error) {
             console.error('Error finalizing glasses setup:', error);
-            alert('No se pudo cerrar la tarea global de configuracion de gafas.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'seat_deployment', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: seat_deployment (glasses setup)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo cerrar. Se guardó para reintentar.');
         } finally {
             setIsFinalizing(false);
         }

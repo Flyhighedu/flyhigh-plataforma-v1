@@ -38,39 +38,8 @@ const NAV_STEPS = [
     { id: 'operacion', label: 'OPERACIÓN', icon: 'flight', status: 'pending' },
 ];
 
-function getOfflineQueue(journeyId) {
-    try {
-        const raw = localStorage.getItem(`flyhigh_aux_queue_2_${journeyId}`);
-        return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-}
-
-function addToOfflineQueue(journeyId, event) {
-    const queue = getOfflineQueue(journeyId);
-    queue.push({ ...event, idempotency_key: crypto.randomUUID(), queued_at: new Date().toISOString() });
-    localStorage.setItem(`flyhigh_aux_queue_2_${journeyId}`, JSON.stringify(queue));
-}
-
-function clearOfflineQueue(journeyId) {
-    localStorage.removeItem(`flyhigh_aux_queue_2_${journeyId}`);
-}
-
-async function flushQueueToSupabase(supabase, journeyId, fallbackUserId = null) {
-    const queue = getOfflineQueue(journeyId);
-    if (queue.length === 0) return;
-
-    const inserts = queue.map((queuedEvent) => ({
-        journey_id: journeyId,
-        user_id: queuedEvent.user_id || fallbackUserId,
-        event_type: queuedEvent.event_type,
-        payload: queuedEvent.payload
-    }));
-
-    const { error } = await supabase.from('staff_prep_events').insert(inserts);
-    if (error) throw error;
-
-    clearOfflineQueue(journeyId);
-}
+// [H-01 FIX] Dead offline queue removed — was never synced outside this component.
+// Critical state transitions now use enqueueOptimisticUpload as fallback.
 
 import SyncHeader from './SyncHeader';
 
@@ -98,28 +67,8 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
     const canDoPhotos = allChecksDone;
     const canSubmit = allChecksDone && allPhotosDone;
 
-    const flushPendingEvents = async () => {
-        if (preview || !journeyId || !navigator.onLine) return;
-
-        try {
-            const supabase = createClient();
-            await flushQueueToSupabase(supabase, journeyId, userId);
-        } catch (error) {
-            console.warn('No se pudo sincronizar cola auxiliar:', error.message || error);
-        }
-    };
-
-    useEffect(() => {
-        if (preview || !journeyId) return;
-
-        const handleOnline = () => {
-            flushPendingEvents();
-        };
-
-        flushPendingEvents();
-        window.addEventListener('online', handleOnline);
-        return () => window.removeEventListener('online', handleOnline);
-    }, [journeyId, preview, userId]);
+    // [H-01 FIX] Removed dead flushPendingEvents and its useEffect.
+    // Checklist events are visual/local. Only the final state transition needs offline protection.
 
     const toggleCheck = (item) => {
         if (item.type === 'check_confirm' && !checkedItems[item.id]) {
@@ -246,27 +195,18 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
     const saveEvent = async (type, payload) => {
         if (!journeyId || preview) return;
 
-        const event = { event_type: `aux2_${type}`, payload, user_id: userId };
-
-        if (!navigator.onLine) {
-            addToOfflineQueue(journeyId, event);
-            return;
-        }
-
         try {
             const supabase = createClient();
-            await flushQueueToSupabase(supabase, journeyId, userId);
             const { error } = await supabase.from('staff_prep_events').insert({
                 journey_id: journeyId,
                 user_id: userId,
-                event_type: event.event_type,
-                payload: event.payload
+                event_type: `aux2_${type}`,
+                payload
             });
-
-            if (error) throw error;
+            if (error) console.warn('No se pudo guardar evento de checklist:', error.message);
         } catch (error) {
-            addToOfflineQueue(journeyId, event);
-            console.warn('No se pudo guardar evento en vivo, enviado a cola local:', error.message || error);
+            // Checklist events are non-critical visual state — safe to drop if offline
+            console.warn('Evento de checklist no guardado (offline):', error.message || error);
         }
     };
 
@@ -306,8 +246,6 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
             const supabase = createClient();
             const now = new Date().toISOString();
 
-            await flushQueueToSupabase(supabase, journeyId, userId);
-
             // Direct transition to IN_ROUTE (skipping ROUTE_READY)
             await supabase.from('staff_journeys')
                 .update({
@@ -329,6 +267,22 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
 
         } catch (e) {
             console.error(e);
+            // [H-01 FIX] Enqueue the critical state transition for offline sync
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: {
+                        mission_state: 'IN_ROUTE',
+                        route_started_at: new Date().toISOString(),
+                        route_started_by: userId,
+                        updated_at: new Date().toISOString()
+                    }
+                },
+                label: 'Transición offline: IN_ROUTE (carga vehículo)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
         } finally {
             setSaving(false);
             onComplete && onComplete();

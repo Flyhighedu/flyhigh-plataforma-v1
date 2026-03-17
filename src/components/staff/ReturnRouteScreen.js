@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Navigation, Truck } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -125,7 +126,18 @@ export default function ReturnRouteScreen({
             onRefresh && onRefresh();
         } catch (error) {
             console.error('No se pudo notificar llegada a base:', error);
-            alert('No se pudo notificar llegada. Intenta de nuevo.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'dismantling', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: dismantling (return route)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo notificar. Se guardó para reintentar.');
         } finally {
             setIsSubmitting(false);
         }

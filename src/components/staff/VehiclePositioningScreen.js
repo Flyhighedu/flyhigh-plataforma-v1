@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -217,7 +218,18 @@ export default function VehiclePositioningScreen({
             onRefresh && onRefresh();
         } catch (error) {
             console.error('Error confirming vehicle positioning:', error);
-            alert('No se pudo confirmar la posicion del vehiculo.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'dismantling', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: dismantling (vehicle positioning)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo confirmar. Se guardó para reintentar.');
         } finally {
             setIsSaving(false);
         }

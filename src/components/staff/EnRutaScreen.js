@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Truck, MapPin, Navigation, Camera, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import ArrivalPhotoCapture from './ArrivalPhotoCapture';
 import IncidentReporter from './IncidentReporter';
 import SyncHeader from './SyncHeader';
@@ -60,7 +61,18 @@ export default function EnRutaScreen({
 
         } catch (e) {
             console.error(e);
-            alert('Error al iniciar ruta.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'IN_ROUTE', route_started_at: new Date().toISOString(), route_started_by: userId, updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: IN_ROUTE'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('Error al iniciar ruta. Se guardó para reintentar.');
         } finally {
             setLoadingAction(false);
         }

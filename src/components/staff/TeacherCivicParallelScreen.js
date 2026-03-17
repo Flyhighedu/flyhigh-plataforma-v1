@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Mic, Radio } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -218,10 +219,40 @@ export default function TeacherCivicParallelScreen({
             try {
                 await updateJourneyMeta({
                     civic_parallel_teacher_audio_status: 'failed',
-                    civic_parallel_teacher_audio_error: message
+                    civic_parallel_teacher_audio_error: message,
+                    // [H-06 FIX] Mark task as done even if upload failed
+                    // — evidence upload must never gate operational progress
+                    civic_parallel_teacher_done_at: meta.civic_parallel_teacher_done_at || new Date().toISOString(),
+                    civic_parallel_teacher_done_by: meta.civic_parallel_teacher_done_by || userId
                 });
             } catch (metaError) {
                 console.warn('No se pudo guardar estado failed de audio:', metaError);
+            }
+
+            // [H-06+] Enqueue blob for background retry so evidence is not lost
+            if (blob) {
+                const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+                const filePath = `${journeyId}/civic-audio/teacher-${Date.now()}.${extension}`;
+                enqueueOptimisticUpload({
+                    storageUpload: {
+                        bucket: 'staff-arrival',
+                        path: filePath,
+                        blob,
+                        upsert: true
+                    },
+                    dbMutation: {
+                        table: 'staff_journeys',
+                        operation: 'update',
+                        matchColumn: 'id',
+                        matchValue: journeyId,
+                        metaPatch: {
+                            civic_parallel_teacher_audio_status: 'uploaded',
+                            civic_parallel_teacher_audio_url: `__PUBLIC_URL__`,
+                            civic_parallel_teacher_audio_duration_sec: durationSec
+                        }
+                    },
+                    label: 'Reintento audio cívico docente'
+                }).catch(err => console.warn('[OfflineEnqueue] audio retry error:', err));
             }
 
             setAudioStatus('failed');

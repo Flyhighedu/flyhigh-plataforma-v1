@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -141,7 +142,18 @@ export default function TeacherCivicNotificationScreen({
             }, 250);
         } catch (error) {
             console.error('Error confirming civic notice:', error);
-            alert('No se pudo confirmar. Intenta de nuevo.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'seat_deployment', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: seat_deployment (civic yes)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo confirmar. Se guardó para reintentar.');
         } finally {
             setIsSaving(false);
         }
@@ -204,7 +216,18 @@ export default function TeacherCivicNotificationScreen({
             }, 250);
         } catch (error) {
             console.error('Error registering no civic decision:', error);
-            alert('No se pudo registrar. Intenta de nuevo.');
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'seat_deployment', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: seat_deployment (civic no)'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
+            alert('No se pudo registrar. Se guardó para reintentar.');
         } finally {
             setIsSaving(false);
         }

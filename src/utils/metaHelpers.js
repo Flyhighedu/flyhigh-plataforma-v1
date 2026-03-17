@@ -1,3 +1,5 @@
+import { createClient } from '@/utils/supabase/client';
+
 export const PILOT_READY_SOURCE = 'pilot_prepare_flight_v1';
 
 export function parseMeta(meta) {
@@ -127,4 +129,44 @@ export function shouldLockPilot(role, missionState, meta, arrivalPhotoTakenAt = 
     });
 
     return shouldLock;
+}
+
+// [H-05] Atomic read-merge-write with optimistic lock to prevent race conditions
+// when multiple roles update meta simultaneously.
+export async function atomicMetaUpdate(journeyId, patch, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        const supabase = createClient();
+        const { data, error: readErr } = await supabase
+            .from('staff_journeys')
+            .select('meta, updated_at')
+            .eq('id', journeyId)
+            .single();
+
+        if (readErr) throw readErr;
+
+        const currentMeta = parseMeta(data?.meta);
+        const nextMeta = { ...currentMeta, ...patch };
+        const now = new Date().toISOString();
+
+        const { data: writeData, error: writeErr } = await supabase
+            .from('staff_journeys')
+            .update({ meta: nextMeta, updated_at: now })
+            .eq('id', journeyId)
+            .eq('updated_at', data.updated_at)
+            .select('id')
+            .maybeSingle();
+
+        if (writeErr) throw writeErr;
+
+        // If no row was updated, another write happened between our read and write
+        if (!writeData) {
+            if (attempt < retries) {
+                await new Promise(r => setTimeout(r, 150 * (attempt + 1)));
+                continue;
+            }
+            throw new Error('atomicMetaUpdate: max retries exceeded — concurrent write conflict');
+        }
+
+        return nextMeta;
+    }
 }

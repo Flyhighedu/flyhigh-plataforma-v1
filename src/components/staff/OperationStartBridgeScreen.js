@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { parseMeta } from '@/utils/metaHelpers';
@@ -87,6 +88,17 @@ export default function OperationStartBridgeScreen({
             onRefresh && onRefresh();
         } catch (error) {
             console.error('Error finalizing synchronized operation start:', error);
+            // [H-02 FIX] Enqueue offline fallback for critical state transition
+            enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'staff_journeys',
+                    operation: 'update',
+                    matchColumn: 'id',
+                    matchValue: journeyId,
+                    data: { mission_state: 'OPERATION', updated_at: new Date().toISOString() }
+                },
+                label: 'Transición offline: OPERATION'
+            }).catch(err => console.warn('[OfflineEnqueue] error:', err));
             onRefresh && onRefresh();
         } finally {
             isCommittingRef.current = false;
