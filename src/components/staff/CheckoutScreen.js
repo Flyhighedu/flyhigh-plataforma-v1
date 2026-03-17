@@ -852,7 +852,7 @@ export default function CheckoutScreen({
             const { error: updateError } = await supabase.from('staff_journeys')
                 .update({
                     mission_state: allTeamCheckedOut ? 'report' : 'dismantling',
-                    ...(allTeamCheckedOut ? { status: 'report' } : {}), meta: nextMeta, updated_at: now
+                    ...(allTeamCheckedOut ? { status: 'closed' } : {}), meta: nextMeta, updated_at: now
                 })
                 .eq('id', journeyId);
             if (updateError) throw updateError;
@@ -862,6 +862,16 @@ export default function CheckoutScreen({
             setCheckoutComment('');
             onRefresh && onRefresh();
             if (allTeamCheckedOut) {
+                // Seal school as completed (moved from handleCloseDay in StaffOperationLegacy)
+                const schoolId = missionInfo?.id || missionInfo?.mission_id || missionId;
+                if (schoolId) {
+                    supabase.from('proximas_escuelas')
+                        .update({ estatus: 'completado' })
+                        .eq('id', schoolId)
+                        .then(({ error }) => {
+                            if (error) console.warn('⚠️ proximas_escuelas update failed (non-blocking):', error);
+                        });
+                }
                 clearJourneyLocalOperationalData(journeyId);
                 clearLocalProgress(journeyId);
                 if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('flyhigh_staff_mission');

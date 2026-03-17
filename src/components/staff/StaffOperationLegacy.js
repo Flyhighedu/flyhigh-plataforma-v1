@@ -552,27 +552,13 @@ export default function StaffOperationLegacy({
                     console.warn('⚠️ cierres_mision upsert failed (non-blocking):', cierreError);
                 }
 
-                // 2. UPDATE → staff_journeys.status = 'closed'
-                const { error: journeyError } = await supabase
-                    .from('staff_journeys')
-                    .update({ status: 'closed', updated_at: now })
-                    .eq('id', journeyId);
+                // NOTE: status='closed' and proximas_escuelas='completado' are NOT set here.
+                // Those transitions happen AFTER the full checkout process is complete
+                // (see CheckoutScreen / handleReportComplete). Sealing them here was
+                // causing the journey to disappear from the supervisor dashboard while
+                // the team was still in the dismantling phase.
 
-                if (journeyError) {
-                    console.warn('⚠️ staff_journeys status update failed (non-blocking):', journeyError);
-                }
-
-                // 3. UPDATE → proximas_escuelas.estatus = 'completado'
-                const { error: escuelaError } = await supabase
-                    .from('proximas_escuelas')
-                    .update({ estatus: 'completado' })
-                    .eq('id', currentMission.id);
-
-                if (escuelaError) {
-                    console.warn('⚠️ proximas_escuelas update failed (non-blocking):', escuelaError);
-                }
-
-                console.log('✅ Mission sealed:', {
+                console.log('✅ Flight log sealed:', {
                     journeyId,
                     missionId: currentMission.id,
                     totalFlights: sealTotalFlights,
