@@ -140,6 +140,7 @@ export default function PilotPrepareFlightScreen({
             audioConfiguredForCurrentSpot
         } = getPilotPrepTiming(m);
 
+        if (audioConfiguredForCurrentSpot) return 'done';
         if (checklistDoneForCurrentSpot && !controllerConnectedForCurrentSpot) return 'connect';
         if (controllerConnectedForCurrentSpot && !audioConfiguredForCurrentSpot) return 'audio';
         if (spotConfirmed) return 'prepare';
@@ -223,6 +224,7 @@ export default function PilotPrepareFlightScreen({
         if (spotConfirmed) expectedPhase = 'prepare';
         if (checklistDoneForCurrentSpot && !controllerConnectedForCurrentSpot) expectedPhase = 'connect';
         if (controllerConnectedForCurrentSpot && !audioConfiguredForCurrentSpot) expectedPhase = 'audio';
+        if (audioConfiguredForCurrentSpot) expectedPhase = 'done';
 
         if (pilotPhase !== expectedPhase) {
             setPilotPhase(expectedPhase);
@@ -1294,6 +1296,54 @@ export default function PilotPrepareFlightScreen({
                             <span style={{ fontSize: 11, fontWeight: 500, color: '#6B7280' }}>
                                 No cierres la app (los datos se guardan)
                             </span>
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══ PHASE DONE: Pilot prep complete, waiting for team ═══ */}
+                {pilotPhase === 'done' && (
+                    <div style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        gap: 20,
+                        padding: '40px 24px'
+                    }}>
+                        <div style={{
+                            width: 80, height: 80, borderRadius: '50%',
+                            backgroundColor: '#DCFCE7',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 8px 30px -10px rgba(34,197,94,0.3)'
+                        }}>
+                            <CheckCircle2 size={40} color="#22C55E" />
+                        </div>
+                        <div>
+                            <h2 style={{
+                                fontSize: 24, fontWeight: 700,
+                                color: '#1F2937', margin: 0, marginBottom: 8,
+                                letterSpacing: '-0.02em'
+                            }}>
+                                Preparación completa
+                            </h2>
+                            <p style={{
+                                fontSize: 14, color: '#6B7280',
+                                lineHeight: 1.6, margin: 0, maxWidth: 280
+                            }}>
+                                Has completado todas tus tareas de preparación. Esperando a que el equipo avance para continuar.
+                            </p>
+                        </div>
+                        <div style={{
+                            padding: '8px 16px',
+                            borderRadius: 999,
+                            backgroundColor: '#F0FDF4',
+                            border: '1px solid #BBF7D0'
+                        }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#16A34A' }}>
+                                ✓ Pista · ✓ Checklist · ✓ Mando · ✓ Audio
+                            </p>
                         </div>
                     </div>
                 )}

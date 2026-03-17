@@ -113,16 +113,15 @@ export function shouldLockPilot(role, missionState, meta, arrivalPhotoTakenAt = 
     ];
 
     const isOperational = operationalStates.includes(missionState);
-    const hasArrivalEvidence = !isOperational || Boolean(arrivalPhotoTakenAt);
-    const pilotReady = isPilotReady(meta, arrivalPhotoTakenAt);
-    const shouldLock = isOperational && (!pilotReady || !hasArrivalEvidence);
+    // [DESIGN] Evidence uploads (arrival photo, etc.) NEVER gate the pilot.
+    // The pilot is locked ONLY until they complete their own prep tasks.
+    const pilotReady = isPilotReady(meta, null);
+    const shouldLock = isOperational && !pilotReady;
 
     console.log('🔧 shouldLockPilot:', {
         role,
         missionState,
-        arrivalPhotoTakenAt,
         isOperational,
-        hasArrivalEvidence,
         pilotReady,
         shouldLock
     });
