@@ -1323,7 +1323,9 @@ export default function StaffDashboard() {
 
                         // Auto-advance logic (LOCAL GATING ADDED)
                         // Auto-advance logic (LOCAL GATING WITH META CHECK)
-                        if (currentCheckIn) {
+                        const isContingencyActive = incomingMeta?.contingency_direct_operation === true || ['OPERATION', 'operation'].includes(newState);
+
+                        if (currentCheckIn || isContingencyActive) {
                             if (currentProfile?.role === 'pilot') {
                                 const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(newState, incomingMeta);
 
@@ -1341,6 +1343,11 @@ export default function StaffDashboard() {
                                 setAuxFlowState(null);
                                 setTeacherFlowState(null);
                                 setCurrentStep(2);
+                            }
+
+                            // Esconder la pre-pantalla (CheckIn/Brief) si nos fuerzan a avanzar
+                            if (isContingencyActive && showBriefRef.current) {
+                                setShowBrief(false);
                             }
 
                             const isPilotLocked = shouldLockPilot(
@@ -1367,7 +1374,7 @@ export default function StaffDashboard() {
 
 
                             // If the mission has advanced to any post-checklist state, move to Step 1
-                            if (LISTENER_STEP_ONE_STATES.has(newState)) {
+                            if (LISTENER_STEP_ONE_STATES.has(newState) || ['OPERATION', 'operation'].includes(newState)) {
                                 if (currentStepRef.current < 1) {
                                     setCurrentStep(1);
                                 }
@@ -1376,7 +1383,7 @@ export default function StaffDashboard() {
                             }
 
                             // Advance to Step 2 (Operation)
-                            if (['OPERATION', 'dismantling'].includes(newState)) {
+                            if (['OPERATION', 'operation', 'dismantling'].includes(newState)) {
                                 setCurrentStep(2);
                             }
                         } else {
