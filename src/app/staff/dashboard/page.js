@@ -2693,6 +2693,8 @@ export default function StaffDashboard() {
                         journeyId={journeyId}
                         schoolId={todaySchool?.id}
                         role={profile?.role}
+                        userId={userId}
+                        profile={profile}
                         onDemoStart={() => refreshMission()}
                     />
                 </div>

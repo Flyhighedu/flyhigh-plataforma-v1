@@ -7,23 +7,73 @@ import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
-export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null }) {
+export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null, userId = null, profile = null }) {
     const [isOpen, setIsOpen] = useState(false);
     const [changeMissionProgress, setChangeMissionProgress] = useState(false);
+    const [directOpProgress, setDirectOpProgress] = useState(false);
     const changeMissionTimerRef = useRef(null);
+    const directOpTimerRef = useRef(null);
     const router = useRouter();
     const normalizedRole = role ? String(role).toLowerCase() : null;
     const canSeeHistory = !normalizedRole || ['pilot', 'teacher', 'assistant', 'auxiliar', 'operativo', 'admin'].includes(normalizedRole);
     const canGoDirectToOperation = ['pilot', 'teacher', 'assistant', 'auxiliar'].includes(normalizedRole || '');
     const directOperationHint = normalizedRole === 'teacher'
-        ? 'Abrir registro de vuelos'
-        : 'Abrir panel de operación';
+        ? 'Saltar directo a vuelos'
+        : 'Saltar directo a panel';
 
-    const handleDirectOperation = () => {
+    const handleDirectOperation = async () => {
+        // Local event (fallback/immediate UI switch)
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('flyhigh:direct-operation', {
-                detail: { role: normalizedRole || null, source: 'header_hamburger' }
+                detail: { role: normalizedRole || null, source: 'header_hamburger_emergency' }
             }));
+        }
+
+        // Global sync (Supabase write)
+        if (journeyId && userId) {
+            try {
+                const supabase = createClient();
+                const now = new Date().toISOString();
+                const actorName = profile?.full_name?.split(' ')[0] || 'Operativo';
+                
+                // Read current meta to preserve it
+                const { data: currentData } = await supabase
+                    .from('staff_journeys')
+                    .select('meta')
+                    .eq('id', journeyId)
+                    .single();
+                
+                const currentMeta = currentData?.meta || {};
+                
+                // Force state to OPERATION and flag contingency
+                const nextMeta = {
+                    ...currentMeta,
+                    contingency_direct_operation: true,
+                    contingency_direct_operation_at: now,
+                    contingency_direct_operation_by: userId,
+                    contingency_direct_operation_by_name: actorName
+                };
+
+                await supabase.from('staff_journeys')
+                    .update({ 
+                        mission_state: 'OPERATION',
+                        meta: nextMeta,
+                        updated_at: now
+                    })
+                    .eq('id', journeyId);
+
+                // Log audit event
+                await supabase.from('staff_events').insert({
+                    journey_id: journeyId,
+                    type: 'CONTINGENCY_DIRECT_OPERATION',
+                    actor_user_id: userId,
+                    payload: { by_name: actorName }
+                });
+
+                console.log('🚨 Emergency Direct Operation fired. Sync sent.');
+            } catch (err) {
+                console.error('Failed to broadcast emergency operation state:', err);
+            }
         }
     };
 
@@ -81,27 +131,70 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                             </button>
                         )}
 
-                        <p className="px-4 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-t border-slate-100 mt-1">
-                            Acciones de prueba
+                        <p className="px-4 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-t border-slate-100 mt-1 flex items-center gap-1.5 text-red-500">
+                            <span className="shrink-0 size-2 rounded-full bg-red-500 animate-pulse" /> Contingencia
                         </p>
 
                         {canGoDirectToOperation && (
                             <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    handleDirectOperation();
+                                onMouseDown={() => {
+                                    setDirectOpProgress(true);
+                                    directOpTimerRef.current = setTimeout(() => {
+                                        setIsOpen(false);
+                                        setDirectOpProgress(false);
+                                        handleDirectOperation();
+                                    }, 2000); // 2 seconds hold for emergency
                                 }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors rounded-lg text-blue-700 group"
+                                onMouseUp={() => {
+                                    clearTimeout(directOpTimerRef.current);
+                                    setDirectOpProgress(false);
+                                }}
+                                onMouseLeave={() => {
+                                    clearTimeout(directOpTimerRef.current);
+                                    setDirectOpProgress(false);
+                                }}
+                                onTouchStart={() => {
+                                    setDirectOpProgress(true);
+                                    directOpTimerRef.current = setTimeout(() => {
+                                        setIsOpen(false);
+                                        setDirectOpProgress(false);
+                                        handleDirectOperation();
+                                    }, 2000);
+                                }}
+                                onTouchEnd={() => {
+                                    clearTimeout(directOpTimerRef.current);
+                                    setDirectOpProgress(false);
+                                }}
+                                className="relative w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 transition-colors rounded-lg text-red-600 group overflow-hidden select-none"
                             >
-                                <div className="p-2 bg-blue-50 rounded-lg transition-colors group-hover:bg-blue-100">
-                                    <Plane size={18} />
+                                {/* Progress bar fill */}
+                                {directOpProgress && (
+                                    <div
+                                        className="absolute inset-0 bg-red-100/70 origin-left"
+                                        style={{ animation: 'emergencyFill 2s linear forwards' }}
+                                    />
+                                )}
+                                <div className="relative p-2 bg-red-50 rounded-lg transition-colors group-hover:bg-red-100">
+                                    <Plane size={18} className={directOpProgress ? 'animate-bounce' : ''} />
                                 </div>
-                                <div>
-                                    <p className="text-sm font-semibold">Ir directo a operación</p>
-                                    <p className="text-[10px] text-blue-500/80 font-medium tracking-tight">{directOperationHint}</p>
+                                <div className="relative">
+                                    <p className="text-sm font-bold">Ir directo a operación</p>
+                                    <p className="text-[10px] text-red-500 font-semibold tracking-tight">
+                                        {directOpProgress ? 'Mantén 2s para activar...' : directOperationHint}
+                                    </p>
                                 </div>
                             </button>
                         )}
+                        <style jsx>{`
+                            @keyframes changeMissionFill {
+                                from { transform: scaleX(0); }
+                                to { transform: scaleX(1); }
+                            }
+                            @keyframes emergencyFill {
+                                from { transform: scaleX(0); }
+                                to { transform: scaleX(1); }
+                            }
+                        `}</style>
 
                         {/* Demo Start */}
                         <div className="relative">

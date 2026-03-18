@@ -3257,6 +3257,12 @@ export default function SupervisorDashboard() {
             });
             recentSteps.sort((a, b) => new Date(b.at) - new Date(a.at));
 
+            const missionMeta = parseMetaLike(j.meta);
+            const contingencyMeta = missionMeta?.contingency_direct_operation ? {
+                at: missionMeta.contingency_direct_operation_at,
+                byName: missionMeta.contingency_direct_operation_by_name || 'Operativo',
+            } : null;
+
             return {
                 id: j.id, journey: j, school, isClosed,
                 schoolName: school?.nombre_escuela || j.school_name || closureMatch?.school_name_snapshot || 'Escuela sin nombre',
@@ -3277,6 +3283,7 @@ export default function SupervisorDashboard() {
                 liveGraceEndsAtMs,
                 isInCompletionGrace,
                 completionGraceRemainingMs,
+                contingencyMeta,
             };
         }).filter((m) => !m.isClosed || m.isInCompletionGrace).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     }, [journeys, schoolMap, prepByJ, photosByJ, staffByJ, presByJ, closures, profileMap, staffProfiles, flightLogs, now]);
@@ -4384,6 +4391,26 @@ export default function SupervisorDashboard() {
                             <span className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide bg-emerald-400/20 text-emerald-100 border border-emerald-300/30 tabular-nums">
                                 {completionGraceRemainingMinutes} min
                             </span>
+                        </div>
+                    </section>
+                )}
+
+                {sel?.contingencyMeta && !completionGraceVisible && (
+                    <section className="rounded-2xl border border-amber-500/50 bg-amber-900/40 text-amber-50 p-4 mb-1 shadow-lg shadow-amber-950/35 backdrop-blur-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-500/20 rounded-xl shrink-0 border border-amber-500/30">
+                                <span className="material-symbols-outlined text-2xl text-amber-400">warning</span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-sm font-black tracking-wide text-amber-300 uppercase">Contingencia Activada</p>
+                                </div>
+                                <p className="mt-1 text-xs leading-relaxed text-amber-100/90 font-medium">
+                                    <span className="font-bold text-amber-200">{sel.contingencyMeta.byName}</span> activó el modo de emergencia 
+                                    a las {new Date(sel.contingencyMeta.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true })}. 
+                                    Los checklists de preparación han sido saltados.
+                                </p>
+                            </div>
                         </div>
                     </section>
                 )}

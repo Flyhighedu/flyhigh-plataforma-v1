@@ -552,11 +552,33 @@ export default function StaffOperationLegacy({
                     console.warn('⚠️ cierres_mision upsert failed (non-blocking):', cierreError);
                 }
 
-                // NOTE: status='closed' and proximas_escuelas='completado' are NOT set here.
-                // Those transitions happen AFTER the full checkout process is complete
-                // (see CheckoutScreen / handleReportComplete). Sealing them here was
-                // causing the journey to disappear from the supervisor dashboard while
-                // the team was still in the dismantling phase.
+                const missionMeta = parseMetaLike(currentMission?.meta || {});
+                const isContingency = missionMeta?.contingency_direct_operation === true;
+
+                if (isContingency) {
+                    // 🚨 EMERGENCY CLOSURE 🚨
+                    // If this was an emergency operation, we skip all checklists
+                    // and close the journey directly here.
+                    await supabase.from('staff_journeys').update({
+                        status: 'closed',
+                        mission_state: 'completed',
+                        updated_at: now
+                    }).eq('id', journeyId);
+
+                    await supabase.from('proximas_escuelas').update({
+                        estatus: 'completado',
+                        updated_at: now
+                    }).eq('id', currentMission.id);
+
+                    console.log('🚨 Emergency Contingency Closure triggered. Journey sealed.');
+                } else {
+                    // NORMAL CLOSURE
+                    // NOTE: status='closed' and proximas_escuelas='completado' are NOT set here.
+                    // Those transitions happen AFTER the full checkout process is complete
+                    // (see CheckoutScreen / handleReportComplete). Sealing them here was
+                    // causing the journey to disappear from the supervisor dashboard while
+                    // the team was still in the dismantling phase.
+                }
 
                 console.log('✅ Flight log sealed:', {
                     journeyId,
@@ -566,8 +588,17 @@ export default function StaffOperationLegacy({
                 });
             }
 
-            // ── NAVIGATE: Proceed to dismantling flow ──
-            if (onCloseDay) {
+            // ── NAVIGATE: Proceed to dismantling flow or History ──
+            const missionMetaStr = currentMission?.meta || {};
+            const isContingencyRoute = typeof missionMetaStr === 'string' 
+                ? missionMetaStr.includes('"contingency_direct_operation":true') 
+                : missionMetaStr?.contingency_direct_operation === true;
+
+            if (isContingencyRoute) {
+                // Return to dashboard (which defaults to history tab if no active mission)
+                router.push('/staff/dashboard');
+                setTimeout(() => window.location.reload(), 500); // hard-refresh to clear local state
+            } else if (onCloseDay) {
                 await onCloseDay();
             } else {
                 router.push('/staff/dashboard');
