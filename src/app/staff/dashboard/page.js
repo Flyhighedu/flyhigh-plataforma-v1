@@ -2035,7 +2035,6 @@ export default function StaffDashboard() {
                     onCloseDay={handleGoToReport}
                     hideMenu={false}
                     useSyncHeader={true}
-                    startFromMissionSelector={true}
                     journeyId={journeyId}
                     userId={userId}
                     profile={profile}

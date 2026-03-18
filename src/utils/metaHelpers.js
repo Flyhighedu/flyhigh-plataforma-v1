@@ -104,6 +104,12 @@ export function shouldLockPilot(role, missionState, meta, arrivalPhotoTakenAt = 
         return false;
     }
 
+    // [EMERGENCY BYPASS]
+    const parsedMeta = parseMeta(meta);
+    if (parsedMeta?.contingency_direct_operation === true) {
+        return false;
+    }
+
     const operationalStates = [
         'ARRIVAL_PHOTO_DONE',
         'waiting_unload_assignment',
