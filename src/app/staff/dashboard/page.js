@@ -1324,9 +1324,14 @@ export default function StaffDashboard() {
                             window.location.reload();
                         }
 
-                        // Auto-advance logic (LOCAL GATING ADDED)
                         // Auto-advance logic (LOCAL GATING WITH META CHECK)
                         const isContingencyActive = incomingMeta?.contingency_direct_operation === true || ['OPERATION', 'operation'].includes(newState);
+
+                        // [EMERGENCY FIX] If contingency is detected from DB, explicitly force the app into direct mode for this client!
+                        if (incomingMeta?.contingency_direct_operation === true) {
+                            console.log('🚨 Contingency active from DB metadata! Forcing client into Direct Operation Mode.');
+                            activateDirectOperationMode();
+                        }
 
                         if (currentCheckIn || isContingencyActive) {
                             if (currentProfile?.role === 'pilot') {
