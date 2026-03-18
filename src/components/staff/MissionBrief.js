@@ -500,6 +500,7 @@ export default function MissionBrief({
                 onViewMap={() => setShowMapModal(true)}
                 onLogout={() => setShowLogoutConfirm(true)}
                 journeyId={journeyId} // [NEW]
+                userId={userId} // [NEW]
                 onDemoStart={onRefresh} // [NEW] (Uses refresh logic)
             >
                 {/* Fallback Content como Children */}
