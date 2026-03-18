@@ -22,14 +22,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
         : 'Saltar directo a panel';
 
     const handleDirectOperation = async () => {
-        // Local event (fallback/immediate UI switch)
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('flyhigh:direct-operation', {
-                detail: { role: normalizedRole || null, source: 'header_hamburger_emergency' }
-            }));
-        }
-
-        // Global sync (Supabase write)
+        // Global sync (Supabase write for audit trail + triggers other clients to redirect)
         if (journeyId && userId) {
             try {
                 const supabase = createClient();
@@ -70,11 +63,14 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                     payload: { by_name: actorName }
                 });
 
-                console.log('🚨 Emergency Direct Operation fired. Sync sent.');
+                console.log('🚨 Emergency Direct Operation fired. Redirecting to contingencia route.');
             } catch (err) {
                 console.error('Failed to broadcast emergency operation state:', err);
             }
         }
+
+        // Navigate to the isolated contingency route (this client + others via Supabase listener)
+        window.location.href = '/staff/contingencia';
     };
 
     const handleLogout = async () => {

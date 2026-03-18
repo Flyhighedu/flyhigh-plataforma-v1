@@ -556,7 +556,6 @@ export default function StaffDashboard() {
     const [mounted, setMounted] = useState(false);
     const [missionState, setMissionState] = useState(null); // Local reliable state
     const [isStartingClosureFlow, setIsStartingClosureFlow] = useState(false);
-    const [directOperationMode, setDirectOperationMode] = useState(false);
     const [teacherCivicPanelOpen, setTeacherCivicPanelOpen] = useState(false);
     const [teacherCivicPanelDismissed, setTeacherCivicPanelDismissed] = useState(false);
     const [assistantCivicPanelDismissed, setAssistantCivicPanelDismissed] = useState(false);
@@ -1332,16 +1331,14 @@ export default function StaffDashboard() {
                             window.location.reload();
                         }
 
-                        // Auto-advance logic (LOCAL GATING WITH META CHECK)
-                        const isContingencyActive = incomingMeta?.contingency_direct_operation === true || ['OPERATION', 'operation'].includes(newState);
-
-                        // [EMERGENCY FIX] If contingency is detected from DB, explicitly force the app into direct mode for this client!
+                        // [CONTINGENCY REDIRECT] If another client activated contingency, redirect everyone to the isolated route
                         if (incomingMeta?.contingency_direct_operation === true) {
-                            console.log('🚨 Contingency active from DB metadata! Forcing client into Direct Operation Mode.');
-                            activateDirectOperationMode();
+                            console.log('🚨 Contingency detected from DB! Redirecting to /staff/contingencia...');
+                            window.location.href = '/staff/contingencia';
+                            return;
                         }
 
-                        if (currentCheckIn || isContingencyActive) {
+                        if (currentCheckIn) {
                             if (currentProfile?.role === 'pilot') {
                                 const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(newState, incomingMeta);
 
@@ -1527,33 +1524,6 @@ export default function StaffDashboard() {
         window.location.href = '/staff/login';
     };
 
-    const activateDirectOperationMode = useCallback(() => {
-        const activeRole = String(profileRef.current?.role || '').toLowerCase();
-        if (!['pilot', 'teacher', 'assistant', 'auxiliar'].includes(activeRole)) return;
-
-        setDirectOperationMode(true);
-        setShowBrief(false);
-        setWaitingForAux(false);
-        setAuxFlowState(null);
-        setTeacherFlowState(null);
-        setTeacherCivicPanelOpen(false);
-        setCurrentStep(2);
-
-        console.log('🚀 Direct operation mode activated:', { role: activeRole });
-    }, []);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const handleDirectOperation = (event) => {
-            const roleFromEvent = String(event?.detail?.role || profileRef.current?.role || '').toLowerCase();
-            if (!['pilot', 'teacher', 'assistant', 'auxiliar'].includes(roleFromEvent)) return;
-            activateDirectOperationMode();
-        };
-
-        window.addEventListener('flyhigh:direct-operation', handleDirectOperation);
-        return () => window.removeEventListener('flyhigh:direct-operation', handleDirectOperation);
-    }, [activateDirectOperationMode]);
 
     const handleManualMissionSelect = async (mission) => {
         setManualMission(mission);
@@ -1865,7 +1835,7 @@ export default function StaffDashboard() {
     }
 
     // --- MISSION LOBBY (always shown first until user picks a mission) ---
-    if ((lobbyMode || noSchoolToday) && !todaySchool && !manualMission && !directOperationMode) {
+    if ((lobbyMode || noSchoolToday) && !todaySchool && !manualMission) {
         return withDependencyOverlay(
             <div className="min-h-screen bg-slate-50 p-4">
                 <div className="max-w-md mx-auto space-y-6 pt-6">
@@ -2008,7 +1978,7 @@ export default function StaffDashboard() {
 
     // --- Mission Brief (first screen) ---
     // If we haven't checked in OR if we are explicitly showing brief
-    if (showBrief && !manualMission && !directOperationMode) {
+    if (showBrief && !manualMission) {
         const handleBackToLobby = () => {
             localStorage.removeItem('flyhigh_selected_mission_id');
             localStorage.removeItem('flyhigh_staff_mission');
@@ -2043,39 +2013,7 @@ export default function StaffDashboard() {
         );
     }
 
-    const isContingencyActive = parseMeta(todaySchool?.meta)?.contingency_direct_operation === true || directOperationMode;
 
-    if (isContingencyActive && missionState !== 'dismantling' && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
-        // [EMERGENCY FIX] Override missionState to 'OPERATION' so internal headers skip to the active phase
-        const overrideState = 'OPERATION';
-
-        if (profile?.role === 'teacher') {
-            return withDependencyOverlay(
-                <StaffOperationLegacy
-                    initialMission={todaySchool}
-                    onCloseDay={handleGoToReport}
-                    hideMenu={false}
-                    useSyncHeader={true}
-                    journeyId={journeyId}
-                    userId={userId}
-                    profile={profile}
-                    missionState={overrideState}
-                    onRefresh={refreshMission}
-                />
-            );
-        }
-
-        return withDependencyOverlay(
-            <OperationPanelConstructionScreen
-                journeyId={journeyId}
-                userId={userId}
-                profile={profile}
-                missionInfo={todaySchool}
-                missionState={overrideState}
-                onRefresh={refreshMission}
-            />
-        );
-    }
 
 
 
