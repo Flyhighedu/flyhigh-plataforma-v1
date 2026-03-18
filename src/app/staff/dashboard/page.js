@@ -2033,6 +2033,9 @@ export default function StaffDashboard() {
     const isContingencyActive = parseMeta(todaySchool?.meta)?.contingency_direct_operation === true || directOperationMode;
 
     if (isContingencyActive && missionState !== 'dismantling' && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
+        // [EMERGENCY FIX] Override missionState to 'OPERATION' so internal headers skip to the active phase
+        const overrideState = 'OPERATION';
+
         if (profile?.role === 'teacher') {
             return withDependencyOverlay(
                 <StaffOperationLegacy
@@ -2043,7 +2046,7 @@ export default function StaffDashboard() {
                     journeyId={journeyId}
                     userId={userId}
                     profile={profile}
-                    missionState={missionState}
+                    missionState={overrideState}
                     onRefresh={refreshMission}
                 />
             );
@@ -2055,7 +2058,7 @@ export default function StaffDashboard() {
                 userId={userId}
                 profile={profile}
                 missionInfo={todaySchool}
-                missionState={missionState}
+                missionState={overrideState}
                 onRefresh={refreshMission}
             />
         );
