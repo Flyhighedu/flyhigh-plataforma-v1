@@ -266,116 +266,7 @@ export const journeyColumns = [
     cell: (props) => <TipoEscuelaCell {...props} />,
     size: 90,
   },
-  {
-    accessorKey: "cuota_alumno",
-    header: "Cuota Alumno",
-    cell: (props) => <CurrencyCell {...props} />,
-    size: 120,
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("cuota_alumno")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  {
-    accessorKey: "tarifa_base",
-    header: "Tarifa Base",
-    cell: (props) => <CurrencyCell {...props} />,
-    size: 120,
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("tarifa_base")) || 0), 0);
-      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  // --- CALCULATED COLUMNS (UI-only, not in DB) ---
-  {
-    id: "subsidio_calc",
-    header: "Subsidio",
-    accessorFn: (row) => {
-      const t = Number(row.tarifa_base) || 0;
-      const c = Number(row.cuota_alumno) || 0;
-      return t && c ? t - c : null;
-    },
-    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
-    size: 110,
-    enableColumnFilter: false,
-    meta: { isCalculated: true },
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("subsidio_calc")) || 0), 0);
-      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  {
-    id: "recaudacion_calc",
-    header: "Recaudación",
-    accessorFn: (row) => {
-      const c = Number(row.cuota_alumno) || 0;
-      const n = Number(row.total_students) || 0;
-      return c && n ? c * n : null;
-    },
-    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
-    size: 130,
-    enableColumnFilter: false,
-    meta: { isCalculated: true },
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("recaudacion_calc")) || 0), 0);
-      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  {
-    id: "venta_bruta_calc",
-    header: "Venta Bruta",
-    accessorFn: (row) => {
-      const t = Number(row.tarifa_base) || 0;
-      const n = Number(row.total_students) || 0;
-      return t && n ? t * n : null;
-    },
-    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
-    size: 130,
-    enableColumnFilter: false,
-    meta: { isCalculated: true },
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("venta_bruta_calc")) || 0), 0);
-      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  {
-    id: "costo_total_becados",
-    header: "Costo Total Becados",
-    accessorFn: (row) => {
-      const b = Number(row.becados) || 0;
-      const t = Number(row.tarifa_base) || 0;
-      return b && t ? b * t : null;
-    },
-    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
-    size: 150,
-    enableColumnFilter: false,
-    meta: { isCalculated: true },
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("costo_total_becados")) || 0), 0);
-      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  {
-    id: "aportacion_patrocinador",
-    header: "Total Aportación Patrocinador",
-    accessorFn: (row) => {
-      const t = Number(row.tarifa_base) || 0;
-      const c = Number(row.cuota_alumno) || 0;
-      const n = Number(row.total_students) || 0;
-      const b = Number(row.becados) || 0;
-      if (!t || !n) return null;
-      return ((t - c) * n) + (b * t);
-    },
-    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
-    size: 180,
-    enableColumnFilter: false,
-    meta: { isCalculated: true },
-    footer: ({ table }) => {
-      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("aportacion_patrocinador")) || 0), 0);
-      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
-    },
-  },
-  // --- METRIC COLUMNS ---
+  // ═══ VOLUME INPUTS (Volumen) ═══
   {
     accessorKey: "total_students",
     header: "Niños",
@@ -398,6 +289,150 @@ export const journeyColumns = [
       return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
   },
+  // ═══ UNIT PRICE INPUTS (Unitarios) ═══
+  {
+    accessorKey: "tarifa_base",
+    header: "Tarifa Base",
+    cell: (props) => <CurrencyCell {...props} />,
+    size: 120,
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("tarifa_base")) || 0), 0);
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    accessorKey: "cuota_alumno",
+    header: "Cuota Alumno",
+    cell: (props) => <CurrencyCell {...props} />,
+    size: 120,
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("cuota_alumno")) || 0), 0);
+      return <span className="font-bold text-sm">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  // ═══ CALCULATED COLUMNS — read-only, exact arithmetic, no rounding ═══
+  // Subtotales → Gran Total. meta.isCalculated applies bg-slate-100 styling.
+  {
+    id: "subsidio_calc",
+    header: "Subsidio por Niño",
+    accessorFn: (row) => {
+      const t = Number(row.tarifa_base);
+      const c = Number(row.cuota_alumno);
+      if (!Number.isFinite(t) || !Number.isFinite(c) || t === 0) return null;
+      return t - c;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 140,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("subsidio_calc")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "recaudacion_calc",
+    header: "Recaudación",
+    // (Total Niños − Becados) × Cuota Alumno
+    accessorFn: (row) => {
+      const n = Number(row.total_students);
+      const b = Number(row.becados) || 0;
+      const c = Number(row.cuota_alumno);
+      if (!Number.isFinite(n) || !Number.isFinite(c) || n === 0) return null;
+      return (n - b) * c;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 130,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("recaudacion_calc")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "costo_total_becados",
+    header: "Costo Total Becados",
+    // Becados × Tarifa Base
+    accessorFn: (row) => {
+      const b = Number(row.becados);
+      const t = Number(row.tarifa_base);
+      if (!Number.isFinite(b) || !Number.isFinite(t) || b === 0 || t === 0) return null;
+      return b * t;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 150,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("costo_total_becados")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "subsidio_total_calc",
+    header: "Subsidio Total",
+    // (Tarifa Base − Cuota Alumno) × (Total Niños − Becados)
+    accessorFn: (row) => {
+      const t = Number(row.tarifa_base);
+      const c = Number(row.cuota_alumno);
+      const n = Number(row.total_students);
+      const b = Number(row.becados) || 0;
+      if (!Number.isFinite(t) || !Number.isFinite(c) || !Number.isFinite(n) || t === 0 || n === 0) return null;
+      return (t - c) * (n - b);
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 130,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("subsidio_total_calc")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "aportacion_patrocinador",
+    header: "Total Aportación Patrocinador",
+    // (Becados × Tarifa) + ((Tarifa − Cuota) × (Niños − Becados))
+    accessorFn: (row) => {
+      const t = Number(row.tarifa_base);
+      const c = Number(row.cuota_alumno);
+      const n = Number(row.total_students);
+      const b = Number(row.becados) || 0;
+      if (!Number.isFinite(t) || !Number.isFinite(n) || t === 0 || n === 0) return null;
+      const costoBecados = b * t;
+      const subsidioNoBecados = (t - (Number.isFinite(c) ? c : 0)) * (n - b);
+      return costoBecados + subsidioNoBecados;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 180,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("aportacion_patrocinador")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  {
+    id: "venta_bruta_calc",
+    header: "Venta Bruta",
+    // Tarifa Base × Total Niños
+    accessorFn: (row) => {
+      const t = Number(row.tarifa_base);
+      const n = Number(row.total_students);
+      if (!Number.isFinite(t) || !Number.isFinite(n) || t === 0 || n === 0) return null;
+      return t * n;
+    },
+    cell: ({ getValue }) => <CalcCell value={getValue()} prefix="$" />,
+    size: 130,
+    enableColumnFilter: false,
+    meta: { isCalculated: true },
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("venta_bruta_calc")) || 0), 0);
+      return <span className="font-bold text-sm text-slate-500 italic">{formatMoneyExact(sum)}</span>;
+    },
+  },
+  // ═══ OPERATIONAL ═══
   {
     accessorKey: "total_flights",
     header: "Vuelos",

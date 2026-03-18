@@ -30,8 +30,10 @@ export function GhostRow({ columnCount, onCreateRow }) {
 
   // Column order must match journey-columns.jsx exactly:
   // # | ▶ | Fecha | Escuela | CCT | Dirección | Director | Tel | Sector | Zona |
-  // Estado | Tipo | Cuota | Tarifa | Subsidio(c) | Recaudación(c) | Venta(c) | CostoBecados(c) | AportPatr(c) |
-  // Niños | Becados | Vuelos | Acción
+  // Estado | Tipo |
+  // Niños | Becados | Tarifa | Cuota |
+  // SubsidioNiño(c) | Recaudación(c) | CostoBecados(c) | SubsidioTotal(c) | AportPatr(c) | VentaBruta(c) |
+  // Vuelos | Acción
 
   return (
     <TableRow className="bg-emerald-50/30 border-t-2 border-dashed border-emerald-300 hover:bg-emerald-50/50">
@@ -54,18 +56,20 @@ export function GhostRow({ columnCount, onCreateRow }) {
           <option value="">—</option><option value="Pública">Pública</option><option value="Privada">Privada</option>
         </select>
       </TableCell>
-      {/* ── Cuota & Tarifa ── */}
-      <TableCell><div className="flex items-center gap-1"><span className="text-xs text-muted-foreground">$</span><Input type="number" placeholder="0" min={0} value={form.cuota_alumno} onChange={(e) => setForm((f) => ({ ...f, cuota_alumno: e.target.value }))} onKeyDown={kd} className={`${cls} w-20`} /></div></TableCell>
-      <TableCell><div className="flex items-center gap-1"><span className="text-xs text-muted-foreground">$</span><Input type="number" placeholder="0" min={0} value={form.tarifa_base} onChange={(e) => setForm((f) => ({ ...f, tarifa_base: e.target.value }))} onKeyDown={kd} className={`${cls} w-20`} /></div></TableCell>
-      {/* ── 5 calculated columns — auto ── */}
-      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
-      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
-      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
-      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
-      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
-      {/* ── Niños / Becados / Vuelos ── */}
+      {/* ── Volumen: Niños & Becados ── */}
       <TableCell><Input type="number" placeholder="0" min={0} value={form.total_students} onChange={(e) => setForm((f) => ({ ...f, total_students: e.target.value }))} onKeyDown={kd} className={cls} /></TableCell>
       <TableCell><Input type="number" placeholder="0" min={0} value={form.becados} onChange={(e) => setForm((f) => ({ ...f, becados: e.target.value }))} onKeyDown={kd} className={cls} /></TableCell>
+      {/* ── Unitarios: Tarifa & Cuota ── */}
+      <TableCell><div className="flex items-center gap-1"><span className="text-xs text-muted-foreground">$</span><Input type="number" placeholder="0" min={0} value={form.tarifa_base} onChange={(e) => setForm((f) => ({ ...f, tarifa_base: e.target.value }))} onKeyDown={kd} className={`${cls} w-20`} /></div></TableCell>
+      <TableCell><div className="flex items-center gap-1"><span className="text-xs text-muted-foreground">$</span><Input type="number" placeholder="0" min={0} value={form.cuota_alumno} onChange={(e) => setForm((f) => ({ ...f, cuota_alumno: e.target.value }))} onKeyDown={kd} className={`${cls} w-20`} /></div></TableCell>
+      {/* ── 6 calculated columns — auto ── */}
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      <TableCell><span className="text-muted-foreground italic text-xs">auto</span></TableCell>
+      {/* ── Vuelos ── */}
       <TableCell><Input type="number" placeholder="0" min={0} value={form.total_flights} onChange={(e) => setForm((f) => ({ ...f, total_flights: e.target.value }))} onKeyDown={kd} className={cls} /></TableCell>
       {/* ── Acción ── */}
       <TableCell>
