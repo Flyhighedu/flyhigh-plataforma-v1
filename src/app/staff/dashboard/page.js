@@ -1002,9 +1002,12 @@ export default function StaffDashboard() {
                     checkInAvailable = true;
                 }
 
-                if (checkInAvailable) {
+                // [EMERGENCY BYPASS] Allow bypassing check-in wall if contingency is active
+                const isContingencyInit = meta?.contingency_direct_operation === true || ['OPERATION', 'operation'].includes(state);
+
+                if (checkInAvailable || isContingencyInit) {
                     let serverStep = 0;
-                    if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'PILOT_READY_FOR_LOAD', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
+                    if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
                         serverStep = 0;
                     } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
                         serverStep = 1;
@@ -2027,7 +2030,9 @@ export default function StaffDashboard() {
         );
     }
 
-    if (directOperationMode && missionState !== 'dismantling' && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
+    const isContingencyActive = parseMeta(todaySchool?.meta)?.contingency_direct_operation === true || directOperationMode;
+
+    if (isContingencyActive && missionState !== 'dismantling' && currentStep !== 3 && (profile?.role === 'assistant' || profile?.role === 'pilot' || profile?.role === 'teacher')) {
         if (profile?.role === 'teacher') {
             return withDependencyOverlay(
                 <StaffOperationLegacy
