@@ -1199,6 +1199,14 @@ export default function StaffDashboard() {
                     setLoading(false);
                     return;
                 }
+
+                // [EMERGENCY FIX] Normalize 'auxiliar' to 'assistant' immediately.
+                // The database or authentication might assign 'auxiliar' instead of 'assistant',
+                // causing hardcoded `profile?.role === 'assistant'` statements to fail and return null.
+                if (profileData.role === 'auxiliar') {
+                    profileData.role = 'assistant';
+                }
+
                 setProfile(profileData);
 
             } catch (e) {
