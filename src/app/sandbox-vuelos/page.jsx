@@ -2,11 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { journeyColumns } from "./journey-columns";
 import { DataTable } from "./data-table";
 import { VuelosSubTable } from "./vuelos-subtable";
 import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
 
 export default function SandboxVuelosPage() {
   const [data, setData] = useState([]);
@@ -33,6 +34,87 @@ export default function SandboxVuelosPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ─── Realtime: keep state alive with field operations ──────────────────────
+  // We use a ref to always access the latest `data` without re-subscribing.
+  const dataRef = useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel('sandbox-vuelos-realtime')
+      // ── cierres_mision: captures total_students, total_flights, becados ──
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cierres_mision',
+      }, (payload) => {
+        const row = payload.new;
+        if (!row?.journey_id) return;
+
+        setData((prev) =>
+          prev.map((j) => {
+            if (j.id !== row.journey_id) return j;
+            return {
+              ...j,
+              total_students: row.total_students ?? j.total_students,
+              total_flights:  row.total_flights  ?? j.total_flights,
+              becados:        row.becados        ?? j.becados,
+            };
+          })
+        );
+      })
+      // ── staff_journeys: captures status changes + field edits from other tabs ──
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'staff_journeys',
+      }, (payload) => {
+        const row = payload.new;
+        if (!row?.id) return;
+
+        setData((prev) =>
+          prev.map((j) => {
+            if (j.id !== row.id) return j;
+            return {
+              ...j,
+              status:            row.status            ?? j.status,
+              school_name:       row.school_name        ?? j.school_name,
+              tipo_escuela:      row.tipo_escuela       ?? j.tipo_escuela,
+              tarifa_base:       row.tarifa_base        ?? j.tarifa_base,
+              cuota_alumno:      row.cuota_alumno       ?? j.cuota_alumno,
+              numero_sector:     row.numero_sector      ?? j.numero_sector,
+              numero_zona:       row.numero_zona        ?? j.numero_zona,
+              cct:               row.cct                ?? j.cct,
+              direccion:         row.direccion           ?? j.direccion,
+              nombre_director:   row.nombre_director     ?? j.nombre_director,
+              telefono_director: row.telefono_director   ?? j.telefono_director,
+            };
+          })
+        );
+      })
+      // ── staff_journeys INSERT: new journeys from other sources ──
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'staff_journeys',
+      }, (payload) => {
+        const row = payload.new;
+        if (!row?.id) return;
+        // Only add if not already present (avoids duplication from optimistic inserts)
+        setData((prev) => {
+          if (prev.some((j) => j.id === row.id)) return prev;
+          return [{ ...row, total_students: 0, total_flights: 0, becados: 0, vuelo_count: 0 }, ...prev];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []); // Subscribe once, merge via functional setState
 
   // Inline update for journey fields
   // For total_students / total_flights: triggers UPSERT-cierre + seal
