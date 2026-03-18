@@ -31,9 +31,6 @@ export default function ContingenciaPage() {
     const [userId, setUserId] = useState(null);
     const [journeyId, setJourneyId] = useState(null);
     const [missionInfo, setMissionInfo] = useState(null);
-    const [isClosed, setIsClosed] = useState(false);
-    const [closeProgress, setCloseProgress] = useState(false);
-    const closeTimerRef = useRef(null);
 
     // ── 1. Initialize: auth + journey from localStorage ──
     useEffect(() => {
@@ -130,8 +127,18 @@ export default function ContingenciaPage() {
 
                     // If journey was closed (by this or another device), redirect to dashboard
                     if (newStatus === 'closed' || newStatus === 'completada' || newStatus === 'cerrada') {
-                        console.log('📦 Journey closed. Redirecting to dashboard...');
-                        window.location.href = '/staff/dashboard';
+                        console.log('📦 Journey closed. Cleaning state and redirecting...');
+                        
+                        // Clear all mission-related local storage to avoid loops
+                        localStorage.removeItem('flyhigh_staff_mission');
+                        localStorage.removeItem('flyhigh_selected_mission_id');
+                        localStorage.removeItem('flyhigh_active_journey_id');
+                        localStorage.removeItem('flyhigh_active_flight');
+                        localStorage.removeItem('flyhigh_flight_logs');
+                        localStorage.removeItem('flyhigh_recently_closed_flights');
+                        
+                        // Force hard redirect to history
+                        window.location.href = '/staff/dashboard?tab=history';
                     }
 
                     // Update mission info with latest data
@@ -151,62 +158,6 @@ export default function ContingenciaPage() {
         };
     }, [journeyId]);
 
-    // ── 3. Close operation handler (Teacher only) ──
-    const handleCloseOperation = async () => {
-        if (!journeyId || !userId) return;
-        setIsClosed(true);
-
-        try {
-            const supabase = createClient();
-            const now = new Date().toISOString();
-            const actorName = profile?.full_name?.split(' ')[0] || 'Docente';
-
-            // Read current meta to preserve it
-            const { data: currentData } = await supabase
-                .from('staff_journeys')
-                .select('meta')
-                .eq('id', journeyId)
-                .single();
-
-            const currentMeta = typeof currentData?.meta === 'string'
-                ? safeParseJson(currentData.meta, {}) : (currentData?.meta || {});
-
-            const closureMeta = {
-                ...currentMeta,
-                contingency_closed_at: now,
-                contingency_closed_by: userId,
-                contingency_closed_by_name: actorName,
-                contingency_closure: true
-            };
-
-            await supabase.from('staff_journeys')
-                .update({
-                    status: 'closed',
-                    mission_state: 'closed',
-                    meta: closureMeta,
-                    updated_at: now
-                })
-                .eq('id', journeyId);
-
-            // Audit event
-            await supabase.from('staff_events').insert({
-                journey_id: journeyId,
-                type: 'CONTINGENCY_OPERATION_CLOSED',
-                actor_user_id: userId,
-                payload: { by_name: actorName, closed_at: now }
-            });
-
-            console.log('✅ Contingencia cerrada exitosamente.');
-
-            // Redirect after a brief delay to let the realtime broadcast fire
-            setTimeout(() => {
-                window.location.href = '/staff/dashboard';
-            }, 800);
-        } catch (err) {
-            console.error('Error cerrando contingencia:', err);
-            setIsClosed(false);
-        }
-    };
 
     // ── Render: Loading ──
     if (loading) {
@@ -238,18 +189,6 @@ export default function ContingenciaPage() {
         );
     }
 
-    // ── Render: Closed state ──
-    if (isClosed) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <div className="text-center space-y-4">
-                    <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mx-auto" />
-                    <p className="text-slate-700 font-semibold">Operación cerrada</p>
-                    <p className="text-slate-500 text-sm">Redirigiendo al dashboard...</p>
-                </div>
-            </div>
-        );
-    }
 
     const isTeacher = profile?.role === 'teacher';
     const roleName = ROLE_LABELS[profile?.role] || 'Operativo';
@@ -286,70 +225,6 @@ export default function ContingenciaPage() {
                     missionState="OPERATION"
                     onRefresh={null}
                 />
-
-                {/* Close Operation Button — Fixed at bottom */}
-                <div style={{
-                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-                    padding: '12px 16px 20px',
-                    background: 'linear-gradient(to top, rgba(248,250,252,1) 60%, rgba(248,250,252,0))'
-                }}>
-                    <button
-                        onMouseDown={() => {
-                            setCloseProgress(true);
-                            closeTimerRef.current = setTimeout(() => {
-                                setCloseProgress(false);
-                                handleCloseOperation();
-                            }, 3000);
-                        }}
-                        onMouseUp={() => { clearTimeout(closeTimerRef.current); setCloseProgress(false); }}
-                        onMouseLeave={() => { clearTimeout(closeTimerRef.current); setCloseProgress(false); }}
-                        onTouchStart={() => {
-                            setCloseProgress(true);
-                            closeTimerRef.current = setTimeout(() => {
-                                setCloseProgress(false);
-                                handleCloseOperation();
-                            }, 3000);
-                        }}
-                        onTouchEnd={() => { clearTimeout(closeTimerRef.current); setCloseProgress(false); }}
-                        className="relative w-full overflow-hidden select-none"
-                        style={{
-                            padding: '16px 0',
-                            borderRadius: 16,
-                            background: closeProgress
-                                ? 'linear-gradient(135deg, #B91C1C, #991B1B)'
-                                : 'linear-gradient(135deg, #DC2626, #B91C1C)',
-                            color: 'white',
-                            border: 'none',
-                            fontWeight: 800,
-                            fontSize: 15,
-                            cursor: 'pointer',
-                            boxShadow: '0 6px 20px rgba(220,38,38,0.35)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        {/* Progress fill bar */}
-                        {closeProgress && (
-                            <div
-                                style={{
-                                    position: 'absolute', inset: 0,
-                                    background: 'rgba(0,0,0,0.15)',
-                                    transformOrigin: 'left',
-                                    animation: 'contingencyCloseFill 3s linear forwards'
-                                }}
-                            />
-                        )}
-                        <span style={{ position: 'relative', zIndex: 1 }}>
-                            {closeProgress ? 'Mantén 3s para cerrar...' : '🛑 Cerrar Operación'}
-                        </span>
-                    </button>
-                </div>
-
-                <style jsx>{`
-                    @keyframes contingencyCloseFill {
-                        from { transform: scaleX(0); }
-                        to { transform: scaleX(1); }
-                    }
-                `}</style>
             </div>
         );
     }

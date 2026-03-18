@@ -128,7 +128,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                         )}
 
                         <p className="px-4 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-t border-slate-100 mt-1 flex items-center gap-1.5 text-red-500">
-                            <span className="shrink-0 size-2 rounded-full bg-red-500 animate-pulse" /> Contingencia
+                            <span className="shrink-0 size-2 rounded-full bg-red-500" /> Contingencia
                         </p>
 
                         {canGoDirectToOperation && (

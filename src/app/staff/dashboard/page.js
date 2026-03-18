@@ -891,6 +891,13 @@ export default function StaffDashboard() {
                 const state = journeyData.mission_state;
                 const meta = parseMeta(journeyData.meta);
 
+                // [CONTINGENCY REDIRECT] If contingency was already activated, redirect immediately
+                if (meta?.contingency_direct_operation === true) {
+                    console.log('🚨 Contingency already active on init! Redirecting to /staff/contingencia...');
+                    window.location.href = '/staff/contingencia';
+                    return;
+                }
+
                 setMissionState(state);
                 setTodaySchool(prev => ({
                     ...prev,
@@ -1002,9 +1009,7 @@ export default function StaffDashboard() {
                 }
 
                 // [EMERGENCY BYPASS] Allow bypassing check-in wall if contingency is active
-                const isContingencyInit = meta?.contingency_direct_operation === true || ['OPERATION', 'operation'].includes(state);
-
-                if (checkInAvailable || isContingencyInit) {
+                if (checkInAvailable) {
                     let serverStep = 0;
                     if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
                         serverStep = 0;
@@ -1223,6 +1228,44 @@ export default function StaffDashboard() {
         }
     }, [userId, profile, journeyId, refreshMission]);
 
+    // ── CONTINGENCY POLL — Bulletproof fallback ──
+    // Supabase realtime can miss events due to HMR, late subscription, or PWA cache.
+    // This polls every 5s to catch the contingency flag regardless.
+    useEffect(() => {
+        if (!journeyId) return;
+
+        const supabase = createClient();
+        let cancelled = false;
+
+        const poll = async () => {
+            try {
+                const { data } = await supabase
+                    .from('staff_journeys')
+                    .select('meta')
+                    .eq('id', journeyId)
+                    .single();
+
+                if (cancelled) return;
+                const meta = parseMeta(data?.meta);
+                if (meta?.contingency_direct_operation === true) {
+                    console.log('🚨 [POLL] Contingency detected! Redirecting to /staff/contingencia...');
+                    window.location.href = '/staff/contingencia';
+                }
+            } catch (err) {
+                // Silently ignore polling errors
+            }
+        };
+
+        const intervalId = setInterval(poll, 5000);
+        // Also poll once immediately
+        poll();
+
+        return () => {
+            cancelled = true;
+            clearInterval(intervalId);
+        };
+    }, [journeyId]);
+
     // ── GLOBAL RESET LISTENER ──
     useEffect(() => {
         if (!journeyId) return;
@@ -1252,6 +1295,13 @@ export default function StaffDashboard() {
                         const newState = payload.new.mission_state;
                         const incomingMeta = parseMeta(payload.new?.meta);
                         const incomingArrivalPhotoTakenAt = payload.new?.arrival_photo_taken_at || null;
+
+                        // [CONTINGENCY REDIRECT] Must be FIRST — redirect before any snapshot logic
+                        if (incomingMeta?.contingency_direct_operation === true) {
+                            console.log('🚨 Contingency detected from DB! Redirecting to /staff/contingencia...');
+                            window.location.href = '/staff/contingencia';
+                            return;
+                        }
 
                         const beforeSnapshot = buildListenerSnapshot();
                         const afterSnapshot = projectSnapshotForRealtimeUpdate(
@@ -1331,12 +1381,6 @@ export default function StaffDashboard() {
                             window.location.reload();
                         }
 
-                        // [CONTINGENCY REDIRECT] If another client activated contingency, redirect everyone to the isolated route
-                        if (incomingMeta?.contingency_direct_operation === true) {
-                            console.log('🚨 Contingency detected from DB! Redirecting to /staff/contingencia...');
-                            window.location.href = '/staff/contingencia';
-                            return;
-                        }
 
                         if (currentCheckIn) {
                             if (currentProfile?.role === 'pilot') {
@@ -1358,10 +1402,7 @@ export default function StaffDashboard() {
                                 setCurrentStep(2);
                             }
 
-                            // Esconder la pre-pantalla (CheckIn/Brief) si nos fuerzan a avanzar
-                            if (isContingencyActive && showBriefRef.current) {
-                                setShowBrief(false);
-                            }
+
 
                             const isPilotLocked = shouldLockPilot(
                                 currentProfile?.role,
@@ -1447,18 +1488,23 @@ export default function StaffDashboard() {
                     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                         const newSchool = payload.new;
                         // Client-side Date Check
-                        if (newSchool.fecha_programada === today && newSchool.estatus === 'pendiente') {
-                            const schoolData = {
-                                id: newSchool.id,
-                                school_name: newSchool.nombre_escuela,
-                                colonia: newSchool.colonia,
-                                fecha: newSchool.fecha_programada,
-                            };
-                            console.log('✨ Auto-assigning new school (Sync):', schoolData);
-                            setTodaySchool(schoolData);
-                            localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
-                            setNoSchoolToday(false);
-                            refreshMission();
+                        if (newSchool.fecha_programada === today) {
+                            if (newSchool.estatus === 'pendiente') {
+                                const schoolData = {
+                                    id: newSchool.id,
+                                    school_name: newSchool.nombre_escuela,
+                                    colonia: newSchool.colonia,
+                                    fecha: newSchool.fecha_programada,
+                                };
+                                console.log('✨ Auto-assigning new school (Sync):', schoolData);
+                                setTodaySchool(schoolData);
+                                localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
+                                setNoSchoolToday(false);
+                                refreshMission();
+                            } else if (['completada', 'cerrada'].includes(newSchool.estatus)) {
+                                console.log('✅ School completed/closed globally. Refreshing lobby list.');
+                                refreshMission();
+                            }
                         }
                     }
 
@@ -1664,7 +1710,7 @@ export default function StaffDashboard() {
     const handleGoToReport = async () => {
         if (isStartingClosureFlow) return;
 
-        setDirectOperationMode(false);
+
         setWaitingForAux(false);
         setAuxFlowState(null);
         setTeacherFlowState(null);
@@ -1914,7 +1960,7 @@ export default function StaffDashboard() {
                                         </div>
 
                                         {/* Presence Avatars */}
-                                        {school.presence && school.presence.length > 0 && (
+                                        {school.presence && school.presence.length > 0 && !isCompleted && (
                                             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
                                                 <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
                                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />

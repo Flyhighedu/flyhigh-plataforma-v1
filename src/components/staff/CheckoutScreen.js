@@ -731,6 +731,21 @@ export default function CheckoutScreen({
 
             if (updateError) throw updateError;
 
+            // [FIX] Update school status and clear presence on final checkout
+            if (allTeamCheckedOut && missionId && !String(missionId).startsWith('manual')) {
+                try {
+                    await supabase
+                        .from('proximas_escuelas')
+                        .update({ estatus: 'completada' })
+                        .eq('id', missionId);
+                    
+                    await supabase.from('staff_presence').delete().eq('journey_id', journeyId);
+                    console.log('✅ Final team checkout. School marked as completed and presence cleared.');
+                } catch (schoolErr) {
+                    console.warn('⚠️ Could not update school status (non-blocking):', schoolErr);
+                }
+            }
+
             setTeamCheckoutStatus(nextStatus);
             setFeedback(allTeamCheckedOut
                 ? 'Equipo completo. Jornada finalizada.'

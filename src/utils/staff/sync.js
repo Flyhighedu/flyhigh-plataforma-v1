@@ -33,9 +33,7 @@ async function uploadImage(base64Data, bucket, prefix = 'evidencia') {
         return publicData.publicUrl;
     } catch (error) {
         console.error(`Error uploading to ${bucket}:`, error);
-        return null; // Keep base64? No, better to fail upload than save huge string in DB if we want clean data.
-        // Actually, if upload fails, we might want to retry later.
-        // For now, return null and log functionality is compromised for that image.
+        return null; 
     }
 }
 
@@ -95,8 +93,6 @@ export async function syncFlightLog(flightLog) {
             })
         );
 
-        // Handle mission_id checking - DB column is TEXT so we can store 'manual-...' explicitly.
-        // No need to nullify it.
         const missionIdToSend = flightLog.mission_id?.toString();
 
         // 2. Insert into DB
@@ -149,7 +145,6 @@ export async function syncFlightLog(flightLog) {
 
     } catch (error) {
         console.error("Sync Flight Error Detailed:", JSON.stringify(error, null, 2));
-        // Also log the message if it's a standard Error object
         if (error.message) console.error("Error Message:", error.message);
         return false;
     }
@@ -224,7 +219,7 @@ export async function syncMissionClosure(closureData) {
         if (closureData.mission_id && !closureData.mission_id.toString().startsWith('manual')) {
             await supabase
                 .from('proximas_escuelas')
-                .update({ estatus: 'completado' })
+                .update({ estatus: 'completada' })
                 .eq('id', closureData.mission_id);
         }
 
@@ -255,39 +250,44 @@ export async function syncAllPendingFlights() {
 
     console.log(`Syncing ${pendingLogs.length} pending flights...`);
 
-    // Ensure auth before batch sync
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        console.warn("No session for batch sync. Attempting emergency re-auth...");
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-            email: 'staff_test@flyhigh.com',
-            password: 'flyhigh_test_123'
-        });
-        if (loginError) {
-            console.error("Emergency re-auth failed for batch sync:", loginError);
-            return { synced: 0, failed: pendingLogs.length };
+    try {
+        // Ensure auth before batch sync
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            console.warn("No session for batch sync. Attempting emergency re-auth...");
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+                email: 'staff_test@flyhigh.com',
+                password: 'flyhigh_test_123'
+            });
+            if (loginError) {
+                console.error("Emergency re-auth failed for batch sync:", loginError);
+                return { synced: 0, failed: pendingLogs.length };
+            }
         }
-    }
 
-    let syncedCount = 0;
-    let failedCount = 0;
-    const updatedLogs = [...logs];
+        let syncedCount = 0;
+        let failedCount = 0;
+        const updatedLogs = [...logs];
 
-    for (const flight of pendingLogs) {
-        const success = await syncFlightLog(flight);
-        if (success) {
-            syncedCount++;
-            const idx = updatedLogs.findIndex(l => l.id === flight.id);
-            if (idx !== -1) updatedLogs[idx].synced = true;
-        } else {
-            failedCount++;
+        for (const flight of pendingLogs) {
+            const success = await syncFlightLog(flight);
+            if (success) {
+                syncedCount++;
+                const idx = updatedLogs.findIndex(l => l.id === flight.id);
+                if (idx !== -1) updatedLogs[idx].synced = true;
+            } else {
+                failedCount++;
+            }
         }
+
+        localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
+
+        console.log(`Batch sync complete: ${syncedCount} synced, ${failedCount} failed.`);
+        return { synced: syncedCount, failed: failedCount };
+    } catch (err) {
+        console.error("Critical error in syncAllPendingFlights:", err);
+        return { synced: 0, failed: pendingLogs.length };
     }
-
-    localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
-
-    console.log(`Batch sync complete: ${syncedCount} synced, ${failedCount} failed.`);
-    return { synced: syncedCount, failed: failedCount };
 }
 
 /**
@@ -341,7 +341,6 @@ export async function syncPauseStart(pauseData) {
  */
 export async function syncPauseEnd(pauseId, resumeChecklist) {
     try {
-        // Ensure we have a session
         let { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
@@ -444,7 +443,6 @@ export async function syncPendingCheckIns() {
     if (pending.length === 0) return;
 
     console.log(`Syncing ${pending.length} pending check-ins...`);
-    const supabase = createClient();
     const remaining = [];
     let authUserId = null;
 

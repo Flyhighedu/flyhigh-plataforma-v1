@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import TodayFlightList from '@/components/staff/TodayFlightList';
 import FlightLogger from '@/components/staff/FlightLogger';
-import { syncFlightLog, syncPauseStart, syncPauseEnd } from '@/utils/staff/sync';
+import { syncFlightLog, syncPauseStart, syncPauseEnd, syncAllPendingFlights } from '@/utils/staff/sync';
 import { LogOut, MoreVertical, RotateCcw, Clock, Pause } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -557,18 +557,48 @@ export default function StaffOperationLegacy({
 
                 if (isContingency) {
                     // 🚨 EMERGENCY CLOSURE 🚨
-                    // If this was an emergency operation, we skip all checklists
-                    // and close the journey directly here.
+                    // 1. Force sync all pending flight logs before sealing
+                    try {
+                        console.log('🔄 Syncing pending flights before emergency closure...');
+                        await syncAllPendingFlights();
+                    } catch (syncErr) {
+                        console.warn('⚠️ Pre-closure sync failed (non-blocking):', syncErr);
+                    }
+
+                    // 2. SEAL MISSION: Insert/update closure record with real totals
+                    // (Already handled by the upsert at line 540)
+                    const actorName = profile?.full_name?.split(' ')[0] || 'Docente';
+                    const closureMeta = {
+                        ...missionMeta,
+                        contingency_closed_at: now,
+                        contingency_closed_by: userId,
+                        contingency_closed_by_name: actorName,
+                        contingency_closure: true
+                    };
+
                     await supabase.from('staff_journeys').update({
                         status: 'closed',
                         mission_state: 'completed',
+                        meta: closureMeta,
                         updated_at: now
                     }).eq('id', journeyId);
 
+                    // Audit event
+                    await supabase.from('staff_events').insert({
+                        journey_id: journeyId,
+                        type: 'CONTINGENCY_OPERATION_CLOSED',
+                        actor_user_id: userId,
+                        payload: { by_name: actorName, closed_at: now }
+                    });
+
+                    // Update mission status
                     await supabase.from('proximas_escuelas').update({
-                        estatus: 'completado',
+                        estatus: 'completada',
                         updated_at: now
                     }).eq('id', currentMission.id);
+
+                    // Clear presence for this mission/journey
+                    await supabase.from('staff_presence').delete().eq('journey_id', journeyId);
 
                     console.log('🚨 Emergency Contingency Closure triggered. Journey sealed.');
                 } else {
@@ -595,13 +625,21 @@ export default function StaffOperationLegacy({
                 : missionMetaStr?.contingency_direct_operation === true;
 
             if (isContingencyRoute) {
-                // Return to dashboard (which defaults to history tab if no active mission)
-                router.push('/staff/dashboard');
-                setTimeout(() => window.location.reload(), 500); // hard-refresh to clear local state
+                // ── CLEAN EXIT (Lobby) ──
+                // Clear local mission state to prevent dashboard from auto-returning to operation
+                localStorage.removeItem('flyhigh_staff_mission');
+                localStorage.removeItem('flyhigh_selected_mission_id');
+                localStorage.removeItem('flyhigh_active_journey_id');
+                localStorage.removeItem(ACTIVE_FLIGHT_KEY);
+                localStorage.removeItem(CLOSED_FLIGHTS_KEY);
+                
+                // Hard-refresh redirect to Lobby (History tab)
+                console.log('🚪 Contingency complete. Returning to Lobby...');
+                window.location.href = '/staff/dashboard?tab=history';
             } else if (onCloseDay) {
                 await onCloseDay();
             } else {
-                router.push('/staff/dashboard');
+                router.push('/staff/history');
             }
             // Only close modal on SUCCESS
             setShowCloseConfirmModal(false);
