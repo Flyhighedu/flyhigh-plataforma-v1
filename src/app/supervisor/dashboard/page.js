@@ -97,6 +97,19 @@ function safeSchoolName(value) {
     return trimmed.length > 0 ? trimmed : null;
 }
 
+function parseMetaLike(meta) {
+    if (!meta) return Object.create(null);
+    if (typeof meta === 'string') {
+        try {
+            return JSON.parse(meta);
+        } catch {
+            return Object.create(null);
+        }
+    }
+    if (typeof meta === 'object' && !Array.isArray(meta)) return meta;
+    return Object.create(null);
+}
+
 function parseObject(value) {
     if (!value) return Object.create(null);
 
