@@ -24,7 +24,7 @@ export async function GET(request) {
         if (reqAllVuelos) {
             const { data, error } = await supabase
                 .from('bitacora_vuelos')
-                .select('id, mission_id, journey_id, student_count, duration_seconds, start_time, end_time, created_at')
+                .select('id, mission_id, journey_id, student_count, staff_count, duration_seconds, start_time, end_time, created_at')
                 .not('journey_id', 'is', null)
                 .order('created_at', { ascending: true });
 
@@ -47,7 +47,7 @@ export async function GET(request) {
         if (journeyId) {
             const { data, error } = await supabase
                 .from('bitacora_vuelos')
-                .select('id, mission_id, journey_id, student_count, duration_seconds, start_time, end_time, created_at')
+                .select('id, mission_id, journey_id, student_count, staff_count, duration_seconds, start_time, end_time, created_at')
                 .eq('journey_id', journeyId)
                 .order('created_at', { ascending: false });
 
@@ -58,7 +58,7 @@ export async function GET(request) {
         // Master: fetch journeys with resolved school names + vuelo counts
         const { data: rawJourneys, error: rawError } = await supabase
             .from('staff_journeys')
-            .select('id, date, school_name, school_id, status, tipo_escuela, cct, direccion, nombre_director, telefono_director, tarifa_base, cuota_alumno, created_at')
+            .select('id, date, school_name, school_id, status, tipo_escuela, cct, direccion, nombre_director, telefono_director, tarifa_base, cuota_alumno, numero_sector, numero_zona, created_at')
             .order('created_at', { ascending: false });
 
         if (rawError) throw rawError;
@@ -213,7 +213,7 @@ export async function PATCH(request) {
         // Standard path: update a field on the target table
         const editableFields = {
             bitacora_vuelos: ['mission_id', 'student_count', 'duration_seconds', 'start_time', 'end_time'],
-            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'status', 'cct', 'direccion', 'nombre_director', 'telefono_director', 'tarifa_base', 'cuota_alumno'],
+            staff_journeys: ['date', 'school_name', 'tipo_escuela', 'status', 'cct', 'direccion', 'nombre_director', 'telefono_director', 'tarifa_base', 'cuota_alumno', 'numero_sector', 'numero_zona'],
         };
 
         const allowed = editableFields[targetTable];

@@ -147,41 +147,37 @@ export default function SandboxVuelosPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-6 pb-4">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            🛩️ Bitácora de Vuelos — Maestro-Detalle
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Haz clic en cualquier celda para editar. La fila verde (＋) permite inyectar misiones históricas.
-            Al editar Niños o Vuelos, se ejecuta un UPSERT en <code className="text-xs">cierres_mision</code> y se sella el journey.
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Full-bleed header area */}
+      <div className="px-6 md:px-10 pt-8 pb-4">
+        <h1 className="text-2xl font-bold tracking-tight">
+          🛩️ Bitácora de Vuelos — Maestro-Detalle
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Haz clic en cualquier celda para editar. La fila verde (＋) permite inyectar misiones históricas.
+          Al editar Niños o Vuelos, se ejecuta un UPSERT en <code className="text-xs">cierres_mision</code> y se sella el journey.
+        </p>
+      </div>
 
-        {/* Master Table */}
+      {/* Table — full width, no max-w cap — scrolls natively */}
+      <div className="px-6 md:px-10 pb-10">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              <span className="text-sm text-muted-foreground">
-                Cargando journeys…
-              </span>
+              <span className="text-sm text-muted-foreground">Cargando journeys…</span>
             </div>
           </div>
         ) : (
-          <div>
-            <DataTable
-              columns={journeyColumns}
-              data={data}
-              onUpdateRow={handleUpdateRow}
-              onDeleteRow={handleDeleteRow}
-              onCreateRow={handleCreateRow}
-              renderSubComponent={renderSubComponent}
-              fetchAllSubRows={fetchAllSubRows}
-            />
-          </div>
+          <DataTable
+            columns={journeyColumns}
+            data={data}
+            onUpdateRow={handleUpdateRow}
+            onDeleteRow={handleDeleteRow}
+            onCreateRow={handleCreateRow}
+            renderSubComponent={renderSubComponent}
+            fetchAllSubRows={fetchAllSubRows}
+          />
         )}
       </div>
     </div>

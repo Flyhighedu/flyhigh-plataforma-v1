@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { columns as vueloColumns } from "./columns";
+import { columns as vueloColumns, FlightGapSeparator } from "./columns";
 import { toast } from "sonner";
 
 export function VuelosSubTable({ journeyId, onUpdateVuelo }) {
@@ -97,6 +97,9 @@ export function VuelosSubTable({ journeyId, onUpdateVuelo }) {
     );
   }
 
+  const rows = table.getRowModel().rows;
+  const colCount = vueloColumns.length;
+
   return (
     <div className="px-6 py-3">
       <div className="rounded-md border bg-muted/30">
@@ -115,14 +118,25 @@ export function VuelosSubTable({ journeyId, onUpdateVuelo }) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="text-xs py-1.5">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
+            {rows.map((row, i) => (
+              <Fragment key={row.id}>
+                {/* Inter-flight gap separator — between flights (not before the first one) */}
+                {/* Data is DESC, so row at i=0 is newest. The gap goes between i-1 and i. */}
+                {i > 0 && (
+                  <FlightGapSeparator
+                    prevEnd={rows[i].original?.end_time}
+                    curStart={rows[i - 1].original?.start_time}
+                    colSpan={colCount}
+                  />
+                )}
+                <TableRow>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="text-xs py-1.5">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </Fragment>
             ))}
           </TableBody>
         </Table>

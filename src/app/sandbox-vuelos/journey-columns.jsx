@@ -240,6 +240,20 @@ export const journeyColumns = [
     size: 120,
   },
   {
+    accessorKey: "numero_sector",
+    header: "Sector",
+    cell: (props) => <EditableCell {...props} />,
+    size: 90,
+    enableGlobalFilter: false,
+  },
+  {
+    accessorKey: "numero_zona",
+    header: "Zona",
+    cell: (props) => <EditableCell {...props} />,
+    size: 90,
+    enableGlobalFilter: false,
+  },
+  {
     accessorKey: "status",
     header: "Estado",
     cell: (props) => <StatusSelectCell {...props} />,
