@@ -118,6 +118,28 @@ function DeleteActionCell({ row, table }) {
   );
 }
 
+// --- Visitada indicator cell (read-only, driven by trigger) ---
+function VisitadaIndicator({ getValue }) {
+  const value = !!getValue();
+
+  return (
+    <div
+      className="inline-flex items-center justify-center w-8 h-8 rounded-full"
+      title={value ? "Misión completada (automático)" : "Pendiente de visita"}
+    >
+      {value ? (
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 drop-shadow-sm">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+          <circle cx="12" cy="12" r="10" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
 // --- Columns definition ---
 export const escuelasColumns = [
   {
@@ -177,6 +199,26 @@ export const escuelasColumns = [
     cell: (props) => <TurnoSelectCell {...props} />,
     size: 130,
     enableGlobalFilter: false,
+  },
+  {
+    accessorKey: "visitada",
+    header: "✈️ Visitada",
+    cell: (props) => <VisitadaIndicator {...props} />,
+    size: 90,
+    enableGlobalFilter: false,
+    enableSorting: true,
+    filterFn: (row, columnId, filterValue) => {
+      if (!filterValue) return true;
+      const v = row.getValue(columnId);
+      if (filterValue === "si") return v === true;
+      if (filterValue === "no") return v === false;
+      return true;
+    },
+    footer: ({ table }) => {
+      const total = table.getFilteredRowModel().rows.length;
+      const done = table.getFilteredRowModel().rows.filter((r) => r.getValue("visitada") === true).length;
+      return <span className="font-bold text-xs text-emerald-600">{done}/{total}</span>;
+    },
   },
   {
     id: "actions",

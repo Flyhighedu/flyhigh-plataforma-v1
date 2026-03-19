@@ -185,7 +185,17 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
               <TableRow className="bg-slate-50/80">
                 {table.getAllLeafColumns().map((col) => (
                   <TableHead key={col.id} className="py-1 px-1 bg-slate-50/80" style={{ width: col.getSize() }}>
-                    {col.getCanFilter() ? (
+                    {col.id === "visitada" ? (
+                      <select
+                        value={(col.getFilterValue() ?? "")}
+                        onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+                        className="w-full h-6 text-xs border rounded px-1 bg-white outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                      >
+                        <option value="">Todas</option>
+                        <option value="si">✅ Visitadas</option>
+                        <option value="no">⭕ Pendientes</option>
+                      </select>
+                    ) : col.getCanFilter() ? (
                       <input
                         value={(col.getFilterValue() ?? "")}
                         onChange={(e) => col.setFilterValue(e.target.value || undefined)}

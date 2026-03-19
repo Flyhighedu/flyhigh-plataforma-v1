@@ -43,7 +43,7 @@ export async function PATCH(request) {
             );
         }
 
-        const editableFields = ['nombre_escuela', 'tipo', 'ninos', 'codigo_postal', 'turno'];
+        const editableFields = ['nombre_escuela', 'tipo', 'ninos', 'codigo_postal', 'turno', 'visitada'];
         if (!editableFields.includes(field)) {
             return NextResponse.json(
                 { error: `Field "${field}" is not editable on catalogo_escuelas` },

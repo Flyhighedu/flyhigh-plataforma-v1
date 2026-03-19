@@ -37,7 +37,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
   const cls = "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500";
 
   // Column order must match escuelas-columns.jsx exactly:
-  // # | CCT | Nombre | Tipo | Niños | C.P. | Turno | Acción
+  // # | CCT | Nombre | Tipo | Niños | C.P. | Turno | ✈️ Visitada | Acción
   return (
     <TableRow className="bg-emerald-50/30 border-t-2 border-dashed border-emerald-300 hover:bg-emerald-50/50">
       {/* # */}
@@ -115,6 +115,10 @@ export function GhostRow({ columnCount, onCreateRow }) {
           <option value="NOCTURNO">Nocturno</option>
           <option value="DISCONTINUO">Discontinuo</option>
         </select>
+      </TableCell>
+      {/* ✈️ Visitada — auto-set by trigger, read-only */}
+      <TableCell>
+        <span className="text-muted-foreground italic text-xs">auto</span>
       </TableCell>
       {/* Acción: Insertar */}
       <TableCell>
