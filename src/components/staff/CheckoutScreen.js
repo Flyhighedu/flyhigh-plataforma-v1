@@ -723,13 +723,32 @@ export default function CheckoutScreen({
                 .from('staff_journeys')
                 .update({
                     mission_state: allTeamCheckedOut ? 'report' : 'dismantling',
-                    ...(allTeamCheckedOut ? { status: 'report' } : {}),
+                    ...(allTeamCheckedOut ? { status: 'closed' } : {}),
                     meta: nextMeta,
                     updated_at: now
                 })
                 .eq('id', journeyId);
 
             if (updateError) throw updateError;
+
+            // [BUG-FIX] Auto-insert cierres_mision when all team checked out
+            if (allTeamCheckedOut) {
+                try {
+                    const schoolId = missionInfo?.id || missionInfo?.mission_id || missionId;
+                    const schoolName = (missionInfo?.school_name || missionInfo?.nombre_escuela || '').trim();
+                    await supabase.from('cierres_mision').insert({
+                        mission_id: String(journeyId),
+                        school_id: schoolId ? Number(schoolId) : null,
+                        school_name_snapshot: schoolName || null,
+                        total_flights: 0,
+                        total_students: studentsCount || 0,
+                        end_time: now
+                    });
+                    console.log('✅ cierres_mision record created for journey:', journeyId);
+                } catch (cierreErr) {
+                    console.warn('⚠️ Could not create cierres_mision record (non-blocking):', cierreErr);
+                }
+            }
 
             // [FIX] Update school status and clear presence on final checkout
             if (allTeamCheckedOut && missionId && !String(missionId).startsWith('manual')) {

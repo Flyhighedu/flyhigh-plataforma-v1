@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { supabaseNew } from '@/lib/supabaseClientNew';
+import SchoolCombobox from '@/components/admin/SchoolCombobox';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     School, MapPin, FileText, Camera, Lock, KeyRound, ShieldCheck,
@@ -60,11 +61,17 @@ export default function AdminPage() {
     const [nextSchoolForm, setNextSchoolForm] = useState({
         nombre_escuela: '',
         colonia: '',
-        fecha_programada: ''
+        fecha_programada: '',
+        cct: ''
     });
-    const [nextSchoolLoading, setNextSchoolLoading] = useState(false); // <--- Added this line
+    const [nextSchoolLoading, setNextSchoolLoading] = useState(false);
     const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
     const [editingSchoolId, setEditingSchoolId] = useState(null);
+
+    // --- ESTADO DEL CATÁLOGO DE ESCUELAS ---
+    const [catalogoEscuelas, setCatalogoEscuelas] = useState([]);
+    const [catalogoLoading, setCatalogoLoading] = useState(false);
+    const [selectedCatalogoSchool, setSelectedCatalogoSchool] = useState(null);
 
     // --- ESTADO DE ESCUELAS EXTRAS (Históricas/Manuales) ---
     const [extraSchools, setExtraSchools] = useState([]);
@@ -174,7 +181,23 @@ export default function AdminPage() {
         fetchNextSchools();
         fetchExtraSchools();
         fetchReports();
+        fetchCatalogoEscuelas();
     }, [isAuthenticated]);
+
+    // Fetch catálogo oficial de escuelas
+    const fetchCatalogoEscuelas = async () => {
+        setCatalogoLoading(true);
+        try {
+            const res = await fetch('/api/admin/catalogo-escuelas');
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error fetching catalogo');
+            setCatalogoEscuelas(result.data || []);
+        } catch (err) {
+            console.error('Error fetching catalogo_escuelas:', err);
+        } finally {
+            setCatalogoLoading(false);
+        }
+    };
 
     // Fetch Reportes de Misión
     const fetchReports = async () => {
@@ -574,12 +597,20 @@ export default function AdminPage() {
 
     const handleNextSchoolSubmit = async (e) => {
         e.preventDefault();
+
+        // Validate that a school from the catalog is selected
+        if (!selectedCatalogoSchool && !editingSchoolId) {
+            alert('Selecciona una escuela del catálogo');
+            return;
+        }
+
         setNextSchoolLoading(true);
         try {
             const payload = {
-                nombre_escuela: nextSchoolForm.nombre_escuela,
+                nombre_escuela: selectedCatalogoSchool?.nombre_escuela || nextSchoolForm.nombre_escuela,
                 colonia: nextSchoolForm.colonia,
                 fecha_programada: nextSchoolForm.fecha_programada,
+                cct: selectedCatalogoSchool?.cct || nextSchoolForm.cct || null,
             };
 
             if (editingSchoolId) {
@@ -604,7 +635,8 @@ export default function AdminPage() {
                 alert('Escuela programada exitosamente');
             }
 
-            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '' });
+            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '' });
+            setSelectedCatalogoSchool(null);
         } catch (err) {
             console.error('Error saving next school:', err);
             alert('Error al guardar escuela: ' + (err.message || err));
@@ -617,15 +649,23 @@ export default function AdminPage() {
         setNextSchoolForm({
             nombre_escuela: school.nombre_escuela,
             colonia: school.colonia,
-            fecha_programada: school.fecha_programada
+            fecha_programada: school.fecha_programada,
+            cct: school.cct || ''
         });
+        // Try to find and pre-select the school from catalogo
+        if (school.cct) {
+            const catalogMatch = catalogoEscuelas.find(s => s.cct === school.cct);
+            setSelectedCatalogoSchool(catalogMatch || null);
+        } else {
+            setSelectedCatalogoSchool(null);
+        }
         setEditingSchoolId(school.id);
-        // Scroll to form if needed? Not strictly necessary but good UX.
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelNextSchoolEdit = () => {
-        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '' });
+        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '' });
+        setSelectedCatalogoSchool(null);
         setEditingSchoolId(null);
     };
 
@@ -1740,15 +1780,29 @@ export default function AdminPage() {
                                 <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
                                     <div>
                                         <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <School size={14} /> Nombre de la Escuela
+                                            <School size={14} /> Escuela (Catálogo Oficial)
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={nextSchoolForm.nombre_escuela}
-                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, nombre_escuela: e.target.value })}
-                                            required
-                                            placeholder="Ej: Primaria Lázaro Cárdenas"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                                        <SchoolCombobox
+                                            schools={catalogoEscuelas}
+                                            value={selectedCatalogoSchool}
+                                            onChange={(school) => {
+                                                setSelectedCatalogoSchool(school);
+                                                if (school) {
+                                                    setNextSchoolForm(prev => ({
+                                                        ...prev,
+                                                        nombre_escuela: school.nombre_escuela,
+                                                        cct: school.cct
+                                                    }));
+                                                } else {
+                                                    setNextSchoolForm(prev => ({
+                                                        ...prev,
+                                                        nombre_escuela: '',
+                                                        cct: ''
+                                                    }));
+                                                }
+                                            }}
+                                            loading={catalogoLoading}
+                                            disabled={false}
                                         />
                                     </div>
 
@@ -1846,10 +1900,15 @@ export default function AdminPage() {
                                                     }`}
                                             >
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                         <p className={`font-bold ${school.estatus === 'completado' ? 'text-emerald-400 line-through' : 'text-white'}`}>
                                                             {school.nombre_escuela}
                                                         </p>
+                                                        {school.cct && (
+                                                            <span className="text-[10px] font-mono bg-cyan-500/15 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                                                                {school.cct}
+                                                            </span>
+                                                        )}
                                                         {school.estatus === 'completado' && (
                                                             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
                                                         )}

@@ -757,7 +757,8 @@ export default function StaffDashboard() {
 
             const schools = (scheduled || []).map(school => ({
                 id: school.id,
-                school_name: school.nombre_escuela,
+                school_name: (school.nombre_escuela || '').trim(),
+                cct: school.cct || null,
                 colonia: school.colonia,
                 fecha: school.fecha_programada,
                 pilot_id: school.pilot_id,
@@ -1052,7 +1053,8 @@ export default function StaffDashboard() {
                     .insert({
                         date: today,
                         school_id: school.id,
-                        school_name: school.nombre_escuela,
+                        school_name: (school.school_name || school.nombre_escuela || '').trim(),
+                        cct: school.cct || null,
                         created_by: userId,
                         status: 'prep'
                     })

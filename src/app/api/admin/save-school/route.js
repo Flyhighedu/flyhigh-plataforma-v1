@@ -13,7 +13,7 @@ function getAdminSupabase() {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { nombre_escuela, colonia, fecha_programada, id } = body;
+        const { nombre_escuela, colonia, fecha_programada, cct, id } = body;
 
         // Validate required fields
         if (!nombre_escuela || !fecha_programada) {
@@ -26,9 +26,10 @@ export async function POST(request) {
         const supabase = getAdminSupabase();
 
         const schoolData = {
-            nombre_escuela,
+            nombre_escuela: nombre_escuela.trim(),
             colonia: colonia || '',
             fecha_programada,
+            cct: cct || null,
         };
 
         let result;
