@@ -93,7 +93,8 @@ export default function OperationPanelConstructionScreen({
 }) {
     const first = firstName(profile?.full_name, 'Operativo');
     const roleName = ROLE_LABELS[profile?.role] || 'Operativo';
-    const isAuxiliar = profile?.role === 'assistant' || profile?.role === 'auxiliar';
+    const roleNormalized = String(profile?.role || '').trim().toLowerCase();
+    const isAuxiliar = roleNormalized === 'assistant' || roleNormalized === 'auxiliar';
 
     const handleEpicReaction = async () => {
         try {
