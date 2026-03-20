@@ -105,21 +105,24 @@ async function syncOne(key, record) {
         // Mark as uploading
         await set(key, { ...record, status: 'uploading', lastAttempt: Date.now() });
 
-        // 1. Upload file to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-            .from(record.storageBucket)
-            .upload(record.storagePath, record.file, {
-                upsert: true,
-                contentType: record.contentType
-            });
+        // 1. Upload file to Supabase Storage (if required)
+        let publicUrl = null;
+        if (record.storageBucket && record.storagePath && record.file) {
+            const { error: uploadError } = await supabase.storage
+                .from(record.storageBucket)
+                .upload(record.storagePath, record.file, {
+                    upsert: true,
+                    contentType: record.contentType
+                });
 
-        if (uploadError) throw uploadError;
+            if (uploadError) throw uploadError;
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-            .from(record.storageBucket)
-            .getPublicUrl(record.storagePath);
-        const publicUrl = urlData?.publicUrl;
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from(record.storageBucket)
+                .getPublicUrl(record.storagePath);
+            publicUrl = urlData?.publicUrl;
+        }
 
         // 2. Execute DB mutation if provided
         if (record.dbMutation) {

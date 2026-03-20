@@ -1,5 +1,8 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
 import SyncHeader from './SyncHeader';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 
@@ -90,6 +93,175 @@ export default function OperationPanelConstructionScreen({
 }) {
     const first = firstName(profile?.full_name, 'Operativo');
     const roleName = ROLE_LABELS[profile?.role] || 'Operativo';
+    const isAuxiliar = profile?.role === 'auxiliar';
+
+    const handleEpicReaction = async () => {
+        try {
+            const timestamp = new Date().toISOString();
+            
+            await enqueueOptimisticUpload({
+                dbMutation: {
+                    table: 'video_markers',
+                    operation: 'insert',
+                    data: {
+                        journey_id: journeyId,
+                        device_timestamp: timestamp,
+                        marker_type: 'Reacción Épica'
+                    }
+                },
+                label: 'Marcador: Reacción Épica'
+            });
+
+            toast.success('¡Reacción marcada!', {
+                description: 'El momento ha sido guardado para la cápsula.',
+                position: 'bottom-center'
+            });
+            
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+            
+        } catch (error) {
+            console.error('Error al guardar marcador:', error);
+            toast.error('Error al guardar marcador', {
+                description: 'Revisa tu conexión o intenta de nuevo.',
+                position: 'bottom-center'
+            });
+        }
+    };
+
+    if (isAuxiliar) {
+        return (
+            <div style={{
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                backgroundColor: '#020617',
+                color: '#F8FAFC',
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                WebkitFontSmoothing: 'antialiased',
+                position: 'relative'
+            }}>
+                <style>{`
+                    @keyframes claquetaPulse {
+                        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+                        70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+                        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+                    }
+                    .claqueta-ripple {
+                        animation: claquetaPulse 2s infinite;
+                    }
+                `}</style>
+
+                <SyncHeader
+                    firstName={first}
+                    roleName={roleName}
+                    role={profile?.role}
+                    journeyId={journeyId}
+                    userId={userId}
+                    missionInfo={missionInfo}
+                    missionState={missionState}
+                    onDemoStart={onRefresh}
+                />
+
+                <main style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px 22px 120px'
+                }}>
+                    
+                    <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                        <h2 style={{
+                            fontSize: '28px',
+                            fontWeight: 800,
+                            color: '#F8FAFC',
+                            letterSpacing: '-0.02em',
+                            margin: '0 0 8px 0'
+                        }}>
+                            Claqueta Digital
+                        </h2>
+                        <p style={{
+                            color: '#94A3B8',
+                            fontSize: '15px',
+                            margin: 0
+                        }}>
+                            Registra el momento exacto para la cápsula de video.
+                        </p>
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                        <motion.button
+                            onClick={handleEpicReaction}
+                            whileTap={{ scale: 0.92 }}
+                            whileHover={{ scale: 1.02 }}
+                            className="claqueta-ripple"
+                            style={{
+                                width: '220px',
+                                height: '220px',
+                                borderRadius: '50%',
+                                border: '4px solid rgba(59, 130, 246, 0.5)',
+                                background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+                                boxShadow: '0 0 40px rgba(59, 130, 246, 0.4), inset 0 4px 12px rgba(255, 255, 255, 0.3)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '12px',
+                                cursor: 'pointer',
+                                color: '#FFFFFF',
+                                zIndex: 10,
+                                position: 'relative'
+                            }}
+                        >
+                            <span 
+                                style={{ 
+                                    fontSize: '56px',
+                                    fontVariationSettings: "'FILL' 1",
+                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))'
+                                }} 
+                                className="material-symbols-outlined"
+                            >
+                                movie_creation
+                            </span>
+                            <span style={{
+                                fontWeight: 800,
+                                fontSize: '16px',
+                                letterSpacing: '0.05em',
+                                textTransform: 'uppercase',
+                                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                textAlign: 'center',
+                                padding: '0 10px'
+                            }}>
+                                Marcar Reacción Épica
+                            </span>
+                        </motion.button>
+                    </div>
+
+                    <div style={{
+                        marginTop: 60,
+                        padding: '12px 20px',
+                        backgroundColor: 'rgba(30, 41, 59, 0.5)',
+                        border: '1px solid rgba(51, 65, 85, 0.5)',
+                        borderRadius: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        backdropFilter: 'blur(8px)'
+                    }}>
+                        <span className="material-symbols-outlined" style={{ color: '#3B82F6', fontSize: 20 }}>
+                            offline_pin
+                        </span>
+                        <p style={{ margin: 0, color: '#94A3B8', fontSize: '13px', fontWeight: 500 }}>
+                            Los marcadores se sincronizan offline automáticamente
+                        </p>
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div style={{
