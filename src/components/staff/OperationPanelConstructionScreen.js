@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { enqueueOptimisticUpload } from '@/utils/offlineSyncManager';
@@ -18,6 +19,35 @@ function firstName(fullName, fallback = 'Operativo') {
     const [first] = normalized.split(/\s+/);
     return first || fallback;
 }
+
+/** Play a short 880Hz success beep via AudioContext */
+function playSuccessBeep() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+        setTimeout(() => ctx.close(), 300);
+    } catch { /* non-critical */ }
+}
+
+const HOLD_DURATION_MS = 1000;
+const COOLDOWN_MS = 2000;
+const HAPTIC_PULSE_INTERVAL_MS = 150;
+const TAG_AUTO_CLOSE_MS = 5000;
+
+// SVG ring constants
+const RING_RADIUS = 118;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 const OPERATION_CONSTRUCTION_SVG = `
 <svg viewBox="0 0 840 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Panel de operacion en construccion">
@@ -96,42 +126,168 @@ export default function OperationPanelConstructionScreen({
     const roleNormalized = String(profile?.role || '').trim().toLowerCase();
     const isAuxiliar = roleNormalized === 'assistant' || roleNormalized === 'auxiliar';
 
-    const handleEpicReaction = async () => {
+    // ── Hold-to-Record state ──
+    const [holdProgress, setHoldProgress] = useState(0); // 0 → 1
+    const [isHolding, setIsHolding] = useState(false);
+    const [justFired, setJustFired] = useState(false);     // success flash
+    const [cooldown, setCooldown] = useState(false);        // post-fire lock
+
+    // ── Tag Modal state ──
+    const [showTagModal, setShowTagModal] = useState(false);
+    const [tagText, setTagText] = useState('');
+
+    const holdStartRef = useRef(null);
+    const holdRafRef = useRef(null);
+    const hapticIntervalRef = useRef(null);
+    const cooldownTimerRef = useRef(null);
+    const firedRef = useRef(false);
+    const frozenTimestampRef = useRef(null);
+    const tagAutoCloseRef = useRef(null);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (holdRafRef.current) cancelAnimationFrame(holdRafRef.current);
+            if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+            if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+            if (tagAutoCloseRef.current) clearTimeout(tagAutoCloseRef.current);
+        };
+    }, []);
+
+    // ── commitMarker: sends data using the FROZEN timestamp ──
+    const commitMarker = useCallback(async (tag) => {
+        // Close modal immediately
+        setShowTagModal(false);
+        if (tagAutoCloseRef.current) clearTimeout(tagAutoCloseRef.current);
+
         try {
-            const timestamp = new Date().toISOString();
-            
             await enqueueOptimisticUpload({
                 dbMutation: {
                     table: 'video_markers',
                     operation: 'insert',
                     data: {
                         journey_id: journeyId,
-                        device_timestamp: timestamp,
-                        marker_type: 'Reacción Épica'
+                        device_timestamp: frozenTimestampRef.current,
+                        marker_type: 'Reacción Épica',
+                        user_id: userId || null,
+                        cct: missionInfo?.cct || null,
+                        school_name_snapshot: missionInfo?.school_name || null,
+                        tag: tag || null
                     }
                 },
                 label: 'Marcador: Reacción Épica'
             });
 
-            toast.success('¡Reacción marcada!', {
+            setJustFired(true);
+            setCooldown(true);
+
+            toast.success(tag ? `¡Marcado: "${tag}"!` : '¡Reacción marcada!', {
                 description: 'El momento ha sido guardado para la cápsula.',
                 position: 'bottom-center'
             });
-            
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-            
+
+            cooldownTimerRef.current = setTimeout(() => {
+                setCooldown(false);
+                setJustFired(false);
+                firedRef.current = false;
+            }, COOLDOWN_MS);
+
         } catch (error) {
             console.error('Error al guardar marcador:', error);
+            firedRef.current = false;
             toast.error('Error al guardar marcador', {
                 description: 'Revisa tu conexión o intenta de nuevo.',
                 position: 'bottom-center'
             });
         }
-    };
+    }, [journeyId, userId, missionInfo]);
+
+    // ── onHoldComplete: freezes timestamp, plays feedback, opens modal ──
+    const onHoldComplete = useCallback(() => {
+        if (firedRef.current) return;
+        firedRef.current = true;
+
+        // a) Freeze the timestamp at this exact instant
+        frozenTimestampRef.current = new Date().toISOString();
+
+        // b) Multisensory feedback
+        playSuccessBeep();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+        }
+
+        // c) Open tag modal + start 5s auto-close timer
+        setTagText('');
+        setShowTagModal(true);
+
+        tagAutoCloseRef.current = setTimeout(() => {
+            // Auto-save without tag
+            commitMarker(null);
+        }, TAG_AUTO_CLOSE_MS);
+    }, [commitMarker]);
+
+    const startHold = useCallback(() => {
+        if (cooldown || firedRef.current) return;
+        setIsHolding(true);
+        setHoldProgress(0);
+        holdStartRef.current = performance.now();
+
+        // Haptic pulse loop
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(50);
+            hapticIntervalRef.current = setInterval(() => {
+                navigator.vibrate(50);
+            }, HAPTIC_PULSE_INTERVAL_MS);
+        }
+
+        // Animation frame loop
+        const tick = () => {
+            const elapsed = performance.now() - holdStartRef.current;
+            const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
+            setHoldProgress(progress);
+
+            if (progress >= 1) {
+                // ── HOLD COMPLETE ──
+                if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+                setIsHolding(false);
+                onHoldComplete();
+                return;
+            }
+            holdRafRef.current = requestAnimationFrame(tick);
+        };
+        holdRafRef.current = requestAnimationFrame(tick);
+    }, [cooldown, onHoldComplete]);
+
+    const cancelHold = useCallback(() => {
+        if (holdRafRef.current) cancelAnimationFrame(holdRafRef.current);
+        if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
+        setIsHolding(false);
+        if (!firedRef.current) setHoldProgress(0);
+    }, []);
+
+    // ── Cancel auto-close when user interacts with input ──
+    const handleTagInputFocus = useCallback(() => {
+        if (tagAutoCloseRef.current) {
+            clearTimeout(tagAutoCloseRef.current);
+            tagAutoCloseRef.current = null;
+        }
+    }, []);
+
+    const handleTagSave = useCallback(() => {
+        commitMarker(tagText.trim() || null);
+    }, [commitMarker, tagText]);
 
     if (isAuxiliar) {
+        const ringOffset = RING_CIRCUMFERENCE * (1 - holdProgress);
+        const ringColor = justFired ? '#22C55E' : isHolding ? '#60A5FA' : 'rgba(59, 130, 246, 0.25)';
+        const buttonLabel = justFired
+            ? '✓ Marcado'
+            : isHolding
+                ? 'Mantén presionado...'
+                : cooldown
+                    ? 'Espera...'
+                    : 'Mantén para marcar';
+
         return (
             <div style={{
                 fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -143,17 +299,6 @@ export default function OperationPanelConstructionScreen({
                 WebkitFontSmoothing: 'antialiased',
                 position: 'relative'
             }}>
-                <style>{`
-                    @keyframes claquetaPulse {
-                        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-                        70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
-                        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-                    }
-                    .claqueta-ripple {
-                        animation: claquetaPulse 2s infinite;
-                    }
-                `}</style>
-
                 <SyncHeader
                     firstName={first}
                     roleName={roleName}
@@ -189,60 +334,126 @@ export default function OperationPanelConstructionScreen({
                             fontSize: '15px',
                             margin: 0
                         }}>
-                            Registra el momento exacto para la cápsula de video.
+                            Mantén presionado 1 segundo para registrar el momento.
                         </p>
                     </div>
 
-                    <div style={{ position: 'relative' }}>
-                        <motion.button
-                            onClick={handleEpicReaction}
-                            whileTap={{ scale: 0.92 }}
-                            whileHover={{ scale: 1.02 }}
-                            className="claqueta-ripple"
+                    {/* Hold-to-Record Button with SVG Ring */}
+                    <div style={{ position: 'relative', width: 250, height: 250 }}>
+                        {/* SVG Progress Ring */}
+                        <svg
+                            width="250"
+                            height="250"
+                            viewBox="0 0 250 250"
                             style={{
-                                width: '220px',
-                                height: '220px',
-                                borderRadius: '50%',
-                                border: '4px solid rgba(59, 130, 246, 0.5)',
-                                background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
-                                boxShadow: '0 0 40px rgba(59, 130, 246, 0.4), inset 0 4px 12px rgba(255, 255, 255, 0.3)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '12px',
-                                cursor: 'pointer',
-                                color: '#FFFFFF',
-                                zIndex: 10,
-                                position: 'relative'
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                transform: 'rotate(-90deg)',
+                                zIndex: 5
                             }}
                         >
-                            <span 
-                                style={{ 
-                                    fontSize: '56px',
-                                    fontVariationSettings: "'FILL' 1",
-                                    filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))'
-                                }} 
-                                className="material-symbols-outlined"
+                            {/* Background ring */}
+                            <circle
+                                cx="125"
+                                cy="125"
+                                r={RING_RADIUS}
+                                fill="none"
+                                stroke="rgba(59, 130, 246, 0.15)"
+                                strokeWidth="6"
+                            />
+                            {/* Progress ring */}
+                            <circle
+                                cx="125"
+                                cy="125"
+                                r={RING_RADIUS}
+                                fill="none"
+                                stroke={ringColor}
+                                strokeWidth="6"
+                                strokeLinecap="round"
+                                strokeDasharray={RING_CIRCUMFERENCE}
+                                strokeDashoffset={ringOffset}
+                                style={{
+                                    transition: isHolding ? 'none' : 'stroke-dashoffset 0.3s ease-out, stroke 0.3s ease'
+                                }}
+                            />
+                        </svg>
+
+                        {/* Core Button */}
+                        <motion.div
+                            animate={justFired ? { scale: [1, 1.15, 1] } : {}}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                            style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 10
+                            }}
+                        >
+                            <div
+                                onPointerDown={startHold}
+                                onPointerUp={cancelHold}
+                                onPointerLeave={cancelHold}
+                                onPointerCancel={cancelHold}
+                                onContextMenu={(e) => e.preventDefault()}
+                                style={{
+                                    width: '220px',
+                                    height: '220px',
+                                    borderRadius: '50%',
+                                    border: justFired
+                                        ? '4px solid rgba(34, 197, 94, 0.7)'
+                                        : '4px solid rgba(59, 130, 246, 0.5)',
+                                    background: justFired
+                                        ? 'linear-gradient(135deg, #14532D 0%, #22C55E 100%)'
+                                        : 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+                                    boxShadow: justFired
+                                        ? '0 0 60px rgba(34, 197, 94, 0.5), inset 0 4px 12px rgba(255, 255, 255, 0.3)'
+                                        : isHolding
+                                            ? '0 0 60px rgba(59, 130, 246, 0.6), inset 0 4px 12px rgba(255, 255, 255, 0.4)'
+                                            : '0 0 40px rgba(59, 130, 246, 0.4), inset 0 4px 12px rgba(255, 255, 255, 0.3)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    cursor: cooldown ? 'not-allowed' : 'pointer',
+                                    color: '#FFFFFF',
+                                    userSelect: 'none',
+                                    WebkitUserSelect: 'none',
+                                    touchAction: 'none',
+                                    opacity: cooldown && !justFired ? 0.6 : 1,
+                                    transition: 'background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease'
+                                }}
                             >
-                                movie_creation
-                            </span>
-                            <span style={{
-                                fontWeight: 800,
-                                fontSize: '16px',
-                                letterSpacing: '0.05em',
-                                textTransform: 'uppercase',
-                                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                                textAlign: 'center',
-                                padding: '0 10px'
-                            }}>
-                                Marcar Reacción Épica
-                            </span>
-                        </motion.button>
+                                <span
+                                    style={{
+                                        fontSize: '52px',
+                                        fontVariationSettings: "'FILL' 1",
+                                        filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))'
+                                    }}
+                                    className="material-symbols-outlined"
+                                >
+                                    {justFired ? 'check_circle' : 'movie_creation'}
+                                </span>
+                                <span style={{
+                                    fontWeight: 800,
+                                    fontSize: '13px',
+                                    letterSpacing: '0.06em',
+                                    textTransform: 'uppercase',
+                                    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                                    textAlign: 'center',
+                                    padding: '0 14px',
+                                    lineHeight: 1.3
+                                }}>
+                                    {buttonLabel}
+                                </span>
+                            </div>
+                        </motion.div>
                     </div>
 
                     <div style={{
-                        marginTop: 60,
+                        marginTop: 50,
                         padding: '12px 20px',
                         backgroundColor: 'rgba(30, 41, 59, 0.5)',
                         border: '1px solid rgba(51, 65, 85, 0.5)',
@@ -260,6 +471,102 @@ export default function OperationPanelConstructionScreen({
                         </p>
                     </div>
                 </main>
+
+                {/* ── Tag Bottom Sheet Modal ── */}
+                {showTagModal && (
+                    <>
+                        {/* Backdrop */}
+                        <div
+                            onClick={() => commitMarker(tagText.trim() || null)}
+                            style={{
+                                position: 'fixed',
+                                inset: 0,
+                                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                                zIndex: 900,
+                                backdropFilter: 'blur(4px)'
+                            }}
+                        />
+                        {/* Sheet */}
+                        <motion.div
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+                            style={{
+                                position: 'fixed',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                zIndex: 910,
+                                backgroundColor: '#0F172A',
+                                borderTopLeftRadius: 24,
+                                borderTopRightRadius: 24,
+                                padding: '20px 24px calc(24px + env(safe-area-inset-bottom, 0px))',
+                                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)'
+                            }}
+                        >
+                            {/* Drag handle */}
+                            <div style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: '#334155', margin: '0 auto 18px' }} />
+
+                            <p style={{
+                                margin: '0 0 14px',
+                                fontSize: 15,
+                                fontWeight: 700,
+                                color: '#F1F5F9',
+                                textAlign: 'center'
+                            }}>
+                                ¿Qué pasó en este momento?
+                            </p>
+
+                            <input
+                                type="text"
+                                value={tagText}
+                                onChange={(e) => setTagText(e.target.value)}
+                                onFocus={handleTagInputFocus}
+                                placeholder="¿Qué pasó? (Ej. Vi mi casa!, Parque Nacional...)"
+                                maxLength={60}
+                                autoFocus
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px',
+                                    borderRadius: 14,
+                                    border: '2px solid #334155',
+                                    backgroundColor: '#1E293B',
+                                    color: '#F8FAFC',
+                                    fontSize: 15,
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    transition: 'border-color 0.2s ease'
+                                }}
+                                onFocusCapture={(e) => e.target.style.borderColor = '#3B82F6'}
+                                onBlurCapture={(e) => e.target.style.borderColor = '#334155'}
+                            />
+
+                            <button
+                                type="button"
+                                onClick={handleTagSave}
+                                style={{
+                                    width: '100%',
+                                    marginTop: 14,
+                                    padding: '14px 16px',
+                                    borderRadius: 14,
+                                    border: 'none',
+                                    backgroundColor: '#2563EB',
+                                    color: '#FFFFFF',
+                                    fontSize: 16,
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    letterSpacing: '0.02em',
+                                    boxShadow: '0 8px 20px -8px rgba(37, 99, 235, 0.5)',
+                                    transition: 'background-color 0.2s ease'
+                                }}
+                            >
+                                Guardar
+                            </button>
+                        </motion.div>
+                    </>
+                )}
             </div>
         );
     }
