@@ -91,6 +91,7 @@ export const config = {
         '/staff/:path*',
         '/staff-v2/:path*',
         '/supervisor/:path*',
+        '/sandbox-dashboards/:path*',
         '/api/:path*',
     ],
 }
