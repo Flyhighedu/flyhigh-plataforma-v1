@@ -3,6 +3,7 @@
 import {
     BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
+    AreaChart as RechartsAreaChart, Area,
 } from 'recharts';
 
 /* ── Color Palette ── */
@@ -164,5 +165,60 @@ export function TremorProgressBar({ value = 0, label, sublabel, color, showValue
                 />
             </div>
         </div>
+    );
+}
+
+/* ── Area Chart ── */
+export function TremorAreaChart({ data = [], index = 'label', categories = [], colors, height = 280, valueFormatter }) {
+    const palette = colors || COLORS;
+    const fmt = valueFormatter || ((v) => v.toLocaleString());
+
+    return (
+        <ResponsiveContainer width="100%" height={height}>
+            <RechartsAreaChart data={data} margin={{ top: 8, right: 12, left: -8, bottom: 4 }}>
+                <defs>
+                    {categories.map((cat, i) => (
+                        <linearGradient key={cat} id={`gradient-${cat}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={palette[i % palette.length]} stopOpacity={0.3} />
+                            <stop offset="95%" stopColor={palette[i % palette.length]} stopOpacity={0.02} />
+                        </linearGradient>
+                    ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border, #e2e8f0)" strokeOpacity={0.5} />
+                <XAxis
+                    dataKey={index}
+                    tick={{ ...CHART_STYLE, fill: 'var(--muted-foreground, #94a3b8)' }}
+                    axisLine={false} tickLine={false}
+                />
+                <YAxis
+                    tick={{ ...CHART_STYLE, fill: 'var(--muted-foreground, #94a3b8)' }}
+                    axisLine={false} tickLine={false}
+                    tickFormatter={fmt}
+                />
+                <Tooltip
+                    formatter={(value) => fmt(value)}
+                    contentStyle={{
+                        background: 'var(--card, #fff)',
+                        border: '1px solid var(--border, #e2e8f0)',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+                        fontSize: 13,
+                    }}
+                    cursor={{ stroke: 'var(--muted-foreground, #94a3b8)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                />
+                {categories.map((cat, i) => (
+                    <Area
+                        key={cat}
+                        type="monotone"
+                        dataKey={cat}
+                        stroke={palette[i % palette.length]}
+                        strokeWidth={2.5}
+                        fill={`url(#gradient-${cat})`}
+                        dot={{ r: 4, fill: palette[i % palette.length], strokeWidth: 2, stroke: 'var(--card, #fff)' }}
+                        activeDot={{ r: 6, strokeWidth: 2 }}
+                    />
+                ))}
+            </RechartsAreaChart>
+        </ResponsiveContainer>
     );
 }

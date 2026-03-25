@@ -12,11 +12,20 @@ function getAdminSupabase() {
 function getDateBoundary(range) {
     const now = new Date();
     switch (range) {
-        case 'week': return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        case 'week': return null; // 'week' = view mode (weekly grouping), not a data filter
         case 'month': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
         case 'year': return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
         default: return null;
     }
+}
+
+// Returns [startISO, endISO] for a specific month like '2026-03'
+function getMonthBoundary(monthStr) {
+    if (!monthStr || !/^\d{4}-\d{2}$/.test(monthStr)) return null;
+    const [year, month] = monthStr.split('-').map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1); // first day of NEXT month
+    return [start.toISOString(), end.toISOString()];
 }
 
 export async function GET(request) {
@@ -24,17 +33,27 @@ export async function GET(request) {
         const supabase = getAdminSupabase();
         const { searchParams } = new URL(request.url);
         const range = searchParams.get('range') || 'all';
+        const monthFilter = searchParams.get('month') || null; // e.g. '2026-03'
         const dateBoundary = getDateBoundary(range);
+        const monthBounds = getMonthBoundary(monthFilter);
 
         // ── PANEL 1: Impacto General ──
         let cierresQuery = supabase.from('cierres_mision')
             .select('total_students, total_flights, becados, created_at, school_name_snapshot, end_time');
-        if (dateBoundary) cierresQuery = cierresQuery.gte('created_at', dateBoundary);
+        if (monthBounds) {
+            cierresQuery = cierresQuery.gte('created_at', monthBounds[0]).lt('created_at', monthBounds[1]);
+        } else if (dateBoundary) {
+            cierresQuery = cierresQuery.gte('created_at', dateBoundary);
+        }
         const { data: cierres } = await cierresQuery;
 
         let bitacoraQuery = supabase.from('bitacora_vuelos')
             .select('duration_seconds, student_count, start_time, end_time, created_at, journey_id');
-        if (dateBoundary) bitacoraQuery = bitacoraQuery.gte('created_at', dateBoundary);
+        if (monthBounds) {
+            bitacoraQuery = bitacoraQuery.gte('created_at', monthBounds[0]).lt('created_at', monthBounds[1]);
+        } else if (dateBoundary) {
+            bitacoraQuery = bitacoraQuery.gte('created_at', dateBoundary);
+        }
         const { data: bitacora } = await bitacoraQuery;
 
         const { data: statsRow } = await supabase.from('stats').select('total_sponsored_kids').single();
@@ -57,6 +76,71 @@ export async function GET(request) {
         }
         const monthlyTrend = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
 
+        // Per-school breakdown by month (for stacked bar chart)
+        const schoolMonthMap = {};
+        const allSchoolNames = new Set();
+        for (const c of (cierres || [])) {
+            const d = new Date(c.created_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const school = c.school_name_snapshot || 'Sin nombre';
+            allSchoolNames.add(school);
+            if (!schoolMonthMap[key]) schoolMonthMap[key] = { month: key };
+            schoolMonthMap[key][school] = (schoolMonthMap[key][school] || 0) + (c.total_students || 0);
+        }
+        const schoolMonthlyTrend = Object.values(schoolMonthMap).sort((a, b) => a.month.localeCompare(b.month));
+
+        // Per-school totals for the selected period
+        const schoolTotals = {};
+        for (const c of (cierres || [])) {
+            const school = c.school_name_snapshot || 'Sin nombre';
+            if (!schoolTotals[school]) schoolTotals[school] = { name: school, students: 0, flights: 0, missions: 0 };
+            schoolTotals[school].students += (c.total_students || 0);
+            schoolTotals[school].flights += (c.total_flights || 0);
+            schoolTotals[school].missions += 1;
+        }
+
+        // Weekly trend (group by ISO week)
+        const weekMap = {};
+        for (const c of (cierres || [])) {
+            const d = new Date(c.created_at);
+            // Get ISO week start (Monday)
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(d);
+            monday.setDate(diff);
+            const weekKey = monday.toISOString().slice(0, 10);
+            if (!weekMap[weekKey]) weekMap[weekKey] = { week: weekKey, students: 0, flights: 0, missions: 0, schools: {} };
+            weekMap[weekKey].students += (c.total_students || 0);
+            weekMap[weekKey].flights += (c.total_flights || 0);
+            weekMap[weekKey].missions += 1;
+            const school = c.school_name_snapshot || 'Sin nombre';
+            if (!weekMap[weekKey].schools[school]) weekMap[weekKey].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
+            weekMap[weekKey].schools[school].students += (c.total_students || 0);
+            weekMap[weekKey].schools[school].flights += (c.total_flights || 0);
+            weekMap[weekKey].schools[school].missions += 1;
+        }
+        const weeklyTrend = Object.values(weekMap).sort((a, b) => a.week.localeCompare(b.week)).map(w => ({
+            ...w,
+            schools: Object.values(w.schools).sort((a, b) => b.students - a.students)
+        }));
+
+        // Add per-school detail to each month entry (for click-to-detail)
+        const monthDetailMap = {};
+        for (const c of (cierres || [])) {
+            const d = new Date(c.created_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!monthDetailMap[key]) monthDetailMap[key] = {};
+            const school = c.school_name_snapshot || 'Sin nombre';
+            if (!monthDetailMap[key][school]) monthDetailMap[key][school] = { name: school, students: 0, flights: 0, missions: 0 };
+            monthDetailMap[key][school].students += (c.total_students || 0);
+            monthDetailMap[key][school].flights += (c.total_flights || 0);
+            monthDetailMap[key][school].missions += 1;
+        }
+        const monthlyTrendWithDetail = monthlyTrend.map(m => ({
+            ...m,
+            schools: Object.values(monthDetailMap[m.month] || {}).sort((a, b) => b.students - a.students)
+        }));
+
         const impacto = {
             totalStudents,
             totalFlights,
@@ -64,7 +148,9 @@ export async function GET(request) {
             totalMissions: (cierres || []).length,
             totalBecados,
             sponsoredKidsGoal: statsRow?.total_sponsored_kids || 7209,
-            monthlyTrend,
+            monthlyTrend: monthlyTrendWithDetail,
+            weeklyTrend,
+            schoolTotals: Object.values(schoolTotals).sort((a, b) => b.students - a.students),
         };
 
         // ── PANEL 2: Eficiencia Operativa ──

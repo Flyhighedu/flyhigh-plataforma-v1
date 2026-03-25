@@ -185,7 +185,7 @@ export default function SandboxDashboardsPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const panelMap = {
-        impacto: <PanelImpacto data={data?.impacto} loading={loading} />,
+        impacto: <PanelImpacto data={data?.impacto} loading={loading} dateRange={dateRange} />,
         operacion: <PanelOperacion data={data?.operacion} loading={loading} />,
         escuelas: <PanelEscuelas data={data?.escuelas} loading={loading} />,
         patrocinios: <PanelPatrocinios data={data?.patrocinios} loading={loading} />,
