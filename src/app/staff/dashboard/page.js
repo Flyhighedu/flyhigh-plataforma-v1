@@ -2131,7 +2131,7 @@ export default function StaffDashboard() {
     }
 
     // --- Assistant: Waiting for pilot OR doing vehicle checklist ---
-    if (profile?.role === 'assistant' && auxFlowState === 'waiting') {
+    if (profile?.role === 'assistant' && auxFlowState === 'waiting' && currentStep < 2) {
         return withDependencyOverlay(
             <AuxWaitingScreen
                 journeyId={journeyId}
@@ -2144,7 +2144,7 @@ export default function StaffDashboard() {
         );
     }
 
-    if (profile?.role === 'assistant' && auxFlowState === 'checklist') {
+    if (profile?.role === 'assistant' && auxFlowState === 'checklist' && currentStep < 2) {
         return withDependencyOverlay(
             <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
                 {profile && journeyId && userId ? (
@@ -2168,7 +2168,7 @@ export default function StaffDashboard() {
         );
     }
 
-    if (profile?.role === 'teacher' && teacherFlowState === 'waiting') {
+    if (profile?.role === 'teacher' && teacherFlowState === 'waiting' && currentStep < 2) {
         return withDependencyOverlay(
             <TeacherWaitingScreen
                 journeyId={journeyId}
