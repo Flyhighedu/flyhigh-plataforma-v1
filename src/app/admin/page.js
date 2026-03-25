@@ -671,7 +671,7 @@ export default function AdminPage() {
 
     const handleCompleteNextSchool = async (id, currentStatus) => {
         // Optimistic UI Update
-        const newStatus = currentStatus === 'completado' ? 'pendiente' : 'completado';
+        const newStatus = currentStatus === 'completada' ? 'pendiente' : 'completada';
         setNextSchools(prev => prev.map(s => s.id === id ? { ...s, estatus: newStatus } : s));
 
         try {
@@ -1894,14 +1894,14 @@ export default function AdminPage() {
                                         {nextSchools.map((school) => (
                                             <div
                                                 key={school.id}
-                                                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completado'
+                                                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completada'
                                                     ? 'bg-emerald-500/10 border-emerald-500/30'
                                                     : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
                                                     }`}
                                             >
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <p className={`font-bold ${school.estatus === 'completado' ? 'text-emerald-400 line-through' : 'text-white'}`}>
+                                                        <p className={`font-bold ${school.estatus === 'completada' ? 'text-emerald-400 line-through' : 'text-white'}`}>
                                                             {school.nombre_escuela}
                                                         </p>
                                                         {school.cct && (
@@ -1909,7 +1909,7 @@ export default function AdminPage() {
                                                                 {school.cct}
                                                             </span>
                                                         )}
-                                                        {school.estatus === 'completado' && (
+                                                        {school.estatus === 'completada' && (
                                                             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
                                                         )}
                                                     </div>
@@ -1946,11 +1946,11 @@ export default function AdminPage() {
 
                                                     <button
                                                         onClick={() => handleCompleteNextSchool(school.id, school.estatus)}
-                                                        className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completado'
+                                                        className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completada'
                                                             ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
                                                             : 'bg-slate-700/50 text-slate-400 border-slate-600/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30'
                                                             }`}
-                                                        title={school.estatus === 'completado' ? "Marcar como pendiente" : "Marcar como realizada"}
+                                                        title={school.estatus === 'completada' ? "Marcar como pendiente" : "Marcar como realizada"}
                                                     >
                                                         <CheckCircle size={18} />
                                                     </button>

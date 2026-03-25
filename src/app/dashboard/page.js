@@ -425,9 +425,9 @@ const NextMissions = ({ missions }) => {
         return true;
     });
 
-    // Split into tabs: Pendientes = NOT completado, Historial = completado
-    const pendientes = cleanMissions.filter((m) => m.estatus !== 'completado');
-    const historial = cleanMissions.filter((m) => m.estatus === 'completado');
+    // Split into tabs: Pendientes = NOT completada, Historial = completada
+    const pendientes = cleanMissions.filter((m) => m.estatus !== 'completada');
+    const historial = cleanMissions.filter((m) => m.estatus === 'completada');
 
     const activeMissions = activeTab === 'pendientes' ? pendientes : historial;
 
@@ -505,28 +505,28 @@ const NextMissions = ({ missions }) => {
                                 viewport={{ once: true }}
                                 transition={{ delay: index * 0.06 }}
                                 className={`group relative rounded-[2rem] p-6 shadow-xl border overflow-hidden transition-all duration-300 ${
-                                    mission.estatus === 'completado'
+                                    mission.estatus === 'completada'
                                         ? 'bg-gradient-to-br from-emerald-50 to-white shadow-emerald-100/50 border-emerald-100 hover:shadow-emerald-200/60'
                                         : 'bg-white shadow-slate-200/50 border-white hover:shadow-2xl hover:shadow-amber-500/10'
                                 }`}
                             >
                                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                    <School size={80} className={mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} />
+                                    <School size={80} className={mission.estatus === 'completada' ? 'text-emerald-500' : 'text-amber-500'} />
                                 </div>
 
                                 <div className="relative z-10">
                                     {/* Automated Status Badge */}
                                     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border ${
-                                        mission.estatus === 'completado'
+                                        mission.estatus === 'completada'
                                             ? 'bg-emerald-100 text-emerald-600 border-emerald-200'
                                             : 'bg-amber-50 text-amber-600 border-amber-100'
                                     }`}>
-                                        {mission.estatus === 'completado' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                                        {mission.estatus === 'completado' ? 'Realizada' : 'Programada'}
+                                        {mission.estatus === 'completada' ? <CheckCircle size={12} /> : <Clock size={12} />}
+                                        {mission.estatus === 'completada' ? 'Realizada' : 'Programada'}
                                     </div>
 
                                     <h3 className={`text-xl font-bold mb-2 line-clamp-2 ${
-                                        mission.estatus === 'completado' ? 'text-emerald-800' : 'text-slate-800'
+                                        mission.estatus === 'completada' ? 'text-emerald-800' : 'text-slate-800'
                                     }`}>
                                         {mission.nombre_escuela}
                                     </h3>
@@ -534,12 +534,12 @@ const NextMissions = ({ missions }) => {
                                     <div className="space-y-3 mt-4">
                                         {mission.colonia && (
                                             <div className="flex items-start gap-3 text-slate-500">
-                                                <MapPin size={18} className={`${mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} shrink-0 mt-0.5`} />
+                                                <MapPin size={18} className={`${mission.estatus === 'completada' ? 'text-emerald-500' : 'text-amber-500'} shrink-0 mt-0.5`} />
                                                 <span className="text-sm font-medium">{mission.colonia}</span>
                                             </div>
                                         )}
                                         <div className="flex items-center gap-3 text-slate-500">
-                                            <Calendar size={18} className={`${mission.estatus === 'completado' ? 'text-emerald-500' : 'text-amber-500'} shrink-0`} />
+                                            <Calendar size={18} className={`${mission.estatus === 'completada' ? 'text-emerald-500' : 'text-amber-500'} shrink-0`} />
                                             <span className="text-sm font-bold text-slate-700">
                                                 {new Date(mission.fecha_programada + 'T12:00:00').toLocaleDateString('es-MX', {
                                                     weekday: 'long',

@@ -286,7 +286,7 @@ export async function POST(request) {
                     nombre_escuela: trimmedName,
                     colonia: '',
                     fecha_programada: date,
-                    estatus: 'completado',
+                    estatus: 'completada',
                 })
                 .select('id')
                 .single();

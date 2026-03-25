@@ -900,7 +900,7 @@ export default function CheckoutScreen({
                 const schoolId = missionInfo?.id || missionInfo?.mission_id || missionId;
                 if (schoolId) {
                     supabase.from('proximas_escuelas')
-                        .update({ estatus: 'completado' })
+                        .update({ estatus: 'completada' })
                         .eq('id', schoolId)
                         .then(({ error }) => {
                             if (error) console.warn('⚠️ proximas_escuelas update failed (non-blocking):', error);
