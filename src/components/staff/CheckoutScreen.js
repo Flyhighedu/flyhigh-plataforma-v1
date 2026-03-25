@@ -768,16 +768,18 @@ export default function CheckoutScreen({
             setTeamCheckoutStatus(nextStatus);
             setFeedback(allTeamCheckedOut
                 ? 'Equipo completo. Jornada finalizada.'
-                : 'Check-out completado. Esperando al resto del equipo.');
+                : 'Check-out completado. Redirigiendo al lobby...');
             setCheckoutComment('');
             onRefresh && onRefresh();
 
-            if (allTeamCheckedOut) {
-                clearJourneyLocalOperationalData(journeyId);
-                clearLocalProgress(journeyId);
-                if (typeof window !== 'undefined' && window.localStorage) {
-                    window.localStorage.removeItem('flyhigh_staff_mission');
-                }
+            // Always clear local operational data on checkout (individual or team)
+            // so the user returns to a clean lobby and can start a new mission.
+            clearJourneyLocalOperationalData(journeyId);
+            clearLocalProgress(journeyId);
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.removeItem('flyhigh_staff_mission');
+                window.localStorage.removeItem('flyhigh_selected_mission_id');
+                window.localStorage.removeItem('flyhigh_active_journey_id');
             }
 
             if (typeof onCheckoutComplete === 'function') {
@@ -788,7 +790,9 @@ export default function CheckoutScreen({
                 });
             }
 
-            router.replace('/staff/history');
+            // Redirect to lobby — NOT /staff/history — so the user can pick a new mission.
+            // School status ('completada') is already set above (L735-766) when allTeamCheckedOut.
+            router.replace('/staff/dashboard');
         } catch (error) {
             const details = getErrorMessage(error);
             console.error('No se pudo finalizar el check-out:', { error, details });
