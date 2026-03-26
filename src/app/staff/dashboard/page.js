@@ -837,6 +837,14 @@ export default function StaffDashboard() {
         setLobbyMode(false);
         localStorage.setItem('flyhigh_selected_mission_id', String(school.id));
 
+        // 🧹 DEEP STATE RESET: Prevent any stale state from previous missions from bleeding in
+        setMissionState(null);
+        setCurrentStep(0);
+        setAuxFlowState(null);
+        setTeacherFlowState(null);
+        setWaitingForAux(false);
+        setShowBrief(true);
+
         try {
             const supabase = createClient();
             const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
@@ -1624,6 +1632,14 @@ export default function StaffDashboard() {
         // FIX: Persist to localStorage
         localStorage.setItem('flyhigh_staff_mission', JSON.stringify(missionData));
         setNoSchoolToday(false);
+
+        // 🧹 DEEP STATE RESET: Protect real manual missions from stale demo states
+        setMissionState(null);
+        setCurrentStep(0);
+        setAuxFlowState(null);
+        setTeacherFlowState(null);
+        setWaitingForAux(false);
+        setShowBrief(true);
 
         // Crear jornada para misión manual
         try {
