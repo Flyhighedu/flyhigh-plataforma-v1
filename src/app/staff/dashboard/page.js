@@ -1524,6 +1524,20 @@ export default function StaffDashboard() {
                             } else if (['completada', 'cerrada'].includes(newSchool.estatus)) {
                                 console.log('✅ School completed/closed globally. Refreshing lobby list.');
                                 refreshMission();
+                            } else if (newSchool.estatus === 'archivado') {
+                                // Demo exit or school archived — force ALL clients back to lobby
+                                console.warn('🧹 School archived (demo exit detected). Resetting to lobby...');
+                                localStorage.removeItem('flyhigh_staff_mission');
+                                localStorage.removeItem('flyhigh_selected_mission_id');
+                                localStorage.removeItem('flyhigh_active_journey_id');
+                                localStorage.removeItem('flyhigh_test_mode');
+                                setTodaySchool(null);
+                                setNoSchoolToday(true);
+                                setJourneyId(null);
+                                setCurrentStep(0);
+                                setMissionState(null);
+                                setLobbyMode(true);
+                                window.location.reload();
                             }
                         }
                     }
