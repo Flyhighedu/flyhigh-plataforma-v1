@@ -1484,7 +1484,7 @@ export default function StaffDashboard() {
                     table: 'proximas_escuelas'
                     // FILTER REMOVED: catch all events to ensure reliability
                 },
-                (payload) => {
+                async (payload) => {
                     console.log('🔔 Raw School Update Received:', payload);
 
                     // 1. HANDLE INSERT / UPDATE
