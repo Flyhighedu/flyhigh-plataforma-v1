@@ -1504,6 +1504,15 @@ export default function StaffDashboard() {
                                 localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
                                 setNoSchoolToday(false);
 
+                                // Reset stale state from any previous mission (prevents rendering wrong screens)
+                                setMissionState(null);
+                                setCurrentStep(0);
+                                setAuxFlowState(null);
+                                setTeacherFlowState(null);
+                                setWaitingForAux(false);
+                                setLobbyMode(false);
+                                setShowBrief(true);
+
                                 // Also discover the journey (prevents race condition with refreshMission)
                                 try {
                                     const { data: journey } = await supabase
