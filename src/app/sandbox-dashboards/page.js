@@ -16,8 +16,8 @@ const TABS = [
 ];
 
 const DATE_FILTERS = [
-    { value: 'week', label: 'Semana' },
-    { value: 'month', label: 'Mes' },
+    { value: 'week', label: 'Semanal' },
+    { value: 'month', label: 'Mensual' },
     { value: 'year', label: 'Año' },
     { value: 'all', label: 'Todo' },
 ];

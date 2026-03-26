@@ -12,8 +12,9 @@ function getAdminSupabase() {
 function getDateBoundary(range) {
     const now = new Date();
     switch (range) {
-        case 'week': return null; // 'week' = view mode (weekly grouping), not a data filter
-        case 'month': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        // 'week' and 'month' are VIEW MODES (grouping), not data filters
+        case 'week': return null;
+        case 'month': return null;
         case 'year': return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
         default: return null;
     }
@@ -75,19 +76,6 @@ export async function GET(request) {
             monthMap[key].missions += 1;
         }
         const monthlyTrend = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
-
-        // Per-school breakdown by month (for stacked bar chart)
-        const schoolMonthMap = {};
-        const allSchoolNames = new Set();
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const school = c.school_name_snapshot || 'Sin nombre';
-            allSchoolNames.add(school);
-            if (!schoolMonthMap[key]) schoolMonthMap[key] = { month: key };
-            schoolMonthMap[key][school] = (schoolMonthMap[key][school] || 0) + (c.total_students || 0);
-        }
-        const schoolMonthlyTrend = Object.values(schoolMonthMap).sort((a, b) => a.month.localeCompare(b.month));
 
         // Per-school totals for the selected period
         const schoolTotals = {};
