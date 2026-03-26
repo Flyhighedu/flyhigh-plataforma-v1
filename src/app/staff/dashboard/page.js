@@ -1706,7 +1706,18 @@ export default function StaffDashboard() {
         setCurrentStep(1);
     };
 
-    const handleCheckoutComplete = useCallback(() => {
+    const handleCheckoutComplete = useCallback(async () => {
+        // If this was a demo school, auto-cleanup all demo data
+        const currentSchoolId = todaySchool?.id;
+        if (String(currentSchoolId) === '999999') {
+            try {
+                await fetch('/api/staff/deploy-demo', { method: 'DELETE' });
+                console.log('🧹 Demo data cleaned up automatically after checkout.');
+            } catch (e) {
+                console.warn('Demo cleanup failed (non-blocking):', e);
+            }
+        }
+
         // Reset ALL flow state to force clean return to lobby
         setCurrentStep(0);
         setMissionState(null);
@@ -1722,9 +1733,10 @@ export default function StaffDashboard() {
             window.localStorage.removeItem('flyhigh_staff_mission');
             window.localStorage.removeItem('flyhigh_selected_mission_id');
             window.localStorage.removeItem('flyhigh_active_journey_id');
+            window.localStorage.removeItem('flyhigh_test_mode');
         }
         refreshMission();
-    }, [refreshMission]);
+    }, [refreshMission, todaySchool]);
 
     const handleGoToReport = async () => {
         if (isStartingClosureFlow) return;
