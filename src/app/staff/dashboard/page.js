@@ -61,6 +61,7 @@ import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
 import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import TaskErrorBoundary from '@/components/staff/TaskErrorBoundary';
 import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
+import StartDemoFab from '@/components/staff/StartDemoFab';
 
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
@@ -1706,6 +1707,22 @@ export default function StaffDashboard() {
     };
 
     const handleCheckoutComplete = useCallback(() => {
+        // Reset ALL flow state to force clean return to lobby
+        setCurrentStep(0);
+        setMissionState(null);
+        setTeacherFlowState(null);
+        setAuxFlowState(null);
+        setWaitingForAux(false);
+        setTodaySchool(null);
+        setJourneyId(null);
+        setLobbyMode(true);
+        setShowBrief(true);
+        // Clear persisted mission data
+        if (typeof window !== 'undefined' && window.localStorage) {
+            window.localStorage.removeItem('flyhigh_staff_mission');
+            window.localStorage.removeItem('flyhigh_selected_mission_id');
+            window.localStorage.removeItem('flyhigh_active_journey_id');
+        }
         refreshMission();
     }, [refreshMission]);
 
@@ -2018,6 +2035,12 @@ export default function StaffDashboard() {
                     {profile?.role === 'admin' && noSchoolToday && (
                         <MissionSelector onSelect={handleManualMissionSelect} />
                     )}
+
+                    {/* Demo Mode FAB */}
+                    <StartDemoFab
+                        onDemoStarted={() => refreshMission()}
+                        schoolId={todaySchool?.id}
+                    />
                 </div>
             </div>
         );
