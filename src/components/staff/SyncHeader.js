@@ -258,7 +258,6 @@ export default function SyncHeader({
         !hideTeacherCivicFab &&
         role === 'teacher' &&
         teacherCivicDecision === 'yes' &&
-        !teacherCivicStarted &&
         !teacherCivicCompleted &&
         !showCivicRecorder &&
         !isCivicRecording;
@@ -1165,16 +1164,43 @@ export default function SyncHeader({
 
                                     {/* Error + retry */}
                                     {civicError && (
-                                        <div className="rounded-xl border border-red-200 bg-red-50 p-3.5">
+                                        <div className="rounded-xl border border-red-200 bg-red-50 p-3.5 mt-4">
                                             <p className="m-0 text-sm font-bold text-red-700">{civicError}</p>
                                             {pendingCivicBlob && !isCivicRecording && (
+                                                <div className="mt-3 flex flex-col gap-2.5">
+                                                    <button
+                                                        onClick={handleRetryAudioUpload}
+                                                        disabled={isCivicSaving}
+                                                        className="w-full rounded-xl bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white text-sm font-bold py-2.5 transition-all"
+                                                        style={{ opacity: isCivicSaving ? 0.65 : 1 }}
+                                                    >
+                                                        Reintentar guardado
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setCivicError('');
+                                                            setPendingCivicBlob(null);
+                                                            setShowCivicRecorder(false);
+                                                            setShowCivicStartModal(true);
+                                                        }}
+                                                        disabled={isCivicSaving}
+                                                        className="w-full rounded-xl border border-red-300 bg-white hover:bg-red-50 active:scale-[0.98] text-red-700 text-sm font-bold py-2.5 transition-all"
+                                                        style={{ opacity: isCivicSaving ? 0.65 : 1 }}
+                                                    >
+                                                        Descartar y grabar de nuevo
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {!pendingCivicBlob && !isCivicRecording && (
                                                 <button
-                                                    onClick={handleRetryAudioUpload}
-                                                    disabled={isCivicSaving}
-                                                    className="mt-2.5 w-full rounded-xl bg-red-500 text-white text-sm font-bold py-2"
-                                                    style={{ opacity: isCivicSaving ? 0.65 : 1 }}
+                                                    onClick={() => {
+                                                        setCivicError('');
+                                                        setShowCivicRecorder(false);
+                                                        setShowCivicStartModal(true);
+                                                    }}
+                                                    className="mt-3 w-full rounded-xl bg-red-500 hover:bg-red-600 active:scale-[0.98] text-white text-sm font-bold py-2.5 transition-all"
                                                 >
-                                                    Reintentar guardado
+                                                    Grabar de nuevo
                                                 </button>
                                             )}
                                         </div>
