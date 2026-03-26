@@ -64,15 +64,17 @@ export default function StartDemoFab({ onDemoStarted, minimal = false, schoolId 
             // Save mission ID so refreshMission auto-selects it (prevents race condition)
             if (!isDemoMode) {
                 localStorage.setItem('flyhigh_selected_mission_id', String(TEST_SCHOOL_ID));
+                if (onDemoStarted) onDemoStarted();
+                setLoading(false);
             } else {
+                // EXIT DEMO: clean everything and force reload for instant lobby return
                 localStorage.removeItem('flyhigh_selected_mission_id');
+                localStorage.removeItem('flyhigh_staff_mission');
+                localStorage.removeItem('flyhigh_active_journey_id');
+                localStorage.removeItem('flyhigh_test_mode');
+                window.location.reload();
+                return; // Don't continue — page is reloading
             }
-
-            if (onDemoStarted) onDemoStarted();
-
-            // Force a UI update just in case
-            setLoading(false);
-            alert(isDemoMode ? 'Saliendo de modo demo. Regresando a misión real...' : 'Escuela Demo iniciada. Esperando sincronización...');
 
         } catch (error) {
             console.error('Error in demo action:', error);
