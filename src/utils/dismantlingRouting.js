@@ -249,14 +249,32 @@ export function resolveDismantlingRoute(role, meta) {
             return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.EQUIPMENT_UNLOAD, routeKey: 'teacher:equipment_unload' };
         }
 
-        if (
-            !flags.pilotReturnInventoryDone ||
-            !flags.pilotElectronicsCharged ||
-            !flags.auxRecordingCharged ||
-            !flags.auxFinalParkingDone ||
-            !flags.auxKeyDropDone
-        ) {
+        // 1. Si el piloto aún trabaja (inventario o carga) → docente apoya en bodega
+        if (!flags.pilotReturnInventoryDone || !flags.pilotElectronicsCharged) {
             return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.APOYO_BODEGA, routeKey: 'teacher:apoyo_bodega' };
+        }
+
+        // 2. Si falta estacionamiento final o llaves del auxiliar → esperar al auxiliar
+        if (!flags.auxFinalParkingDone || !flags.auxKeyDropDone) {
+            const waitingForKeyDrop = flags.auxFinalParkingChecklistDone && !flags.auxKeyDropDone;
+            return {
+                kind: 'wait',
+                routeKey: waitingForKeyDrop ? 'teacher:wait_aux_key_drop' : 'teacher:wait_aux_parking',
+                waitChip: 'En espera del auxiliar',
+                waitMessage: waitingForKeyDrop
+                    ? 'Esperando resguardo de llaves del auxiliar...'
+                    : 'Esperando a que el auxiliar complete estacionamiento final...'
+            };
+        }
+
+        // 3. Si falta carga de grabación del auxiliar → esperar al auxiliar
+        if (!flags.auxRecordingCharged) {
+            return {
+                kind: 'wait',
+                routeKey: 'teacher:wait_aux_recording_charging',
+                waitChip: 'En espera del auxiliar',
+                waitMessage: 'Esperando a que el auxiliar conecte el equipo de grabación...'
+            };
         }
 
         return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.CHECKOUT, routeKey: 'teacher:checkout' };
