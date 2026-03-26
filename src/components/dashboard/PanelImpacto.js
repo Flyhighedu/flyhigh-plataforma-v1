@@ -149,7 +149,7 @@ function RichTooltip({ active, payload, label }) {
 /* ═══════════════════════════════════════════════════════
    3. INLINE SCHOOL BREAKDOWN (expands inside card)
    ═══════════════════════════════════════════════════════ */
-function InlineSchoolBreakdown({ entry, onClose }) {
+function InlineSchoolBreakdown({ entry, isDetailed, onClose }) {
     const contentRef = useRef(null);
     const [height, setHeight] = useState(0);
     const [opacity, setOpacity] = useState(0);
@@ -227,6 +227,20 @@ function InlineSchoolBreakdown({ entry, onClose }) {
                                         }}
                                     />
                                 </div>
+                                
+                                {isDetailed && (
+                                    <div className="ml-8 mt-2.5 flex items-center gap-4 text-[11px] bg-accent/40 rounded-lg px-3 py-2 text-muted-foreground border border-border/50">
+                                        <div className="flex gap-1.5 items-center">
+                                            <span><strong className="text-foreground">{s.missions}</strong> {s.missions === 1 ? 'misión' : 'misiones'}</span>
+                                        </div>
+                                        <div className="flex gap-1.5 items-center">
+                                            <span><strong className="text-foreground">{s.flights}</strong> vuelos logrados</span>
+                                        </div>
+                                        <div className="flex gap-1.5 items-center ml-auto">
+                                            <span><strong className="text-foreground text-primary">{s.students}</strong> de impacto</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -358,32 +372,99 @@ function ClickableBarChart({ data, xKey, yKey, height = 340, onBarClick, selecte
 /* ═══════════════════════════════════════════════════════
    5. MAIN PANEL EXPORT
    ═══════════════════════════════════════════════════════ */
-export default function PanelImpacto({ data, loading, dateRange }) {
-    const [selectedIndex, setSelectedIndex] = useState(null);
+export default function PanelImpacto({ data, loading, filter }) {
+    // ── Drill-Down State ──
     const chartCardRef = useRef(null);
     const unifiedGroupRef = useRef(null);
 
-    const isWeeklyView = dateRange === 'week';
+    // Initial state derived from filter
+    const getInitialDrillPath = useCallback((currentFilter) => {
+        if (!currentFilter || currentFilter.type === 'all') {
+            return [{ level: 'year', filterValue: null, label: 'Vista General Histórica', parentData: null }];
+        }
+        if (currentFilter.type === 'month') {
+            return [{ 
+                level: 'week', 
+                filterValue: `${currentFilter.year}-${String(currentFilter.month).padStart(2, '0')}`, 
+                label: `Vista de Mes (${SHORT_MONTHS[String(currentFilter.month).padStart(2, '0')] || currentFilter.month} ${currentFilter.year})`, 
+                parentData: null 
+            }];
+        }
+        if (currentFilter.type === 'custom') {
+            return [{ level: 'month', filterValue: null, label: 'Rango Personalizado', parentData: null }];
+        }
+        return [{ level: 'year', filterValue: null, label: 'Vista General', parentData: null }];
+    }, []);
 
-    // ── Prepare chart data ──
-    const monthlyData = useMemo(() =>
-        (data?.monthlyTrend || []).map(t => ({
-            ...t,
-            monthLabel: formatMonthLabel(t.month),
-            label: SHORT_MONTHS[t.month.split('-')[1]] || t.month,
-        })), [data?.monthlyTrend]);
+    const [drillPath, setDrillPath] = useState(getInitialDrillPath(filter));
+    
+    // Reset drill down when global filter changes
+    useEffect(() => {
+        setDrillPath(getInitialDrillPath(filter));
+    }, [filter, getInitialDrillPath]);
 
-    const weeklyData = useMemo(() =>
-        (data?.weeklyTrend || []).map((w, i) => ({
-            ...w,
-            weekLabel: formatWeekLabel(w.week, i),
-            label: formatWeekLabel(w.week, i),
-        })), [data?.weeklyTrend]);
+    const currentDrill = drillPath[drillPath.length - 1];
+    const isJoined = !!currentDrill.filterValue;
+    const activeDrillNode = isJoined ? currentDrill : null;
+    const selectedEntry = activeDrillNode ? activeDrillNode.parentData : null;
+    const periodLabel = activeDrillNode ? activeDrillNode.label : null;
 
-    const activeData = isWeeklyView ? weeklyData : monthlyData;
+    // ── Prepare chart data based on drill level ──
+    const processData = useCallback(() => {
+        let list = [];
+        if (currentDrill.level === 'year') {
+            list = data?.yearlyTrend || [];
+            list = list.map(y => ({ ...y, label: String(y.year), rawId: String(y.year) }));
+        } else if (currentDrill.level === 'month') {
+            list = data?.monthlyTrend || [];
+            if (currentDrill.filterValue) {
+               list = list.filter(m => m.month.startsWith(currentDrill.filterValue));
+            }
+            list = list.map(m => ({ ...m, label: SHORT_MONTHS[m.month.split('-')[1]] || m.month, rawId: m.month }));
+        } else if (currentDrill.level === 'week') {
+            list = data?.weeklyTrend || [];
+            if (currentDrill.filterValue) {
+               list = list.filter(w => {
+                   const monday = new Date(`${w.week}T12:00:00Z`);
+                   const sunday = new Date(monday);
+                   sunday.setUTCDate(monday.getUTCDate() + 6);
+                   const mStr = currentDrill.filterValue; // e.g. "2026-03"
+                   return w.week.startsWith(mStr) || sunday.toISOString().startsWith(mStr);
+               });
+            }
+            list = list.map((w, i) => {
+                const monday = new Date(`${w.week}T12:00:00Z`);
+                const labelStr = currentDrill.filterValue 
+                    ? `Semana del ${monday.getUTCDate()}` 
+                    : `S-${monday.getUTCDate()} ${SHORT_MONTHS[String(monday.getUTCMonth()+1).padStart(2,'0')]}`;
+                return { ...w, label: labelStr, rawId: w.week };
+            });
+        } else if (currentDrill.level === 'day') {
+            list = data?.dailyTrend || [];
+            if (currentDrill.filterValue) { // e.g., '2026-03-02' (A Monday)
+               const baseMonday = new Date(`${currentDrill.filterValue}T12:00:00Z`);
+               const daysInWeek = Array.from({length: 7}, (_, i) => {
+                   const d = new Date(baseMonday);
+                   d.setUTCDate(baseMonday.getUTCDate() + i);
+                   return d.toISOString().split('T')[0];
+               });
+               list = list.filter(d => daysInWeek.includes(d.day));
+            }
+            list = list.map((d) => {
+                const date = new Date(`${d.day}T12:00:00Z`);
+                const label = `${date.getUTCDate()} ${SHORT_MONTHS[String(date.getUTCMonth()+1).padStart(2,'0')]}`;
+                return { ...d, label, rawId: d.day };
+            });
+        } else if (currentDrill.level === 'detail') {
+            list = currentDrill.parentData?.schools || [];
+            list = list.map((s) => ({ ...s, label: s.name.length > 20 ? s.name.substring(0, 17) + '...' : s.name, rawId: s.name }));
+        }
+        return list;
+    }, [data, currentDrill]);
+
+    const activeData = useMemo(() => processData(), [processData]);
 
     // ── Compute metrics: selected period or global ──
-    const selectedEntry = selectedIndex != null ? activeData[selectedIndex] : null;
 
     const metrics = useMemo(() => {
         if (!data) return { students: 0, flights: 0, hours: 0, missions: 0, becados: 0, schools: 0 };
@@ -415,42 +496,47 @@ export default function PanelImpacto({ data, loading, dateRange }) {
             Vuelos: d.flights,
         })), [activeData]);
 
-    const handleBarClick = useCallback((entry, index) => {
-        setSelectedIndex(prev => {
-            const newIndex = prev === index ? null : index;
-            
-            // Auto-scroll the unified group into view so both the top cards and bottom schools are visible
-            if (newIndex != null) {
-                setTimeout(() => {
-                    if (unifiedGroupRef.current) {
-                        const header = document.querySelector('header');
-                        const headerHeight = header?.getBoundingClientRect().height || 72;
-                        const groupTop = unifiedGroupRef.current.getBoundingClientRect().top + window.scrollY;
-                        window.scrollTo({
-                            top: groupTop - headerHeight - 16,
-                            behavior: 'smooth',
-                        });
-                    }
-                }, 100); // Slight delay to let CSS resize kickoff before measuring
-            }
-            
-            return newIndex;
+    const handleBarClick = useCallback((entry) => {
+        let nextLevel;
+        if (currentDrill.level === 'year') nextLevel = 'month';
+        else if (currentDrill.level === 'month') nextLevel = 'week';
+        else if (currentDrill.level === 'week') nextLevel = 'day';
+        else if (currentDrill.level === 'day') nextLevel = 'detail';
+        else return; // No further drill down
+
+        setDrillPath(prev => {
+            return [...prev, {
+                level: nextLevel,
+                filterValue: entry.rawId,
+                label: currentDrill.level === 'week' ? `Día ${entry.label}` : currentDrill.level === 'day' ? `Detalle ${entry.label}` : entry.label,
+                parentData: entry
+            }];
         });
+
+        // Auto-scroll the unified group into view
+        setTimeout(() => {
+            if (unifiedGroupRef.current) {
+                const header = document.querySelector('header');
+                const headerHeight = header?.getBoundingClientRect().height || 72;
+                const groupTop = unifiedGroupRef.current.getBoundingClientRect().top + window.scrollY;
+                window.scrollTo({
+                    top: groupTop - headerHeight - 16,
+                    behavior: 'smooth',
+                });
+            }
+        }, 100);
+    }, [currentDrill]);
+
+    const goBack = useCallback(() => {
+        setDrillPath(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
     }, []);
 
-    // ── Reset selection when view mode changes ──
-    useEffect(() => {
-        setSelectedIndex(null);
-    }, [dateRange]);
+    const jumpToLevel = useCallback((levelStr, labelStr) => {
+        setDrillPath([{ level: levelStr, filterValue: null, label: labelStr, parentData: null }]);
+    }, []);
 
     if (loading) return <SkeletonPanel />;
     if (!data) return null;
-
-    const periodLabel = selectedEntry
-        ? (selectedEntry.monthLabel || selectedEntry.weekLabel || selectedEntry.label)
-        : null;
-
-    const isJoined = selectedIndex != null;
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -498,19 +584,56 @@ export default function PanelImpacto({ data, loading, dateRange }) {
                 >
                     <div className="mb-6 flex items-start sm:items-center flex-col sm:flex-row justify-between gap-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-foreground">Alumnos Atendidos {isJoined && <span className="text-muted-foreground font-normal">· Reporte de {periodLabel}</span>}</h3>
+                            <h3 className="text-lg font-semibold text-foreground">
+                                Alumnos Atendidos 
+                                {isJoined 
+                                    ? <span className="text-muted-foreground font-normal"> · Desglose {periodLabel}</span>
+                                    : <span className="text-muted-foreground font-normal"> · Agrupación Mensual/Semanal</span>
+                                }
+                            </h3>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                {isWeeklyView ? 'Desglose semanal' : 'Desglose mensual'} · Haz click en una barra para {isJoined ? 'cerrar o cambiar de' : 'ver las escuelas de ese'} periodo
+                                {currentDrill.level === 'day' 
+                                    ? 'Visualizando impacto por día' 
+                                    : 'Haz click en una barra para profundizar en ese periodo temporal'
+                                }
                             </p>
                         </div>
-                        {isJoined && (
-                            <button
-                                onClick={() => setSelectedIndex(null)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all duration-200 animate-in fade-in zoom-in-95 self-end sm:self-auto"
-                            >
-                                ✕ Cerrar reporte
-                            </button>
-                        )}
+                        
+                        <div className="flex flex-col-reverse sm:flex-row items-end sm:items-center gap-3">
+                            {/* Selector de Granularidad Global */}
+                            <div className="flex items-center p-1 bg-muted/40 border border-border/50 rounded-xl">
+                                {[
+                                    { id: 'year', label: 'Año' },
+                                    { id: 'month', label: 'Mes' },
+                                    { id: 'week', label: 'Sem' },
+                                    { id: 'day', label: 'Día' }
+                                ].map(opt => {
+                                    const isActive = currentDrill.level === opt.id && !currentDrill.filterValue;
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => jumpToLevel(opt.id, `Vista Global por ${opt.label}`)}
+                                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                                                isActive ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Botón Volver (solo en inmersión activa) */}
+                            {drillPath.length > 1 && (
+                                <button
+                                    onClick={goBack}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-secondary/80 text-foreground hover:bg-secondary transition-all duration-200 animate-in fade-in zoom-in-95"
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                                    Volver atrás
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="transition-[height] duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden" style={{ height: isJoined ? 240 : 340 }}>
                         <ClickableBarChart
@@ -519,16 +642,17 @@ export default function PanelImpacto({ data, loading, dateRange }) {
                             yKey="students"
                             height={isJoined ? 240 : 340}
                             onBarClick={handleBarClick}
-                            selectedIndex={selectedIndex}
+                            selectedIndex={null} // We don't retain highlight, the whole chart zooms in
                         />
                     </div>
 
                     {/* ── Inline Expansion: school breakdown ── */}
                     {selectedEntry && selectedEntry.schools?.length > 0 && (
                         <InlineSchoolBreakdown
-                            key={selectedIndex}
+                            key={currentDrill.filterValue} // Re-animate on path change
                             entry={selectedEntry}
-                            onClose={() => setSelectedIndex(null)}
+                            isDetailed={currentDrill.level === 'detail'}
+                            onClose={goBack}
                         />
                     )}
                 </div>
@@ -538,9 +662,9 @@ export default function PanelImpacto({ data, loading, dateRange }) {
             <div className="rounded-2xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h3 className="text-lg font-semibold text-foreground">Tendencia de Crecimiento</h3>
+                        <h3 className="text-lg font-semibold text-foreground">Tendencia General de Crecimiento</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Evolución de alumnos y vuelos {isWeeklyView ? 'por semana' : 'por mes'}
+                            Evolución de alumnos y vuelos de manera global
                         </p>
                     </div>
                     <div className="flex items-center gap-4 text-xs">

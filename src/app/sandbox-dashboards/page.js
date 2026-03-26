@@ -15,14 +15,131 @@ const TABS = [
     { id: 'patrocinios', label: 'Patrocinios', icon: '💎', description: 'Fondo de patrocinadores' },
 ];
 
-const DATE_FILTERS = [
-    { value: 'week', label: 'Semanal' },
-    { value: 'month', label: 'Mensual' },
-    { value: 'year', label: 'Año' },
-    { value: 'all', label: 'Todo' },
-];
+/* ── Period Selector UI ── */
+function PeriodSelector({ filter, setFilter }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('mes'); // 'general', 'mes', 'rango'
+    const currentYear = new Date().getFullYear();
+    const [year, setYear] = useState(currentYear);
+    
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
-/* ── Theme Toggle Switch ── */
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const triggerLabel = () => {
+        if (filter.type === 'month') return `${months[filter.month - 1]} ${filter.year}`;
+        if (filter.type === 'custom') return `${filter.start} al ${filter.end}`;
+        return 'Todo el tiempo';
+    };
+
+    return (
+        <div className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-secondary/50 text-sm font-medium text-foreground hover:bg-accent transition-colors shadow-sm"
+            >
+                <span className="text-muted-foreground">📅</span>
+                {triggerLabel()}
+                <svg className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-border bg-card shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Tabs */}
+                        <div className="flex border-b border-border bg-muted/40 p-2 gap-1 rounded-t-2xl">
+                            {['general', 'mes', 'rango'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`flex-1 text-xs font-semibold py-1.5 rounded-lg capitalize transition-colors ${activeTab === tab ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-4">
+                            {activeTab === 'general' && (
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => { setFilter({ type: 'all' }); setIsOpen(false); }}
+                                        className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-colors ${filter.type === 'all' ? 'bg-primary/10 text-primary font-bold shadow-inner' : 'hover:bg-accent text-foreground'}`}
+                                    >
+                                        🌐 Todo el tiempo
+                                    </button>
+                                </div>
+                            )}
+
+                            {activeTab === 'mes' && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-4 px-2">
+                                        <button onClick={() => setYear(y => y - 1)} className="p-1 hover:bg-accent rounded-lg text-muted-foreground transition-colors">◀</button>
+                                        <span className="font-bold text-foreground text-sm">{year}</span>
+                                        <button onClick={() => setYear(y => y + 1)} className="p-1 hover:bg-accent rounded-lg text-muted-foreground transition-colors">▶</button>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {months.map((m, i) => {
+                                            const isSelected = filter.type === 'month' && filter.month === i + 1 && filter.year === year;
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => { setFilter({ type: 'month', year, month: i + 1 }); setIsOpen(false); }}
+                                                    className={`py-2 rounded-xl text-sm font-medium transition-all ${isSelected ? 'bg-primary text-primary-foreground shadow-md scale-105' : 'bg-muted/30 hover:bg-accent text-muted-foreground hover:text-foreground'}`}
+                                                >
+                                                    {m}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'rango' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Desde</label>
+                                            <input
+                                                type="date"
+                                                value={startDate}
+                                                onChange={(e) => setStartDate(e.target.value)}
+                                                className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Hasta</label>
+                                            <input
+                                                type="date"
+                                                value={endDate}
+                                                onChange={(e) => setEndDate(e.target.value)}
+                                                className="w-full bg-accent/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button
+                                        disabled={!startDate || !endDate}
+                                        onClick={() => { setFilter({ type: 'custom', start: startDate, end: endDate }); setIsOpen(false); }}
+                                        className="w-full py-2.5 mt-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold shadow-sm disabled:opacity-50 transition-all hover:opacity-90 active:scale-95"
+                                    >
+                                        Aplicar Rango
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+/* ── Theme Switch ── */
 function ThemeSwitch() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
@@ -34,7 +151,7 @@ function ThemeSwitch() {
     return (
         <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            className="relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+            className="relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 shadow-inner"
             style={{ backgroundColor: isDark ? '#6366f1' : '#e2e8f0' }}
             aria-label="Toggle theme"
         >
@@ -55,7 +172,7 @@ function Sidebar({ activeTab, onTabChange }) {
             {/* Logo */}
             <div className="px-6 py-6 border-b border-border">
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">✈️</span>
+                    <span className="text-2xl drop-shadow-sm">✈️</span>
                     <div>
                         <h1 className="text-base font-extrabold tracking-tight text-foreground">Fly High</h1>
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Analytics</p>
@@ -91,7 +208,7 @@ function Sidebar({ activeTab, onTabChange }) {
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-border">
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground font-medium">
                     Datos en tiempo real · Supabase
                 </p>
             </div>
@@ -100,9 +217,8 @@ function Sidebar({ activeTab, onTabChange }) {
 }
 
 /* ── Top Bar ── */
-function TopBar({ activeTab, dateRange, onDateChange }) {
+function TopBar({ activeTab, filter, setFilter }) {
     const tabInfo = TABS.find(t => t.id === activeTab);
-    const [filterOpen, setFilterOpen] = useState(false);
 
     return (
         <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur-xl">
@@ -116,41 +232,7 @@ function TopBar({ activeTab, dateRange, onDateChange }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {/* Date Filter Dropdown */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setFilterOpen(!filterOpen)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-secondary/50 text-sm font-medium text-foreground hover:bg-accent transition-colors"
-                        >
-                            <span className="text-muted-foreground">📅</span>
-                            {DATE_FILTERS.find(f => f.value === dateRange)?.label || 'Todo'}
-                            <svg className={`w-4 h-4 text-muted-foreground transition-transform ${filterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {filterOpen && (
-                            <>
-                                <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
-                                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-border bg-card shadow-xl z-20 overflow-hidden">
-                                    {DATE_FILTERS.map(f => (
-                                        <button
-                                            key={f.value}
-                                            onClick={() => { onDateChange(f.value); setFilterOpen(false); }}
-                                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors
-                                                ${dateRange === f.value
-                                                    ? 'bg-primary/10 text-primary font-semibold'
-                                                    : 'text-foreground hover:bg-accent'
-                                                }`}
-                                        >
-                                            {f.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Theme Switch */}
+                    {activeTab !== 'impacto' && <PeriodSelector filter={filter} setFilter={setFilter} />}
                     <ThemeSwitch />
                 </div>
             </div>
@@ -161,7 +243,7 @@ function TopBar({ activeTab, dateRange, onDateChange }) {
 /* ── Main Page ── */
 export default function SandboxDashboardsPage() {
     const [activeTab, setActiveTab] = useState('impacto');
-    const [dateRange, setDateRange] = useState('all');
+    const [filter, setFilter] = useState({ type: 'month', year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -170,7 +252,22 @@ export default function SandboxDashboardsPage() {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/sandbox-dashboards?range=${dateRange}`);
+            let query = '/api/sandbox-dashboards?';
+            const effectiveFilter = activeTab === 'impacto' ? { type: 'all' } : filter;
+
+            if (effectiveFilter.type === 'month') {
+                const start = `${filter.year}-${String(filter.month).padStart(2, '0')}-01`;
+                const nextMonth = filter.month === 12 ? 1 : filter.month + 1;
+                const nextYear = filter.month === 12 ? filter.year + 1 : filter.year;
+                const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+                query += `start=${start}&end=${end}`;
+            } else if (filter.type === 'custom') {
+                query += `start=${filter.start}&end=${filter.end}T23:59:59.999Z`;
+            } else {
+                query += `range=all`;
+            }
+
+            const res = await fetch(query);
             if (!res.ok) throw new Error('Error al cargar datos');
             const json = await res.json();
             setData(json);
@@ -180,43 +277,50 @@ export default function SandboxDashboardsPage() {
         } finally {
             setLoading(false);
         }
-    }, [dateRange]);
+    }, [filter, activeTab]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const panelMap = {
-        impacto: <PanelImpacto data={data?.impacto} loading={loading} dateRange={dateRange} />,
+        impacto: <PanelImpacto data={data?.impacto} loading={loading} filter={filter} />,
         operacion: <PanelOperacion data={data?.operacion} loading={loading} />,
         escuelas: <PanelEscuelas data={data?.escuelas} loading={loading} />,
         patrocinios: <PanelPatrocinios data={data?.patrocinios} loading={loading} />,
     };
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen bg-background">
             <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-            <div className="flex-1 ml-[260px]">
+            <div className="flex-1 ml-[260px] relative">
                 <TopBar
                     activeTab={activeTab}
-                    dateRange={dateRange}
-                    onDateChange={setDateRange}
+                    filter={filter}
+                    setFilter={setFilter}
                 />
 
                 <main className="px-8 py-6">
+                    {loading && (
+                        <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] z-10 flex items-center justify-center pointer-events-none transition-opacity duration-300">
+                            <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin shadow-lg"></div>
+                        </div>
+                    )}
                     {error && (
-                        <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4">
+                        <div className="mb-6 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 shadow-sm animate-in fade-in slide-in-from-top-4">
                             <p className="text-sm text-red-700 dark:text-red-400 font-medium">
                                 ⚠️ {error}
                             </p>
                             <button
                                 onClick={fetchData}
-                                className="mt-2 text-xs text-red-600 dark:text-red-400 underline hover:no-underline"
+                                className="mt-2 text-xs text-red-600 dark:text-red-400 font-semibold hover:text-red-800 transition-colors"
                             >
                                 Reintentar
                             </button>
                         </div>
                     )}
-                    {panelMap[activeTab]}
+                    <div className={loading ? 'opacity-40 transition-opacity pointer-events-none' : 'opacity-100 transition-opacity'}>
+                        {panelMap[activeTab]}
+                    </div>
                 </main>
             </div>
         </div>

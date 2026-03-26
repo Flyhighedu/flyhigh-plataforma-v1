@@ -35,13 +35,19 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const range = searchParams.get('range') || 'all';
         const monthFilter = searchParams.get('month') || null; // e.g. '2026-03'
+        const startDateParam = searchParams.get('start');
+        const endDateParam = searchParams.get('end');
+
+        const monthBounds = monthFilter ? getMonthBoundary(monthFilter) : null;
         const dateBoundary = getDateBoundary(range);
-        const monthBounds = getMonthBoundary(monthFilter);
 
         // ── PANEL 1: Impacto General ──
         let cierresQuery = supabase.from('cierres_mision')
             .select('total_students, total_flights, becados, created_at, school_name_snapshot, end_time');
-        if (monthBounds) {
+        
+        if (startDateParam && endDateParam) {
+            cierresQuery = cierresQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
+        } else if (monthBounds) {
             cierresQuery = cierresQuery.gte('created_at', monthBounds[0]).lt('created_at', monthBounds[1]);
         } else if (dateBoundary) {
             cierresQuery = cierresQuery.gte('created_at', dateBoundary);
@@ -50,7 +56,10 @@ export async function GET(request) {
 
         let bitacoraQuery = supabase.from('bitacora_vuelos')
             .select('duration_seconds, student_count, start_time, end_time, created_at, journey_id');
-        if (monthBounds) {
+            
+        if (startDateParam && endDateParam) {
+            bitacoraQuery = bitacoraQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
+        } else if (monthBounds) {
             bitacoraQuery = bitacoraQuery.gte('created_at', monthBounds[0]).lt('created_at', monthBounds[1]);
         } else if (dateBoundary) {
             bitacoraQuery = bitacoraQuery.gte('created_at', dateBoundary);
@@ -87,11 +96,30 @@ export async function GET(request) {
             schoolTotals[school].missions += 1;
         }
 
+        // Yearly trend
+        const yearMap = {};
+        for (const c of (cierres || [])) {
+            const d = new Date(c.created_at);
+            const key = `${d.getFullYear()}`;
+            if (!yearMap[key]) yearMap[key] = { year: key, students: 0, flights: 0, missions: 0, schools: {} };
+            yearMap[key].students += (c.total_students || 0);
+            yearMap[key].flights += (c.total_flights || 0);
+            yearMap[key].missions += 1;
+            const school = c.school_name_snapshot || 'Sin nombre';
+            if (!yearMap[key].schools[school]) yearMap[key].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
+            yearMap[key].schools[school].students += (c.total_students || 0);
+            yearMap[key].schools[school].flights += (c.total_flights || 0);
+            yearMap[key].schools[school].missions += 1;
+        }
+        const yearlyTrend = Object.values(yearMap).sort((a, b) => a.year.localeCompare(b.year)).map(y => ({
+            ...y,
+            schools: Object.values(y.schools).sort((a, b) => b.students - a.students)
+        }));
+
         // Weekly trend (group by ISO week)
         const weekMap = {};
         for (const c of (cierres || [])) {
             const d = new Date(c.created_at);
-            // Get ISO week start (Monday)
             const day = d.getDay();
             const diff = d.getDate() - day + (day === 0 ? -6 : 1);
             const monday = new Date(d);
@@ -110,6 +138,26 @@ export async function GET(request) {
         const weeklyTrend = Object.values(weekMap).sort((a, b) => a.week.localeCompare(b.week)).map(w => ({
             ...w,
             schools: Object.values(w.schools).sort((a, b) => b.students - a.students)
+        }));
+
+        // Daily trend
+        const dailyMap = {};
+        for (const c of (cierres || [])) {
+            const d = new Date(c.created_at);
+            const key = d.toISOString().slice(0, 10);
+            if (!dailyMap[key]) dailyMap[key] = { day: key, students: 0, flights: 0, missions: 0, schools: {} };
+            dailyMap[key].students += (c.total_students || 0);
+            dailyMap[key].flights += (c.total_flights || 0);
+            dailyMap[key].missions += 1;
+            const school = c.school_name_snapshot || 'Sin nombre';
+            if (!dailyMap[key].schools[school]) dailyMap[key].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
+            dailyMap[key].schools[school].students += (c.total_students || 0);
+            dailyMap[key].schools[school].flights += (c.total_flights || 0);
+            dailyMap[key].schools[school].missions += 1;
+        }
+        const dailyTrend = Object.values(dailyMap).sort((a, b) => a.day.localeCompare(b.day)).map(d => ({
+            ...d,
+            schools: Object.values(d.schools).sort((a, b) => b.students - a.students)
         }));
 
         // Add per-school detail to each month entry (for click-to-detail)
@@ -136,8 +184,10 @@ export async function GET(request) {
             totalMissions: (cierres || []).length,
             totalBecados,
             sponsoredKidsGoal: statsRow?.total_sponsored_kids || 7209,
+            yearlyTrend,
             monthlyTrend: monthlyTrendWithDetail,
             weeklyTrend,
+            dailyTrend,
             schoolTotals: Object.values(schoolTotals).sort((a, b) => b.students - a.students),
         };
 
@@ -145,14 +195,20 @@ export async function GET(request) {
         const { data: catalogo } = await supabase.from('catalogo_escuelas').select('ninos');
         const totalCatalogKids = (catalogo || []).reduce((s, e) => s + (e.ninos || 0), 0);
         const capacityUtil = totalCatalogKids > 0 ? Math.round((totalStudents / totalCatalogKids) * 100) : 0;
-        const avgFlightDuration = (bitacora || []).length > 0
-            ? Math.round((bitacora || []).reduce((s, b) => s + (b.duration_seconds || 0), 0) / (bitacora || []).length)
+        
+        // Filtrar vuelos válidos para duración (excluye < 30 segs o > 30 mins generados por bugs)
+        const validFlightsForDuration = (bitacora || []).filter(b => b.duration_seconds >= 30 && b.duration_seconds <= 1800);
+        const avgFlightDuration = validFlightsForDuration.length > 0
+            ? Math.round(validFlightsForDuration.reduce((s, b) => s + b.duration_seconds, 0) / validFlightsForDuration.length)
             : 0;
-        const avgStudentsPerFlight = (bitacora || []).length > 0
-            ? Math.round((bitacora || []).reduce((s, b) => s + (b.student_count || 0), 0) / (bitacora || []).length * 10) / 10
+            
+        // Filtrar vuelos válidos para alumnos (excluye vuelos de prueba con 0 alumnos o errores absurdos > 50)
+        const validFlightsForStudents = (bitacora || []).filter(b => b.student_count > 0 && b.student_count <= 50);
+        const avgStudentsPerFlight = validFlightsForStudents.length > 0
+            ? Math.round(validFlightsForStudents.reduce((s, b) => s + b.student_count, 0) / validFlightsForStudents.length * 10) / 10
             : 0;
 
-        // Wait time between flights per journey
+        // Wait time between flights per journey (Tiempo entre vuelos)
         const journeyFlights = {};
         for (const b of (bitacora || [])) {
             if (!b.journey_id || !b.start_time) continue;
@@ -160,19 +216,20 @@ export async function GET(request) {
             journeyFlights[b.journey_id].push(new Date(b.start_time).getTime());
         }
         let totalWait = 0, waitCount = 0;
-        const waitBuckets = { '0-2 min': 0, '3-5 min': 0, '6-10 min': 0, '11-15 min': 0, '16+ min': 0 };
+        const waitBuckets = { '0-2 min': 0, '3-5 min': 0, '6-10 min': 0, '11-15 min': 0, '15-20 min': 0 };
         for (const times of Object.values(journeyFlights)) {
             times.sort((a, b) => a - b);
             for (let i = 1; i < times.length; i++) {
                 const gap = (times[i] - times[i - 1]) / 60000;
-                if (gap > 0 && gap < 120) { 
+                // Filtrar gaps irreales: > 20 minutos usualmente indica el bug de "último vuelo" contado hasta fin de misión
+                if (gap > 0 && gap <= 20) { 
                     totalWait += gap; 
                     waitCount++;
                     if (gap <= 2) waitBuckets['0-2 min']++;
                     else if (gap <= 5) waitBuckets['3-5 min']++;
                     else if (gap <= 10) waitBuckets['6-10 min']++;
                     else if (gap <= 15) waitBuckets['11-15 min']++;
-                    else waitBuckets['16+ min']++;
+                    else waitBuckets['15-20 min']++;
                 }
             }
         }
@@ -183,10 +240,10 @@ export async function GET(request) {
         const cycleTimeMinutes = (avgFlightDuration / 60) + avgWaitMinutes;
         const avgStudentsPerHour = cycleTimeMinutes > 0 ? Math.round((avgStudentsPerFlight / cycleTimeMinutes) * 60 * 10) / 10 : 0;
 
-        // Flight duration distribution
+        // Flight duration distribution (basado solo en vuelos válidos)
         const durationBuckets = { '0-3 min': 0, '3-5 min': 0, '5-8 min': 0, '8-12 min': 0, '12+ min': 0 };
-        for (const b of (bitacora || [])) {
-            const mins = (b.duration_seconds || 0) / 60;
+        for (const b of validFlightsForDuration) {
+            const mins = b.duration_seconds / 60;
             if (mins <= 3) durationBuckets['0-3 min']++;
             else if (mins <= 5) durationBuckets['3-5 min']++;
             else if (mins <= 8) durationBuckets['5-8 min']++;
@@ -194,11 +251,10 @@ export async function GET(request) {
             else durationBuckets['12+ min']++;
         }
 
-        // Students per flight distribution
+        // Students per flight distribution (basado solo en vuelos válidos)
         const studentsBuckets = { '1-5': 0, '6-8': 0, '9-10': 0, '11-12': 0, '13+': 0 };
-        for (const b of (bitacora || [])) {
-            const sc = (b.student_count || 0);
-            if (sc === 0) continue; // Ignorar vuelos sin alumnos
+        for (const b of validFlightsForStudents) {
+            const sc = b.student_count;
             if (sc <= 5) studentsBuckets['1-5']++;
             else if (sc <= 8) studentsBuckets['6-8']++;
             else if (sc <= 10) studentsBuckets['9-10']++;
@@ -211,7 +267,7 @@ export async function GET(request) {
             avgStudentsPerFlight,
             avgStudentsPerHour,
             cycleTimeMinutes: Math.round(cycleTimeMinutes * 10) / 10,
-            totalFlightRecords: (bitacora || []).length,
+            totalFlightRecords: validFlightsForDuration.length,
             capacityUtilization: capacityUtil,
             avgWaitMinutes,
             durationDistribution: Object.entries(durationBuckets).map(([range, count]) => ({ range, count })),
@@ -234,7 +290,12 @@ export async function GET(request) {
         let journeysQuery = supabase.from('staff_journeys')
             .select('id, date, school_name, cct, status, created_at')
             .order('date', { ascending: false });
-        if (dateBoundary) journeysQuery = journeysQuery.gte('created_at', dateBoundary);
+        
+        if (startDateParam && endDateParam) {
+            journeysQuery = journeysQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
+        } else if (dateBoundary) {
+            journeysQuery = journeysQuery.gte('created_at', dateBoundary);
+        }
         const { data: journeys } = await journeysQuery;
 
         // Build cierre map
@@ -250,7 +311,12 @@ export async function GET(request) {
         let allCierresQuery = supabase.from('cierres_mision')
             .select('journey_id, total_students, total_flights, becados, school_name_snapshot, created_at, end_time')
             .order('created_at', { ascending: false });
-        if (dateBoundary) allCierresQuery = allCierresQuery.gte('created_at', dateBoundary);
+            
+        if (startDateParam && endDateParam) {
+            allCierresQuery = allCierresQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
+        } else if (dateBoundary) {
+            allCierresQuery = allCierresQuery.gte('created_at', dateBoundary);
+        }
         const { data: allCierres } = await allCierresQuery;
 
         const historyJourneyMap = {};
