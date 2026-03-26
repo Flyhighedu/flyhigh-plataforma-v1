@@ -61,6 +61,13 @@ export default function StartDemoFab({ onDemoStarted, minimal = false, schoolId 
             const data = await response.json();
             console.log('Demo action completed:', data);
 
+            // Save mission ID so refreshMission auto-selects it (prevents race condition)
+            if (!isDemoMode) {
+                localStorage.setItem('flyhigh_selected_mission_id', String(TEST_SCHOOL_ID));
+            } else {
+                localStorage.removeItem('flyhigh_selected_mission_id');
+            }
+
             if (onDemoStarted) onDemoStarted();
 
             // Force a UI update just in case

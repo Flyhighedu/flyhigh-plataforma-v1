@@ -1503,6 +1503,23 @@ export default function StaffDashboard() {
                                 setTodaySchool(schoolData);
                                 localStorage.setItem('flyhigh_staff_mission', JSON.stringify(schoolData));
                                 setNoSchoolToday(false);
+
+                                // Also discover the journey (prevents race condition with refreshMission)
+                                try {
+                                    const { data: journey } = await supabase
+                                        .from('staff_journeys')
+                                        .select('id')
+                                        .eq('date', today)
+                                        .eq('school_id', newSchool.id)
+                                        .single();
+                                    if (journey) {
+                                        console.log('📋 Journey discovered via listener:', journey.id);
+                                        setJourneyId(journey.id);
+                                    }
+                                } catch (e) {
+                                    console.warn('Journey lookup in listener failed (non-blocking):', e);
+                                }
+
                                 refreshMission();
                             } else if (['completada', 'cerrada'].includes(newSchool.estatus)) {
                                 console.log('✅ School completed/closed globally. Refreshing lobby list.');
