@@ -38,21 +38,28 @@ function formatWeekLabel(weekStr, index) {
 /* ═══════════════════════════════════════════════════════
    1. METRIC CARD
    ═══════════════════════════════════════════════════════ */
-function MetricCard({ icon, label, value, sublabel, accent }) {
+function MetricCard({ icon, label, value, sublabel, accent, isJoined }) {
     return (
-        <div className="group relative rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 overflow-hidden">
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `linear-gradient(135deg, ${accent}08, transparent 60%)` }} />
-            <div className="relative space-y-2">
-                <div className="flex items-center gap-2">
-                    <span className="text-lg">{icon}</span>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <div className={`group relative transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden ${
+            isJoined 
+            ? 'bg-transparent border-transparent px-4 py-3 hover:-translate-y-1' 
+            : 'rounded-2xl border border-border bg-card p-5 hover:shadow-lg hover:-translate-y-1'
+        }`}>
+            <div className="relative space-y-1.5">
+                <div className="flex items-center gap-3">
+                    <span 
+                        className={`text-lg transition-transform duration-500 flex items-center justify-center w-8 h-8 rounded-xl text-white shadow-md ${isJoined ? 'scale-110' : ''}`} 
+                        style={{ backgroundColor: accent }}
+                    >
+                        {icon}
+                    </span>
+                    <span className={`text-[11px] font-bold uppercase tracking-wider transition-colors duration-500 ${isJoined ? 'text-foreground/90' : 'text-muted-foreground'}`}>{label}</span>
                 </div>
-                <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
+                <p className="text-3xl font-extrabold tracking-tight tabular-nums text-foreground transition-all duration-500 mt-2">
                     {typeof value === 'number' ? value.toLocaleString() : value}
                 </p>
                 {sublabel && (
-                    <p className="text-xs text-muted-foreground">{sublabel}</p>
+                    <p className={`text-[11px] font-medium transition-colors duration-500 ${isJoined ? 'text-primary/80' : 'text-muted-foreground'}`}>{sublabel}</p>
                 )}
             </div>
         </div>
@@ -172,46 +179,20 @@ function InlineSchoolBreakdown({ entry, onClose }) {
             }}
         >
             <div ref={contentRef} style={{ opacity, transition: 'opacity 0.4s ease 0.15s' }}>
-                {/* Divider with gradient */}
-                <div className="relative my-5">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full h-px" style={{ background: `linear-gradient(90deg, transparent, ${PRIMARY}40, transparent)` }} />
-                    </div>
-                    <div className="relative flex justify-center">
-                        <span className="px-4 py-1 rounded-full text-xs font-semibold bg-card border border-border text-foreground">
-                            📊 {title} · {schools.length} escuelas
-                        </span>
-                    </div>
+                {/* Clean minimalist divider */}
+                <div className="relative my-4 flex items-center justify-center">
+                    <div className="w-full max-w-sm h-px" style={{ background: `linear-gradient(90deg, transparent, ${PRIMARY}40, transparent)` }} />
                 </div>
 
-                {/* Summary row */}
-                <div className="flex items-center gap-6 mb-4 px-1">
-                    <span className="text-xs text-muted-foreground">
-                        <strong className="text-foreground">{(entry.students || 0).toLocaleString()}</strong> alumnos
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                        <strong className="text-foreground">{entry.flights}</strong> vuelos
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                        <strong className="text-foreground">{entry.missions}</strong> misiones
-                    </span>
-                    <button
-                        onClick={onClose}
-                        className="ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
-                    >
-                        ✕ Cerrar
-                    </button>
-                </div>
-
-                {/* School list with staggered animation, letting the card grow infinitely */}
-                <div className="space-y-2.5 pr-1 mt-6">
+                {/* Lista de Escuelas (espacio optimizado al remover resumen redundante) */}
+                <div className="space-y-1 mt-3 pr-1">
                     {schools.map((s, i) => {
                         const max = schools[0]?.students || 1;
                         const pct = Math.round((s.students / max) * 100);
                         return (
                             <div
                                 key={s.name + i}
-                                className="group/school rounded-xl p-3 hover:bg-secondary/40 transition-all duration-200"
+                                className="group/school rounded-xl py-2 px-3 hover:bg-secondary/40 transition-all duration-200"
                                 style={{
                                     opacity,
                                     transform: opacity === 1 ? 'translateY(0)' : 'translateY(8px)',
@@ -380,6 +361,7 @@ function ClickableBarChart({ data, xKey, yKey, height = 340, onBarClick, selecte
 export default function PanelImpacto({ data, loading, dateRange }) {
     const [selectedIndex, setSelectedIndex] = useState(null);
     const chartCardRef = useRef(null);
+    const unifiedGroupRef = useRef(null);
 
     const isWeeklyView = dateRange === 'week';
 
@@ -404,7 +386,7 @@ export default function PanelImpacto({ data, loading, dateRange }) {
     const selectedEntry = selectedIndex != null ? activeData[selectedIndex] : null;
 
     const metrics = useMemo(() => {
-        if (!data) return { students: 0, flights: 0, hours: 0, missions: 0, becados: 0 };
+        if (!data) return { students: 0, flights: 0, hours: 0, missions: 0, becados: 0, schools: 0 };
         if (selectedEntry) {
             return {
                 students: selectedEntry.students || 0,
@@ -412,6 +394,7 @@ export default function PanelImpacto({ data, loading, dateRange }) {
                 missions: selectedEntry.missions || 0,
                 hours: data.totalHours,
                 becados: data.totalBecados || 0,
+                schools: selectedEntry.schools?.length || 0
             };
         }
         return {
@@ -420,6 +403,7 @@ export default function PanelImpacto({ data, loading, dateRange }) {
             hours: data.totalHours || 0,
             missions: data.totalMissions || 0,
             becados: data.totalBecados || 0,
+            schools: data.schoolTotals?.length || 0
         };
     }, [data, selectedEntry]);
 
@@ -431,23 +415,25 @@ export default function PanelImpacto({ data, loading, dateRange }) {
             Vuelos: d.flights,
         })), [activeData]);
 
-    // ── Handle bar click ──
     const handleBarClick = useCallback((entry, index) => {
         setSelectedIndex(prev => {
             const newIndex = prev === index ? null : index;
-            // Auto-scroll the chart card into view when selecting
-            if (newIndex != null && chartCardRef.current) {
-                requestAnimationFrame(() => {
-                    const header = document.querySelector('header');
-                    const headerHeight = header?.getBoundingClientRect().height || 72;
-                    const cardTop = chartCardRef.current.getBoundingClientRect().top + window.scrollY;
-                    const targetY = cardTop - headerHeight - 16; // 16px breathing room
-                    window.scrollTo({
-                        top: targetY,
-                        behavior: 'smooth',
-                    });
-                });
+            
+            // Auto-scroll the unified group into view so both the top cards and bottom schools are visible
+            if (newIndex != null) {
+                setTimeout(() => {
+                    if (unifiedGroupRef.current) {
+                        const header = document.querySelector('header');
+                        const headerHeight = header?.getBoundingClientRect().height || 72;
+                        const groupTop = unifiedGroupRef.current.getBoundingClientRect().top + window.scrollY;
+                        window.scrollTo({
+                            top: groupTop - headerHeight - 16,
+                            behavior: 'smooth',
+                        });
+                    }
+                }, 100); // Slight delay to let CSS resize kickoff before measuring
             }
+            
             return newIndex;
         });
     }, []);
@@ -464,69 +450,88 @@ export default function PanelImpacto({ data, loading, dateRange }) {
         ? (selectedEntry.monthLabel || selectedEntry.weekLabel || selectedEntry.label)
         : null;
 
+    const isJoined = selectedIndex != null;
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
+            {/* Header text */}
+            <div className="flex items-center justify-between mb-4">
+                <div className={`transition-opacity duration-500 ${isJoined ? 'opacity-0 h-0 hidden' : 'opacity-100'}`}>
                     <h2 className="text-2xl font-bold tracking-tight text-foreground">Impacto General</h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                        {periodLabel
-                            ? `Mostrando datos de ${periodLabel}`
-                            : 'Resumen del impacto global de las misiones Fly High'
-                        }
+                        Resumen del impacto global de las misiones Fly High
                     </p>
                 </div>
-                {selectedIndex != null && (
-                    <button
-                        onClick={() => setSelectedIndex(null)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 animate-in fade-in slide-in-from-right-2 duration-300"
-                    >
-                        ✕ Limpiar filtro
-                    </button>
-                )}
             </div>
 
-            {/* Metric Cards — reactive to selected period */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard icon="👧🏽" label="Alumnos atendidos" value={metrics.students}
-                    sublabel={selectedEntry ? `De ${periodLabel}` : `${metrics.becados.toLocaleString()} becados`} accent={PRIMARY} />
-                <MetricCard icon="🛩️" label="Vuelos realizados" value={metrics.flights}
-                    sublabel={`${metrics.missions} misiones`} accent={ACCENT} />
-                <MetricCard icon="⏱️" label="Horas de operación" value={metrics.hours}
-                    sublabel="Tiempo acumulado de vuelo" accent="#ec4899" />
-                <MetricCard icon="🎯" label="Meta patrocinados" value={data.sponsoredKidsGoal?.toLocaleString()}
-                    sublabel={`${Math.round((data.totalStudents / (data.sponsoredKidsGoal || 1)) * 100)}% alcanzado`} accent="#10b981" />
-            </div>
-
-            {/* ── Bar Chart Card — expands inline ── */}
-            <div
-                ref={chartCardRef}
-                className="rounded-2xl border bg-card p-6"
-            >
-                <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-foreground">Alumnos Atendidos</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        {isWeeklyView ? 'Desglose semanal' : 'Desglose mensual'} · Haz click en una barra para ver las escuelas
-                    </p>
+            {/* ── Unified Report Group ── */}
+            <div 
+                ref={unifiedGroupRef}
+                className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] relative -mx-2 -my-2 p-2 border ${
+                isJoined 
+                ? 'bg-card border-primary/20 shadow-2xl shadow-primary/5 rounded-[2rem] z-10' 
+                : 'bg-transparent border-transparent rounded-[2rem]'
+            }`}>
+                
+                {/* Metric Cards Row */}
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                    isJoined ? 'gap-2 mb-2 p-2 bg-transparent rounded-[1.5rem]' : 'gap-4 mb-6 p-0 bg-transparent rounded-[1.5rem]'
+                }`}>
+                    <MetricCard icon="👧🏽" label="Alumnos atendidos" value={metrics.students}
+                        sublabel={selectedEntry ? `En ${periodLabel}` : `${metrics.becados.toLocaleString()} becados`} accent={PRIMARY} isJoined={isJoined} />
+                    <MetricCard icon="🛩️" label="Vuelos realizados" value={metrics.flights}
+                        sublabel={`${metrics.missions} misiones`} accent={ACCENT} isJoined={isJoined} />
+                    <MetricCard icon="⏱️" label="Horas de operación" value={metrics.hours}
+                        sublabel="Tiempo acumulado de vuelo" accent="#ec4899" isJoined={isJoined} />
+                    <MetricCard icon="🏫" label="Total de Escuelas" value={metrics.schools}
+                        sublabel={selectedEntry ? `En ${periodLabel}` : "Acumulado global"} accent="#10b981" isJoined={isJoined} />
                 </div>
-                <ClickableBarChart
-                    data={activeData}
-                    xKey="label"
-                    yKey="students"
-                    height={340}
-                    onBarClick={handleBarClick}
-                    selectedIndex={selectedIndex}
-                />
 
-                {/* ── Inline Expansion: school breakdown ── */}
-                {selectedEntry && selectedEntry.schools?.length > 0 && (
-                    <InlineSchoolBreakdown
-                        key={selectedIndex}
-                        entry={selectedEntry}
-                        onClose={() => setSelectedIndex(null)}
-                    />
-                )}
+                {/* ── Bar Chart Card — expands inline ── */}
+                <div
+                    ref={chartCardRef}
+                    className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] border ${
+                        isJoined 
+                        ? 'p-6 bg-transparent border-transparent rounded-2xl' 
+                        : 'rounded-2xl border-border bg-card p-6'
+                    }`}
+                >
+                    <div className="mb-6 flex items-start sm:items-center flex-col sm:flex-row justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-foreground">Alumnos Atendidos {isJoined && <span className="text-muted-foreground font-normal">· Reporte de {periodLabel}</span>}</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                {isWeeklyView ? 'Desglose semanal' : 'Desglose mensual'} · Haz click en una barra para {isJoined ? 'cerrar o cambiar de' : 'ver las escuelas de ese'} periodo
+                            </p>
+                        </div>
+                        {isJoined && (
+                            <button
+                                onClick={() => setSelectedIndex(null)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all duration-200 animate-in fade-in zoom-in-95 self-end sm:self-auto"
+                            >
+                                ✕ Cerrar reporte
+                            </button>
+                        )}
+                    </div>
+                    <div className="transition-[height] duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden" style={{ height: isJoined ? 240 : 340 }}>
+                        <ClickableBarChart
+                            data={activeData}
+                            xKey="label"
+                            yKey="students"
+                            height={isJoined ? 240 : 340}
+                            onBarClick={handleBarClick}
+                            selectedIndex={selectedIndex}
+                        />
+                    </div>
+
+                    {/* ── Inline Expansion: school breakdown ── */}
+                    {selectedEntry && selectedEntry.schools?.length > 0 && (
+                        <InlineSchoolBreakdown
+                            key={selectedIndex}
+                            entry={selectedEntry}
+                            onClose={() => setSelectedIndex(null)}
+                        />
+                    )}
+                </div>
             </div>
 
             {/* ── Area Chart: Adapts to view mode ── */}

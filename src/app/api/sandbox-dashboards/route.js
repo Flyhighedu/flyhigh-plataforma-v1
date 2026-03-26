@@ -160,14 +160,28 @@ export async function GET(request) {
             journeyFlights[b.journey_id].push(new Date(b.start_time).getTime());
         }
         let totalWait = 0, waitCount = 0;
+        const waitBuckets = { '0-2 min': 0, '3-5 min': 0, '6-10 min': 0, '11-15 min': 0, '16+ min': 0 };
         for (const times of Object.values(journeyFlights)) {
             times.sort((a, b) => a - b);
             for (let i = 1; i < times.length; i++) {
                 const gap = (times[i] - times[i - 1]) / 60000;
-                if (gap > 0 && gap < 120) { totalWait += gap; waitCount++; }
+                if (gap > 0 && gap < 120) { 
+                    totalWait += gap; 
+                    waitCount++;
+                    if (gap <= 2) waitBuckets['0-2 min']++;
+                    else if (gap <= 5) waitBuckets['3-5 min']++;
+                    else if (gap <= 10) waitBuckets['6-10 min']++;
+                    else if (gap <= 15) waitBuckets['11-15 min']++;
+                    else waitBuckets['16+ min']++;
+                }
             }
         }
         const avgWaitMinutes = waitCount > 0 ? Math.round(totalWait / waitCount * 10) / 10 : 0;
+        const waitDistribution = Object.entries(waitBuckets).map(([range, count]) => ({ range, count }));
+
+        // Metricas adicionales (Ciclo total y Alumnos por hora)
+        const cycleTimeMinutes = (avgFlightDuration / 60) + avgWaitMinutes;
+        const avgStudentsPerHour = cycleTimeMinutes > 0 ? Math.round((avgStudentsPerFlight / cycleTimeMinutes) * 60 * 10) / 10 : 0;
 
         // Flight duration distribution
         const durationBuckets = { '0-3 min': 0, '3-5 min': 0, '5-8 min': 0, '8-12 min': 0, '12+ min': 0 };
@@ -180,13 +194,29 @@ export async function GET(request) {
             else durationBuckets['12+ min']++;
         }
 
+        // Students per flight distribution
+        const studentsBuckets = { '1-5': 0, '6-8': 0, '9-10': 0, '11-12': 0, '13+': 0 };
+        for (const b of (bitacora || [])) {
+            const sc = (b.student_count || 0);
+            if (sc === 0) continue; // Ignorar vuelos sin alumnos
+            if (sc <= 5) studentsBuckets['1-5']++;
+            else if (sc <= 8) studentsBuckets['6-8']++;
+            else if (sc <= 10) studentsBuckets['9-10']++;
+            else if (sc <= 12) studentsBuckets['11-12']++;
+            else studentsBuckets['13+']++;
+        }
+
         const operacion = {
             avgFlightDuration,
             avgStudentsPerFlight,
+            avgStudentsPerHour,
+            cycleTimeMinutes: Math.round(cycleTimeMinutes * 10) / 10,
             totalFlightRecords: (bitacora || []).length,
             capacityUtilization: capacityUtil,
             avgWaitMinutes,
             durationDistribution: Object.entries(durationBuckets).map(([range, count]) => ({ range, count })),
+            studentsDistribution: Object.entries(studentsBuckets).map(([range, count]) => ({ range, count })),
+            waitDistribution,
             flightsPerMission: (cierres || []).length > 0 ? Math.round(totalFlights / (cierres || []).length * 10) / 10 : 0,
         };
 
