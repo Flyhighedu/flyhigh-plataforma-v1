@@ -2504,6 +2504,25 @@ export default function StaffDashboard() {
     }
 
 
+    // [BLIND-FIX] Desync Guard: If missionState already reached OPERATION/dismantling
+    // but currentStep is stuck at 1 (race condition between refreshMission and step state),
+    // force advancement to Step 2 immediately. This prevents Teacher/Assistant from being
+    // trapped in Step 1 screens (TeacherWaitingScreen / EnRutaScreen) when they should
+    // already be in their Operation screens.
+    if (currentStep === 1 && ['OPERATION', 'operation', 'ARRIVAL_PHOTO_DONE', 'dismantling'].includes(missionState)) {
+        console.warn('🛡️ [DesyncGuard] missionState is', missionState, 'but currentStep is 1. Forcing step to 2.');
+        // Use queueMicrotask to avoid setState-during-render warnings
+        queueMicrotask(() => setCurrentStep(2));
+        // Return a loading indicator while the state catches up
+        return withDependencyOverlay(
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    Sincronizando fase...
+                </div>
+            </div>
+        );
+    }
 
     // --- Step 1: En Ruta (y Subflujo Post-Llegada) ---
     if (currentStep === 1) {
