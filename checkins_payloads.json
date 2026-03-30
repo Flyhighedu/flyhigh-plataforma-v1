@@ -1,0 +1,621 @@
+[
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 11.19136469142259,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:25:47.133Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "distance": 1
+      },
+      "timestamp": "2026-02-11T10:31:11.251Z"
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "distance": 1
+      },
+      "timestamp": "2026-02-11T10:31:17.449Z"
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "distance": 1
+      },
+      "timestamp": "2026-02-11T10:31:58.734Z"
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 37.88504035751491,
+        "distance": 71,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-25T13:16:45.193Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 14.901000022888184,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-25T13:17:36.394Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 14.24330046297313,
+        "distance": 6080,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-25T21:07:00.803Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "uniform": true,
+      "location": {
+        "radius": 100,
+        "accuracy": 14.418999671936035,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:25:48.753Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": null,
+        "distance": null,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-10T19:02:30.608Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 10.067739811854208,
+        "distance": 10,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-19T13:16:10.726Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 24.899999618530273,
+        "distance": 10,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-19T13:16:51.977Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.388999938964844,
+        "distance": 4,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-06T13:14:28.560Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-18T13:17:13.760Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 28.100000381469727,
+        "distance": 4,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-19T13:15:52.785Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 4.748415003527361,
+        "distance": 8,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-23T13:08:09.611Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 11.377544517902974,
+        "distance": 79,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-06T13:18:04.675Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 3,
+        "distance": 3173,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-10T18:51:24.731Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 4.748651530191761,
+        "distance": 3167,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-10T19:03:29.460Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 4.613896115642102,
+        "distance": 65,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-11T12:59:16.243Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.62600040435791,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-11T13:15:38.750Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-12T13:20:27.853Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 3.5355339059327373,
+        "distance": 55,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-18T13:18:08.186Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 14.02299976348877,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-23T13:13:10.617Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 17.85300064086914,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-11T13:05:45.462Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 15.813203021603789,
+        "distance": 93,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-24T13:20:20.216Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20.15399932861328,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-18T13:24:12.156Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 11.572568823493668,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-10T13:15:23.742Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 14.694999694824219,
+        "distance": 7,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-10T13:15:37.701Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 15.1997793145081,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-12T13:14:41.691Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 17.36400032043457,
+        "distance": 15,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-06T13:06:42.055Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 18.350000381469727,
+        "distance": 8,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-10T13:19:10.630Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.916999816894531,
+        "distance": 4,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-12T13:19:31.771Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 14.416000366210938,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-20T13:10:52.322Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 22.99799919128418,
+        "distance": 4,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-24T13:20:05.846Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 12.041999816894531,
+        "distance": 6058,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-25T21:03:34.437Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 2.387412475389312,
+        "distance": 6,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-03T13:29:33.013Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 17.209999084472656,
+        "distance": 14,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-03T13:34:52.585Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.725000381469727,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-03T13:38:21.892Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 100,
+        "distance": 6558,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-05T21:24:03.700Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 22.5,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-20T13:16:35.282Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 16.415558270971694,
+        "distance": 30,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-20T13:17:44.595Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 15.281000137329102,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-24T13:21:02.026Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 100,
+        "distance": 5804,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-25T21:03:04.547Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 2.523580880390173,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-04T13:43:58.284Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.298999786376953,
+        "distance": 4,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-04T13:43:29.790Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 2.2392353601913277,
+        "distance": 6651,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-05T21:24:37.545Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.78499984741211,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-23T13:22:06.079Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 13.467000007629395,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-25T13:15:39.521Z",
+      "fallback_evidence": null
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20.46500015258789,
+        "distance": 6631,
+        "is_fallback": true
+      },
+      "timestamp": "2026-03-05T21:24:39.708Z",
+      "fallback_evidence": {
+        "force": true,
+        "bypass_reason": "test_mode_remote"
+      }
+    }
+  },
+  {
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:24:58.585Z",
+      "fallback_evidence": null
+    }
+  }
+]

@@ -10,7 +10,7 @@ function CycleTimeCard({ label, value, unit = 'min' }) {
     const borderColor = value <= 12 ? 'border-emerald-200 dark:border-emerald-800' : value <= 18 ? 'border-amber-200 dark:border-amber-800' : 'border-red-200 dark:border-red-800';
 
     return (
-        <div className={`rounded-2xl border ${borderColor} ${bgColor} p-5 transition-all duration-300 hover:shadow-md`}>
+        <div className={`neu-list-item p-5 transition-all duration-300 hover:shadow-md`}>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
             <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-extrabold" style={{ color }}>{value}</span>
@@ -28,7 +28,7 @@ function CycleTimeCard({ label, value, unit = 'min' }) {
 
 function StatMini({ label, value, icon, className = "" }) {
     return (
-        <div className={`rounded-2xl border border-border bg-card p-5 ${className}`}>
+        <div className={`neu-list-item p-5 ${className.replace('bg-', '')}`}>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 line-clamp-1">
                 <span>{icon}</span>{label}
             </p>
@@ -63,7 +63,7 @@ export default function PanelOperacion({ data, loading }) {
             {/* Top Row — Metrics Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Capacity */}
-                <div className="rounded-2xl border border-border bg-card p-6 flex flex-col justify-center items-center">
+                <div className="neu-list-item p-6 flex flex-col justify-center items-center">
                     <ProgressCircle
                         value={data.capacityUtilization}
                         label="Utilización de Capacidad"
@@ -96,7 +96,7 @@ export default function PanelOperacion({ data, loading }) {
             {/* Bottom Row — Distribution Charts */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Flight Duration Distribution */}
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <div className="flex justify-between items-baseline mb-4">
                         <h3 className="text-lg font-semibold text-foreground">Duración de Vuelo</h3>
                         <span className="text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 px-2 py-1 rounded-md">
@@ -113,7 +113,7 @@ export default function PanelOperacion({ data, loading }) {
                 </div>
 
                 {/* Wait Time Distribution */}
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <div className="flex justify-between items-baseline mb-4">
                         <h3 className="text-lg font-semibold text-foreground">Tiempo Entre Vuelos</h3>
                         <span className="text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded-md">
@@ -130,7 +130,7 @@ export default function PanelOperacion({ data, loading }) {
                 </div>
 
                 {/* Students per Flight Distribution */}
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <div className="flex justify-between items-baseline mb-4">
                         <h3 className="text-lg font-semibold text-foreground">Alumnos por Vuelo</h3>
                         <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-md">

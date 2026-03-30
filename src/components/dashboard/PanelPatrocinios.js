@@ -47,21 +47,21 @@ export default function PanelPatrocinios({ data, loading }) {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fondo Total</p>
                     <p className="text-3xl font-extrabold text-foreground mt-2">
                         ${data.totalFund?.toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">{data.sponsors?.length || 0} patrocinadores</p>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Presupuesto Asignado</p>
                     <p className="text-3xl font-extrabold text-foreground mt-2">
                         ${data.totalAssigned?.toLocaleString()}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">Distribuido en 4 categorías</p>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consumido</p>
                     <p className="text-3xl font-extrabold mt-2" style={{ color: consumptionPercent > 85 ? '#ef4444' : consumptionPercent > 60 ? '#f59e0b' : '#10b981' }}>
                         ${data.totalConsumed?.toLocaleString()}
@@ -73,7 +73,7 @@ export default function PanelPatrocinios({ data, loading }) {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Donut Chart — Sponsor Distribution */}
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <h3 className="text-lg font-semibold text-foreground mb-2">Reparto por Patrocinador</h3>
                     <p className="text-xs text-muted-foreground mb-4">Aportación total de cada patrocinador</p>
                     <TremorDonutChart
@@ -87,7 +87,7 @@ export default function PanelPatrocinios({ data, loading }) {
                 </div>
 
                 {/* Category Progress Bars */}
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <h3 className="text-lg font-semibold text-foreground mb-2">Consumo por Categoría</h3>
                     <p className="text-xs text-muted-foreground mb-6">Porcentaje utilizado del presupuesto asignado</p>
                     <div className="space-y-6">
@@ -108,8 +108,8 @@ export default function PanelPatrocinios({ data, loading }) {
             </div>
 
             {/* Detail Table */}
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                <div className="px-6 py-4 border-b border-border">
+            <div className="neu-list-item overflow-hidden">
+                <div className="px-6 py-4 border-b border-border/40">
                     <h3 className="text-base font-semibold text-foreground">Detalle por Patrocinador y Categoría</h3>
                 </div>
                 <div className="overflow-x-auto">

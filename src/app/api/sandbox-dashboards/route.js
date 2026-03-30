@@ -24,8 +24,9 @@ function getDateBoundary(range) {
 function getMonthBoundary(monthStr) {
     if (!monthStr || !/^\d{4}-\d{2}$/.test(monthStr)) return null;
     const [year, month] = monthStr.split('-').map(Number);
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 1); // first day of NEXT month
+    // Use Date.UTC to prevent Local Time shifting which loses up to 6 hours of flight data at month boundaries
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1)); // first day of NEXT month
     return [start.toISOString(), end.toISOString()];
 }
 
@@ -43,7 +44,7 @@ export async function GET(request) {
 
         // ── PANEL 1: Impacto General ──
         let cierresQuery = supabase.from('cierres_mision')
-            .select('total_students, total_flights, becados, created_at, school_name_snapshot, end_time');
+            .select('journey_id, total_students, total_flights, becados, created_at, school_name_snapshot, end_time');
         
         if (startDateParam && endDateParam) {
             cierresQuery = cierresQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
@@ -67,18 +68,59 @@ export async function GET(request) {
         const { data: bitacora } = await bitacoraQuery;
 
         const { data: statsRow } = await supabase.from('stats').select('total_sponsored_kids').single();
+        const { data: fondo } = await supabase.from('fondo_patrocinadores')
+            .select('patrocinador_id, categoria, monto_asignado, monto_consumido');
 
-        const totalStudents = (cierres || []).reduce((s, c) => s + (c.total_students || 0), 0);
-        const totalFlights = (cierres || []).reduce((s, c) => s + (c.total_flights || 0), 0);
-        const totalBecados = (cierres || []).reduce((s, c) => s + (c.becados || 0), 0);
+        // Fetch staff journeys to get real school names for active missions
+        const { data: rawJourneys } = await supabase.from('staff_journeys').select('id, school_name');
+        const journeyNameMap = (rawJourneys || []).reduce((acc, j) => { acc[j.id] = j.school_name; return acc; }, {});
+
+        // ── SSoT: Unified Missions (Cierres + Vuelos Vivos) ──
+        const unifiedMissions = (cierres || []).map(c => ({
+            id: c.journey_id || `orphan-${c.id}`,
+            date: c.created_at,
+            total_students: c.total_students || 0,
+            total_flights: c.total_flights || 0,
+            becados: c.becados || 0,
+            school_name: c.school_name_snapshot || (c.journey_id ? journeyNameMap[c.journey_id] : 'Sin nombre'),
+        }));
+
+        const closedJourneyIds = new Set((cierres || []).map(c => c.journey_id).filter(Boolean));
+        const liveMissionsMap = {};
+        for (const b of (bitacora || [])) {
+            if (b.journey_id && journeyNameMap.hasOwnProperty(b.journey_id) && !closedJourneyIds.has(b.journey_id)) {
+                if (!liveMissionsMap[b.journey_id]) {
+                    liveMissionsMap[b.journey_id] = {
+                        id: b.journey_id,
+                        date: b.created_at,
+                        total_students: 0,
+                        total_flights: 0,
+                        becados: 0,
+                        school_name: journeyNameMap[b.journey_id] || 'Misión Activa'
+                    };
+                }
+                liveMissionsMap[b.journey_id].total_students += (b.student_count || 0);
+                liveMissionsMap[b.journey_id].total_flights += 1;
+                // Use the earliest flight start time as the mission's temporal anchor
+                if (new Date(b.created_at) < new Date(liveMissionsMap[b.journey_id].date)) {
+                    liveMissionsMap[b.journey_id].date = b.created_at;
+                }
+            }
+        }
+        unifiedMissions.push(...Object.values(liveMissionsMap));
+
+        const totalStudents = unifiedMissions.reduce((s, c) => s + (c.total_students || 0), 0);
+        const totalFlights = unifiedMissions.reduce((s, c) => s + (c.total_flights || 0), 0);
+        const totalBecados = unifiedMissions.reduce((s, c) => s + (c.becados || 0), 0);
         const totalSeconds = (bitacora || []).reduce((s, b) => s + (b.duration_seconds || 0), 0);
         const totalHours = Math.round((totalSeconds / 3600) * 10) / 10;
 
-        // Monthly trend
+        // Formatos UTC estrictos para agrupaciones cronológicas
+        // 1. Mensual (YYYY-MM)
         const monthMap = {};
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        for (const c of unifiedMissions) {
+            const d = new Date(c.date);
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
             if (!monthMap[key]) monthMap[key] = { month: key, students: 0, flights: 0, missions: 0 };
             monthMap[key].students += (c.total_students || 0);
             monthMap[key].flights += (c.total_flights || 0);
@@ -86,26 +128,27 @@ export async function GET(request) {
         }
         const monthlyTrend = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
 
-        // Per-school totals for the selected period
+        // 2. Totales por escuela
         const schoolTotals = {};
-        for (const c of (cierres || [])) {
-            const school = c.school_name_snapshot || 'Sin nombre';
-            if (!schoolTotals[school]) schoolTotals[school] = { name: school, students: 0, flights: 0, missions: 0 };
+        for (const c of unifiedMissions) {
+            const school = c.school_name || 'Sin nombre';
+            if (!schoolTotals[school]) schoolTotals[school] = { name: school, students: 0, flights: 0, missions: 0, becados: 0 };
             schoolTotals[school].students += (c.total_students || 0);
             schoolTotals[school].flights += (c.total_flights || 0);
             schoolTotals[school].missions += 1;
+            schoolTotals[school].becados += (c.becados || 0);
         }
 
-        // Yearly trend
+        // 3. Anual (YYYY)
         const yearMap = {};
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const key = `${d.getFullYear()}`;
+        for (const c of unifiedMissions) {
+            const d = new Date(c.date);
+            const key = `${d.getUTCFullYear()}`;
             if (!yearMap[key]) yearMap[key] = { year: key, students: 0, flights: 0, missions: 0, schools: {} };
             yearMap[key].students += (c.total_students || 0);
             yearMap[key].flights += (c.total_flights || 0);
             yearMap[key].missions += 1;
-            const school = c.school_name_snapshot || 'Sin nombre';
+            const school = c.school_name || 'Sin nombre';
             if (!yearMap[key].schools[school]) yearMap[key].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
             yearMap[key].schools[school].students += (c.total_students || 0);
             yearMap[key].schools[school].flights += (c.total_flights || 0);
@@ -116,20 +159,22 @@ export async function GET(request) {
             schools: Object.values(y.schools).sort((a, b) => b.students - a.students)
         }));
 
-        // Weekly trend (group by ISO week)
+        // 4. Semanal estricto en Lunes (ISO 8601) anclado en UTC
         const weekMap = {};
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const day = d.getDay();
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            const monday = new Date(d);
-            monday.setDate(diff);
-            const weekKey = monday.toISOString().slice(0, 10);
+        for (const c of unifiedMissions) {
+            const d = new Date(c.date);
+            const utcDay = d.getUTCDay();
+            // Si es Domingo(0) restamos 6 dias, de lo contrario restamos el día actual y sumamos 1 para Lunes(1)
+            const diff = d.getUTCDate() - utcDay + (utcDay === 0 ? -6 : 1);
+            // Date.UTC para crear el Lunes congelado a las 00:00:00Z exactas y prevenir fuga de husos
+            const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff));
+            const weekKey = monday.toISOString().substring(0, 10);
+            
             if (!weekMap[weekKey]) weekMap[weekKey] = { week: weekKey, students: 0, flights: 0, missions: 0, schools: {} };
             weekMap[weekKey].students += (c.total_students || 0);
             weekMap[weekKey].flights += (c.total_flights || 0);
             weekMap[weekKey].missions += 1;
-            const school = c.school_name_snapshot || 'Sin nombre';
+            const school = c.school_name || 'Sin nombre';
             if (!weekMap[weekKey].schools[school]) weekMap[weekKey].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
             weekMap[weekKey].schools[school].students += (c.total_students || 0);
             weekMap[weekKey].schools[school].flights += (c.total_flights || 0);
@@ -140,16 +185,16 @@ export async function GET(request) {
             schools: Object.values(w.schools).sort((a, b) => b.students - a.students)
         }));
 
-        // Daily trend
+        // 5. Diario estricto UTC
         const dailyMap = {};
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const key = d.toISOString().slice(0, 10);
+        for (const c of unifiedMissions) {
+            const d = new Date(c.date);
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
             if (!dailyMap[key]) dailyMap[key] = { day: key, students: 0, flights: 0, missions: 0, schools: {} };
             dailyMap[key].students += (c.total_students || 0);
             dailyMap[key].flights += (c.total_flights || 0);
             dailyMap[key].missions += 1;
-            const school = c.school_name_snapshot || 'Sin nombre';
+            const school = c.school_name || 'Sin nombre';
             if (!dailyMap[key].schools[school]) dailyMap[key].schools[school] = { name: school, students: 0, flights: 0, missions: 0 };
             dailyMap[key].schools[school].students += (c.total_students || 0);
             dailyMap[key].schools[school].flights += (c.total_flights || 0);
@@ -160,13 +205,13 @@ export async function GET(request) {
             schools: Object.values(d.schools).sort((a, b) => b.students - a.students)
         }));
 
-        // Add per-school detail to each month entry (for click-to-detail)
+        // Añadir detalle mensual
         const monthDetailMap = {};
-        for (const c of (cierres || [])) {
-            const d = new Date(c.created_at);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        for (const c of unifiedMissions) {
+            const d = new Date(c.date);
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
             if (!monthDetailMap[key]) monthDetailMap[key] = {};
-            const school = c.school_name_snapshot || 'Sin nombre';
+            const school = c.school_name || 'Sin nombre';
             if (!monthDetailMap[key][school]) monthDetailMap[key][school] = { name: school, students: 0, flights: 0, missions: 0 };
             monthDetailMap[key][school].students += (c.total_students || 0);
             monthDetailMap[key][school].flights += (c.total_flights || 0);
@@ -177,13 +222,17 @@ export async function GET(request) {
             schools: Object.values(monthDetailMap[m.month] || {}).sort((a, b) => b.students - a.students)
         }));
 
+        const totalSponsoredKidsGoal = (fondo || []).reduce(
+            (sum, f) => sum + Math.floor((f.monto_asignado || 0) / 150), 0
+        );
+
         const impacto = {
             totalStudents,
             totalFlights,
             totalHours,
-            totalMissions: (cierres || []).length,
+            totalMissions: unifiedMissions.length,
             totalBecados,
-            sponsoredKidsGoal: statsRow?.total_sponsored_kids || 7209,
+            sponsoredKidsGoal: totalSponsoredKidsGoal,
             yearlyTrend,
             monthlyTrend: monthlyTrendWithDetail,
             weeklyTrend,
@@ -192,9 +241,35 @@ export async function GET(request) {
         };
 
         // ── PANEL 2: Eficiencia Operativa ──
-        const { data: catalogo } = await supabase.from('catalogo_escuelas').select('ninos');
-        const totalCatalogKids = (catalogo || []).reduce((s, e) => s + (e.ninos || 0), 0);
-        const capacityUtil = totalCatalogKids > 0 ? Math.round((totalStudents / totalCatalogKids) * 100) : 0;
+        const { data: catalogo } = await supabase.from('catalogo_escuelas').select('nombre_escuela, ninos');
+        
+        const catalogMap = {};
+        for (const esc of (catalogo || [])) {
+            if (esc.nombre_escuela && esc.ninos > 0) {
+                catalogMap[esc.nombre_escuela.trim().toLowerCase()] = esc.ninos;
+            }
+        }
+
+        const visitedSchools = new Set();
+        for (const c of unifiedMissions) {
+            if (c.school_name) visitedSchools.add(c.school_name.trim().toLowerCase());
+        }
+
+        let visitedCapacity = 0;
+        let flownInKnownCapacity = 0;
+
+        for (const schoolName of visitedSchools) {
+            const capacity = catalogMap[schoolName];
+            if (capacity) {
+                visitedCapacity += capacity;
+                const flown = unifiedMissions
+                    .filter(c => c.school_name && c.school_name.trim().toLowerCase() === schoolName)
+                    .reduce((s, c) => s + (c.total_students || 0), 0);
+                flownInKnownCapacity += flown;
+            }
+        }
+
+        const capacityUtil = visitedCapacity > 0 ? Math.round((flownInKnownCapacity / visitedCapacity) * 100) : 0;
         
         // Filtrar vuelos válidos para duración (excluye < 30 segs o > 30 mins generados por bugs)
         const validFlightsForDuration = (bitacora || []).filter(b => b.duration_seconds >= 30 && b.duration_seconds <= 1800);
@@ -350,8 +425,6 @@ export async function GET(request) {
 
         // ── PANEL 4: Patrocinios ──
         const { data: sponsors } = await supabase.from('patrocinadores').select('id, nombre, aportacion_total');
-        const { data: fondo } = await supabase.from('fondo_patrocinadores')
-            .select('patrocinador_id, categoria, monto_asignado, monto_consumido');
 
         const sponsorList = (sponsors || []).map(s => ({
             id: s.id,

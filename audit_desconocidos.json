@@ -1,0 +1,334 @@
+{
+  "count": 152,
+  "sample": [
+    {
+      "id": "35fd54ce-fbd4-4429-9d4d-ede86556b4bc",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "gafete",
+        "target_user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d"
+      },
+      "created_at": "2026-03-05T21:25:37.490239+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "23d52d9a-bca9-44b5-bdb3-d30cc0445c48",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "uniforme",
+        "target_user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d"
+      },
+      "created_at": "2026-03-05T21:25:37.204032+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "79760648-5bef-4bdc-98dc-530171d08749",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "app",
+        "target_user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d"
+      },
+      "created_at": "2026-03-05T21:25:37.050415+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "a3d6e841-cca7-445b-ada2-db0a23ba0b03",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "app",
+        "target_user_id": "3e2af369-c23e-40e1-9119-9c07909f496a"
+      },
+      "created_at": "2026-03-05T21:25:36.637465+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "a7dd752d-1ab2-4eef-a2e2-80f525c0177d",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "app",
+        "target_user_id": "3e2af369-c23e-40e1-9119-9c07909f496a"
+      },
+      "created_at": "2026-03-05T21:25:35.452213+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "1adf44d6-5761-4753-a13e-e6e1a78271cd",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "gafete",
+        "target_user_id": "3e2af369-c23e-40e1-9119-9c07909f496a"
+      },
+      "created_at": "2026-03-05T21:25:35.098062+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "c5fe74f9-8ac0-4742-9928-84143726dce5",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "team_check",
+      "payload": {
+        "status": "OK",
+        "check_type": "uniforme",
+        "target_user_id": "3e2af369-c23e-40e1-9119-9c07909f496a"
+      },
+      "created_at": "2026-03-05T21:25:34.872687+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "dde9b86a-232d-4530-b893-d2825e63d94f",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "item_id": "keys_hand"
+      },
+      "created_at": "2026-03-05T21:25:28.497648+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "3cfa5571-f779-4b97-b952-0399f8f6a20b",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "item_id": "tires_visual"
+      },
+      "created_at": "2026-03-05T21:25:27.224221+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "63710654-e594-46ad-b330-e0b2e2d6e239",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "item_id": "trunk_open"
+      },
+      "created_at": "2026-03-05T21:25:08.719871+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "ca7ca699-118a-4b07-8a45-b6a6d1aabda7",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "item_id": "fuel_level"
+      },
+      "created_at": "2026-03-05T21:25:03.152567+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "e47abd9f-161a-46d4-9c40-f6816b070309",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "source": "pilot_block_confirm",
+        "item_id": "goggles_kit",
+        "block_id": "vr_experience",
+        "timestamp": "2026-03-05T21:24:22.320Z"
+      },
+      "created_at": "2026-03-05T21:24:54.991882+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "35875ba6-0cae-4bf2-8e28-55308939b305",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "source": "pilot_block_confirm",
+        "item_id": "batteries_ready",
+        "block_id": "energy_center",
+        "timestamp": "2026-03-05T21:24:19.525Z"
+      },
+      "created_at": "2026-03-05T21:24:52.154935+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "35de4aad-a629-48a8-a99b-960916dd5fbb",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "source": "pilot_block_confirm",
+        "item_id": "sd_cards",
+        "block_id": "flight_kit",
+        "timestamp": "2026-03-05T21:24:18.269Z"
+      },
+      "created_at": "2026-03-05T21:24:50.988345+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "895ee167-d027-496e-b1ce-c8004a2dab94",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "source": "pilot_block_confirm",
+        "item_id": "drone_stored",
+        "block_id": "flight_kit",
+        "timestamp": "2026-03-05T21:24:18.269Z"
+      },
+      "created_at": "2026-03-05T21:24:50.988345+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "fda2fc7f-c26f-4ddb-9fb0-a8896dc761f3",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "source": "pilot_block_confirm",
+        "item_id": "controller_stored",
+        "block_id": "flight_kit",
+        "timestamp": "2026-03-05T21:24:18.269Z"
+      },
+      "created_at": "2026-03-05T21:24:50.988345+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "47639ffd-542c-40e4-a33d-42ac1995bb4f",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "check",
+      "payload": {
+        "value": true,
+        "item_id": "vehicle_loc"
+      },
+      "created_at": "2026-03-05T21:24:48.007528+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "bd606a91-07ca-465e-a20a-f4c4287ec3b7",
+      "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+      "event_type": "checkin",
+      "payload": {
+        "location": {
+          "radius": 100,
+          "accuracy": 20.46500015258789,
+          "distance": 6631,
+          "is_fallback": true
+        },
+        "timestamp": "2026-03-05T21:24:39.708Z",
+        "fallback_evidence": {
+          "force": true,
+          "bypass_reason": "test_mode_remote"
+        }
+      },
+      "created_at": "2026-03-05T21:24:40.010032+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "e802e490-0bed-4782-aaec-229047e1b267",
+      "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+      "event_type": "checkin",
+      "payload": {
+        "location": {
+          "radius": 100,
+          "accuracy": 2.2392353601913277,
+          "distance": 6651,
+          "is_fallback": true
+        },
+        "timestamp": "2026-03-05T21:24:37.545Z",
+        "fallback_evidence": {
+          "force": true,
+          "bypass_reason": "test_mode_remote"
+        }
+      },
+      "created_at": "2026-03-05T21:24:37.693473+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    },
+    {
+      "id": "bd3d94af-b788-420d-a423-848f3f674fb2",
+      "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+      "event_type": "checkin",
+      "payload": {
+        "location": {
+          "radius": 100,
+          "accuracy": 100,
+          "distance": 6558,
+          "is_fallback": true
+        },
+        "timestamp": "2026-03-05T21:24:03.700Z",
+        "fallback_evidence": {
+          "force": true,
+          "bypass_reason": "test_mode_remote"
+        }
+      },
+      "created_at": "2026-03-05T21:24:36.364796+00:00",
+      "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "staff_journeys": {
+        "school_name": null
+      }
+    }
+  ]
+}

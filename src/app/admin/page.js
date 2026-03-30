@@ -1,15 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import SchoolCombobox from '@/components/admin/SchoolCombobox';
+import AdminLayout from '@/components/admin/AdminLayout';
+import AnalyticsView from '@/components/admin/AnalyticsView';
+import HRCommandCenter from '@/components/admin/HRCommandCenter';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
-    School, MapPin, FileText, Camera, Lock, KeyRound, ShieldCheck,
+    Globe, Zap, School, Gem, FileText, Database, ArrowLeft,
+    MapPin, Camera, Lock, KeyRound, ShieldCheck,
     Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar,
-    ChevronDown, ChevronUp, UserPlus, Shield, ToggleLeft, ToggleRight, Copy, ExternalLink
+    ChevronDown, ChevronUp, UserPlus, Shield, ToggleLeft, ToggleRight, Copy, ExternalLink,
+    Gamepad2, BookOpen, Package, Settings, Smartphone
 } from 'lucide-react';
+
+import SandboxEscuelasPage from '@/app/sandbox-escuelas/page';
+import SandboxVuelosPage from '@/app/sandbox-vuelos/page';
+import SandboxCronogramaPage from '@/app/sandbox-cronograma/page';
+import SandboxHRPage from '@/app/sandbox-hr/page';
+import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
 const DashboardPage = dynamic(() => import('../dashboard/page'), {
@@ -37,24 +49,177 @@ export default function AdminPage() {
     const [isMounted, setIsMounted] = useState(false); // Fix hydration mismatch
 
     // --- ESTADO DE TABS ---
-    const [activeTab, setActiveTab] = useState('vuelos'); // 'vuelos' | 'patrocinadores' | 'cronograma' | 'operativos'
+    const [activeTab, setActiveTab] = useState('bd'); // Starts on database tab now
     // New state for embedded dashboard preview
     const [showDashboardPreview, setShowDashboardPreview] = useState(false);
+    // --- ESTADO PARA LA SECCIÓN "BASES DE DATOS" ---
+    const [dbView, setDbView] = useState('menu'); // 'menu' | 'catalogo' | 'vuelos'
+    const [isExitingDB, setIsExitingDB] = useState(false);
 
-    // --- ESTADO DEL FORMULARIO DE VUELO ---
-    const [flightForm, setFlightForm] = useState({
-        nombreEscuela: '',
-        ninosSesion: '',
-        colonia: ''
-    });
-    const [actaFile, setActaFile] = useState(null);
-    const [fotoFile, setFotoFile] = useState(null);
-    const [flightLoading, setFlightLoading] = useState(false);
-    const [flightMessage, setFlightMessage] = useState({ type: '', text: '' });
-    const [editingFlightId, setEditingFlightId] = useState(null);
+    // --- SINCRONIZADOR PIXEL-PERFECT DEL MASCOT AL SCROLL ---
+    useEffect(() => {
+        if (!isMounted || activeTab !== 'operativos') return;
+        
+        let frameId;
+        const syncMascot = () => {
+            const anchor = document.getElementById('operativos-mascot-anchor');
+            const mascot = document.getElementById('portal-mascot-container');
+            if (anchor && mascot) {
+                const rect = anchor.getBoundingClientRect();
+                // -250px offset to let it peek down slightly more from the top browser edge.
+                mascot.style.transform = `translate3d(${rect.left}px, ${rect.top - 250}px, 0)`;
+            }
+            frameId = requestAnimationFrame(syncMascot);
+        };
+        
+        syncMascot();
+        return () => { if (frameId) cancelAnimationFrame(frameId); };
+    }, [isMounted, activeTab]);
 
-    const [flightsList, setFlightsList] = useState([]);
-    const [fetchingFlights, setFetchingFlights] = useState(false);
+
+
+    // --- GLOBAL STYLES ---
+    const globalStyles = (
+        <style dangerouslySetInnerHTML={{
+            __html: `
+            :root {
+                --neu-bg: #f8fafc; /* Ultra White background (slate-50) */
+                --neu-surface: #ffffff; /* Pure White components */
+                --neu-shadow-light: #ffffff;
+                --neu-shadow-dark: #e2e8f0; /* Softer, elegant shadow */
+                --neu-text: #1e293b;
+                --neu-text-sub: #64748b;
+                --neu-accent: #0ea5e9; /* Premium cyan */
+            }
+            .dark {
+                --neu-bg: #0f172a;
+                --neu-surface: #1e293b;
+                --neu-shadow-light: #00000040;
+                --neu-shadow-dark: #00000099;
+                --neu-text: #f8fafc;
+                --neu-text-sub: #94a3b8;
+                --neu-accent: #38bdf8;
+            }
+
+            .neu-bg-screen {
+                background-color: var(--neu-bg);
+                color: var(--neu-text);
+            }
+
+            @keyframes premiumFadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(15px) scale(0.99);
+                    filter: blur(4px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                    filter: blur(0);
+                }
+            }
+            .animate-premium-in {
+                animation: premiumFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                will-change: opacity, transform, filter;
+            }
+
+            @keyframes premiumFadeOutDown {
+                from {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                    filter: blur(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateY(15px) scale(0.99);
+                    filter: blur(4px);
+                }
+            }
+            .animate-premium-out {
+                animation: premiumFadeOutDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                will-change: opacity, transform, filter;
+            }
+
+            /* Container Panels */
+            .neu-card {
+                background: var(--neu-surface);
+                box-shadow: 12px 12px 24px var(--neu-shadow-dark), 
+                           -12px -12px 24px var(--neu-shadow-light);
+                border-radius: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.8);
+            }
+            .dark .neu-card {
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            /* Inset Inputs (Hundidos) */
+            .neu-input-inset {
+                background: var(--neu-bg);
+                box-shadow: inset 4px 4px 8px var(--neu-shadow-dark),
+                            inset -4px -4px 8px var(--neu-shadow-light);
+                border: 1px solid transparent;
+                border-radius: 12px;
+                color: var(--neu-text);
+                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .neu-input-inset:focus-within, .neu-input-inset:active {
+                box-shadow: inset 5px 5px 10px var(--neu-shadow-dark),
+                            inset -5px -5px 10px var(--neu-shadow-light);
+                border-color: var(--neu-accent);
+                outline: none;
+            }
+            .neu-input-inset::placeholder {
+                color: var(--neu-text-sub);
+                opacity: 0.7;
+            }
+
+            /* List Item Cards (Salidos/Botones suaves) */
+            .neu-list-item {
+                background: var(--neu-surface);
+                box-shadow: 6px 6px 12px var(--neu-shadow-dark),
+                           -6px -6px 12px var(--neu-shadow-light);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.8);
+                transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            .dark .neu-list-item {
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .neu-list-item:hover {
+                transform: translateY(-4px);
+                box-shadow: 10px 10px 20px var(--neu-shadow-dark),
+                           -10px -10px 20px var(--neu-shadow-light);
+            }
+            .neu-list-item:active {
+                transform: scale(0.97) translateY(0);
+                box-shadow: 2px 2px 5px var(--neu-shadow-dark),
+                           -2px -2px 5px var(--neu-shadow-light);
+            }
+
+            /* Selectors & Text */
+            .neu-action-select {
+                appearance: none;
+                background: var(--neu-surface);
+                box-shadow: inset 2px 2px 5px var(--neu-shadow-dark),
+                            inset -2px -2px 5px var(--neu-shadow-light);
+                border-radius: 12px;
+                padding: 6px 12px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                color: var(--neu-text);
+                border: none;
+                outline: none;
+                cursor: pointer;
+            }
+            .neu-text {
+                color: var(--neu-text);
+            }
+            .neu-text-sub {
+                color: var(--neu-text-sub);
+            }
+            `
+        }} />
+    );
 
     // --- ESTADO DE CRONOGRAMA (Próximas Escuelas) ---
     const [nextSchools, setNextSchools] = useState([]);
@@ -73,22 +238,9 @@ export default function AdminPage() {
     const [catalogoLoading, setCatalogoLoading] = useState(false);
     const [selectedCatalogoSchool, setSelectedCatalogoSchool] = useState(null);
 
-    // --- ESTADO DE ESCUELAS EXTRAS (Históricas/Manuales) ---
-    const [extraSchools, setExtraSchools] = useState([]);
-    const [extraSchoolForm, setExtraSchoolForm] = useState({ nombre: '' });
-    const [extraSchoolLoading, setExtraSchoolLoading] = useState(false);
-    const [fetchingExtraSchools, setFetchingExtraSchools] = useState(false);
-
     const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
 
-    // --- ESTADO DEL PANEL DE IMPACTO ---
-    const [impactData, setImpactData] = useState({
-        ninosVoladosAcumulado: 0,
-        vueloEnVivo: false
-    });
-    const [impactLoading, setImpactLoading] = useState(false);
-    const [impactMessage, setImpactMessage] = useState({ type: '', text: '' });
-    const [fetchingImpact, setFetchingImpact] = useState(true);
+
 
     // --- ESTADO DE PATROCINADORES ---
     const [sponsorForm, setSponsorForm] = useState({
@@ -104,8 +256,7 @@ export default function AdminPage() {
     const [showPasswords, setShowPasswords] = useState(false);
     const [editingSponsorId, setEditingSponsorId] = useState(null);
 
-    // --- ESTADO DE IMPACTO DE BECAS (tabla estadísticas) ---
-    const [ninosPatrocinados, setNinosPatrocinados] = useState(0);
+    // --- ESTADO DE IMPACTO DE BECAS REMOVIDO (Calculado desde SSoT) ---
 
     // --- ESTADO DE OPERATIVOS (Staff) ---
     const [staffList, setStaffList] = useState([]);
@@ -118,17 +269,23 @@ export default function AdminPage() {
     const [showStaffPasswords, setShowStaffPasswords] = useState(false);
     const [editForm, setEditForm] = useState({ user_id: null, email: '', full_name: '', role: '' });
     const [editLoading, setEditLoading] = useState(false);
-    const [becasLoading, setBecasLoading] = useState(false);
-    const [becasMessage, setBecasMessage] = useState({ type: '', text: '' });
-    const [fetchingBecas, setFetchingBecas] = useState(true);
 
-    // --- ESTADO DE REPORTES DE MISIÓN ---
-    const [reports, setReports] = useState({}); // Map: mission_id -> report
-    const [selectedReport, setSelectedReport] = useState(null);
-    const [reportModalOpen, setReportModalOpen] = useState(false);
-    const [loadingReportDetails, setLoadingReportDetails] = useState(false);
-    const [reportDetails, setReportDetails] = useState({ logs: [] });
-    const [unlinkedReports, setUnlinkedReports] = useState([]);
+
+
+    // Fetch staff para que se pueda llamar si es necesario
+    const fetchStaffList = async () => {
+        setFetchingStaff(true);
+        try {
+            const res = await fetch('/api/staff/list');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error fetching staff');
+            setStaffList(data.staff || []);
+        } catch (err) {
+            console.error('Error fetching staff:', err);
+        } finally {
+            setFetchingStaff(false);
+        }
+    };
 
     // --- EFFECTS ---
     // Verificar si ya está autenticado (sessionStorage)
@@ -140,47 +297,23 @@ export default function AdminPage() {
         }
     }, []);
 
-    // Cargar datos de impacto al montar (solo si está autenticado)
+    // Fetch tab-specific data on tab switch
     useEffect(() => {
         if (!isAuthenticated) return;
+        if (activeTab === 'operativos') {
+            fetchStaffList();
+        } else if (activeTab === 'cronograma') {
+            if (typeof fetchReports === 'function') fetchReports();
+        }
+    }, [activeTab, isAuthenticated]);
 
-        fetchFlightsList(); // Cargar lista de vuelos
 
-        const fetchImpactData = async () => {
-            try {
-                const { data, error } = await supabaseNew
-                    .from('impacto_global')
-                    .select('*')
-                    .limit(1)
-                    .single();
-
-                if (error) throw error;
-
-                if (data) {
-                    setImpactData({
-                        ninosVoladosAcumulado: data.niños_volados_acumulado || data.ninos_volados_acumulado || 0,
-                        vueloEnVivo: data.vuelo_en_vivo || false
-                    });
-                }
-            } catch (err) {
-                console.error('Error fetching impact data:', err);
-                setImpactMessage({ type: 'error', text: 'Error al cargar datos de impacto.' });
-            } finally {
-                setFetchingImpact(false);
-            }
-        };
-
-        fetchImpactData();
-    }, [isAuthenticated]);
 
     // Cargar patrocinadores y cronograma al montar
     useEffect(() => {
         if (!isAuthenticated) return;
         fetchSponsors();
-        fetchBecasData();
         fetchNextSchools();
-        fetchExtraSchools();
-        fetchReports();
         fetchCatalogoEscuelas();
     }, [isAuthenticated]);
 
@@ -199,196 +332,33 @@ export default function AdminPage() {
         }
     };
 
-    // Fetch Reportes de Misión
-    const fetchReports = async () => {
-        try {
-            const { data, error } = await supabaseNew
-                .from('cierres_mision')
-                .select('*');
 
-            if (error) throw error;
-
-            console.log('Reportes fetched:', data);
-
-            // Map mission_id to report object for easy lookup
-            const reportMap = {};
-            data.forEach(report => {
-                // Normalizar mission_id si es necesario (asegurar string)
-                if (report.mission_id) {
-                    reportMap[String(report.mission_id)] = report;
-                }
-            });
-            setReports(reportMap);
-
-            const { data: currentSchools } = await supabaseNew
-                .from('proximas_escuelas')
-                .select('id');
-
-            const linkedSchoolIds = new Set((currentSchools || []).map((school) => String(school.id)));
-            const unlinked = data.filter((report) => {
-                const reportSchoolId = report.school_id ?? (/^\d+$/.test(String(report.mission_id || '')) ? Number(report.mission_id) : null);
-                if (!reportSchoolId) return true;
-                return !linkedSchoolIds.has(String(reportSchoolId));
-            });
-            setUnlinkedReports(unlinked);
-        } catch (err) {
-            console.error('Error fetching reports:', err);
-        }
-    };
-
-    const handleLinkReport = async (reportId, schoolId) => {
-        if (!confirm(`¿Vincular este reporte a la escuela con ID ${schoolId} sin alterar la historia original?`)) return;
-
-        try {
-            const selectedSchool = nextSchools.find((school) => String(school.id) === String(schoolId));
-
-            let { error: e1 } = await supabaseNew
-                .from('cierres_mision')
-                .update({
-                    school_id: Number(schoolId),
-                    school_name_snapshot: selectedSchool?.nombre_escuela || null
-                })
-                .eq('id', reportId);
-
-            if (e1 && /column/i.test(e1.message || '')) {
-                const fallback = await supabaseNew
-                    .from('cierres_mision')
-                    .update({ school_id: Number(schoolId) })
-                    .eq('id', reportId);
-
-                e1 = fallback.error;
-            }
-
-            if (e1) throw e1;
-
-            alert('Reporte vinculado para visualización sin modificar registros históricos.');
-            fetchReports();
-        } catch (err) {
-            console.error('Error linking report:', err);
-            alert('Error vinculando reporte (sin alterar historial): ' + err.message);
-        }
-    };
-
-    const handleViewReport = async (missionId) => {
-        // Find basic report data from state
-        const summary = reports[missionId];
-        if (!summary) return;
-
-        setSelectedReport(summary);
-        setReportModalOpen(true);
-        setLoadingReportDetails(true);
-        setReportDetails({ logs: [] }); // Reset previous logs
-
-        try {
-            // Fetch detailed flight logs
-            const { data: logs, error } = await supabaseNew
-                .from('bitacora_vuelos')
-                .select('*')
-                .eq('mission_id', missionId)
-                .order('start_time', { ascending: true });
-
-            if (error) throw error;
-
-            setReportDetails({ logs: logs || [] });
-        } catch (err) {
-            console.error('Error fetching report details:', err);
-            alert('Error cargando detalles del reporte');
-        } finally {
-            setLoadingReportDetails(false);
-        }
-    };
-
-    // Fetch Escuelas Extras
-    const fetchExtraSchools = async () => {
-        setFetchingExtraSchools(true);
-        try {
-            const { data, error } = await supabaseNew
-                .from('escuelas_extras')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                if (error.code === '42P01') {
-                    console.warn('Tabla escuelas_extras no existe.');
-                    return;
-                }
-                throw error;
-            }
-            setExtraSchools(data || []);
-        } catch (err) {
-            console.error('Error fetching extra schools:', err);
-        } finally {
-            setFetchingExtraSchools(false);
-        }
-    };
 
     // Fetch próximas escuelas (via API to bypass RLS)
-    const fetchNextSchools = async () => {
-        setFetchingNextSchools(true);
+    const fetchNextSchools = async (silent = false) => {
+        if (!silent) setFetchingNextSchools(true);
         try {
-            const res = await fetch('/api/admin/list-schools');
+            const res = await fetch('/api/admin/list-schools', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }});
             const result = await res.json();
             if (!res.ok) throw new Error(result.error || 'Error fetching schools');
             setNextSchools(result.data || []);
         } catch (err) {
             console.error('Error fetching next schools:', err);
         } finally {
-            setFetchingNextSchools(false);
+            if (!silent) setFetchingNextSchools(false);
         }
     };
 
-    // Cargar datos de becas
-    // Cargar datos de becas
-    const fetchBecasData = async () => {
-        setFetchingBecas(true);
-        try {
-            // NOMBRE REAL (Confirmado por imagen): tabla "stats", columna "total_sponsored_kids"
-            let { data, error } = await supabaseNew
-                .from('stats')
-                .select('*')
-                .limit(1)
-                .single();
+    // Auto-polling para Próximas Misiones en tiempo real
+    useEffect(() => {
+        if (!isAuthenticated || activeTab !== 'cronograma') return;
+        const interval = setInterval(() => fetchNextSchools(true), 2500);
+        return () => clearInterval(interval);
+    }, [isAuthenticated, activeTab]);
 
-            if (error) {
-                console.warn('Error fetching stats:', error);
-                // Fallback por si acaso sigue existiendo la tabla anterior
-                if (error.code === 'PGRST205') {
-                    console.log('Intentando fallback a "estadísticas"...');
-                    const res = await supabaseNew.from('estadísticas').select('*').limit(1).single();
-                    if (res.data) data = res.data;
-                } else {
-                    return;
-                }
-            }
 
-            if (data) {
-                // Columna correcta confirmada: total_sponsored_kids
-                const val = data['total_sponsored_kids'] || data['niños patrocinados'] || 0;
-                setNinosPatrocinados(val);
-            }
-        } catch (err) {
-            console.error('Error fetching becas data:', err);
-        } finally {
-            setFetchingBecas(false);
-        }
-    };
 
-    const fetchFlightsList = async () => {
-        setFetchingFlights(true);
-        try {
-            const { data, error } = await supabaseNew
-                .from('historial_vuelos')
-                .select('*')
-                .order('fecha', { ascending: false });
 
-            if (error) throw error;
-            setFlightsList(data || []);
-        } catch (err) {
-            console.error('Error fetching flights:', err);
-        } finally {
-            setFetchingFlights(false);
-        }
-    };
 
     const fetchSponsors = async () => {
         setFetchingSponsors(true);
@@ -437,163 +407,7 @@ export default function AdminPage() {
         }, 500);
     };
 
-    // Handlers de formulario de vuelo
-    const handleFlightInputChange = (e) => {
-        const { name, value } = e.target;
-        setFlightForm(prev => ({ ...prev, [name]: value }));
-    };
 
-    const handleActaChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setActaFile(e.target.files[0]);
-        }
-    };
-
-    const handleFotoChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setFotoFile(e.target.files[0]);
-        }
-    };
-
-    const handleFlightSubmit = async (e) => {
-        e.preventDefault();
-        setFlightLoading(true);
-        setFlightMessage({ type: '', text: '' });
-
-        try {
-            let actaUrl = null;
-            let fotoUrl = null;
-            const timestamp = Date.now();
-
-            // Subir Acta si hay nuevo archivo
-            if (actaFile) {
-                const actaPath = `acta_${timestamp}_${actaFile.name}`;
-                const { error: actaError } = await supabaseNew.storage
-                    .from('actas-vuelos')
-                    .upload(actaPath, actaFile);
-
-                if (actaError) throw new Error(`Error subiendo acta: ${actaError.message}`);
-
-                const { data: actaPublicUrl } = supabaseNew.storage
-                    .from('actas-vuelos')
-                    .getPublicUrl(actaPath);
-                actaUrl = actaPublicUrl.publicUrl;
-            }
-
-            // Subir Foto si hay nuevo archivo
-            if (fotoFile) {
-                const fotoPath = `foto_${timestamp}_${fotoFile.name}`;
-                const { error: fotoError } = await supabaseNew.storage
-                    .from('fotos-impacto')
-                    .upload(fotoPath, fotoFile);
-
-                if (fotoError) throw new Error(`Error subiendo foto: ${fotoError.message}`);
-
-                const { data: fotoPublicUrl } = supabaseNew.storage
-                    .from('fotos-impacto')
-                    .getPublicUrl(fotoPath);
-                fotoUrl = fotoPublicUrl.publicUrl;
-            }
-
-            if (editingFlightId) {
-                // UPDATE
-                const updates = {
-                    nombre_escuela: flightForm.nombreEscuela,
-                    ninos_sesion: parseInt(flightForm.ninosSesion) || 0,
-                    colonia: flightForm.colonia,
-                };
-                if (actaUrl) updates.acta_url = actaUrl;
-                if (fotoUrl) updates.foto_url = fotoUrl;
-
-                const { error: updateError } = await supabaseNew
-                    .from('historial_vuelos')
-                    .update(updates)
-                    .eq('id', editingFlightId);
-
-                if (updateError) throw updateError;
-
-                setFlightMessage({ type: 'success', text: 'Vuelo actualizado con éxito' });
-                setEditingFlightId(null);
-            } else {
-                // INSERT
-                const { error: insertError } = await supabaseNew
-                    .from('historial_vuelos')
-                    .insert({
-                        nombre_escuela: flightForm.nombreEscuela,
-                        ninos_sesion: parseInt(flightForm.ninosSesion) || 0,
-                        colonia: flightForm.colonia,
-                        acta_url: actaUrl,
-                        foto_url: fotoUrl,
-                        fecha: new Date().toISOString()
-                    });
-
-                if (insertError) throw insertError;
-                setFlightMessage({ type: 'success', text: 'Vuelo registrado con éxito' });
-            }
-
-            // Reset form
-            setFlightForm({ nombreEscuela: '', ninosSesion: '', colonia: '' });
-            setActaFile(null);
-            setFotoFile(null);
-            // Refresh list if it exists (need to implement fetchFlightsList)
-            if (typeof fetchFlightsList === 'function') fetchFlightsList();
-
-        } catch (err) {
-            console.error('Error saving flight:', err);
-            setFlightMessage({ type: 'error', text: err.message });
-        } finally {
-            setFlightLoading(false);
-        }
-    };
-
-    const handleEditFlight = (flight) => {
-        setFlightForm({
-            nombreEscuela: flight.nombre_escuela,
-            ninosSesion: flight.ninos_sesion,
-            colonia: flight.colonia
-        });
-        setEditingFlightId(flight.id);
-        setFlightMessage({ type: 'info', text: 'Editando vuelo. Sube archivos solo si deseas cambiarlos.' });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleCancelEditFlight = () => {
-        setFlightForm({ nombreEscuela: '', ninosSesion: '', colonia: '' });
-        setEditingFlightId(null);
-        setFlightMessage({ type: '', text: '' });
-        setActaFile(null);
-        setFotoFile(null);
-    };
-
-    const handleDeleteFlight = async (id) => {
-        if (!confirm('¿Estás seguro de eliminar este vuelo? Esta acción no se puede deshacer.')) return;
-
-        // Optimistic UI
-        const originalList = [...flightsList];
-        setFlightsList(prev => prev.filter(f => f.id !== id));
-
-        try {
-            const { error } = await supabaseNew
-                .from('historial_vuelos')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-        } catch (err) {
-            console.error('Error deleting flight:', err);
-            alert('Error al eliminar vuelo');
-            setFlightsList(originalList); // Rollback
-        }
-    };
-
-    // Handlers de panel de impacto
-    const handleImpactChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setImpactData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
-    };
 
     const handleNextSchoolSubmit = async (e) => {
         e.preventDefault();
@@ -689,7 +503,7 @@ export default function AdminPage() {
     };
 
     const handleDeleteNextSchool = async (id) => {
-        if (!confirm('¿Archivar esta escuela? No se eliminará de forma permanente.')) return;
+        if (!confirm('Tierra Arrasada: ¿Estás seguro de que deseas ELIMINAR permanentemente a esta misión del Cronograma logístico? Esta acción es irreversible.')) return;
 
         // Optimistic UI Update
         const previousSchools = [...nextSchools];
@@ -712,44 +526,7 @@ export default function AdminPage() {
         }
     };
 
-    const handleImpactSubmit = async (e) => {
-        e.preventDefault();
-        setImpactLoading(true);
-        setImpactMessage({ type: '', text: '' });
 
-        try {
-            const updatePayload = {
-                vuelo_en_vivo: impactData.vueloEnVivo
-            };
-
-            const { data: schemaCheck } = await supabaseNew
-                .from('impacto_global')
-                .select('*')
-                .limit(1)
-                .single();
-
-            if (schemaCheck && 'niños_volados_acumulado' in schemaCheck) {
-                updatePayload['niños_volados_acumulado'] = parseInt(impactData.ninosVoladosAcumulado) || 0;
-            } else {
-                updatePayload['ninos_volados_acumulado'] = parseInt(impactData.ninosVoladosAcumulado) || 0;
-            }
-
-            const { error } = await supabaseNew
-                .from('impacto_global')
-                .update(updatePayload)
-                .eq('id', 1);
-
-            if (error) throw new Error(`Error actualizando impacto: ${error.message}`);
-
-            setImpactMessage({ type: 'success', text: '¡Impacto global actualizado!' });
-
-        } catch (err) {
-            console.error(err);
-            setImpactMessage({ type: 'error', text: err.message });
-        } finally {
-            setImpactLoading(false);
-        }
-    };
 
     // Handlers de patrocinadores
     const handleSponsorInputChange = (e) => {
@@ -840,74 +617,9 @@ export default function AdminPage() {
         }
     };
 
-    // Handlers de Escuelas Extras
-    const handleExtraSchoolSubmit = async (e) => {
-        e.preventDefault();
-        setExtraSchoolLoading(true);
-        try {
-            const { data, error } = await supabaseNew
-                .from('escuelas_extras')
-                .insert({ nombre: extraSchoolForm.nombre })
-                .select()
-                .single();
 
-            if (error) throw error;
 
-            setExtraSchools(prev => [data, ...prev]);
-            setExtraSchoolForm({ nombre: '' });
-            alert('Escuela extra agregada exitosamente');
-        } catch (err) {
-            console.error('Error saving extra school:', err);
-            alert('Error al guardar escuela extra');
-        } finally {
-            setExtraSchoolLoading(false);
-        }
-    };
 
-    const handleDeleteExtraSchool = async (id) => {
-        if (!confirm('¿Eliminar esta escuela extra?')) return;
-
-        // Optimistic
-        const prevList = [...extraSchools];
-        setExtraSchools(prev => prev.filter(s => s.id !== id));
-
-        try {
-            const { error } = await supabaseNew
-                .from('escuelas_extras')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-        } catch (err) {
-            console.error('Error deleting extra school:', err);
-            setExtraSchools(prevList);
-            alert('Error al eliminar');
-        }
-    };
-
-    // Handler para actualizar niños patrocinados (Impacto de Becas)
-    const handleBecasUpdate = async () => {
-        setBecasLoading(true);
-        setBecasMessage({ type: '', text: '' });
-
-        try {
-            // Update en tabla REAL: 'stats'
-            let { error } = await supabaseNew
-                .from('stats')
-                .update({ 'total_sponsored_kids': parseInt(ninosPatrocinados) || 0 })
-                .eq('id', 1);
-
-            if (error) throw new Error(`Error actualizando: ${error.message}`);
-
-            setBecasMessage({ type: 'success', text: '¡Impacto de becas actualizado!' });
-
-        } catch (err) {
-            console.error(err);
-            setBecasMessage({ type: 'error', text: err.message });
-        } finally {
-            setBecasLoading(false);
-        }
-    };
 
     // ============================================
     // RENDER
@@ -916,7 +628,7 @@ export default function AdminPage() {
     // --- HYDRATION GUARD ---
     if (!isMounted) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <div className="min-h-screen neu-bg-screen flex items-center justify-center p-4">
                 <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
             </div>
         );
@@ -925,33 +637,34 @@ export default function AdminPage() {
     // --- PANTALLA DE LOGIN ---
     if (!isAuthenticated) {
         return (
-            <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans flex items-center justify-center p-4">
+            <main className="min-h-screen neu-bg-screen flex items-center justify-center p-4">
+                {globalStyles}
                 <div className="w-full max-w-md">
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl shadow-lg shadow-blue-500/30 mb-6">
                             <ShieldCheck className="w-10 h-10 text-white" />
                         </div>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2">
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 neu-text">
                             Acceso <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Restringido</span>
                         </h1>
-                        <p className="text-slate-400 text-sm">Panel de Administración · Fly High Edu</p>
+                        <p className="neu-text-sub text-sm">Panel de Administración · Fly High Edu</p>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+                    <div className="neu-card p-10 max-w-md w-full relative z-10 text-center">
                         <form onSubmit={handleLogin} className="space-y-6">
                             <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+                                <label className="flex items-center gap-2 text-xs font-bold neu-text-sub uppercase tracking-wider mb-3">
                                     <KeyRound size={14} /> Contraseña de Administrador
                                 </label>
                                 <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 neu-text-sub" />
                                     <input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                         placeholder="Ingresa la contraseña"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl pl-12 pr-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                        className="w-full neu-input-inset pl-12 pr-4 py-4 focus:ring-2 focus:ring-blue-500 transition-all font-mono tracking-widest"
                                         autoFocus
                                     />
                                 </div>
@@ -987,19 +700,7 @@ export default function AdminPage() {
     }
 
     // --- FUNCIONES DE OPERATIVOS ---
-    const fetchStaffList = async () => {
-        setFetchingStaff(true);
-        try {
-            const res = await fetch('/api/staff/list');
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error fetching staff');
-            setStaffList(data.staff || []);
-        } catch (err) {
-            console.error('Error fetching staff:', err);
-        } finally {
-            setFetchingStaff(false);
-        }
-    };
+    // (Movido hacia arriba para que esté disponible en useEffect)
 
     const generatePassword = () => {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -1099,432 +800,237 @@ export default function AdminPage() {
 
     // --- PANEL DE ADMINISTRACIÓN ---
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans p-4 md:p-8">
-            {/* HEADER */}
-            <header className="max-w-5xl mx-auto mb-8 relative">
-                {/* Logout Button - Mobile & Desktop */}
-                <div className="flex justify-end mb-4 md:absolute md:top-0 md:right-0 md:mb-0">
-                    <button
-                        onClick={() => {
-                            sessionStorage.removeItem('flyHighAdminAuth');
-                            setIsAuthenticated(false);
-                            setPassword('');
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-sm font-bold"
-                    >
-                        <Lock size={16} /> Cerrar Sesión
-                    </button>
-                </div>
-
-                <div className="text-center">
-                    <div className="inline-flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                            <Plane className="w-6 h-6 text-white" />
-                        </div>
-                        <h1 className="text-2xl md:text-4xl font-black tracking-tight">
-                            Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Administración</span>
-                        </h1>
-                    </div>
-                    <p className="text-slate-400 text-sm md:text-base">Gestiona los vuelos, patrocinadores e impacto de Fly High Edu</p>
-                </div>
-            </header>
-
-            {/* TABS */}
-            {/* TABS */}
-            <div className="max-w-5xl mx-auto mb-8">
-                <div className="flex flex-wrap gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-2">
-                    <button
-                        onClick={() => setActiveTab('vuelos')}
-                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'vuelos'
-                            ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Plane size={18} />
-                        Vuelos & Impacto
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('patrocinadores')}
-                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'patrocinadores'
-                            ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Building2 size={18} />
-                        Patrocinadores
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('cronograma'); fetchReports(); }}
-                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'cronograma'
-                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Calendar size={18} />
-                        Cronograma
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('operativos'); fetchStaffList(); }}
-                        className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transition-all ${activeTab === 'operativos'
-                            ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Shield size={18} />
-                        Operativos
-                    </button>
-                </div>
-            </div>
-
+        <AdminLayout
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            isAuthenticated={isAuthenticated}
+            onLogout={() => {
+                sessionStorage.removeItem('flyHighAdminAuth');
+                setIsAuthenticated(false);
+                setPassword('');
+            }}
+        >
+            {globalStyles}
             {/* CONTENIDO DE TABS */}
-            {activeTab === 'vuelos' && (
-                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                    {/* --- TARJETA: REGISTRO DE VUELO --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                                <Plane className="w-5 h-5 text-emerald-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold">Registrar Vuelo</h2>
-                                <p className="text-slate-400 text-xs">Añade una nueva sesión de vuelo</p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleFlightSubmit} className="space-y-5">
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <School size={14} /> Nombre de la Escuela
-                                </label>
-                                <input
-                                    type="text"
-                                    name="nombreEscuela"
-                                    value={flightForm.nombreEscuela}
-                                    onChange={handleFlightInputChange}
-                                    required
-                                    placeholder="Ej: Escuela Primaria Benito Juárez"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                />
+            
+            {/* TAB: BASES DE DATOS (IMPORTACIÓN DE SANDBOXES) */}
+            {activeTab === 'bd' && (
+                <div className="animate-premium-in w-full">
+                    {dbView === 'menu' && (
+                        <div className="max-w-6xl mx-auto space-y-8">
+                            <div className="mb-6">
+                                <h1 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                                    <Database className="w-8 h-8 text-rose-500" />
+                                    <span>Bases de Datos <span className="text-rose-500">Maestras</span></span>
+                                </h1>
+                                <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">
+                                    Acceso directo a las fuentes de verdad (Catálogos históricos y operacionales).
+                                </p>
                             </div>
 
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <Users size={14} /> Niños en esta Sesión
-                                </label>
-                                <input
-                                    type="number"
-                                    name="ninosSesion"
-                                    value={flightForm.ninosSesion}
-                                    onChange={handleFlightInputChange}
-                                    required
-                                    min="1"
-                                    placeholder="Ej: 25"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                    <MapPin size={14} /> Colonia
-                                </label>
-                                <input
-                                    type="text"
-                                    name="colonia"
-                                    value={flightForm.colonia}
-                                    onChange={handleFlightInputChange}
-                                    required
-                                    placeholder="Ej: Centro"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <FileText size={14} /> Acta de Vuelo
-                                    </label>
-                                    <label className="flex flex-col items-center justify-center w-full h-24 bg-slate-800/50 border border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-blue-500 transition-colors group">
-                                        <Upload size={20} className="text-slate-400 group-hover:text-blue-400 mb-1 transition-colors" />
-                                        <span className="text-xs text-slate-400 group-hover:text-blue-400 transition-colors">
-                                            {actaFile ? actaFile.name.slice(0, 20) + '...' : 'Seleccionar archivo'}
-                                        </span>
-                                        <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.png" onChange={handleActaChange} />
-                                    </label>
-                                </div>
-
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Camera size={14} /> Foto de Impacto
-                                    </label>
-                                    <label className="flex flex-col items-center justify-center w-full h-24 bg-slate-800/50 border border-dashed border-slate-600 rounded-xl cursor-pointer hover:border-pink-500 transition-colors group">
-                                        <Upload size={20} className="text-slate-400 group-hover:text-pink-400 mb-1 transition-colors" />
-                                        <span className="text-xs text-slate-400 group-hover:text-pink-400 transition-colors">
-                                            {fotoFile ? fotoFile.name.slice(0, 20) + '...' : 'Seleccionar imagen'}
-                                        </span>
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleFotoChange} />
-                                    </label>
-                                </div>
-                            </div>
-
-                            {flightMessage.text && (
-                                <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${flightMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                                    {flightMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                    {flightMessage.text}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={flightLoading}
-                                className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingFlightId
-                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
-                                    : 'bg-gradient-to-r from-emerald-500 to-cyan-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 text-white'
-                                    }`}
-                            >
-                                {flightLoading ? (
-                                    <><Loader2 size={18} className="animate-spin" /> {editingFlightId ? 'Actualizando...' : 'Guardando...'} </>
-                                ) : (
-                                    <>{editingFlightId ? <RefreshCw size={18} /> : <Plane size={18} />} {editingFlightId ? 'Actualizar Vuelo' : 'Guardar Vuelo'}</>
-                                )}
-                            </button>
-
-                            {editingFlightId && (
-                                <button
-                                    type="button"
-                                    onClick={handleCancelEditFlight}
-                                    className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 md:gap-8">
+                                {/* Catálogo de Escuelas Card */}
+                                <button 
+                                    onClick={() => setDbView('catalogo')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#f43f5e',
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
                                 >
-                                    <X size={18} /> Cancelar Edición
-                                </button>
-                            )}
-                        </form>
-                    </section>
-
-                    {/* --- TARJETA: PANEL DE IMPACTO GLOBAL --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                                <Radio className="w-5 h-5 text-amber-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg md:text-xl font-bold">Impacto Global</h2>
-                                <p className="text-slate-400 text-xs">Actualiza los contadores públicos</p>
-                            </div>
-                        </div>
-
-                        {fetchingImpact ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 size={32} className="animate-spin text-slate-400" />
-                            </div>
-                        ) : (
-                            <form onSubmit={handleImpactSubmit} className="space-y-6">
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <Users size={14} /> Niños Volados Acumulado
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="ninosVoladosAcumulado"
-                                        value={impactData.ninosVoladosAcumulado}
-                                        onChange={handleImpactChange}
-                                        min="0"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-4 text-3xl font-black text-center text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-2 text-center">Este número se muestra en la página principal.</p>
-                                </div>
-
-                                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-3 h-3 rounded-full ${impactData.vueloEnVivo ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`}></div>
-                                            <div>
-                                                <p className="font-bold text-white">Vuelo en Vivo</p>
-                                                <p className="text-xs text-slate-400">Activa el indicador de transmisión</p>
-                                            </div>
+                                    <School className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            Catálogo de Escuelas
+                                        </h2>
+                                        <p className="text-rose-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Registros base (CCT) de las instituciones e historial del padrón activo a nivel municipio.
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Explorar</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                name="vueloEnVivo"
-                                                checked={impactData.vueloEnVivo}
-                                                onChange={handleImpactChange}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-red-500"></div>
-                                        </label>
                                     </div>
-                                </div>
+                                </button>
 
-                                {impactMessage.text && (
-                                    <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${impactMessage.type === 'success' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                                        {impactMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                        {impactMessage.text}
-                                    </div>
-                                )}
-
-                                <button
-                                    type="submit"
-                                    disabled={impactLoading}
-                                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                {/* Historial de Vuelos Card */}
+                                <button 
+                                    onClick={() => setDbView('vuelos')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#0ea5e9',
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
                                 >
-                                    {impactLoading ? (
-                                        <><Loader2 size={18} className="animate-spin" /> Actualizando...</>
-                                    ) : (
-                                        <><Radio size={18} /> Actualizar Impacto</>
-                                    )}
-                                </button>
-                            </form>
-                        )}
-                    </section>
-
-                    {/* --- TARJETA: LISTA DE VUELOS --- */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl lg:col-span-2">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                    <FileText className="w-5 h-5 text-blue-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Historial de Vuelos</h2>
-                                    <p className="text-slate-400 text-xs">{flightsList.length} registros encontrados</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={fetchFlightsList}
-                                className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                            >
-                                <RefreshCw size={18} className="text-slate-400" />
-                            </button>
-                        </div>
-
-                        {fetchingFlights ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 size={32} className="animate-spin text-slate-400" />
-                            </div>
-                        ) : flightsList.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
-                                <Plane size={48} className="mx-auto mb-4 opacity-30" />
-                                <p>No hay vuelos registrados aún.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {flightsList.map((flight) => (
-                                    <div key={flight.id} className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-4 hover:bg-slate-800/50 transition-all flex flex-col justify-between group">
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded-full border border-cyan-400/20">
-                                                    {new Date(flight.fecha).toLocaleDateString()}
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={() => handleEditFlight(flight)}
-                                                        className="p-1.5 text-amber-400 hover:bg-amber-400/10 rounded-lg transition-colors"
-                                                        title="Editar"
-                                                    >
-                                                        <Pencil size={15} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteFlight(flight.id)}
-                                                        className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                                                        title="Eliminar"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <h3 className="font-bold text-white mb-1 line-clamp-1" title={flight.nombre_escuela}>
-                                                {flight.nombre_escuela}
-                                            </h3>
-                                            <p className="text-xs text-slate-400 flex items-center gap-1 mb-3">
-                                                <MapPin size={12} /> {flight.colonia}
-                                            </p>
-                                        </div>
-
-                                        <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-1 text-slate-300">
-                                                <Users size={12} /> <span className="font-bold">{flight.ninos_sesion}</span> niños
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {flight.acta_url && (
-                                                    <a href={flight.acta_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Acta</a>
-                                                )}
-                                                {flight.foto_url && (
-                                                    <a href={flight.foto_url} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline">Foto</a>
-                                                )}
-                                            </div>
+                                    <Plane className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            Archivo Histórico
+                                        </h2>
+                                        <p className="text-sky-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Desglose maestro de operaciones de vuelo, registros de asistencia y estatus.
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Inspeccionar</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
                                         </div>
                                     </div>
-                                ))}
+                                </button>
+
+                                {/* Cronograma Sandbox Card */}
+                                <button 
+                                    onClick={() => setDbView('cronograma')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#10b981',
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
+                                >
+                                    <Calendar className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            Cronograma
+                                        </h2>
+                                        <p className="text-emerald-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Pipeline de vuelos. Visualiza escuelas programadas, completadas y canceladas.
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Desplegar</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {/* Personal HR Sandbox Card */}
+                                <button 
+                                    onClick={() => setDbView('hr')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#8b5cf6',
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
+                                >
+                                    <Users className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            RH
+                                        </h2>
+                                        <p className="text-violet-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Base de datos dinámica de perfiles operativos. Acceso completo y depuración.
+                                        </p>
+                                    </div>
+
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Administrar</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {/* Padrón Patrocinadores Sandbox Card */}
+                                <button 
+                                    onClick={() => setDbView('patrocinadores')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#d946ef',
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
+                                >
+                                    <Building2 className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            Patrocinadores
+                                        </h2>
+                                        <p className="text-fuchsia-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Base de datos financiera. Acceso completo al padrón de inversionistas y control de aportaciones.
+                                        </p>
+                                    </div>
+
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Gestionar</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
+                                        </div>
+                                    </div>
+                                </button>
                             </div>
-                        )}
-                    </section>
+                        </div>
+                    )}
+
+                    {(dbView !== 'menu' || isExitingDB) && createPortal(
+                        <div className={`fixed inset-0 z-[9999] bg-white dark:bg-[#0f172a] flex flex-col overflow-hidden ${isExitingDB ? 'animate-premium-out' : 'animate-premium-in'}`}>
+                            {/* Sticky Header Wrapper para Integración PWA Perfecta */}
+                            <div className="shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-white/10 px-4 md:px-8 py-4 flex items-center shadow-sm z-10 w-full">
+                                <button
+                                    onClick={() => {
+                                        if (isExitingDB) return;
+                                        setIsExitingDB(true);
+                                        setTimeout(() => {
+                                            setDbView('menu');
+                                            setIsExitingDB(false);
+                                        }, 400);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-700 dark:text-slate-200 font-bold text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 group"
+                                >
+                                    <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                                    <span>Volver al Panel</span>
+                                </button>
+                                <div className="ml-auto flex items-center gap-3">
+                                    <span className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-3 py-1.5 rounded-full">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                        Tiempo Real
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Contenedor del componente PWA Edge-to-Edge */}
+                            <div className="flex-1 w-full overflow-y-auto override-sandbox-bg">
+                                <style>{`
+                                    /* Hack CSS para forzar que el background interno de los sandbox se funda con este takeover */
+                                    .override-sandbox-bg > div {
+                                        background-color: transparent !important;
+                                        min-height: auto !important;
+                                    }
+                                `}</style>
+                                {/* El datatable original ahora tiene Todo el lienzo del monitor/ipad */}
+                                <div className="max-w-[100vw]">
+                                    {dbView === 'catalogo' && <SandboxEscuelasPage />}
+                                    {dbView === 'vuelos' && <SandboxVuelosPage />}
+                                    {dbView === 'cronograma' && <SandboxCronogramaPage />}
+                                    {dbView === 'hr' && <SandboxHRPage />}
+                                    {dbView === 'patrocinadores' && <SandboxPatrocinadoresPage />}
+                                </div>
+                            </div>
+                        </div>,
+                        document.body
+                    )}
                 </div>
+            )}
 
-            )
-            }
 
             {
                 activeTab === 'patrocinadores' && (
-                    <div className="max-w-5xl mx-auto space-y-8">
-                        {/* --- SECCIÓN: IMPACTO DE BECAS --- */}
-                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
-                                    <Heart className="w-5 h-5 text-fuchsia-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Impacto de Becas</h2>
-                                    <p className="text-slate-400 text-xs">Tabla: estadísticas · Columna: niños patrocinados</p>
-                                </div>
-                            </div>
-
-                            {fetchingBecas ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <Loader2 className="w-6 h-6 animate-spin text-fuchsia-500" />
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <Users size={14} /> Niños Patrocinados
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={ninosPatrocinados}
-                                            onChange={(e) => setNinosPatrocinados(e.target.value)}
-                                            min="0"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white text-2xl font-bold placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent transition-all"
-                                        />
-                                        <p className="text-slate-500 text-xs mt-2">Este valor se muestra en Homepage y Dashboard de patrocinadores.</p>
-                                    </div>
-
-                                    {becasMessage.text && (
-                                        <div className={`flex items-center gap-2 p-3 rounded-xl text-sm ${becasMessage.type === 'success'
-                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                            }`}>
-                                            {becasMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                                            {becasMessage.text}
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={handleBecasUpdate}
-                                        disabled={becasLoading}
-                                        className="w-full bg-gradient-to-r from-fuchsia-500 to-violet-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-fuchsia-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        {becasLoading ? (
-                                            <><Loader2 size={18} className="animate-spin" /> Actualizando...</>
-                                        ) : (
-                                            <><RefreshCw size={18} /> Actualizar Impacto</>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-                        </section>
+                    <div className="max-w-5xl mx-auto space-y-8 animate-premium-in">
 
                         {/* --- FORMULARIO DE ALTA DE PATROCINADOR --- */}
-                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                        <section className="neu-card p-6 md:p-8">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
                                     <Building2 className="w-5 h-5 text-violet-400" />
@@ -1548,7 +1054,7 @@ export default function AdminPage() {
                                             onChange={handleSponsorInputChange}
                                             required
                                             placeholder="Ej: Empresa ABC"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                            className="w-full neu-input-inset px-4 py-3"
                                         />
                                     </div>
 
@@ -1563,7 +1069,7 @@ export default function AdminPage() {
                                             onChange={handleSponsorInputChange}
                                             required
                                             placeholder="contacto@empresa.com"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                            className="w-full neu-input-inset px-4 py-3"
                                         />
                                     </div>
 
@@ -1578,7 +1084,7 @@ export default function AdminPage() {
                                             onChange={handleSponsorInputChange}
                                             required
                                             placeholder="Contraseña de acceso"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                                            className="w-full neu-input-inset px-4 py-3"
                                         />
                                     </div>
                                 </div>
@@ -1594,7 +1100,7 @@ export default function AdminPage() {
                                         value={sponsorForm.aportacion}
                                         onChange={handleSponsorInputChange}
                                         placeholder="Ej: 50000"
-                                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-mono"
+                                        className="w-full neu-input-inset px-4 py-3 font-mono"
                                     />
                                     <p className="text-xs text-slate-500 mt-1">Esta cifra será visible solo para este patrocinador.</p>
                                 </div>
@@ -1634,7 +1140,7 @@ export default function AdminPage() {
                         </section>
 
                         {/* --- LISTA DE PATROCINADORES --- */}
-                        <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                        <section className="neu-card p-6 md:p-8">
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
@@ -1648,14 +1154,14 @@ export default function AdminPage() {
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => setShowPasswords(!showPasswords)}
-                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                        className="p-2 neu-list-item"
                                         title={showPasswords ? 'Ocultar contraseñas' : 'Mostrar contraseñas'}
                                     >
                                         {showPasswords ? <EyeOff size={18} className="text-slate-400" /> : <Eye size={18} className="text-slate-400" />}
                                     </button>
                                     <button
                                         onClick={fetchSponsors}
-                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
+                                        className="p-2 neu-list-item"
                                         title="Actualizar lista"
                                     >
                                         <RefreshCw size={18} className="text-slate-400" />
@@ -1673,59 +1179,76 @@ export default function AdminPage() {
                                     <p>No hay patrocinadores registrados</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {sponsors.map((sponsor) => (
-                                        <div
-                                            key={sponsor.id}
-                                            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-colors"
-                                        >
-                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
-                                                <div>
-                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Empresa</p>
-                                                    <p className="font-bold text-white">{sponsor.nombre}</p>
+                                    <div className="space-y-3">
+                                        {sponsors.map((sponsor, idx) => {
+                                            const themes = [
+                                                { bg: '#FF6B6B', text: 'text-white', sub: 'text-rose-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
+                                                { bg: '#4EA8DE', text: 'text-white', sub: 'text-sky-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
+                                                { bg: '#FFD166', text: 'text-slate-900', sub: 'text-amber-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900' },
+                                                { bg: '#9D4EDD', text: 'text-white', sub: 'text-fuchsia-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
+                                                { bg: '#06D6A0', text: 'text-slate-900', sub: 'text-emerald-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900' }
+                                            ];
+                                            const theme = themes[idx % themes.length];
+                                            return (
+                                            <div
+                                                key={sponsor.id}
+                                                className="neu-list-item group flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 md:p-4 transition-all duration-300 hover:-translate-y-0.5"
+                                                style={{ background: theme.bg, borderColor: 'transparent' }}
+                                            >
+                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-center pl-1">
+                                                    <div className="min-w-0">
+                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Empresa</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`hidden lg:flex flex-shrink-0 w-8 h-8 rounded-lg items-center justify-center ${theme.iconbg} transition-transform duration-300 group-hover:scale-110`}>
+                                                                <Building2 size={16} className={theme.text} />
+                                                            </div>
+                                                            <p className={`font-black text-base truncate ${theme.text}`}>{sponsor.nombre}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Correo</p>
+                                                        <p className={`text-xs font-semibold truncate ${theme.text}`}>{sponsor.email}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Contraseña</p>
+                                                        <p className={`text-xs font-mono tracking-widest font-black ${theme.text}`}>
+                                                            {showPasswords ? sponsor.password : '••••••••'}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Inversión</p>
+                                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-lg font-black font-mono text-xs shadow-sm ${theme.iconbg} ${theme.money} transition-transform duration-300 group-hover:scale-105`}>
+                                                            ${(sponsor.aportacion_total || 0).toLocaleString()}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Correo</p>
-                                                    <p className="text-slate-300">{sponsor.email}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Contraseña</p>
-                                                    <p className="text-slate-300 font-mono">
-                                                        {showPasswords ? sponsor.password : '••••••••'}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Inversión</p>
-                                                    <p className="text-emerald-400 font-bold font-mono">
-                                                        ${(sponsor.aportacion_total || 0).toLocaleString()} MXN
-                                                    </p>
+                                                
+                                                <div className="flex justify-end gap-1.5 mt-3 md:mt-0 pr-1">
+                                                    <button
+                                                        onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
+                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
+                                                        title="Probar Login"
+                                                    >
+                                                        <ExternalLink size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleEditSponsor(sponsor)}
+                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
+                                                        title="Editar Datos"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteSponsor(sponsor.id)}
+                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95 hover:!bg-red-500 hover:!text-white hover:!border-red-500`}
+                                                        title="Eliminar"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-row md:flex-col gap-2 justify-end mt-4 md:mt-0">
-                                                <button
-                                                    onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
-                                                    className="flex items-center gap-2 px-3 py-2 bg-violet-500/10 text-violet-400 border border-violet-500/20 rounded-xl hover:bg-violet-500/20 transition-colors"
-                                                    title="Probar Login y Ver Dashboard"
-                                                >
-                                                    <Eye size={16} /> <span className="text-xs font-bold">Test</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleEditSponsor(sponsor)}
-                                                    className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
-                                                    title="Editar datos"
-                                                >
-                                                    <Pencil size={18} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteSponsor(sponsor.id)}
-                                                    className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
-                                                    title="Eliminar patrocinador"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                            );
+                                        })}
                                 </div>
                             )}
                         </section>
@@ -1763,26 +1286,40 @@ export default function AdminPage() {
             {/* CONTENIDO CRONOGRAMA */}
             {
                 activeTab === 'cronograma' && (
-                    <>
-                        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-                            {/* --- TARJETA: PROGRAMAR ESCUELA --- */}
-                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                                <div className="flex items-center gap-3 mb-6">
+                    <div className="max-w-5xl mx-auto space-y-8 animate-premium-in">
+                        {/* --- ALTA DE PRÓXIMA MISIÓN --- */}
+                        <section className="neu-card p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                                        <Calendar className="w-5 h-5 text-amber-400" />
+                                        <School className="w-5 h-5 text-amber-500" />
                                     </div>
                                     <div>
-                                        <h2 className="text-lg md:text-xl font-bold">Programar Misión</h2>
-                                        <p className="text-slate-400 text-xs">Agendar próxima visita a escuela</p>
+                                        <h2 className="text-lg md:text-xl font-bold neu-text">
+                                            {editingSchoolId ? 'Editar Misión' : 'Agendar Nueva Misión'}
+                                        </h2>
+                                        <p className="text-xs neu-text-sub">Programa un vuelo directo al Sandbox Opeacional</p>
                                     </div>
                                 </div>
+                                {editingSchoolId && (
+                                    <button 
+                                        type="button" 
+                                        onClick={handleCancelNextSchoolEdit}
+                                        className="p-2 neu-list-item text-slate-400 hover:text-red-500 transition-colors"
+                                        title="Cancelar edición"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                )}
+                            </div>
 
-                                <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <School size={14} /> Escuela (Catálogo Oficial)
+                            <form onSubmit={handleNextSchoolSubmit} className="space-y-5">
+                                <div className="space-y-4">
+                                    <div className="relative z-20">
+                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                            <Database size={14} /> Seleccionar Escuela (Catálogo Oficial)
                                         </label>
-                                        <SchoolCombobox
+                                        <SchoolCombobox 
                                             schools={catalogoEscuelas}
                                             value={selectedCatalogoSchool}
                                             onChange={(school) => {
@@ -1791,92 +1328,89 @@ export default function AdminPage() {
                                                     setNextSchoolForm(prev => ({
                                                         ...prev,
                                                         nombre_escuela: school.nombre_escuela,
-                                                        cct: school.cct
-                                                    }));
-                                                } else {
-                                                    setNextSchoolForm(prev => ({
-                                                        ...prev,
-                                                        nombre_escuela: '',
-                                                        cct: ''
+                                                        cct: school.cct,
+                                                        colonia: school.colonia || prev.colonia
                                                     }));
                                                 }
                                             }}
                                             loading={catalogoLoading}
-                                            disabled={false}
                                         />
                                     </div>
 
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <MapPin size={14} /> Colonia / Ubicación
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={nextSchoolForm.colonia}
-                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, colonia: e.target.value })}
-                                            required
-                                            placeholder="Ej: Col. La Charanda"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <Calendar size={14} /> Fecha Programada
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={nextSchoolForm.fecha_programada}
-                                            onChange={(e) => setNextSchoolForm({ ...nextSchoolForm, fecha_programada: e.target.value })}
-                                            required
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                                        />
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={nextSchoolLoading}
-                                        className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSchoolId
-                                            ? 'bg-gradient-to-r from-orange-500 to-red-500 shadow-orange-500/30 hover:shadow-orange-500/50 text-white'
-                                            : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
-                                            }`}
-                                    >
-                                        {nextSchoolLoading ? (
-                                            <><Loader2 size={18} className="animate-spin" /> {editingSchoolId ? 'Actualizando...' : 'Guardando...'} </>
-                                        ) : (
-                                            <>{editingSchoolId ? <RefreshCw size={18} /> : <Calendar size={18} />} {editingSchoolId ? 'Actualizar Misión' : 'Agendar Visita'}</>
-                                        )}
-                                    </button>
-
-                                    {editingSchoolId && (
-                                        <button
-                                            type="button"
-                                            onClick={handleCancelNextSchoolEdit}
-                                            className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <X size={18} /> Cancelar Edición
-                                        </button>
+                                    {!selectedCatalogoSchool && !editingSchoolId && (
+                                        <div className="p-4 neu-card flex items-start gap-3 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
+                                            <AlertCircle size={16} className="shrink-0 mt-0.5 text-blue-500" />
+                                            <p className="text-xs font-medium leading-relaxed">
+                                                Al agendar una escuela, se mantendrá pendiente en tu Cronograma. <strong className="text-slate-700 dark:text-slate-300">En cuanto el equipo operativo inicie la misión</strong> en asfalto, esta pasará instantáneamente a formar parte oficial de la bitácora de Sandbox Vuelos.
+                                            </p>
+                                        </div>
                                     )}
-                                </form>
-                            </section>
 
-                            {/* --- LISTA DE PRÓXIMAS ESCUELAS --- */}
-                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-0">
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <MapPin size={14} /> Colonia / Detalles
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={nextSchoolForm.colonia}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, colonia: e.target.value }))}
+                                                placeholder="Ej. Centro..."
+                                                className="w-full neu-input-inset px-4 py-3"
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <Calendar size={14} /> Fecha Programada
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={nextSchoolForm.fecha_programada}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, fecha_programada: e.target.value }))}
+                                                className="w-full neu-input-inset px-4 py-3 uppercase"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={nextSchoolLoading || (!selectedCatalogoSchool && !editingSchoolId && !nextSchoolForm.nombre_escuela)}
+                                    className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                                        (!selectedCatalogoSchool && !editingSchoolId && !nextSchoolForm.nombre_escuela) || nextSchoolLoading
+                                            ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                                            : editingSchoolId
+                                                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-[1.01]'
+                                                : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.01]'
+                                    }`}
+                                >
+                                    {nextSchoolLoading ? (
+                                        <><Loader2 size={18} className="animate-spin" /> {editingSchoolId ? 'Actualizando...' : 'Agendando...'} </>
+                                    ) : (
+                                        <>{editingSchoolId ? <RefreshCw size={18} /> : <Plane size={18} />} {editingSchoolId ? 'Guardar Cambios' : 'Agendar al Cronograma'}</>
+                                    )}
+                                </button>
+                            </form>
+                        </section>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                            {/* --- COLUMNA 1: PRÓXIMAS MISIONES --- */}
+                            <section className="neu-card p-6 md:p-8">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                            <Plane className="w-5 h-5 text-blue-400" />
+                                        <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                                            <Calendar className="w-5 h-5 text-amber-500" />
                                         </div>
                                         <div>
-                                            <h2 className="text-lg md:text-xl font-bold">Lista de Misiones</h2>
-                                            <p className="text-slate-400 text-xs">{nextSchools.length} programadas</p>
+                                            <h2 className="text-lg md:text-xl font-bold neu-text">Próximas Misiones</h2>
+                                            <p className="neu-text-sub text-xs">Misiones pendientes por completar</p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={fetchNextSchools}
-                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                                    >
-                                        <RefreshCw size={18} className="text-slate-400" />
+                                    <button onClick={() => fetchNextSchools()} className="p-2 neu-list-item text-amber-500">
+                                        <RefreshCw size={18} />
                                     </button>
                                 </div>
 
@@ -1884,264 +1418,119 @@ export default function AdminPage() {
                                     <div className="flex items-center justify-center py-12">
                                         <Loader2 size={32} className="animate-spin text-slate-400" />
                                     </div>
-                                ) : nextSchools.length === 0 ? (
+                                ) : nextSchools.filter(s => s.estatus !== 'completada').length === 0 ? (
                                     <div className="text-center py-12 text-slate-400">
                                         <Calendar size={48} className="mx-auto mb-4 opacity-30" />
-                                        <p>No hay misiones programadas</p>
+                                        <p>No hay misiones próximas pendientes</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {nextSchools.map((school) => (
-                                            <div
-                                                key={school.id}
-                                                className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border transition-all ${school.estatus === 'completada'
-                                                    ? 'bg-emerald-500/10 border-emerald-500/30'
-                                                    : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50'
-                                                    }`}
-                                            >
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <p className={`font-bold ${school.estatus === 'completada' ? 'text-emerald-400 line-through' : 'text-white'}`}>
-                                                            {school.nombre_escuela}
-                                                        </p>
-                                                        {school.cct && (
-                                                            <span className="text-[10px] font-mono bg-cyan-500/15 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/20">
-                                                                {school.cct}
-                                                            </span>
-                                                        )}
-                                                        {school.estatus === 'completada' && (
-                                                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">REALIZADA</span>
-                                                        )}
-                                                    </div>
+                                        {nextSchools.filter(s => s.estatus !== 'completada').map((school) => {
+                                            const isCanceled = school.estatus === 'cancelada';
+                                            const isArchived = school.estatus === 'archivado';
+                                            const opacityClass = (isCanceled || isArchived) ? 'opacity-60' : 'opacity-100';
+                                            
+                                            let borderClass = 'border-amber-500';
+                                            let pillClass = 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+                                            
+                                            if (isCanceled) {
+                                                borderClass = 'border-red-500';
+                                                pillClass = 'bg-red-500/10 text-red-600 border-red-500/20 line-through';
+                                            } else if (isArchived) {
+                                                borderClass = 'border-slate-500';
+                                                pillClass = 'bg-slate-500/10 text-slate-600 border-slate-500/20';
+                                            }
 
-                                                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                                                        <span className="flex items-center gap-1">
-                                                            <MapPin size={12} /> {school.colonia}
+                                            return (
+                                            <div key={school.id} className={`neu-list-item flex flex-col gap-2 p-4 border-l-4 ${borderClass} ${opacityClass}`}>
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <p className={`font-bold neu-text pr-2 ${isCanceled ? 'line-through' : ''}`}>{school.nombre_escuela}</p>
+                                                        <span className={`mt-1 inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border uppercase ${pillClass}`}>
+                                                            {school.estatus || 'pendiente'}
                                                         </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Calendar size={12} /> {school.fecha_programada}
-                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* Botones de Administración de la Misión */}
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button
+                                                            onClick={() => handleEditNextSchool(school)}
+                                                            className="p-1.5 rounded-lg hover:bg-slate-500/10 text-slate-400 hover:text-amber-500 transition-colors"
+                                                            title="Editar Misión"
+                                                        >
+                                                            <Pencil size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteNextSchool(school.id)}
+                                                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-colors"
+                                                            title="Archivar"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex items-center gap-2 self-end md:self-center">
-                                                    {/* Botón Ver Reporte (si existe) */}
-                                                    {reports[String(school.id)] && (
-                                                        <button
-                                                            onClick={() => handleViewReport(String(school.id))}
-                                                            className="p-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl hover:bg-blue-500/30 transition-colors"
-                                                            title="Ver Reporte de Misión"
-                                                        >
-                                                            <FileText size={18} />
-                                                        </button>
-                                                    )}
-
-                                                    <button
-                                                        onClick={() => handleEditNextSchool(school)}
-                                                        className="p-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-colors"
-                                                        title="Editar detalles"
-                                                    >
-                                                        <Pencil size={18} />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => handleCompleteNextSchool(school.id, school.estatus)}
-                                                        className={`p-2 rounded-xl border transition-colors ${school.estatus === 'completada'
-                                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                                                            : 'bg-slate-700/50 text-slate-400 border-slate-600/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30'
-                                                            }`}
-                                                        title={school.estatus === 'completada' ? "Marcar como pendiente" : "Marcar como realizada"}
-                                                    >
-                                                        <CheckCircle size={18} />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => handleDeleteNextSchool(school.id)}
-                                                        className="p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"
-                                                        title="Eliminar misión"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
+                                                <div className="flex items-center gap-4 text-xs neu-text-sub font-medium mt-1">
+                                                    <span className="flex items-center gap-1">
+                                                        <MapPin size={12} className="text-blue-500" /> {school.colonia}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar size={12} className="text-amber-500" /> {school.fecha_programada}
+                                                    </span>
                                                 </div>
                                             </div>
-                                        ))}
+                                        )})}
                                     </div>
                                 )}
                             </section>
-                        </div>
 
-                        {/* --- SECCIÓN: ESCUELAS EXTRAS / HISTÓRICAS --- */}
-                        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-12 pt-8 border-t border-white/10">
-                            {/* FORMULARIO EXTRAS */}
-                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center">
-                                        <School className="w-5 h-5 text-indigo-400" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg md:text-xl font-bold">Escuelas Extras</h2>
-                                        <p className="text-slate-400 text-xs">Agrega manualmente escuelas pasadas o especiales</p>
-                                    </div>
-                                </div>
-
-                                {/* Disclaimer */}
-                                {/* Disclaimer Collapsible */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsDisclaimerOpen(!isDisclaimerOpen)}
-                                    className={`w-full text-left bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mb-6 transition-all hover:bg-amber-500/15 group ${isDisclaimerOpen ? 'shadow-lg shadow-amber-900/10' : ''}`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <AlertCircle className="shrink-0 w-5 h-5 text-amber-500 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="flex items-center justify-between">
-                                                <p className="font-bold text-amber-500 text-sm">Nota Importante</p>
-                                                {isDisclaimerOpen ? <ChevronUp size={16} className="text-amber-500/70" /> : <ChevronDown size={16} className="text-amber-500/70" />}
-                                            </div>
-
-                                            <div className={`overflow-hidden transition-all duration-300 ${isDisclaimerOpen ? 'max-h-40 mt-2 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                                <div className="text-xs text-amber-200/80 leading-relaxed">
-                                                    Estas escuelas <span className="text-white font-bold">SOLO</span> se reflejarán en los sitios de testimonios (Carrusel de la Home). <br />
-                                                    <span className="opacity-70">No afectarán las métricas ni aparecerán en los Dashboards de los Patrocinadores.</span>
-                                                </div>
-                                            </div>
-
-                                            {!isDisclaimerOpen && (
-                                                <p className="text-xs text-amber-200/60 mt-0.5 truncate max-w-[250px] md:max-w-none">
-                                                    Estas escuelas solo son para testimonios...
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </button>
-
-                                <form onSubmit={handleExtraSchoolSubmit} className="space-y-5">
-                                    <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                            <School size={14} /> Nombre de la Escuela
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={extraSchoolForm.nombre}
-                                            onChange={(e) => setExtraSchoolForm({ nombre: e.target.value })}
-                                            required
-                                            placeholder="Ej: Instituto Histórico 2023"
-                                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                                        />
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={extraSchoolLoading}
-                                        className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {extraSchoolLoading ? (
-                                            <><Loader2 size={18} className="animate-spin" /> Guardando...</>
-                                        ) : (
-                                            <><School size={18} /> Agregar a Lista Extra</>
-                                        )}
-                                    </button>
-                                </form>
-                            </section>
-
-                            {/* LISTA EXTRAS */}
-                            <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
+                            {/* --- COLUMNA 2: MISIONES COMPLETADAS --- */}
+                            <section className="neu-card p-6 md:p-8">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-slate-700/50 rounded-xl flex items-center justify-center">
-                                            <FileText className="w-5 h-5 text-slate-300" />
+                                        <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                                            <CheckCircle className="w-5 h-5 text-emerald-500" />
                                         </div>
                                         <div>
-                                            <h2 className="text-lg md:text-xl font-bold">Lista Manual</h2>
-                                            <p className="text-slate-400 text-xs">{extraSchools.length} registros extra</p>
+                                            <h2 className="text-lg md:text-xl font-bold neu-text">Misiones Completadas</h2>
+                                            <p className="neu-text-sub text-xs">Aterrizaron con éxito (Consumidas por Sandbox)</p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={fetchExtraSchools}
-                                        className="p-2 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700/50 transition-colors"
-                                    >
-                                        <RefreshCw size={18} className="text-slate-400" />
-                                    </button>
                                 </div>
 
-                                {fetchingExtraSchools ? (
+                                {fetchingNextSchools ? (
                                     <div className="flex items-center justify-center py-12">
                                         <Loader2 size={32} className="animate-spin text-slate-400" />
                                     </div>
-                                ) : extraSchools.length === 0 ? (
+                                ) : nextSchools.filter(s => s.estatus === 'completada').length === 0 ? (
                                     <div className="text-center py-12 text-slate-400">
-                                        <School size={48} className="mx-auto mb-4 opacity-30" />
-                                        <p>No hay escuelas extra registradas</p>
+                                        <CheckCircle size={48} className="mx-auto mb-4 opacity-30" />
+                                        <p>Aún no hay misiones completadas</p>
                                     </div>
                                 ) : (
-                                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
-                                        {extraSchools.map((school) => (
-                                            <div key={school.id} className="flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl hover:bg-slate-800/50 transition-colors group">
-                                                <span className="font-bold text-slate-200">{school.nombre}</span>
-                                                <button
-                                                    onClick={() => handleDeleteExtraSchool(school.id)}
-                                                    className="p-1.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                    <div className="space-y-3">
+                                        {nextSchools.filter(s => s.estatus === 'completada').map((school) => (
+                                            <div key={school.id} className="neu-list-item flex flex-col gap-2 p-4 border-l-4 border-emerald-500 opacity-80">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="font-bold neu-text opacity-70 truncate pr-2">{school.nombre_escuela}</p>
+                                                    <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase shrink-0">
+                                                        COMPLETADA
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-xs neu-text-sub font-medium opacity-70">
+                                                    <span className="flex items-center gap-1">
+                                                        <MapPin size={12} className="text-blue-500" /> {school.colonia}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar size={12} className="text-amber-500" /> {school.fecha_programada}
+                                                    </span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-
-                                {/* SECCIÓN DIAGNÓSTICA: REPORTES SIN VINCULAR */}
-                                {unlinkedReports.length > 0 && (
-                                    <div className="mt-12 p-6 bg-amber-500/5 border border-amber-500/20 rounded-3xl">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                                                <AlertCircle className="w-4 h-4 text-amber-400" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-bold text-amber-200">Reportes sin vincular ({unlinkedReports.length})</h3>
-                                                <p className="text-xs text-amber-500/70">Misiones cerradas que no coinciden con un ID del cronograma</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {unlinkedReports.map((report) => (
-                                                <div key={report.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                                                    <div>
-                                                        <p className="text-xs font-mono text-slate-400">ID: {report.mission_id}</p>
-                                                        <p className="text-[10px] text-slate-500 truncate">
-                                                            {new Date(report.end_time).toISOString().split('T')[0]} {new Date(report.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex flex-col gap-2">
-                                                        <button
-                                                            onClick={() => handleViewReport(report.mission_id)}
-                                                            className="px-3 py-1.5 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded-lg hover:bg-amber-500/30 transition-colors"
-                                                        >
-                                                            Ver Reporte
-                                                        </button>
-                                                        <select
-                                                            onChange={(e) => {
-                                                                if (e.target.value) handleLinkReport(report.id, e.target.value);
-                                                                e.target.value = '';
-                                                            }}
-                                                            className="bg-slate-800 text-[10px] text-white border border-white/10 rounded-lg px-2 py-1 outline-none"
-                                                        >
-                                                            <option value="">Vincular a...</option>
-                                                            {nextSchools.filter(s => s.estatus === 'completado').map(s => (
-                                                                <option key={s.id} value={s.id}>{s.nombre_escuela}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p className="mt-4 text-[10px] text-amber-500/50 italic text-center">
-                                            Tip: Si ves un reporte aquí, es porque se cerró como &quot;Misión Manual&quot;.
-                                        </p>
-                                    </div>
-                                )}
                             </section>
                         </div>
-                    </>
+                    </div>
                 )
             }
 
@@ -2149,16 +1538,106 @@ export default function AdminPage() {
 
             {/* TAB: OPERATIVOS */}
             {activeTab === 'operativos' && (
-                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 relative z-10 mt-16 md:mt-20 animate-premium-in">
+                    
+                    {/* ANCLA PARA EL MUÑECO OPERATIVO */}
+                    {/* Esta ancla virtualiza la posicion en el grid; el puppet real se portaliza por encima del Header */}
+                    <div id="operativos-mascot-anchor" className="absolute top-[0px] left-[55%] -translate-x-1/2 w-0 h-0 z-0 pointer-events-none" />
+
+                    {/* PORTAL MUÑECO: Absolute Tracking - Pinned to Browser Top */}
+                    {isMounted && document.body && createPortal(
+                        <div id="portal-mascot-container" className="hidden lg:block fixed top-0 left-0 z-[99999] pointer-events-none group will-change-transform">
+                            <style>{`
+                                @keyframes waveArm {
+                                    0%, 100% { transform: rotate(0deg); }
+                                    25% { transform: rotate(15deg); }
+                                    35% { transform: rotate(-10deg); }
+                                    50% { transform: rotate(15deg); }
+                                    75% { transform: rotate(-10deg); }
+                                }
+                                .group:hover .hand-wave {
+                                    animation: waveArm 1.5s ease-in-out infinite;
+                                    transform-origin: 36px 30px;
+                                }
+                                @keyframes slideDropIn {
+                                    0% { transform: translate(-50%, -150%); opacity: 0; }
+                                    50% { transform: translate(-50%, 15px); opacity: 1; }
+                                    75% { transform: translate(-50%, -5px); opacity: 1; }
+                                    100% { transform: translate(-50%, 0); opacity: 1; }
+                                }
+                                .animate-slide-drop-in {
+                                    animation: slideDropIn 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                                }
+                            `}</style>
+                            
+                            {/* Slide-in container and hover-bounce translation */}
+                            <div className="absolute top-0 left-1/2 pointer-events-auto cursor-pointer animate-slide-drop-in" style={{ transform: 'translateX(-50%)' }}>
+                                {/* Float animation layer - NO SHADOW per user request */}
+                                <div className="animate-bounce-slow hover:-translate-y-2 transition-transform duration-500 will-change-transform">
+                                    <svg viewBox="0 0 160 200" className="w-[150px] h-[190px] overflow-visible">
+                                        <g transform="translate(80, 100) rotate(180)">
+                                            {/* Endless Drone Body so the entry animation never reveals a cut edge! */}
+                                            <rect x="-40" y="0" width="80" height="400" rx="35" fill="#3b82f6" />
+                                            {/* Lateral Tech Ticker Lines */}
+                                            <path d="M -25 10 L -25 400 M 25 10 L 25 400" stroke="#2563eb" strokeWidth="6" strokeLinecap="round" opacity="0.4" />
+
+                                            {/* Short Tech Neck */}
+                                            <rect x="-9" y="-8" width="18" height="15" rx="6" fill="#fcd34d" />
+                                            
+                                            {/* Left Arm */}
+                                            <path d="M -36 30 Q -65 -15 -45 -50" stroke="#60a5fa" strokeWidth="16" strokeLinecap="round" fill="none"/>
+                                            <circle cx="-45" cy="-50" r="10" fill="#fde68a" />
+                                            
+                                            {/* Right Arm (Waving) */}
+                                            <g className="hand-wave">
+                                                <path d="M 36 30 Q 65 -15 45 -50" stroke="#60a5fa" strokeWidth="16" strokeLinecap="round" fill="none"/>
+                                                <circle cx="45" cy="-50" r="10" fill="#fde68a" />
+                                            </g>
+
+                                            {/* Head Base */}
+                                            <circle cx="0" cy="-36" r="32" fill="#fde68a" />
+                                            
+                                            {/* Tech Cap */}
+                                            <path d="M -32 -36 A 32 32 0 0 1 32 -36 Z" fill="#1e3a8a" />
+                                            <line x1="-32" y1="-36" x2="40" y2="-36" stroke="#1e3a8a" strokeWidth="9" strokeLinecap="round" />
+                                            
+                                            {/* "FLYHIGH" Inscription */}
+                                            <text x="0" y="-48" fill="#fcd34d" fontSize="9.8" fontWeight="900" textAnchor="middle" transform="rotate(180 0 -50)" style={{ letterSpacing: '1.5px', fontFamily: 'system-ui, sans-serif' }}>FLYHIGH</text>
+
+                                            {/* Friendly Display Interfaces (Eyes) */}
+                                            <circle cx="-12" cy="-20" r="4.5" fill="#475569" />
+                                            <circle cx="12" cy="-20" r="4.5" fill="#475569" />
+                                            <circle cx="-14" cy="-22" r="1.5" fill="white" opacity="0.6"/>
+                                            <circle cx="10" cy="-22" r="1.5" fill="white" opacity="0.6"/>
+
+                                            {/* Cheeks */}
+                                            <ellipse cx="-20" cy="-14" rx="6" ry="4" fill="#FCA5A5" opacity="0.8" />
+                                            <ellipse cx="20" cy="-14" rx="6" ry="4" fill="#FCA5A5" opacity="0.8" />
+
+                                            {/* Smile */}
+                                            <path d="M -10 -9 Q 0 3 10 -9" fill="none" stroke="#475569" strokeWidth="3.5" strokeLinecap="round" />
+                                        </g>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>,
+                        document.body
+                    )}
+
                     {/* CREAR OPERATIVO */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-rose-500/20 rounded-xl flex items-center justify-center">
-                                <UserPlus className="w-5 h-5 text-rose-400" />
+                    <section className="neu-card p-6 md:p-8 relative overflow-hidden">
+                        {/* Background subtle glow for PWA feel */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                        <div className="flex items-center gap-4 mb-6 relative">
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-[4px_4px_10px_rgba(37,99,235,0.3),-4px_-4px_10px_rgba(255,255,255,0.8)]">
+                                <Smartphone className="w-6 h-6 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-lg md:text-xl font-bold">Nuevo Operativo</h2>
-                                <p className="text-slate-400 text-xs">Crea una cuenta de acceso para staff</p>
+                                <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                                    FlyHigh Ops 
+                                    <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-inner uppercase tracking-widest font-black">App Shell</span>
+                                </h2>
+                                <p className="text-slate-400 text-xs">Administra los accesos móviles del equipo en terreno</p>
                             </div>
                         </div>
 
@@ -2172,7 +1651,7 @@ export default function AdminPage() {
                                     value={staffForm.full_name}
                                     onChange={(e) => setStaffForm(prev => ({ ...prev, full_name: e.target.value }))}
                                     placeholder="Ej: Juan Pérez"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                                    className="w-full neu-input-inset px-4 py-3"
                                 />
                             </div>
 
@@ -2183,13 +1662,13 @@ export default function AdminPage() {
                                 <select
                                     value={staffForm.role}
                                     onChange={(e) => setStaffForm(prev => ({ ...prev, role: e.target.value }))}
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                                    className="w-full neu-input-inset px-4 py-3"
                                 >
-                                    <option value="pilot">🎮 Piloto</option>
-                                    <option value="teacher">📚 Docente</option>
-                                    <option value="assistant">📦 Auxiliar</option>
-                                    <option value="supervisor">👁️ Supervisor</option>
-                                    <option value="admin">⚙️ Admin</option>
+                                    <option value="pilot">Piloto</option>
+                                    <option value="teacher">Docente</option>
+                                    <option value="assistant">Auxiliar</option>
+                                    <option value="supervisor">Supervisor</option>
+                                    <option value="admin">Admin</option>
                                 </select>
                             </div>
 
@@ -2202,7 +1681,7 @@ export default function AdminPage() {
                                     value={staffForm.email}
                                     onChange={(e) => setStaffForm(prev => ({ ...prev, email: e.target.value }))}
                                     placeholder="user@flyhighedu.com"
-                                    className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                                    className="w-full neu-input-inset px-4 py-3"
                                 />
                             </div>
 
@@ -2217,16 +1696,16 @@ export default function AdminPage() {
                                         onChange={(e) => setStaffForm(prev => ({ ...prev, password: e.target.value }))}
                                         placeholder="Mínimo 6 caracteres"
                                         minLength={6}
-                                        className="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                                        className="flex-1 neu-input-inset px-4 py-3"
                                     />
                                     <button type="button" onClick={generatePassword}
-                                        className="px-3 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold text-slate-300 transition-colors whitespace-nowrap"
+                                        className="px-3 py-3 neu-input-inset hover:opacity-80 transition-colors whitespace-nowrap"
                                         title="Generar password"
                                     >
                                         <RefreshCw size={16} />
                                     </button>
                                     <button type="button" onClick={() => setShowStaffPasswords(!showStaffPasswords)}
-                                        className="px-3 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 transition-colors"
+                                        className="px-3 py-3 neu-input-inset hover:opacity-80 transition-colors"
                                     >
                                         {showStaffPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
@@ -2248,151 +1727,171 @@ export default function AdminPage() {
                             )}
 
                             <button type="submit" disabled={staffLoading}
-                                className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-rose-500/30 hover:shadow-rose-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 rounded-xl shadow-[4px_4px_10px_rgba(37,99,235,0.3),-4px_-4px_10px_rgba(255,255,255,0.1)] hover:shadow-[6px_6px_15px_rgba(37,99,235,0.4),-6px_-6px_15px_rgba(255,255,255,0.15)] active:scale-97 active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.3)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                {staffLoading ? <><Loader2 size={18} className="animate-spin" /> Creando...</> : <><UserPlus size={18} /> Crear Operativo</>}
+                                {staffLoading ? <><Loader2 size={18} className="animate-spin" /> Creando Acceso...</> : <><UserPlus size={18} /> Provisionar Acceso PWA</>}
                             </button>
                         </form>
                     </section>
 
                     {/* LISTA DE OPERATIVOS */}
-                    <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-pink-500/20 rounded-xl flex items-center justify-center">
-                                    <Users className="w-5 h-5 text-pink-400" />
+                    <div className="relative flex flex-col h-full">                        
+                        <section className="neu-card p-6 md:p-8 relative overflow-hidden flex-1 z-10">
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-[4px_4px_10px_rgba(0,0,0,0.04),-4px_-4px_10px_rgba(255,255,255,1)] border border-slate-100">
+                                    <Users className="w-6 h-6 text-blue-500" />
                                 </div>
-                                <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Equipo</h2>
-                                    <p className="text-slate-400 text-xs">{staffList.length} operativos registrados</p>
+                                <div className="mt-1">
+                                    <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-none">Dispositivos</h2>
+                                    <p className="text-slate-500 font-medium text-xs mt-1">{staffList.length} operativos en línea</p>
                                 </div>
                             </div>
                             <button onClick={fetchStaffList}
-                                className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-400 hover:text-white"
+                                className="w-11 h-11 flex items-center justify-center bg-white hover:bg-blue-50 rounded-full shadow-[3px_3px_8px_rgba(0,0,0,0.05),-3px_-3px_8px_rgba(255,255,255,1)] border border-slate-50 transition-all text-slate-400 hover:text-blue-600 active:scale-95"
+                                title="Actualizar lista"
                             >
                                 <RefreshCw size={18} className={fetchingStaff ? 'animate-spin' : ''} />
                             </button>
                         </div>
 
                         {fetchingStaff ? (
-                            <div className="flex items-center justify-center py-12">
+                            <div className="flex items-center justify-center py-12 relative z-10">
                                 <Loader2 size={32} className="animate-spin text-slate-400" />
                             </div>
                         ) : staffList.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
-                                <Users size={48} className="mx-auto mb-4 opacity-30" />
-                                <p>No hay operativos registrados aún</p>
-                                <p className="text-xs mt-1">Crea el primero con el formulario</p>
+                            <div className="text-center py-12 text-slate-400 relative z-10">
+                                <Users size={48} className="mx-auto mb-4 opacity-40 text-blue-300" />
+                                <p className="font-medium text-slate-500">No hay operativos listados aún</p>
+                                <p className="text-xs mt-1 text-slate-400">Crea el primero usando el formulario</p>
                             </div>
                         ) : (
-                            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 relative z-10">
                                 {staffList.map((s) => {
-                                    const roleEmojis = { pilot: '🎮', teacher: '📚', assistant: '📦', admin: '⚙️', supervisor: '👁️' };
+                                    const PersonitaAvatar = ({ colorHex, role }) => (
+                                        <svg viewBox="0 0 100 100" className="w-[20px] h-[20px]">
+                                            <g stroke={colorHex} strokeLinecap="round" strokeLinejoin="round">
+                                                <animateTransform attributeName="transform" type="translate" values="0,0; 0,-3; 0,0" dur={`${2 + (s.user_id?.charCodeAt(0) % 3)}s`} repeatCount="indefinite" />
+                                                <path d="M 25 85 Q 50 40 75 85" fill={`${colorHex}20`} strokeWidth="12" />
+                                                <circle cx="50" cy="35" r="16" fill={colorHex} />
+                                                {/* Role specific playful details */}
+                                                {role === 'pilot' && <path d="M 32 30 L 68 30" stroke="white" strokeWidth="6" opacity="0.9"/>}
+                                                {role === 'teacher' && <rect x="36" y="28" width="28" height="8" rx="2" stroke="white" strokeWidth="3" fill="none"/>}
+                                                {role === 'assistant' && <path d="M 35 45 L 65 45 L 50 65 Z" fill={`${colorHex}60`} stroke="none"/>}
+                                                {role === 'supervisor' && <circle cx="50" cy="35" r="5" fill="white" />}
+                                                {role === 'admin' && <path d="M 30 35 A 20 20 0 0 1 70 35" stroke="white" strokeWidth="4" fill="none"/>}
+                                            </g>
+                                        </svg>
+                                    );
+
+                                    const roleIcons = { 
+                                        pilot: <PersonitaAvatar colorHex="#6366f1" role="pilot" />, 
+                                        teacher: <PersonitaAvatar colorHex="#10b981" role="teacher" />, 
+                                        assistant: <PersonitaAvatar colorHex="#f59e0b" role="assistant" />, 
+                                        admin: <PersonitaAvatar colorHex="#3b82f6" role="admin" />, 
+                                        supervisor: <PersonitaAvatar colorHex="#8b5cf6" role="supervisor" /> 
+                                    };
                                     const roleLabels = { pilot: 'Piloto', teacher: 'Docente', assistant: 'Auxiliar', admin: 'Admin', supervisor: 'Supervisor' };
                                     const isResetting = resetPassForm.user_id === s.user_id;
 
                                     return (
-                                        <div key={s.user_id} className={`p-4 rounded-xl border transition-colors ${s.is_active ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50' : 'bg-red-900/10 border-red-900/30 opacity-60'
+                                        <div key={s.user_id} className={`neu-list-item p-4 transition-all duration-300 ${s.is_active ? 'hover:-translate-y-0.5' : 'opacity-60 saturate-50'
                                             }`}>
                                             {/* Header: Nombre + Rol + Estado */}
                                             <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="text-lg">{roleEmojis[s.role] || '👤'}</span>
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 neu-input-inset rounded-full flex items-center justify-center shrink-0 shadow-sm border border-white/5 bg-slate-100 dark:bg-slate-800">
+                                                        {roleIcons[s.role] || <UserPlus size={20} />}
+                                                    </div>
                                                     <div className="min-w-0">
-                                                        <p className="font-bold text-slate-200 truncate">{s.full_name}</p>
-                                                        <p className="text-xs text-slate-500">{roleLabels[s.role] || s.role}</p>
+                                                        <p className="font-extrabold neu-text truncate text-[15px] leading-tight">{s.full_name}</p>
+                                                        <p className="neu-text-sub text-[10px] font-bold uppercase tracking-wider">{roleLabels[s.role] || s.role}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1 flex-shrink-0">
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                        {s.is_active ? 'Activo' : 'Inactivo'}
+                                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full border shadow-sm ${s.is_active ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'}`}>
+                                                        {s.is_active ? 'SYNC OK' : 'OFFLINE'}
                                                     </span>
                                                 </div>
                                             </div>
 
                                             {/* Email + Copiar */}
                                             {s.email && s.email !== 'N/A' && (
-                                                <div className="flex items-center gap-2 mb-2 bg-slate-900/40 rounded-lg px-3 py-1.5">
-                                                    <Mail size={12} className="text-slate-500 flex-shrink-0" />
-                                                    <span className="text-xs text-slate-400 truncate flex-1 select-all">{s.email}</span>
+                                                <div className="flex items-center gap-2 mb-2 neu-input-inset px-3 py-2">
+                                                    <Mail size={14} className="neu-text-sub flex-shrink-0" />
+                                                    <span className="text-xs neu-text-sub font-medium truncate flex-1 select-all">{s.email}</span>
                                                     <button
                                                         type="button"
                                                         onClick={() => { navigator.clipboard.writeText(s.email); }}
-                                                        className="p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                                                        className="p-1.5 hover:opacity-70 transition-opacity flex-shrink-0"
                                                         title="Copiar email"
                                                     >
-                                                        <Copy size={12} className="text-cyan-400" />
+                                                        <Copy size={14} className="text-cyan-500" />
                                                     </button>
                                                 </div>
                                             )}
 
                                             {/* Contraseña inicial */}
                                             {s.initial_password && (
-                                                <div className="flex items-center gap-2 mb-3 bg-slate-900/40 rounded-lg px-3 py-1.5">
-                                                    <Lock size={12} className="text-slate-500 flex-shrink-0" />
-                                                    <span className="text-xs text-slate-400 truncate flex-1 select-all font-mono">
+                                                <div className="flex items-center gap-2 mb-3 neu-input-inset px-3 py-2">
+                                                    <Lock size={14} className="neu-text-sub flex-shrink-0" />
+                                                    <span className="text-xs neu-text-sub font-medium truncate flex-1 select-all font-mono tracking-widest">
                                                         {revealedPasswords[s.user_id] ? s.initial_password : '••••••••'}
                                                     </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => setRevealedPasswords(prev => ({ ...prev, [s.user_id]: !prev[s.user_id] }))}
-                                                        className="p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                                                        className="p-1.5 hover:opacity-70 transition-opacity flex-shrink-0"
                                                         title={revealedPasswords[s.user_id] ? 'Ocultar contraseña' : 'Ver contraseña'}
                                                     >
                                                         {revealedPasswords[s.user_id]
-                                                            ? <EyeOff size={12} className="text-amber-400" />
-                                                            : <Eye size={12} className="text-amber-400" />
+                                                            ? <EyeOff size={14} className="text-amber-500" />
+                                                            : <Eye size={14} className="text-amber-500" />
                                                         }
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => { navigator.clipboard.writeText(s.initial_password); }}
-                                                        className="p-1 hover:bg-white/10 rounded transition-colors flex-shrink-0"
+                                                        className="p-1.5 hover:opacity-70 transition-opacity flex-shrink-0"
                                                         title="Copiar contraseña"
                                                     >
-                                                        <Copy size={12} className="text-amber-400" />
+                                                        <Copy size={14} className="text-amber-500" />
                                                     </button>
                                                 </div>
                                             )}
 
                                             {/* Acciones */}
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <button
-                                                    onClick={() => window.open(`/staff/preview?as=${s.user_id}`, '_blank')}
-                                                    className="text-xs px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-lg text-cyan-400 font-medium transition-colors flex items-center gap-1"
-                                                    title="Ver como este operativo"
-                                                >
-                                                    <ExternalLink size={12} /> Vista previa
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditForm(prev => prev.user_id === s.user_id
-                                                            ? { user_id: null, email: '', full_name: '', role: '' }
-                                                            : { user_id: s.user_id, email: s.email || '', full_name: s.full_name || '', role: s.role || '' }
-                                                        );
+                                            <div className="flex justify-end pt-2 mt-4 border-t border-slate-700/10 dark:border-slate-700/50">
+                                                <select
+                                                    className="neu-action-select w-full md:w-auto"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val === 'preview') window.open(`/staff/preview?as=${s.user_id}`, '_blank');
+                                                        if (val === 'edit') {
+                                                            setEditForm(prev => prev.user_id === s.user_id
+                                                                ? { user_id: null, email: '', full_name: '', role: '' }
+                                                                : { user_id: s.user_id, email: s.email || '', full_name: s.full_name || '', role: s.role || '' }
+                                                            );
+                                                        }
+                                                        if (val === 'reset_pass') {
+                                                            setResetPassForm(prev => ({
+                                                                user_id: prev.user_id === s.user_id ? null : s.user_id,
+                                                                new_password: ''
+                                                            }));
+                                                        }
+                                                        if (val === 'toggle_active') handleToggleStaffActive(s.user_id, s.is_active);
+                                                        e.target.value = '';
                                                     }}
-                                                    className="text-xs px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-amber-400 font-medium transition-colors flex items-center gap-1"
+                                                    defaultValue=""
                                                 >
-                                                    <Pencil size={12} /> Editar
-                                                </button>
-                                                <button
-                                                    onClick={() => setResetPassForm(prev => ({
-                                                        user_id: prev.user_id === s.user_id ? null : s.user_id,
-                                                        new_password: ''
-                                                    }))}
-                                                    className="text-xs px-3 py-1.5 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-slate-300 font-medium transition-colors flex items-center gap-1"
-                                                >
-                                                    <KeyRound size={12} /> Reset Pass
-                                                </button>
-                                                <button
-                                                    onClick={() => handleToggleStaffActive(s.user_id, s.is_active)}
-                                                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${s.is_active
-                                                        ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400'
-                                                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400'
-                                                        }`}
-                                                >
-                                                    {s.is_active ? <><ToggleRight size={12} /> Desactivar</> : <><ToggleLeft size={12} /> Activar</>}
-                                                </button>
+                                                    <option value="" disabled>Acciones</option>
+                                                    <option value="preview">👁️ Vista Previa</option>
+                                                    <option value="edit">✏️ Editar Perfil</option>
+                                                    <option value="reset_pass">🔑 Reset Password</option>
+                                                    <option value="toggle_active">
+                                                        {s.is_active ? '🔴 Desactivar' : '🟢 Activar'}
+                                                    </option>
+                                                </select>
                                             </div>
 
                                             {/* Inline Edit Form */}
@@ -2428,11 +1927,11 @@ export default function AdminPage() {
                                                             onChange={(e) => setEditForm(prev => ({ ...prev, role: e.target.value }))}
                                                             className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
                                                         >
-                                                            <option value="pilot">🎮 Piloto</option>
-                                                            <option value="teacher">📚 Docente</option>
-                                                            <option value="assistant">📦 Auxiliar</option>
-                                                            <option value="supervisor">👁️ Supervisor</option>
-                                                            <option value="admin">⚙️ Admin</option>
+                                                            <option value="pilot">Piloto</option>
+                                                            <option value="teacher">Docente</option>
+                                                            <option value="assistant">Auxiliar</option>
+                                                            <option value="supervisor">Supervisor</option>
+                                                            <option value="admin">Admin</option>
                                                         </select>
                                                     </div>
                                                     <div className="flex gap-2 pt-1">
@@ -2477,6 +1976,7 @@ export default function AdminPage() {
                             </div>
                         )}
                     </section>
+                    </div>
                 </div>
             )}
 
@@ -2484,182 +1984,15 @@ export default function AdminPage() {
             <footer className="max-w-5xl mx-auto mt-12 text-center text-slate-500 text-xs">
                 <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
             </footer>
-            {/* MODAL DE REPORTE */}
-            {reportModalOpen && selectedReport && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                        {/* Header Modal */}
-                        <div className="p-6 border-b border-slate-700 flex items-center justify-between bg-slate-800/50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                                    <FileText className="w-5 h-5 text-blue-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">Reporte de Misión</h2>
-                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">
-                                        {nextSchools.find(s => String(s.id) === String(selectedReport.mission_id))?.nombre_escuela || `Escuela ID: ${selectedReport.mission_id}`}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setReportModalOpen(false)}
-                                className="p-2 hover:bg-slate-700 rounded-xl transition-colors"
-                            >
-                                <X size={20} className="text-slate-400" />
-                            </button>
-                        </div>
 
-                        {/* Content Scrollable */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-
-                            {/* Resumen KPIs */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Total Vuelos</p>
-                                    <p className="text-2xl font-black text-white">{selectedReport.total_flights}</p>
-                                </div>
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Total Alumnos</p>
-                                    <p className="text-2xl font-black text-emerald-400">{selectedReport.total_students}</p>
-                                </div>
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Docentes</p>
-                                    <p className="text-2xl font-black text-blue-400">
-                                        {reportDetails.logs ? reportDetails.logs.reduce((acc, log) => acc + (log.staff_count || 0), 0) : 0}
-                                    </p>
-                                </div>
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Promedio Vuelo</p>
-                                    <p className="text-2xl font-black text-amber-400">
-                                        {reportDetails.logs && reportDetails.logs.length > 0
-                                            ? Math.round(reportDetails.logs.reduce((acc, log) => acc + (log.duration_seconds || 0), 0) / reportDetails.logs.length)
-                                            : 0} seg
-                                    </p>
-                                </div>
-                                <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                                    <p className="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Verificación Prep</p>
-                                    <p className={`text-xl font-black ${selectedReport.checklist_verified ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                        {selectedReport.checklist_verified ? 'Completada' : 'Pendiente'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Evidencias Visuales */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                                        <Users size={16} /> Foto Grupal
-                                    </h3>
-                                    {selectedReport.group_photo_url ? (
-                                        <div className="rounded-2xl overflow-hidden border border-slate-700 aspect-video relative group">
-                                            <img
-                                                src={selectedReport.group_photo_url}
-                                                alt="Grupo"
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <a
-                                                href={selectedReport.group_photo_url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <ExternalLink className="text-white" />
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <div className="h-32 bg-slate-800/50 rounded-2xl flex items-center justify-center border border-dashed border-slate-700 text-slate-500 text-xs">
-                                            Sin foto grupal
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                                        <Pencil size={16} /> Firma Docente
-                                    </h3>
-                                    {selectedReport.signature_url ? (
-                                        <div className="rounded-2xl overflow-hidden border border-slate-700 aspect-video bg-white relative group">
-                                            <img
-                                                src={selectedReport.signature_url}
-                                                alt="Firma"
-                                                className="w-full h-full object-contain"
-                                            />
-                                            <a
-                                                href={selectedReport.signature_url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <ExternalLink className="text-black" />
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <div className="h-32 bg-slate-800/50 rounded-2xl flex items-center justify-center border border-dashed border-slate-700 text-slate-500 text-xs">
-                                            Sin firma
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Bitácora de Vuelos DETALLADA */}
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                                    <Plane size={16} /> Bitácora de Vuelos ({reportDetails.logs.length})
-                                </h3>
-
-                                {loadingReportDetails ? (
-                                    <div className="flex justify-center py-8">
-                                        <Loader2 size={24} className="animate-spin text-blue-500" />
-                                    </div>
-                                ) : reportDetails.logs.length === 0 ? (
-                                    <p className="text-center text-slate-500 py-4 text-xs">No hay vuelos registrados en esta misión.</p>
-                                ) : (
-                                    <div className="overflow-x-auto rounded-xl border border-slate-700">
-                                        <table className="w-full text-left text-xs text-slate-400">
-                                            <thead className="bg-slate-800 text-slate-200 uppercase font-bold">
-                                                <tr>
-                                                    <th className="px-4 py-3">Hora</th>
-                                                    <th className="px-4 py-3">Duración</th>
-                                                    <th className="px-4 py-3 text-center">Alumnos</th>
-                                                    <th className="px-4 py-3">Incidentes</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-700 bg-slate-800/30">
-                                                {reportDetails.logs.map((log, idx) => (
-                                                    <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
-                                                        <td className="px-4 py-3 font-mono text-white">
-                                                            {new Date(log.start_time).toISOString().split('T')[1].substring(0, 5)}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {log.duration_seconds} seg
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center font-bold text-emerald-400">
-                                                            {log.student_count}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {log.incidents && log.incidents.length > 0 ? (
-                                                                <div className="flex flex-col gap-1">
-                                                                    {log.incidents.map((inc, i) => (
-                                                                        <span key={i} className="inline-flex items-center gap-1 text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 w-fit">
-                                                                            <AlertCircle size={10} /> {inc.type}: {inc.description}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-slate-600">-</span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
+            
+            {activeTab === 'hr' && (
+                <HRCommandCenter />
             )}
-        </main >
+
+            {activeTab.startsWith('analytics-') && (
+                <AnalyticsView activeTab={activeTab} />
+            )}
+        </AdminLayout>
     );
 }

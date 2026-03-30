@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, School, Map, ChevronRight, AlertCircle, RefreshCw, MapPin } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import UpcomingMissionsList from '@/components/staff/UpcomingMissionsList';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { STAFF_CONFIG } from '@/config/staffConfig';
 import { syncPendingCheckIns } from '@/utils/staff/sync';
@@ -465,19 +466,27 @@ export default function MissionBrief({
     // Estado vacío (Sin misión)
     if (!school) {
         return (
-            <div className="bg-[#f8f9fb] min-h-screen flex flex-col font-display text-slate-900">
+            <div className="bg-slate-50 min-h-screen flex flex-col font-display text-slate-900">
                 <Header profile={profile} onLogout={() => setShowLogoutConfirm(true)} />
-                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 max-w-sm w-full">
-                        <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <School className="text-slate-400" size={32} />
+                <main className="flex-1 flex flex-col items-center justify-start p-6 pt-10 w-full max-w-md mx-auto">
+                    <div className="bg-white p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 w-full text-center mb-8 relative overflow-hidden shrink-0">
+                        {/* Decorative glow */}
+                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        
+                        <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5 relative z-10 text-amber-500">
+                            <School size={32} />
                         </div>
-                        <h2 className="text-lg font-bold text-slate-900 mb-2">Sin misión asignada</h2>
-                        <p className="text-slate-500 text-sm mb-6">No tienes una escuela programada para hoy.</p>
-                        <button onClick={onRefresh} className="text-blue-600 font-bold text-sm flex items-center justify-center gap-2">
-                            <RefreshCw size={14} /> Actualizar
+                        <h2 className="text-xl font-extrabold text-slate-900 mb-2 tracking-tight">Día Libre</h2>
+                        <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">No tienes ninguna misión activa para <strong className="text-slate-700">hoy</strong>.</p>
+                        
+                        <button onClick={onRefresh} className="w-full py-4 bg-slate-50 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-100 transition-all flex items-center justify-center gap-2 border border-slate-200 active:scale-[0.98]">
+                            <RefreshCw size={16} /> Comprobar Actualización
                         </button>
                     </div>
+
+                    {/* Módulo Aislado de Próximas Misiones (Solo Lectura, Anónimo) */}
+                    <UpcomingMissionsList />
+
                 </main>
                 <StartDemoFab onDemoStarted={onRefresh} />
                 <LogoutModal isOpen={showLogoutConfirm} onClose={() => setShowLogoutConfirm(false)} onLogout={onLogout} />
@@ -585,3 +594,4 @@ function LogoutModal({ isOpen, onClose, onLogout }) {
         </div>
     );
 }
+

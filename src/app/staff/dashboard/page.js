@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck, School, RefreshCw } from 'lucide-react';
+import UpcomingMissionsList from '@/components/staff/UpcomingMissionsList';
 import PrepChecklist from '@/components/staff/PrepChecklist';
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
 // [REMOVED] ClosureLegacy — closure logic now lives in StaffOperationLegacy.handleCloseDay()
@@ -1973,20 +1974,39 @@ export default function StaffDashboard() {
             <div className="min-h-screen bg-slate-50 p-4">
                 <div className="max-w-md mx-auto space-y-6 pt-6">
                     {/* Header */}
+                    {/* Premium Playful Header */}
                     {profile && (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center shadow-md">
-                                    <User className="w-5 h-5 text-white" />
+                        <div 
+                            onClick={() => router.push('/staff/hub')}
+                            className="bg-blue-600 px-5 py-5 rounded-[28px] shadow-[0_12px_35px_rgba(37,99,235,0.25)] relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer mb-6"
+                        >
+                            {/* Decorative playful elements */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none transform translate-x-12 -translate-y-12"></div>
+                            <div className="absolute bottom-0 left-10 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl pointer-events-none transform -translate-x-12 translate-y-8"></div>
+                            
+                            <div className="flex items-start justify-between relative z-10 w-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/20 shrink-0">
+                                        <User className="w-7 h-7 text-white" />
+                                    </div>
+                                    <div className="text-left flex flex-col">
+                                        <p className="font-extrabold text-white text-[16px] tracking-tight">{profile.full_name}</p>
+                                        <p className="text-[11px] font-bold text-blue-200 uppercase tracking-widest">{ROLE_LABELS[profile.role] || profile.role}</p>
+                                        <div className="mt-3 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">
+                                            <span>Ver Perfil</span>
+                                            <ChevronLeft className="w-3 h-3 rotate-180 group-hover:translate-x-1 transition-transform" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-slate-800">{profile.full_name}</p>
-                                    <p className="text-xs text-slate-500">{ROLE_LABELS[profile.role] || profile.role}</p>
-                                </div>
+                                
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleLogout(); }} 
+                                    className="w-10 h-10 flex shrink-0 items-center justify-center rounded-[14px] bg-white/10 border border-white/10 text-white hover:bg-red-50 hover:text-red-500 hover:border-red-100 hover:shadow-lg transition-all"
+                                    title="Cerrar sesión"
+                                >
+                                    <LogOut size={16} />
+                                </button>
                             </div>
-                            <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
-                                <LogOut size={20} />
-                            </button>
                         </div>
                     )}
 
@@ -2080,24 +2100,20 @@ export default function StaffDashboard() {
                             })}
                         </div>
                     ) : (
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                            <Calendar className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-semibold text-amber-800 text-sm">Sin misiones el día de hoy</p>
-                                <p className="text-xs text-amber-600 mt-1">No hay escuelas programadas. Contacta a tu coordinador.</p>
-                            </div>
-                        </div>
+                        <UpcomingMissionsList />
                     )}
 
                     {/* Refresh button */}
                     <button
                         onClick={refreshMission}
                         disabled={loading}
-                        className="w-full py-2.5 bg-white border border-slate-200 text-slate-500 font-semibold rounded-xl text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-400 font-bold rounded-[20px] text-[13px] hover:bg-slate-50 hover:text-amber-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Actualizar
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        Sincronizar Jornada
                     </button>
+
+                    {/* HR Hub Quick Access removed to keep it cleaner (Less is more) */}
 
                     {/* Admin manual selector (legacy) */}
                     {profile?.role === 'admin' && noSchoolToday && (

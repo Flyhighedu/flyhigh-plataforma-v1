@@ -1,0 +1,54 @@
+[
+  {
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "date": "26/3/2026",
+    "uniforme_valido": true,
+    "checkin_id": "b7eb9d3f-30de-4d70-8b98-27c900c0bfe1",
+    "payload": {
+      "uniform": true,
+      "location": {
+        "radius": 100,
+        "accuracy": 14.418999671936035,
+        "distance": 3,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:25:48.753Z",
+      "fallback_evidence": null
+    },
+    "date_raw": "2026-03-26T19:25:49.236Z"
+  },
+  {
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "date": "26/3/2026",
+    "uniforme_valido": true,
+    "checkin_id": "6403cad7-6d31-4054-b952-c64adac5b2aa",
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 11.19136469142259,
+        "distance": 5,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:25:47.133Z",
+      "fallback_evidence": null
+    },
+    "date_raw": "2026-03-26T19:25:47.232Z"
+  },
+  {
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "date": "26/3/2026",
+    "uniforme_valido": true,
+    "checkin_id": "33a78543-7072-457e-b288-bb9b76efc6e2",
+    "payload": {
+      "location": {
+        "radius": 100,
+        "accuracy": 20,
+        "distance": 2,
+        "is_fallback": false
+      },
+      "timestamp": "2026-03-26T19:24:58.585Z",
+      "fallback_evidence": null
+    },
+    "date_raw": "2026-03-26T19:25:31.800Z"
+  }
+]

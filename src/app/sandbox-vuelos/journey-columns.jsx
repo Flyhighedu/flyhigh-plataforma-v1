@@ -14,24 +14,31 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Status badge colors
 const statusColors = {
-  prep: "bg-amber-100 text-amber-800",
-  operation: "bg-blue-100 text-blue-800",
-  report: "bg-purple-100 text-purple-800",
-  dismantling: "bg-orange-100 text-orange-800",
-  closed: "bg-green-100 text-green-800",
+  pending: "bg-slate-100 text-slate-800 border border-slate-200",
+  arrived: "bg-sky-100 text-sky-800",
+  setup: "bg-amber-100 text-amber-800",
+  briefing: "bg-indigo-100 text-indigo-800",
+  boarding: "bg-blue-100 text-blue-800",
+  flight: "bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-200 shadow-sm",
+  deboarding: "bg-teal-100 text-teal-800",
+  wrapup: "bg-orange-100 text-orange-800",
+  closed: "bg-green-100 text-green-800 font-bold border border-green-200",
   cancelled: "bg-red-100 text-red-800",
 };
 
-const STATUS_OPTIONS = [
-  { value: "prep", label: "Preparación" },
-  { value: "operation", label: "Operación" },
-  { value: "report", label: "Reporte" },
-  { value: "dismantling", label: "Desmontaje" },
-  { value: "closed", label: "Cerrada" },
-  { value: "cancelled", label: "Cancelada" },
-];
+const STATUS_LABELS = {
+  pending: "Pendiente (Esperando)",
+  arrived: "✅ En Sitio",
+  setup: "🔧 Armando Equipo",
+  briefing: "👨‍🏫 Capacitación",
+  boarding: "🥽 Abordaje (Lentes)",
+  flight: "🚀 Volando Play",
+  deboarding: "👋 Desabordaje",
+  wrapup: "📦 Desmontaje",
+  closed: "🔒 CERRADA",
+  cancelled: "❌ Cancelada",
+};
 
 // Formatters for exact values (no rounding to integers)
 const formatMoneyExact = (val) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(val);
@@ -39,28 +46,15 @@ const formatNumberExact = (val) => new Intl.NumberFormat("es-MX", { minimumFract
 
 // --- Shared inline cell components ---
 
-function StatusSelectCell({ getValue, row, column, table }) {
-  const initialValue = getValue();
-  const [value, setValue] = useState(initialValue);
-  const [isSaving, setIsSaving] = useState(false);
-  useEffect(() => setValue(initialValue), [initialValue]);
-
-  const handleChange = async (e) => {
-    const nv = e.target.value;
-    if (nv === value) return;
-    setValue(nv);
-    setIsSaving(true);
-    try { await table.options.meta?.updateData(row.original.id, column.id, nv); }
-    catch { setValue(initialValue); }
-    finally { setIsSaving(false); }
-  };
-
-  const colors = statusColors[value] || "bg-gray-100 text-gray-800";
+function StatusTelemetryCell({ getValue, row }) {
+  const value = getValue() || "pending";
+  const colors = statusColors[value] || statusColors.pending;
+  const label = STATUS_LABELS[value] || value;
+  
   return (
-    <select value={value || ""} onChange={handleChange} disabled={isSaving}
-      className={`appearance-none cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 transition-all ${colors} ${isSaving ? "opacity-50" : ""}`}>
-      {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <div className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold select-none ring-1 ring-inset ring-black/5 ${colors}`} title={`Telemetría de la PWA: ${label}`}>
+      {label}
+    </div>
   );
 }
 
@@ -125,9 +119,61 @@ function CurrencyCell({ getValue, row, column, table }) {
   );
 }
 
+function ForceCloseActionCell({ row, table }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const journey = row.original;
+  const isClosed = journey.status === "closed";
+
+  const forceClose = async () => {
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(journey.id, 'status', 'closed');
+      setIsOpen(false);
+    } catch {} finally { setIsSaving(false); }
+  };
+
+  if (isClosed) {
+    return <span className="text-[10px] w-8 h-8 flex items-center justify-center opacity-50 cursor-pointer text-green-700" title="Misión Cerrada">✅</span>;
+  }
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger 
+        className="text-[12px] w-8 h-8 flex items-center justify-center rounded-md bg-stone-100/50 text-stone-600 hover:bg-red-100 hover:text-red-700 transition-colors shadow-sm ring-1 ring-stone-200 hover:ring-red-200 outline-none cursor-pointer" 
+        title="Cierre Forzoso de Misión"
+      >
+        🔒
+      </AlertDialogTrigger>
+      <AlertDialogContent className="shadow-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-stone-900">
+            Cierre Administrativo Forzoso
+          </AlertDialogTitle>
+          <div className="space-y-4 text-stone-600 text-sm">
+            <AlertDialogDescription className="block m-0">
+              Estás a punto de liquidar unilateralmente la misión en la escuela <strong>{journey.school_name}</strong>.
+            </AlertDialogDescription>
+            <div className="bg-red-50 text-red-700 p-3 rounded-md border border-red-200 font-medium">
+              ⚠️ Cuidado: Esta acción removerá automáticamente a la escuela del Cronograma y sobrescribirá la tablet de la PWA. Úsalo ÚNICAMENTE si el equipo olvidó cerrarla o hubo problemas técnicos graves en campo.
+            </div>
+          </div>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="bg-white">Abortar</AlertDialogCancel>
+          <AlertDialogAction disabled={isSaving} onClick={(e) => { e.preventDefault(); forceClose(); }} className="bg-red-600 hover:bg-red-700 text-white border-0 transition-colors shadow-sm">
+            {isSaving ? "Calculando y Cerrando..." : "Sí, Forzar Cierre"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function DeleteActionCell({ row, table }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
   const journey = row.original;
   const label = journey.school_name || journey.date || journey.id.slice(0, 8);
 
@@ -138,26 +184,63 @@ function DeleteActionCell({ row, table }) {
       setIsOpen(false);
     } catch {} finally { 
       setIsDeleting(false); 
+      setConfirmText("");
     }
   };
 
+  const isConfirmed = confirmText.trim().toUpperCase() === "ELIMINAR";
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-      <AlertDialogTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none" disabled={isDeleting} title="Eliminar journey">
-        {isDeleting ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-destructive border-t-transparent" /> :
+    <AlertDialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(!open) setConfirmText(""); }}>
+      <AlertDialogTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 border border-transparent rounded-md text-destructive hover:text-white hover:bg-destructive transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none" disabled={isDeleting} title="Limpieza Profunda (Tierra Arrasada)">
+        {isDeleting ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> :
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>}
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent className="border-destructive/20 bg-background/95 backdrop-blur shadow-2xl">
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Esto eliminará la misión <strong>&quot;{label}&quot;</strong> y todos los vuelos/evidencias <strong>permanentemente</strong>.
-            <br /><br /><span className="text-destructive font-medium">Esta acción no se puede deshacer.</span>
+          <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Limpieza Forense Irreversible
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-slate-600 text-sm block m-0">
+            Estás a punto de aniquilar la estructura completa de la misión <strong>&quot;{label}&quot;</strong>.
           </AlertDialogDescription>
+          <div className="w-full text-left space-y-3 pt-2">
+            <ul className="list-disc pl-5 text-sm space-y-1 font-medium text-slate-700">
+              <li>Todos los {journey.vuelo_count || 0} vuelos de la bitácora.</li>
+              <li>Firmas digitales del cierre de misión.</li>
+              <li><strong>Fotos grupal y de bitácora eliminadas físicamente de Storage.</strong></li>
+              <li>Expedientes del personal (Eventos, Fotos, Asistencia).</li>
+            </ul>
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm font-semibold border border-destructive/20">
+              Esta acción de Nivel 5 es permanente y no hay papelera de reciclaje.
+            </div>
+            
+            <div className="pt-2 w-full">
+              <label className="text-sm font-semibold text-slate-800 mb-1.5 block">
+                Escribe <span className="text-destructive font-mono select-none">ELIMINAR</span> para detonar:
+              </label>
+              <input 
+                type="text" 
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="ELIMINAR"
+                className="w-full h-10 px-3 py-2 text-base font-mono bg-background border rounded-md outline-none focus:ring-2 focus:ring-destructive focus:border-transparent transition-all"
+                autoComplete="off"
+              />
+            </div>
+          </div>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90">Sí, eliminar permanentemente</AlertDialogAction>
+        <AlertDialogFooter className="mt-4">
+          <AlertDialogCancel onClick={() => setConfirmText("")}>Cancelar</AlertDialogCancel>
+          <button 
+            type="button"
+            onClick={handleDelete} 
+            disabled={!isConfirmed || isDeleting}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? "Aniquilando datos..." : "Ejecutar Purga Definitiva"}
+          </button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -188,6 +271,7 @@ export const journeyColumns = [
     enableSorting: false,
     enableColumnFilter: false,
     enableGlobalFilter: false,
+    meta: { sticky: true, stickyLeft: 0 },
   },
   {
     id: "expander",
@@ -202,18 +286,21 @@ export const journeyColumns = [
     enableSorting: false,
     enableColumnFilter: false,
     enableGlobalFilter: false,
+    meta: { sticky: true, stickyLeft: 40 },
   },
   {
     accessorKey: "date",
     header: "Fecha",
     cell: (props) => <EditableCell {...props} />,
     size: 110,
+    meta: { sticky: true, stickyLeft: 80 },
   },
   {
     accessorKey: "school_name",
     header: "Escuela",
     cell: (props) => <EditableCell {...props} />,
     size: 200,
+    meta: { sticky: true, stickyLeft: 190, stickyBorder: true },
   },
   {
     accessorKey: "cct",
@@ -255,9 +342,24 @@ export const journeyColumns = [
   },
   {
     accessorKey: "status",
-    header: "Estado",
-    cell: (props) => <StatusSelectCell {...props} />,
-    size: 110,
+    header: "Fase (Radar Ojo de Dios)",
+    cell: (props) => <StatusTelemetryCell {...props} />,
+    size: 150,
+    enableGlobalFilter: false,
+  },
+  {
+    id: "actions",
+    header: () => null,
+    cell: (props) => (
+      <div className="flex items-center justify-end gap-1.5 w-full pr-1">
+        <ForceCloseActionCell {...props} />
+        <DeleteActionCell {...props} />
+      </div>
+    ),
+    size: 90,
+    enableResizing: false,
+    enableSorting: false,
+    enableColumnFilter: false,
     enableGlobalFilter: false,
   },
   {
@@ -269,12 +371,23 @@ export const journeyColumns = [
   // ═══ VOLUME INPUTS (Volumen) ═══
   {
     accessorKey: "total_students",
-    header: "Niños",
+    header: "Alumnos Volados",
     cell: (props) => <EditableCell {...props} />,
     size: 80,
     enableGlobalFilter: false,
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("total_students")) || 0), 0);
+      return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
+    },
+  },
+  {
+    accessorKey: "vuelo_count",
+    header: "Vuelos",
+    cell: ({ getValue }) => <span className="text-sm tabular-nums">{getValue() || 0}</span>,
+    size: 70,
+    enableGlobalFilter: false,
+    footer: ({ table }) => {
+      const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("vuelo_count")) || 0), 0);
       return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
   },
@@ -443,15 +556,5 @@ export const journeyColumns = [
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("total_flights")) || 0), 0);
       return <span className="font-bold text-sm">{formatNumberExact(sum)}</span>;
     },
-  },
-  {
-    id: "actions",
-    header: () => null,
-    cell: (props) => <DeleteActionCell {...props} />,
-    size: 50,
-    enableResizing: false,
-    enableSorting: false,
-    enableColumnFilter: false,
-    enableGlobalFilter: false,
   },
 ];

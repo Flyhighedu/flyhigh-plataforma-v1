@@ -25,22 +25,10 @@ export async function POST(request) {
 
         const { error } = await supabase
             .from('proximas_escuelas')
-            .update({
-                estatus: 'archivado',
-                is_archived: true,
-                archived_at: new Date().toISOString()
-            })
+            .delete()
             .eq('id', id);
 
-        // Fallback if is_archived / archived_at columns don't exist
-        if (error && /column/i.test(error.message || '')) {
-            const { error: fallbackError } = await supabase
-                .from('proximas_escuelas')
-                .update({ estatus: 'archivado' })
-                .eq('id', id);
-
-            if (fallbackError) throw fallbackError;
-        } else if (error) {
+        if (error) {
             throw error;
         }
 

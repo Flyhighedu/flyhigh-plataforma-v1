@@ -11,7 +11,8 @@ function TopSchoolCard({ rank, name, students, flights, missions }) {
     ];
 
     return (
-        <div className={`rounded-2xl border bg-gradient-to-br ${gradients[rank] || gradients[2]} p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5`}>
+        <div className={`neu-list-item relative overflow-hidden p-5 transition-all duration-300 hover:-translate-y-1`}>
+            <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${gradients[rank] || gradients[2]} pointer-events-none break-inside-avoid`} />
             <div className="flex items-start justify-between">
                 <div className="space-y-2">
                     <span className="text-3xl">{medals[rank] || '🏅'}</span>
@@ -100,8 +101,8 @@ export default function PanelEscuelas({ data, loading }) {
 
             {/* Ranking Table (4th onward) */}
             {restSchools.length > 0 && (
-                <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                    <div className="px-6 py-4 border-b border-border">
+                <div className="neu-list-item overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border/40">
                         <h3 className="text-base font-semibold text-foreground">Ranking completo</h3>
                     </div>
                     <div className="overflow-x-auto">
@@ -132,8 +133,8 @@ export default function PanelEscuelas({ data, loading }) {
             )}
 
             {/* Mission History Table */}
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                <div className="px-6 py-4 border-b border-border">
+            <div className="neu-list-item overflow-hidden">
+                <div className="px-6 py-4 border-b border-border/40">
                     <h3 className="text-base font-semibold text-foreground">Historial de Misiones</h3>
                 </div>
                 <div className="overflow-x-auto max-h-[480px] overflow-y-auto">

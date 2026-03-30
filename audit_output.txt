@@ -1,0 +1,34 @@
+﻿[dotenv@17.3.1] injecting env (5) from .env.local -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
+Γòæ   AUDITOR├ìA COMPLETA - cierres_mision    Γòæ
+ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+
+
+[1] TOTAL CIERRES EN LA TABLA: 42
+    Con journey_id: 36
+    Sin journey_id (hu├⌐rfanos): 6
+
+[2] DEMO JOURNEYS: 1
+    ID: b98fd994-71c9-4079-a25f-0f26c9c5a474
+    Status: prep | State: dismantling
+    Date: 2026-03-27 | School ID: 999999
+    Cierre: Γ¥î NONE
+    Vuelos: 3
+    Sum student_count from vuelos: 34
+
+[3] API SIMULATION for journey b98fd994-71c9-4079-a25f-0f26c9c5a474:
+    cierreMap match: Γ¥î NO MATCH
+    Would show total_students: 0
+
+[4] CONSTRAINTS: Could not query
+
+[5] RLS STATUS:
+    Anon INSERT: Γ¥î new row violates row-level security policy for table "cierres_mision"
+    Anon SELECT: Γ£à 0 rows
+
+[6] LAST 5 CIERRES (all fields):
+    3b4d4453-bbf8-4754-8ebc-66957985a296 | journey: NULL | students: 152 | flights: 0 | school: GRAL IGNACIO ZARAGOZA | created: 2026-03-26T19:31:43.101999+00:00
+    25c3bc51-3f9a-4921-832f-0adce518d581 | journey: f2af4aad-8407-4900-a627-705d06187685 | students: 0 | flights: 0 | school: GRAL IGNACIO ZARAGOZA | created: 2026-03-26T17:04:05.237371+00:00
+    57f4fefb-93f3-4f0d-bc71-19841bc4d734 | journey: NULL | students: 0 | flights: 0 | school: Escuela DEMO FlyHigh | created: 2026-03-26T09:00:32.169729+00:00
+    267a1f32-835d-47aa-adcc-e073d0a9d739 | journey: NULL | students: 225 | flights: 0 | school: GRAL. IGNACIO ZARAGOZA | created: 2026-03-26T01:18:52.412634+00:00
+    8a068821-4eb7-4b20-aa02-374fb43ce43c | journey: 8d529c59-e6e3-4313-846c-ede0305edc16 | students: 226 | flights: 0 | school: HERMANOS FLORES MAGON | created: 2026-03-24T17:55:12.389334+00:00

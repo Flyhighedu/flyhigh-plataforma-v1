@@ -1,0 +1,5 @@
+﻿[dotenv@17.3.1] injecting env (5) from .env.local -- tip: ΓÜí∩╕Å secrets for agents: https://dotenvx.com/as2
+DEMO_JOURNEYS: [{"id":"b98fd994-71c9-4079-a25f-0f26c9c5a474","school_name":"Escuela DEMO FlyHigh","status":"prep","mission_state":"dismantling"}]
+DEMO_CIERRES: []
+DEMO_VUELOS: [{"id":"e5e24e0f-cc69-4244-b1c1-59d823989db0","student_count":1,"journey_id":"b98fd994-71c9-4079-a25f-0f26c9c5a474"},{"id":"726b5456-93a1-4da4-8565-7251e2addd55","student_count":11,"journey_id":"b98fd994-71c9-4079-a25f-0f26c9c5a474"},{"id":"e15b68e4-854f-4a07-8d1f-2b77171e0ea9","student_count":11,"journey_id":"b98fd994-71c9-4079-a25f-0f26c9c5a474"}]
+SUM_STUDENTS: 23

@@ -109,6 +109,27 @@ export default function SandboxVuelosPage() {
           return [{ ...row, total_students: 0, total_flights: 0, becados: 0, vuelo_count: 0 }, ...prev];
         });
       })
+      // ── bitacora_vuelos INSERT: live student count accumulation ──
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'bitacora_vuelos',
+      }, (payload) => {
+        const row = payload.new;
+        if (!row?.journey_id) return;
+        const addedStudents = Number(row.student_count) || 0;
+
+        setData((prev) =>
+          prev.map((j) => {
+            if (j.id !== row.journey_id) return j;
+            return {
+              ...j,
+              total_students: (Number(j.total_students) || 0) + addedStudents,
+              vuelo_count:    (Number(j.vuelo_count) || 0) + 1,
+            };
+          })
+        );
+      })
       .subscribe();
 
     return () => {
@@ -135,10 +156,7 @@ export default function SandboxVuelosPage() {
       setData((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
-          const updates = { [columnId]: castValue };
-          // If editing Niños/Vuelos, also optimistically set status to closed
-          if (isCierreField) updates.status = "closed";
-          return { ...row, ...updates };
+          return { ...row, [columnId]: castValue };
         })
       );
 
@@ -151,7 +169,7 @@ export default function SandboxVuelosPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Error al guardar");
 
-        const label = isCierreField ? `${columnId === "total_students" ? "Niños" : columnId === "becados" ? "Becados" : "Vuelos"} → cierres_mision` : columnId;
+        const label = isCierreField ? `${columnId === "total_students" ? "Alumnos Volados" : columnId === "becados" ? "Becados" : "Vuelos"} → cierres_mision` : columnId;
         toast.success("Guardado", { description: `${label} actualizado.` });
       } catch (err) {
         toast.error("Error al guardar", { description: err.message });
@@ -242,7 +260,7 @@ export default function SandboxVuelosPage() {
       </div>
 
       {/* Table — full width, no max-w cap — scrolls natively */}
-      <div className="px-6 md:px-10 pb-10">
+      <div className="w-full">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-3">

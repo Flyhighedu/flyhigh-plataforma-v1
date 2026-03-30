@@ -43,7 +43,7 @@ function MetricCard({ icon, label, value, sublabel, accent, isJoined }) {
         <div className={`group relative transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden ${
             isJoined 
             ? 'bg-transparent border-transparent px-4 py-3 hover:-translate-y-1' 
-            : 'rounded-2xl border border-border bg-card p-5 hover:shadow-lg hover:-translate-y-1'
+            : 'neu-list-item p-5 hover:-translate-y-1'
         }`}>
             <div className="relative space-y-1.5">
                 <div className="flex items-center gap-3">
@@ -579,7 +579,7 @@ export default function PanelImpacto({ data, loading, filter }) {
                     className={`transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] border ${
                         isJoined 
                         ? 'p-6 bg-transparent border-transparent rounded-2xl' 
-                        : 'rounded-2xl border-border bg-card p-6'
+                        : 'neu-list-item p-6'
                     }`}
                 >
                     <div className="mb-6 flex items-start sm:items-center flex-col sm:flex-row justify-between gap-4">
@@ -659,7 +659,7 @@ export default function PanelImpacto({ data, loading, filter }) {
             </div>
 
             {/* ── Area Chart: Adapts to view mode ── */}
-            <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="neu-list-item p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h3 className="text-lg font-semibold text-foreground">Tendencia General de Crecimiento</h3>
@@ -689,7 +689,7 @@ export default function PanelImpacto({ data, loading, filter }) {
 
             {/* ── School Rankings — reactive to selected period ── */}
             {data.schoolTotals && data.schoolTotals.length > 0 && (
-                <div className="rounded-2xl border border-border bg-card p-6">
+                <div className="neu-list-item p-6">
                     <div className="mb-5">
                         <h3 className="text-lg font-semibold text-foreground">Rankings por Escuela</h3>
                         <p className="text-xs text-muted-foreground mt-0.5">

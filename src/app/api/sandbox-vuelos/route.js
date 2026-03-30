@@ -75,24 +75,27 @@ export async function GET(request) {
             }
         }
 
-        // Get vuelo counts per journey
+        // Get vuelo counts AND student sums per journey
         let countsMap = {};
+        let studentSumMap = {};
         const { data: allVuelos } = await supabase
             .from('bitacora_vuelos')
-            .select('journey_id');
+            .select('journey_id, student_count');
 
         if (allVuelos) {
             for (const v of allVuelos) {
                 if (v.journey_id) {
                     countsMap[v.journey_id] = (countsMap[v.journey_id] || 0) + 1;
+                    studentSumMap[v.journey_id] = (studentSumMap[v.journey_id] || 0) + (v.student_count || 0);
                 }
             }
         }
 
         // Get totals from cierres_mision (total_students, total_flights)
+        // Fetch ALL fields needed to detect orphans and create synthetic rows
         const { data: cierres } = await supabase
             .from('cierres_mision')
-            .select('journey_id, total_students, total_flights, becados');
+            .select('id, journey_id, total_students, total_flights, becados, school_name_snapshot, school_id, end_time, created_at');
 
         const cierreMap = {};
         if (cierres) {
@@ -104,20 +107,59 @@ export async function GET(request) {
         }
 
         // Enrich journeys: resolve school_name via COALESCE logic + add vuelo_count
+        // Priority: cierre (sealed) > bitacora sum (live) > 0
+        const journeyIdSet = new Set((rawJourneys || []).map(j => j.id));
         const enriched = (rawJourneys || []).map(j => {
             const school = schoolMap[j.school_id];
             const cierre = cierreMap[j.id];
-            // Fallback: show cierre totals if available, otherwise sum from bitacora
+            const liveStudents = studentSumMap[j.id] || 0;
+            const liveFlights = countsMap[j.id] || 0;
             return {
                 ...j,
                 school_name: j.school_name || (school?.nombre_escuela) || null,
                 colonia: school?.colonia || null,
-                vuelo_count: countsMap[j.id] || 0,
-                total_students: cierre?.total_students || 0,
-                total_flights: cierre?.total_flights || 0,
+                vuelo_count: liveFlights,
+                // SSoT: Use cierre if sealed, otherwise compute live from bitacora_vuelos
+                total_students: cierre?.total_students ?? liveStudents,
+                total_flights: cierre?.total_flights ?? liveFlights,
                 becados: cierre?.becados || 0,
             };
         });
+
+        // ── SSoT: Include orphan cierres (records with no matching journey) ──
+        // These are cierres whose journey was deleted or never created.
+        // They MUST appear in the sandbox table to maintain data integrity.
+        if (cierres) {
+            for (const c of cierres) {
+                const hasMatchingJourney = c.journey_id && journeyIdSet.has(c.journey_id);
+                if (!hasMatchingJourney) {
+                    const school = c.school_id ? schoolMap[c.school_id] : null;
+                    enriched.push({
+                        id: c.journey_id || `orphan-${c.id}`,
+                        date: c.end_time ? c.end_time.split('T')[0] : (c.created_at ? c.created_at.split('T')[0] : null),
+                        school_name: c.school_name_snapshot || school?.nombre_escuela || '(Registro sin journey)',
+                        school_id: c.school_id || null,
+                        status: 'closed',
+                        tipo_escuela: null,
+                        cct: null,
+                        direccion: null,
+                        nombre_director: null,
+                        telefono_director: null,
+                        tarifa_base: null,
+                        cuota_alumno: null,
+                        numero_sector: null,
+                        numero_zona: null,
+                        created_at: c.created_at,
+                        colonia: school?.colonia || null,
+                        vuelo_count: 0,
+                        total_students: c.total_students || 0,
+                        total_flights: c.total_flights || 0,
+                        becados: c.becados || 0,
+                        _is_orphan: true, // Flag for UI (optional)
+                    });
+                }
+            }
+        }
 
         return NextResponse.json({ data: enriched });
     } catch (err) {
@@ -145,14 +187,16 @@ export async function PATCH(request) {
 
         const supabase = getAdminSupabase();
 
-        // Special path: Niños/Vuelos → UPSERT cierres_mision + seal journey
+        // Special path: Niños/Vuelos/Becados → UPSERT cierres_mision ONLY
+        // ⚠️ Does NOT change journey status — that should only happen from the PWA
+        // when staff actually closes the operation in the field.
         if (targetTable === 'staff_journeys' && ['total_students', 'total_flights', 'becados'].includes(field)) {
             const numValue = parseInt(value) || 0;
 
             // Get journey data for cierre fields
             const { data: journey, error: jErr } = await supabase
                 .from('staff_journeys')
-                .select('id, school_id, school_name, date')
+                .select('id, school_id, school_name, date, status')
                 .eq('id', id)
                 .single();
 
@@ -201,13 +245,8 @@ export async function PATCH(request) {
                 if (insErr) throw insErr;
             }
 
-            // Seal journey status to 'closed'
-            await supabase
-                .from('staff_journeys')
-                .update({ status: 'closed' })
-                .eq('id', id);
-
-            return NextResponse.json({ data: { id, [field]: numValue, status: 'closed' } });
+            // ✅ Return current status — do NOT change it
+            return NextResponse.json({ data: { id, [field]: numValue, status: journey.status } });
         }
 
         // Standard path: update a field on the target table
@@ -358,7 +397,7 @@ export async function POST(request) {
     }
 }
 
-// DELETE — cascade delete: bitacora_vuelos children first, then staff_journeys parent
+// DELETE — cascade delete: bitacora_vuelos children first, then staff_journeys parent, + DEEP CLEAN STORAGE
 export async function DELETE(request) {
     try {
         const { journeyId } = await request.json();
@@ -372,7 +411,102 @@ export async function DELETE(request) {
 
         const supabase = getAdminSupabase();
 
-        // Step A: Delete all child vuelos for this journey
+        // --- ORPHAN HANDLING: Si el journeyId es de un registro sin parent staff_journey
+        const isOrphan = journeyId.startsWith('orphan-');
+        if (isOrphan) {
+            const cierreId = journeyId.replace('orphan-', '');
+            const filesToDelete = [];
+            
+            // 1) Obtener evidencias aisalas
+            const { data: cierreDetails } = await supabase
+                .from('cierres_mision')
+                .select('group_photo_url, signature_url')
+                .eq('id', cierreId)
+                .maybeSingle();
+
+            if (cierreDetails) {
+                if (cierreDetails.group_photo_url) {
+                    const path = cierreDetails.group_photo_url.split('/escuelas_fotos/')[1] || (!cierreDetails.group_photo_url.startsWith('http') ? cierreDetails.group_photo_url : null);
+                    if (path) filesToDelete.push(path);
+                }
+                if (cierreDetails.signature_url) {
+                    const path = cierreDetails.signature_url.split('/escuelas_fotos/')[1] || (!cierreDetails.signature_url.startsWith('http') ? cierreDetails.signature_url : null);
+                    if (path) filesToDelete.push(path);
+                }
+            }
+            
+            // 2) Destruir fisicamente
+            if (filesToDelete.length > 0) {
+                try {
+                    await supabase.storage.from('escuelas_fotos').remove(filesToDelete);
+                } catch(e) { console.warn('Storage orphan delete error:', e); }
+            }
+            
+            // 3) Borrar el registro fantasma
+            const { error: orpErr } = await supabase.from('cierres_mision').delete().eq('id', cierreId);
+            if (orpErr) throw new Error(`Error eliminando cierre huérfano: ${orpErr.message}`);
+            
+            return NextResponse.json({ message: 'Registro huérfano purgado exitosamente' });
+        }
+
+        // --- NORMAL OPERATION ---
+        // Step -1: Rescatar el Origin ID (school_id) para purgar también el Cronograma (SSoT)
+        const { data: targetJourney } = await supabase
+            .from('staff_journeys')
+            .select('school_id')
+            .eq('id', journeyId)
+            .single();
+            
+        const originSchoolId = targetJourney?.school_id;
+
+        // Step 0: Recolección y destrucción profunda de Evidencia Físcia (Tierra Arrasada)
+        const filesToDelete = [];
+        
+        // A) Fotos y firmas finales de cierres_mision
+        const { data: cierres } = await supabase
+            .from('cierres_mision')
+            .select('group_photo_url, signature_url')
+            .eq('journey_id', journeyId);
+            
+        if (cierres && cierres.length > 0) {
+            for (const c of cierres) {
+                if (c.group_photo_url) {
+                    const path = c.group_photo_url.split('/escuelas_fotos/')[1] || (!c.group_photo_url.startsWith('http') ? c.group_photo_url : null);
+                    if (path) filesToDelete.push(path);
+                }
+                if (c.signature_url) {
+                    const path = c.signature_url.split('/escuelas_fotos/')[1] || (!c.signature_url.startsWith('http') ? c.signature_url : null);
+                    if (path) filesToDelete.push(path);
+                }
+            }
+        }
+        
+        // B) Reportes documentales de staff_prep_photos
+        const { data: prepPhotos } = await supabase
+            .from('staff_prep_photos')
+            .select('photo_url')
+            .eq('journey_id', journeyId);
+            
+        if (prepPhotos && prepPhotos.length > 0) {
+            for (const p of prepPhotos) {
+                if (p.photo_url) {
+                    const path = p.photo_url.split('/escuelas_fotos/')[1] || (!p.photo_url.startsWith('http') ? p.photo_url : null);
+                    if (path) filesToDelete.push(path);
+                }
+            }
+        }
+        
+        // C) Ejecutar obliteración física masiva en Storage
+        if (filesToDelete.length > 0) {
+            try {
+               const { error: storageErr } = await supabase.storage
+                   .from('escuelas_fotos')
+                   .remove(filesToDelete);
+               if (storageErr) console.warn('[API] Error incinerando evidencia Storage:', storageErr);
+            } catch(e) { console.warn('[API] Try/catch incinerando Storage fallo:', e); }
+        }
+
+        // Step 1: Vuelos unitarios
         const { error: vuelosError } = await supabase
             .from('bitacora_vuelos')
             .delete()
@@ -382,28 +516,39 @@ export async function DELETE(request) {
             throw new Error(`Error eliminando vuelos: ${vuelosError.message}`);
         }
 
-        // Step B: Delete cierres_mision for this journey
+        // Step 2: Cierres documentales
         await supabase.from('cierres_mision').delete().eq('journey_id', journeyId);
 
-        // Step C: Delete other child tables that reference this journey
+        // Step 3: Evidencias documentales y logísticas
         await supabase.from('staff_prep_events').delete().eq('journey_id', journeyId);
         await supabase.from('staff_prep_photos').delete().eq('journey_id', journeyId);
         await supabase.from('staff_events').delete().eq('journey_id', journeyId);
+        
+        // Step 4: Desvincular existencias de personal
         await supabase.from('staff_presence').update({ journey_id: null }).eq('journey_id', journeyId);
 
-        // Step D: Delete the parent journey
+        // Step 5: Corte de raíz absoluto de la misión
         const { error: journeyError } = await supabase
             .from('staff_journeys')
             .delete()
             .eq('id', journeyId);
 
         if (journeyError) {
-            throw new Error(`Error eliminando journey: ${journeyError.message}`);
+            throw new Error(`Error en el golpe final (journey delete): ${journeyError.message}`);
+        }
+        
+        // Step 6: Limpieza en el Cronograma (Cascade Delete paramétrico SSoT)
+        // Al matar esto, la PWA también borrará automáticamente la asignación.
+        if (originSchoolId) {
+            await supabase
+                .from('proximas_escuelas')
+                .delete()
+                .eq('id', originSchoolId);
         }
 
         return NextResponse.json({
             success: true,
-            message: `Journey eliminado. Vuelos y cierre limpiados.`,
+            message: `Journey eliminado de raíz operativa y logística (Cronograma).`,
         });
     } catch (err) {
         console.error('[API] sandbox-vuelos DELETE error:', err);

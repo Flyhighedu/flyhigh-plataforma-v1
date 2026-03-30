@@ -141,62 +141,52 @@ export default function StartDemoFab({ onDemoStarted, minimal = false, schoolId 
                 onContextMenu={(e) => e.preventDefault()}
                 disabled={loading}
                 className={`
-                    relative group flex items-center justify-center p-4 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)]
-                    transition-all duration-300 select-none overflow-hidden border border-slate-100
-                    ${loading ? 'bg-slate-50 scale-95' : 'bg-white hover:scale-105 active:scale-95'}
-                    ${isHolding ? 'scale-105 ring-0' : ''}
+                    relative group flex items-center justify-center p-3.5 pr-6 rounded-full 
+                    transition-all duration-300 select-none overflow-hidden
+                    ${loading ? 'bg-slate-50 shadow-[inset_4px_4px_10px_#d1d5db,inset_-4px_-4px_10px_#ffffff] scale-95' : 
+                             'bg-slate-50 shadow-[6px_6px_16px_#cbd5e1,-6px_-6px_16px_#ffffff] hover:shadow-[4px_4px_12px_#cbd5e1,-4px_-4px_12px_#ffffff] active:shadow-[inset_4px_4px_10px_#cbd5e1,inset_-4px_-4px_10px_#ffffff] hover:-translate-y-0.5'}
+                    ${isHolding ? 'shadow-[inset_4px_4px_10px_#cbd5e1,inset_-4px_-4px_10px_#ffffff] translate-y-0' : ''}
                 `}
                 style={{ touchAction: 'none' }}
                 title={isDemoMode ? "Mantén para Salir" : "Mantén para iniciar Demo"}
             >
                 {/* Clean Background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white to-slate-50 opacity-100"></div>
+                <div className="absolute inset-0 bg-slate-50 opacity-100"></div>
 
-                {/* Progress Fill (Background) */}
+                {/* Progress Fill (Background) - Subtle fill */}
                 <div
-                    className={`absolute bottom-0 left-0 w-full transition-all duration-75 ease-linear ${isDemoMode ? 'bg-red-500/10' : 'bg-[#137fec]/10'}`}
+                    className={`absolute bottom-0 left-0 w-full transition-all duration-75 ease-linear ${isDemoMode ? 'bg-red-500/10' : 'bg-blue-600/10'}`}
                     style={{ height: `${progress}%` }}
                 ></div>
 
                 {/* Button Content */}
-                <div className="relative z-10 flex items-center gap-3 px-1">
+                <div className="relative z-10 flex items-center gap-4 px-1">
                     <div className="flex items-center justify-center">
-                        {loading ? (
-                            <Loader2 className={`w-6 h-6 animate-spin ${isDemoMode ? 'text-red-600' : 'text-[#137fec]'}`} />
-                        ) : isDemoMode ? (
-                            <LogOut className={`w-6 h-6 text-red-600 transition-transform ${isHolding ? 'scale-125' : ''}`} />
-                        ) : (
-                            <Play className={`w-6 h-6 fill-[#137fec] text-[#137fec] transition-transform ${isHolding ? 'scale-125' : ''}`} />
-                        )}
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center shadow-[inset_3px_3px_8px_#cbd5e1,inset_-3px_-3px_8px_#ffffff] bg-slate-50 ${isDemoMode ? 'text-red-600' : 'text-blue-600'}`}>
+                            {loading ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : isDemoMode ? (
+                                <LogOut className={`w-5 h-5 transition-transform ${isHolding ? 'scale-125' : ''}`} />
+                            ) : (
+                                <Play className={`w-5 h-5 fill-blue-600 transition-transform ${isHolding ? 'scale-125' : 'ml-0.5'}`} />
+                            )}
+                        </div>
                     </div>
 
                     <div className="text-left hidden sm:block">
-                        <p className={`text-[10px] font-bold uppercase tracking-widest leading-none mb-0.5 ${isDemoMode ? 'text-red-400' : 'text-slate-400'}`}>
-                            {isDemoMode ? 'Modo Demo Activo' : 'Modo Prueba'}
+                        <p className={`text-[9.5px] font-extrabold uppercase tracking-widest leading-none mb-1 ${isDemoMode ? 'text-red-400' : 'text-slate-400'}`}>
+                            {isDemoMode ? 'Entrenamiento' : 'Simulador'}
                         </p>
-                        <p className={`text-sm font-bold leading-none ${isDemoMode ? 'text-red-700' : 'text-slate-900'}`}>
-                            {isDemoMode ? 'Salir de Modo Demo' : 'Iniciar Demo'}
+                        <p className={`text-[15px] font-black tracking-tight leading-none ${isDemoMode ? 'text-red-600' : 'text-slate-600 group-hover:text-blue-600 transition-colors'}`}>
+                            {isDemoMode ? 'Finalizar Demo' : 'Modo Pruebas'}
                         </p>
                     </div>
 
-                    {/* Mobile Text (Alternative) */}
-                    <span className={`text-sm font-bold sm:hidden ${isDemoMode ? 'text-red-600' : 'text-slate-700'}`}>
-                        {loading ? '...' : isDemoMode ? 'Salir' : 'Demo'}
-                    </span>
+                {/* Mobile Text (Alternative) */}
+                <span className={`text-[15px] font-black tracking-tight sm:hidden ${isDemoMode ? 'text-red-600' : 'text-slate-600'}`}>
+                    {loading ? '...' : isDemoMode ? 'Finalizar' : 'Demo'}
+                </span>
                 </div>
-
-                {/* Progress Border (Optional detailed ring) */}
-                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none opacity-0 sm:opacity-100">
-                    <rect
-                        x="1" y="1" width="100%" height="100%" rx="16"
-                        fill="none"
-                        stroke={isDemoMode ? "#dc2626" : "#137fec"}
-                        strokeWidth="3"
-                        strokeDasharray="300" // approx circumference
-                        strokeDashoffset={300 - (300 * progress) / 100}
-                        className={`transition-all duration-75 ${progress > 0 ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                </svg>
             </button>
         </div >
     );

@@ -12,8 +12,38 @@ import {
 // --- CONSTANTES ---
 const META_NINOS = 30000;
 
+// Helper: Build enriched flight list from staff_journeys + cierres_mision
+const buildFlightList = (journeys, cierres, schools, liveMap = {}) => {
+    const cierreMap = {};
+    (cierres || []).forEach(c => { if (c.journey_id) cierreMap[c.journey_id] = c; });
+    const schoolMap = {};
+    (schools || []).forEach(s => { schoolMap[s.id] = s; });
+
+    return (journeys || [])
+        .map(j => {
+            const cierre = cierreMap[j.id];
+            const school = schoolMap[j.school_id];
+            const liveSum = liveMap[j.id] || 0;
+            const ninos = cierre?.total_students ?? liveSum;
+            
+            return {
+                id: j.id,
+                fecha: j.date,
+                nombre_escuela: j.school_name || school?.nombre_escuela || '—',
+                colonia: school?.colonia || '',
+                ninos_sesion: ninos,
+                total_flights: cierre?.total_flights || 0,
+                becados: cierre?.becados || 0,
+                acta_url: cierre?.signature_url || null,
+                foto_url: cierre?.group_photo_url || null,
+            };
+        })
+        .filter(flight => flight.ninos_sesion > 0) // <--- Ocultar misiones test con 0 niños
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+};
+
 // --- COMPONENTE: Hero con Alerta de Vuelo ---
-const DashboardHero = ({ vueloEnVivo, sponsorName, onOpenLogin, onLogout }) => {
+const DashboardHero = ({ sponsorName, onOpenLogin, onLogout }) => {
     return (
         <section className="relative w-full pt-24 pb-16 px-4 overflow-hidden">
             {/* Fondo degradado sutil */}
@@ -89,23 +119,7 @@ const DashboardHero = ({ vueloEnVivo, sponsorName, onOpenLogin, onLogout }) => {
                     Cada vuelo documentado. Cada niño contado. Cada escuela registrada.
                 </motion.p>
 
-                {/* Alerta de Vuelo en Vivo */}
-                <AnimatePresence>
-                    {vueloEnVivo && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                            className="mt-8 inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-2xl shadow-xl shadow-red-500/30"
-                        >
-                            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                            <Radio size={18} className="animate-pulse" />
-                            <span className="font-bold text-sm uppercase tracking-wide">Misión en Curso</span>
-                            <Plane size={18} className="-rotate-45" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+
             </div>
         </section>
     );
@@ -315,7 +329,7 @@ const SponsorPrivateCard = ({ sponsor }) => {
                             <span className="text-emerald-400 text-xs font-bold uppercase tracking-wider">Acceso Privado</span>
                         </div>
                         <h2 className="text-2xl md:text-3xl font-black text-white mb-2">
-                            Tu Inversión en el Futuro
+                            Tu Apoyo al Futuro
                         </h2>
                         <p className="text-slate-400 text-sm md:text-base max-w-md">
                             Gracias a tu aportación, estamos transformando la educación de miles de niños en Uruapan. Este es tu impacto directo.
@@ -331,11 +345,141 @@ const SponsorPrivateCard = ({ sponsor }) => {
                                 ${aportacion.toLocaleString()} <span className="text-lg text-slate-500 font-bold">MXN</span>
                             </span>
                         </div>
-                        <p className="text-emerald-400 font-bold text-xs uppercase tracking-widest">Inversión Total Confirmada</p>
+                        <p className="text-emerald-400 font-bold text-xs uppercase tracking-widest">Apoyo Total Confirmado</p>
                     </div>
                 </div>
             </div>
         </motion.div>
+    );
+};
+
+// --- COMPONENTE: Unified Impact Dashboard ---
+const UnifiedImpactCard = ({ ninosVolados, ninosPatrocinados, isLoading }) => {
+    const [displayTotal, setDisplayTotal] = useState(0);
+    const [displayBecados, setDisplayBecados] = useState(0);
+    const porcentaje = Math.min((ninosVolados / META_NINOS) * 100, 100);
+
+    const containerRef = useRef(null);
+    const isInView = useInView(containerRef, { once: true, margin: "-50px" });
+
+    useEffect(() => {
+        if (isLoading || !isInView) return;
+
+        let startT = 0;
+        let startB = 0;
+        const durT = 2500;
+        const durB = 2500;
+
+        const timerT = setInterval(() => {
+            startT += ninosVolados / (durT / 16);
+            if (startT >= ninosVolados) {
+                setDisplayTotal(ninosVolados);
+                clearInterval(timerT);
+            } else setDisplayTotal(Math.floor(startT));
+        }, 16);
+
+        const timerB = setInterval(() => {
+            startB += ninosPatrocinados / (durB / 16);
+            if (startB >= ninosPatrocinados) {
+                setDisplayBecados(ninosPatrocinados);
+                clearInterval(timerB);
+            } else setDisplayBecados(Math.floor(startB));
+        }, 16);
+
+        return () => {
+            clearInterval(timerT);
+            clearInterval(timerB);
+        };
+    }, [ninosVolados, ninosPatrocinados, isLoading, isInView]);
+
+    return (
+        <section className="px-4 w-full mb-12">
+            <div className="max-w-4xl mx-auto">
+                <motion.div
+                    ref={containerRef}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="relative bg-white rounded-[2.5rem] p-8 md:p-12 shadow-[0_20px_50px_-15px_rgba(0,102,255,0.1)] border border-slate-100 overflow-hidden"
+                >
+                    {/* Elementos decorativos de fondo */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-cyan-50 via-blue-50/20 to-transparent rounded-full blur-3xl opacity-70 pointer-events-none -mt-40 -mr-40"></div>
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-fuchsia-50/40 to-transparent rounded-full blur-3xl opacity-60 pointer-events-none -mb-32 -ml-32"></div>
+
+                    <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-end justify-between gap-12">
+                        
+                        {/* MÉTRICA PRINCIPAL: IMPACTO GLOBAL */}
+                        <div className="flex-1 text-center lg:text-left">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-100/50 rounded-full mb-6 relative">
+                                <div className="h-2.5 w-2.5 rounded-full bg-cyan-500 animate-pulse"></div>
+                                <span className="text-xs font-bold text-cyan-800 uppercase tracking-[0.15em]">Impacto Global del Proyecto</span>
+                            </div>
+                            
+                            {isLoading ? (
+                                <Loader2 className="w-16 h-16 animate-spin text-cyan-500 mx-auto lg:mx-0 my-4" />
+                            ) : (
+                                <div className="flex flex-col lg:flex-row lg:items-baseline gap-2 lg:gap-4 mb-3">
+                                    <span className="text-7xl md:text-[6rem] font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 leading-none">
+                                        {displayTotal.toLocaleString()}
+                                    </span>
+                                    <span className="text-xl md:text-3xl font-bold text-slate-400 uppercase tracking-widest mt-2 lg:mt-0">
+                                        Niños
+                                    </span>
+                                </div>
+                            )}
+                            <p className="text-slate-500 text-sm md:text-base max-w-md mx-auto lg:mx-0 font-medium leading-relaxed">
+                                Personas verdaderamente impactadas. Gracias a nuestro equipo y patrocinadores locales, hemos acercado el cielo a miles de estudiantes en la región.
+                            </p>
+                        </div>
+
+                        {/* MÉTRICA SECUNDARIA: BECAS AL 100% */}
+                        <div className="w-full lg:w-80 shrink-0">
+                            <div className="bg-slate-900 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                                <div className="absolute -top-12 -right-12 w-32 h-32 bg-fuchsia-500/20 blur-2xl rounded-full"></div>
+                                <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-cyan-500/20 blur-2xl rounded-full"></div>
+                                
+                                <div className="relative z-10">
+                                    <div className="w-12 h-12 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center mb-6">
+                                        <Heart className="w-6 h-6 text-fuchsia-400" />
+                                    </div>
+                                    <h4 className="text-4xl font-black text-white tracking-tight mb-2">
+                                        {displayBecados.toLocaleString()}
+                                    </h4>
+                                    <p className="text-xs font-black text-cyan-400 uppercase tracking-widest mb-3">
+                                        Becados al 100%
+                                    </p>
+                                    <p className="text-sm text-slate-400 font-medium leading-relaxed border-t border-white/10 pt-4 mt-4">
+                                        Estudiantes de alto riesgo cuyo acceso a la experiencia fue totalmente auspiciado sin costo alguno.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* BARRA DE PROGRESO */}
+                    <div className="relative z-10 mt-12 pt-8 border-t border-slate-100">
+                        <div className="flex justify-between items-end mb-3">
+                            <div>
+                                <h5 className="text-sm font-bold text-slate-700">Progreso hacia la meta global</h5>
+                                <p className="text-xs text-slate-400 mt-0.5">Volando hacia los {META_NINOS.toLocaleString()} niños</p>
+                            </div>
+                            <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">
+                                {porcentaje.toFixed(1)}%
+                            </span>
+                        </div>
+                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${porcentaje}%` }}
+                                transition={{ duration: 2, ease: "easeOut", delay: 0.5 }}
+                                className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-fuchsia-500 rounded-full"
+                            ></motion.div>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </section>
     );
 };
 
@@ -751,7 +895,7 @@ const TransparencyTable = ({ flights, isLoading }) => {
 
 // --- PÁGINA PRINCIPAL ---
 export default function DashboardPage({ previewMode = false }) {
-    const [impactData, setImpactData] = useState({ ninosVolados: 0, vueloEnVivo: false, ninosPatrocinados: 0 });
+    const [impactData, setImpactData] = useState({ ninosVolados: 0, ninosPatrocinados: 0 });
     const [flights, setFlights] = useState([]);
     const [nextMissions, setNextMissions] = useState([]); // <--- New State
     const [isLoading, setIsLoading] = useState(true);
@@ -913,82 +1057,43 @@ export default function DashboardPage({ previewMode = false }) {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch impacto global
-                const { data: impacto, error: impactoError } = await supabaseNew
-                    .from('impacto_global')
-                    .select('*')
-                    .limit(1)
-                    .single();
+                // ── FUENTE ÚNICA DE VERDAD: server-side API (bypasses RLS) ──
+                const res = await fetch('/api/dashboard-data');
+                if (!res.ok) throw new Error('Error al cargar datos del dashboard');
+                const { journeys, cierres, schools, totals, liveStudentsMap } = await res.json();
 
-                if (impactoError) throw impactoError;
+                // Build enriched flight list from real data
+                const enrichedFlights = buildFlightList(journeys, cierres, schools, liveStudentsMap);
+                setFlights(enrichedFlights);
 
-                setImpactData(prev => ({
-                    ...prev,
-                    ninosVolados: impacto?.niños_volados_acumulado || impacto?.ninos_volados_acumulado || 0,
-                    vueloEnVivo: impacto?.vuelo_en_vivo || false
-                }));
+                // Totals already calculated server-side from cierres_mision
+                setImpactData({
+                    ninosVolados: totals.ninosVolados,
+                    ninosPatrocinados: totals.ninosPatrocinados,
+                });
 
-                // Fetch estadísticas (niños patrocinados)
-                let estadisticas = null;
-                // 1. Intentar con nombre REAL 'stats' y columna 'total_sponsored_kids'
-                let { data: estadData, error: estadError } = await supabaseNew
-                    .from('stats') // NOMBRE REAL
-                    .select('*')
-                    .limit(1)
-                    .single();
-
-                // 2. Fallback por si acaso
-                if (estadError) {
-                    console.log('Dashboard: Intentando fallback a "estadísticas"...');
-                    const res = await supabaseNew.from('estadísticas').select('*').limit(1).single();
-                    if (res.data) {
-                        estadData = res.data;
-                        estadError = null;
-                    }
-                }
-
-                if (!estadError && estadData) {
-                    console.log('Dashboard: Datos estadísticas RAW:', estadData);
-
-                    // Columna REAL confirmada: total_sponsored_kids
-                    let ninosPatrocinados = estadData['total_sponsored_kids'] || estadData['niños patrocinados'] || 0;
-                    console.log('Dashboard: Valor final niños:', ninosPatrocinados);
-
-                    setImpactData(prev => ({
-                        ...prev,
-                        ninosPatrocinados: parseInt(ninosPatrocinados) || 0
-                    }));
-                } else {
-                    console.warn('Dashboard: Error cargando estadísticas:', estadError);
-                }
-
-                // Fetch historial de vuelos
-                const { data: vuelosData, error: vuelosError } = await supabaseNew
-                    .from('historial_vuelos')
-                    .select('*')
-                    .order('fecha', { ascending: false });
-
-                if (vuelosError) throw vuelosError;
-
-                // Fetch próximos vuelos/misiones
-                const { data: missionsData, error: missionsError } = await supabaseNew
-                    .from('proximas_escuelas')
-                    .select('*')
-                    .order('fecha_programada', { ascending: true }); // Mostrar los más cercanos primero
-
-                if (!missionsError) {
-                    setNextMissions(missionsData || []);
-                } else {
-                    console.warn('Dashboard: Error fetching next missions:', missionsError);
-                }
-
-                setFlights(vuelosData || []);
+                // ── CRITICAL FIX: SSoT for Cronograma ──
+                // Use actual operational staff_journeys instead of hypothetical proximas_escuelas
+                const schoolMap = {};
+                (schools || []).forEach(s => { schoolMap[s.id] = s; });
+                
+                const realMissions = (journeys || []).map(j => {
+                    const school = schoolMap[j.school_id];
+                    return {
+                        id: j.id,
+                        estatus: j.status === 'closed' ? 'completada' : 'programada',
+                        nombre_escuela: j.school_name || school?.nombre_escuela || 'Sin nombre',
+                        colonia: school?.colonia || '',
+                        fecha_programada: j.date,
+                    };
+                });
+                
+                setNextMissions(realMissions);
 
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
                 setError(err.message);
             } finally {
-                // Force State Refresh
                 setIsLoading(false);
             }
         };
@@ -996,21 +1101,32 @@ export default function DashboardPage({ previewMode = false }) {
         fetchData();
     }, []);
 
-    // ── Real-time: proximas_escuelas updates → auto-move Pendientes↔Historial ──
+    // ── Real-time: staff_journeys updates → auto-move Pendientes↔Historial ──
     useEffect(() => {
         const channel = supabaseNew
             .channel('cronograma-realtime')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'proximas_escuelas'
+                table: 'staff_journeys'
             }, (payload) => {
                 if (payload.eventType === 'UPDATE' && payload.new) {
                     setNextMissions((prev) =>
-                        prev.map((m) => m.id === payload.new.id ? { ...m, ...payload.new } : m)
+                        prev.map((m) => m.id === payload.new.id ? { 
+                            ...m, 
+                            estatus: payload.new.status === 'closed' ? 'completada' : 'programada',
+                            fecha_programada: payload.new.date
+                        } : m)
                     );
                 } else if (payload.eventType === 'INSERT' && payload.new) {
-                    setNextMissions((prev) => [...prev, payload.new]);
+                    const newMission = {
+                        id: payload.new.id,
+                        estatus: payload.new.status === 'closed' ? 'completada' : 'programada',
+                        nombre_escuela: payload.new.school_name || 'Nueva Escuela',
+                        colonia: '',
+                        fecha_programada: payload.new.date,
+                    };
+                    setNextMissions((prev) => [newMission, ...prev]);
                 }
             })
             .subscribe();
@@ -1191,7 +1307,6 @@ export default function DashboardPage({ previewMode = false }) {
     return (
         <main className="min-h-screen bg-white font-sans selection:bg-cyan-100 selection:text-cyan-900">
             <DashboardHero
-                vueloEnVivo={impactData.vueloEnVivo}
                 sponsorName={sponsorName}
                 onLogout={() => {
                     setIsAuthenticated(false);
@@ -1205,8 +1320,9 @@ export default function DashboardPage({ previewMode = false }) {
             {/* Tarjeta Privada */}
             <SponsorPrivateCard sponsor={sponsorUser} />
 
-            {/* Sección de Estadísticas de Becas (Impacto Real) */}
-            <BecasImpactCounter
+            {/* Sección de Estadísticas de Impacto (Global + Becas) */}
+            <UnifiedImpactCard
+                ninosVolados={impactData.ninosVolados}
                 ninosPatrocinados={impactData.ninosPatrocinados}
                 isLoading={isLoading}
             />
@@ -1214,12 +1330,6 @@ export default function DashboardPage({ previewMode = false }) {
             {/* Registro de Vuelos (Mapa y Tabla) */}
             <SchoolsMap flights={flights} />
             <TransparencyTable flights={flights} isLoading={isLoading} />
-
-            {/* Impacto Acumulado */}
-            <ImpactMeter
-                ninosVolados={impactData.ninosVolados}
-                isLoading={isLoading}
-            />
 
             {/* Próximas Misiones */}
             <NextMissions missions={nextMissions} />

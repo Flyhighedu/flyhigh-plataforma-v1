@@ -1,0 +1,1795 @@
+[
+  {
+    "id": "a6fe0681-479e-48af-91c5-b62dacae7364",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:26:09.870739+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "61de7a5f-f6a1-41db-9fd1-f5d2a2bf1ada",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:26:06.118783+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "1fc728a2-7eed-4ef7-92d9-ca17ec1982a3",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:57.459492+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "aaab65da-46f3-4346-9cd2-1826c624b348",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:56.621219+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "6810c193-9f28-44e0-9397-73c5eeef9906",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:55.527394+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "b621e8f7-20e8-4581-984b-9d51be14a97b",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:54.421272+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "13610f6b-3049-4ef3-88b7-1c3090932cdb",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:53.187522+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "3949c3e8-eb83-4b7f-a363-d87d2d7c4e15",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:45.361304+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "3d1841d8-f5dd-4e45-a94e-1b9a09cda2cc",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:25:11.517131+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a7f26a48-8e04-41ff-8199-4a1c739dac24",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:24:59.197491+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0aea7e81-82fd-4ccc-b0cf-aad601cf229f",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:24:57.770704+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "11599be3-faf9-43e1-9a39-39ca9a5505d8",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T13:24:56.370847+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e5df4549-9891-4a76-a847-0d58f11b9c3d",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:56.842363+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "4d444d7d-45c8-4cb2-86f6-675e962aa52c",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:55.005814+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c07c84ad-3fd9-44d5-8357-b89c99fcb308",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:22.956061+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "9c23ee15-7ad0-43a8-b0f5-a511b4f5fd3a",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:22.610845+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "98204fde-62a7-460f-8765-234c867d4e3f",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:22.24985+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "f10bb6c7-a061-4bbb-9849-f60d2d68a424",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:21.992633+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "63ff3ffe-2826-4e27-b1d9-2c7fe801e525",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:21.744409+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "70217712-a468-4634-96a7-2bb349e056c0",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:22:21.501446+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "dfd1d86e-807d-4a77-b7a6-24daa69f4076",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:35.58314+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e6e03f4e-1ebf-4d8c-a340-d845c5e92421",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:21.296361+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0ad01e64-bd96-4fdb-9bd7-bad4dca83273",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:18.607427+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e5d3b888-a466-4500-93c4-81aa0118986f",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:18.607427+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a35805c5-f11b-4211-b1d3-6909b4eafb2e",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:18.607427+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "2b7e4bf7-b879-4258-bb94-364751625c52",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-11T13:16:11.511218+00:00",
+    "event_type": "checkin",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "4b6da0b4-333a-4fa6-a20f-1c210f117161",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:15:27.402207+00:00",
+    "event_type": "check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "5e3d7cfc-6766-4dc7-8158-99118cdd0149",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:10:13.63006+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fb238f4c-d4a4-40f4-8f15-6a95c3f97bf0",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:05:54.858425+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "bb974d4e-8e68-47fb-8d92-4dcabe986065",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:05:54.550311+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c1ad6224-4199-454a-aa88-d90a05cfcdf9",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:05:54.196592+00:00",
+    "event_type": "team_check",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "6e1ea884-280a-4b30-804c-eb6d489bdf29",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-11T13:05:45.706028+00:00",
+    "event_type": "checkin",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "4e589b9e-cd46-4f1f-a4fe-bfbf3f31c7c5",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-11T12:59:16.389327+00:00",
+    "event_type": "checkin",
+    "journey_id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+    "staff_journeys": {
+      "id": "023e46c0-c0b0-4040-9278-c87e3ffbffed",
+      "school_name": null
+    }
+  },
+  {
+    "id": "09499e7c-cbb1-4566-aed6-c5c9098cb17c",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:07:01.752015+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d34a8336-4539-4c21-b06b-deaf3c80d022",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:47.073912+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "11f2bdc3-d467-4288-aca7-0b76b567c675",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:35.979375+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0582e1e4-83dd-48aa-8a91-d7c5baa3f861",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:35.334153+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "b434610b-f303-4cdc-acea-a7f9c282f7b9",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:34.148212+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d6c138f4-c255-43a8-ba36-7d97b027066e",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:33.367696+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "281f3626-eb0e-4ed5-af76-205d7129ed6d",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:32.570515+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0b2efb2c-6361-40ae-b855-2acd108eabfe",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:25.140565+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fc9783e1-abc4-4150-993e-b5dcc03ba0d4",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:16.650312+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "6e78caf3-51dc-4cbd-a3f5-25193e27df84",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:06:00.955084+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "76ae82c9-bac9-49bb-932a-acd644354cef",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:05:50.419107+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "bbbc13af-18b4-4f2b-a044-f70f2833fd7c",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:05:49.5835+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e9e800b8-381c-45fa-828e-4d264e57f01f",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T19:04:27.713794+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "20cda977-0ab8-4432-aa34-58f0c6c18632",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:04:22.977283+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "8a7c49a5-cf94-4f55-93c6-7f271fb86a11",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:04:18.769751+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "57c77763-983a-47f8-ac7e-139c4f5c79ce",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:04:03.69804+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "286f37d8-b97a-490a-8555-01dfcb28d4f3",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:03:56.533984+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "44f4bcc0-a2dc-4afc-bb8d-0952de4edfeb",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:54.783556+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "6ebf5e1a-3570-4943-8b05-70c1c23434e8",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:54.205019+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "7b6aff8f-b10c-4e3c-a753-29dba3b9a1ca",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:53.868941+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d6b13bb5-d209-4f81-bb87-79472ef8a887",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:53.570456+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "b4404af9-9629-4949-bf19-0cfc3af592de",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:53.115198+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "ab9e330e-f31e-469e-b60a-1c5f741b71b9",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T19:03:52.989451+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "aea8b5d1-4944-48bd-ad6e-f24ced37200b",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:03:44.290389+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a57b8e87-7be9-407a-beac-86a9b667ab7b",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T19:03:38.836667+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e78949d9-3941-4ac5-8d4f-597974ced77c",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T19:03:37.667657+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "7861e6cb-fd5e-47a1-b025-0d220e2a43a7",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T19:03:37.667657+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "51290e17-8592-43b5-9895-9d154871b908",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T19:03:37.667657+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c782b003-e8d7-4cf3-a2f3-e709604999bf",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:03:37.34685+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "602fd61b-c530-4e74-9d57-c1132f02bb11",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T19:03:36.550295+00:00",
+    "event_type": "check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "f0dab8eb-c054-42ca-8c89-7dc900fc652b",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T18:51:36.135556+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "3489cfa9-a9ed-43f3-9452-c8a5e5561b33",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T18:51:35.581107+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "26304703-3996-4b05-aec8-6a02f8caa7f0",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T18:51:35.293887+00:00",
+    "event_type": "team_check",
+    "journey_id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+    "staff_journeys": {
+      "id": "149c108c-a6e1-49f0-86b3-df1874aa2030",
+      "school_name": null
+    }
+  },
+  {
+    "id": "2756b2cc-1f38-4793-90da-c0165fe887ac",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:30:10.459436+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "6b65c66d-a8b4-408d-b9fb-6b89f91ab30c",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:30:03.523043+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "87303366-a3e7-4a44-8422-1decca3ad023",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:30.078655+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "4c903d4a-68d0-4ca3-8672-156286bd6721",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:29.31344+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "d2be5f99-5aae-474d-b10d-436acec076cd",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:27.811654+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "fa2e1a59-aac6-4908-9c8d-034db37d4560",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:29:25.262994+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "92957634-9bb8-4453-9289-bdb7fc6d77b3",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:24.562648+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "9d831d2e-a61c-42d5-8bbe-c64990e2d704",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:23.405327+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "db82b26c-3c9e-4908-b297-285672d1f1be",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:29:20.261987+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "08d781e2-1aa3-4730-9c83-9448bcd67e88",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:29:17.082666+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "1d0bfed8-bd77-44bb-baab-1d7424351b65",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:27:04.113787+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "405525d3-6aa5-4115-a089-1b34db7b1fb8",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:27:02.84821+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "3e70894b-a561-43a2-8e06-f3448aa97e8b",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:26:30.371643+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "74408708-b3f0-40e7-a5c4-1f0a31fdb796",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:26:07.565583+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "a708cc8b-1a82-4ec7-9192-a84548ecb9f2",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:24:23.175253+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "a2e04b7e-1827-467a-bff2-f5334a8cfebc",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:24:21.28538+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "ed05c19f-8c0b-40bf-b1ad-f344d578e2ad",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:20:30.323916+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "631277d9-fe5f-4ead-a77c-bcbbc024cc6b",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:20:29.098435+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "f193c1e8-0fb7-4136-8499-fd2cc67ca43e",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:20:02.312614+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "6cb86ace-1861-408a-a300-d308e49a5b76",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:19:42.793112+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "29329249-8c80-4da1-8d8c-189811e597b0",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:19:41.158203+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "3525c427-63b6-4baf-a9dd-8c64d00948af",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:19:41.158203+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "0b817e9e-7a7c-4c2a-a6d8-667a6d062be0",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:19:41.158203+00:00",
+    "event_type": "check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "86a6be51-74b0-40f9-829c-764e30731d1c",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:22.821046+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "3091f458-ba25-4571-bea8-4418316dc469",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:22.234682+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "38fe2da1-8bbf-4ae9-9091-c2a74b898b80",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:21.939469+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "00b71b59-3e25-445c-8002-7b14b919ab7e",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:21.650942+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "98a98e63-a56a-4802-bf3c-58281db7e3eb",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:21.272369+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "688e7cce-fac8-4aa8-9fd2-db360206efda",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:20.871751+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "fa863011-6ec4-429e-8958-7dce104edc59",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:20.511044+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "cae9f244-0c29-4ba9-afd2-c5a793ce9f95",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:20.107915+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "6bfaeff4-acc9-4703-a28e-fef99023ddfd",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:19.752758+00:00",
+    "event_type": "team_check",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "02ea41f7-52a2-4ddd-b9de-e75d40cdb397",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-10T13:19:10.856382+00:00",
+    "event_type": "checkin",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "4c96402b-fb50-4066-938f-fbac9309c5cd",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-10T13:16:09.450499+00:00",
+    "event_type": "checkin",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "000b327e-76fc-4c4f-b8e4-ff5517113dfb",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-10T13:15:23.830307+00:00",
+    "event_type": "checkin",
+    "journey_id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+    "staff_journeys": {
+      "id": "d28253de-30a2-461e-92f1-664fb986c3c8",
+      "school_name": "Primaria Emigdio Matutino"
+    }
+  },
+  {
+    "id": "e2986e0e-a0ec-4d37-b0b1-b1572f9fc587",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:37.400586+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "970970cd-2aa1-4707-a032-965e7ec4a6be",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:33.553079+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "1a8f2e26-0712-4fd5-b29e-1cb468bd03e5",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:26.645393+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fb4f0b6b-ccae-4d29-8f7a-4d829ad613fb",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:25.771501+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "ec6c6675-07b1-4c25-9afa-d213f03e0e46",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:24.955928+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "85fd90a5-512c-49de-b207-aa178f4b42a9",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:24.048794+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0958b7c7-c876-47aa-9f98-2f19d6489519",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:22.948294+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c672a154-ecae-48ec-82e2-35c17cf78f7d",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:16.438894+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "7ca1e324-a4b6-4fe1-aeee-9ab5b56ef110",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:23:07.980806+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "f1e6e8cc-43a7-4957-adc8-acf1a478c77c",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:22:48.610224+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "2de2a85d-01ac-4b68-8016-db9950b8083c",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:22:46.407073+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "9d284c43-f56d-4dba-92f8-2d4eac4c9ec6",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:21:54.052001+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "da9b4732-242d-4f99-8717-702614c0382c",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:21:19.580852+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "688cb363-2b47-417a-be4b-feede7960684",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:21:17.697827+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "9dd424ec-bf5c-446f-acd7-81e27763f2fe",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:20:55.853527+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "970c5170-c8ee-45d3-8933-de92cbe1b281",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:20:55.610464+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0be97d62-fd1d-4bf9-bd81-1cb7dd818f0c",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:20:55.344184+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d8379966-88b4-4c96-8f02-fb9fe0f92e4e",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-06T13:18:04.810542+00:00",
+    "event_type": "checkin",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e29d4c76-5d18-48b5-aa77-a1894efe8f7e",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:15:00.982448+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e39aafc7-7ef2-46b3-9b6a-ec81e396c1f2",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:59.559096+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "4d1f82b8-fe02-48b6-a596-a8b82b5a6313",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:41.048015+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d13bd2d3-9a24-4a18-b24b-61c8f8b4507b",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:40.729623+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "d999ac8f-959b-4c09-a735-8445a64d482d",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:40.128449+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "987d75b9-ffc9-4a06-a933-9b4df6e9024d",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:37.637657+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e6a05ca1-fa28-4e90-9395-4fc33eb96582",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:37.368382+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e5dc1d45-f626-45c1-91b2-eefe70da6b0e",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:37.097224+00:00",
+    "event_type": "team_check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "bc52afb4-3bc3-4a4d-9c95-bdfb0b7ae6f9",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-06T13:14:28.764369+00:00",
+    "event_type": "checkin",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c740f33c-0c31-4669-bc94-c05b5ab491b3",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:45.68442+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fa450716-0943-4260-b8e4-b1be192617ee",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:27.512833+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "87169567-edfd-4b62-a33d-a2d2a95ea9d4",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:25.690557+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "7d8aac88-d907-41bd-89f6-12b3ed5eacde",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:25.690557+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "08d5475b-e5a0-49c4-94a5-e75fd210b809",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:25.690557+00:00",
+    "event_type": "check",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "cdd28451-e721-4dcd-8139-a7e3e7794043",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-06T13:07:14.289423+00:00",
+    "event_type": "checkin",
+    "journey_id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+    "staff_journeys": {
+      "id": "dcf91964-a64b-42ac-8952-10458767a9b2",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e02a703a-e3fd-40f7-90e4-08fc86e107e1",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:26:08.952103+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "cdfb7a25-745e-4122-a6c5-fcc93cdb0aef",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:26:03.350338+00:00",
+    "event_type": "aux2_photo",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "89d3ba5a-5788-44ca-8b38-6153efb52a92",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:57.326674+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "643f8411-2925-43fb-a035-8b1660c7d423",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:57.124629+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "6174d981-93a9-46dd-abf7-4560ebd2cffd",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:57.062681+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fe8510ab-f676-4e9e-b235-721e97f68613",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:56.249241+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a7b5246a-effc-4c86-bc90-821b20f993ae",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:53.584211+00:00",
+    "event_type": "aux2_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "0c1097aa-a251-4574-8415-44d07c2fa0d0",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:47.44735+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e019163a-1bf2-402e-a3d9-4507fdc2d941",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:39.803771+00:00",
+    "event_type": "mission_chip",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "b6d1fd6a-ff84-4d83-8524-eafc695f1579",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:38.16759+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "f201eebe-e645-40b8-86c3-a9bf46b23e09",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:38.1176+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "9661599b-ec5d-408e-ba6d-e8d501d2f523",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:37.752631+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "35fd54ce-fbd4-4429-9d4d-ede86556b4bc",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:37.490239+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "23d52d9a-bca9-44b5-bdb3-d30cc0445c48",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:37.204032+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "79760648-5bef-4bdc-98dc-530171d08749",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:37.050415+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a3d6e841-cca7-445b-ada2-db0a23ba0b03",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:36.637465+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "a7dd752d-1ab2-4eef-a2e2-80f525c0177d",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:35.452213+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "1adf44d6-5761-4753-a13e-e6e1a78271cd",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:35.098062+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "c5fe74f9-8ac0-4742-9928-84143726dce5",
+    "user_id": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+    "created_at": "2026-03-05T21:25:34.872687+00:00",
+    "event_type": "team_check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "dde9b86a-232d-4530-b893-d2825e63d94f",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:28.497648+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "3cfa5571-f779-4b97-b952-0399f8f6a20b",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:27.224221+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "63710654-e594-46ad-b330-e0b2e2d6e239",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:08.719871+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "ca7ca699-118a-4b07-8a45-b6a6d1aabda7",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:25:03.152567+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "e47abd9f-161a-46d4-9c40-f6816b070309",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-05T21:24:54.991882+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "35875ba6-0cae-4bf2-8e28-55308939b305",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-05T21:24:52.154935+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "fda2fc7f-c26f-4ddb-9fb0-a8896dc761f3",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-05T21:24:50.988345+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "35de4aad-a629-48a8-a99b-960916dd5fbb",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-05T21:24:50.988345+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "895ee167-d027-496e-b1ce-c8004a2dab94",
+    "user_id": "3e2af369-c23e-40e1-9119-9c07909f496a",
+    "created_at": "2026-03-05T21:24:50.988345+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  },
+  {
+    "id": "47639ffd-542c-40e4-a33d-42ac1995bb4f",
+    "user_id": "bc7ed873-ad5b-4893-becc-a5f8c4af4e3d",
+    "created_at": "2026-03-05T21:24:48.007528+00:00",
+    "event_type": "check",
+    "journey_id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+    "staff_journeys": {
+      "id": "9d818a34-36c2-4401-a5cc-a89f024faa39",
+      "school_name": null
+    }
+  }
+]

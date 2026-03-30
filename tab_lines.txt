@@ -1,0 +1,9 @@
+40: const [activeTab, setActiveTab] = useState('vuelos'); // 'vuelos' | 'patrocinadores' | 'cronograma' | 'operativos'
+1138: className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transitio
+1148: className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transitio
+1158: className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transitio
+1168: className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm transitio
+1180: {activeTab === 'vuelos' && (
+1467: activeTab === 'patrocinadores' && (
+1765: activeTab === 'cronograma' && (
+2151: {activeTab === 'operativos' && (

@@ -25,17 +25,18 @@ export async function GET() {
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        // 2. Obtener emails de auth.users para cada perfil
+        // 2. Obtener emails y telefonos de auth.users para cada perfil
         const staffWithEmails = await Promise.all(
             (profiles || []).map(async (profile) => {
                 try {
                     const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(profile.user_id);
                     return {
                         ...profile,
-                        email: user?.email || 'N/A'
+                        email: user?.email || 'N/A',
+                        phone: user?.phone || 'No registrado'
                     };
                 } catch {
-                    return { ...profile, email: 'N/A' };
+                    return { ...profile, email: 'N/A', phone: 'No registrado' };
                 }
             })
         );

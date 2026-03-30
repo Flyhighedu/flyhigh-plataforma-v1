@@ -1,0 +1,50 @@
+{
+  "journeys": [
+    {
+      "id": "4714ac61-fd42-4a19-a18c-6e17b041c2ae",
+      "school_name": "GRAL. IGNACIO ZARAGOZA",
+      "cct": "16DPR5340D",
+      "status": "closed",
+      "vuelos_count": 22,
+      "vuelos_sum_students": 225,
+      "cierre": []
+    },
+    {
+      "id": "f2af4aad-8407-4900-a627-705d06187685",
+      "school_name": "GRAL IGNACIO ZARAGOZA",
+      "cct": "16DPR5015H",
+      "status": "closed",
+      "vuelos_count": 19,
+      "vuelos_sum_students": 204,
+      "cierre": [
+        {
+          "id": "25c3bc51-3f9a-4921-832f-0adce518d581",
+          "mission_id": "61",
+          "total_flights": 0,
+          "total_students": 0,
+          "checklist_verified": true,
+          "signature_url": null,
+          "group_photo_url": null,
+          "start_time": "2026-03-25T13:15:58.701+00:00",
+          "end_time": "2026-03-25T18:45:17.817+00:00",
+          "created_by": "2a8e6afa-a51e-40db-a519-75855ed7b3b9",
+          "created_at": "2026-03-26T17:04:05.237371+00:00",
+          "school_id": 61,
+          "school_name_snapshot": "GRAL IGNACIO ZARAGOZA",
+          "mission_datetime": "2026-03-25T13:15:58.701+00:00",
+          "journey_id": "f2af4aad-8407-4900-a627-705d06187685",
+          "becados": 0
+        }
+      ]
+    },
+    {
+      "id": "dc76f173-87c8-4a89-91a0-0db86e6ab883",
+      "school_name": "GRAL IGNACIO ZARAGOZA",
+      "cct": "16DPR5015H",
+      "status": "closed",
+      "vuelos_count": 1,
+      "vuelos_sum_students": 152,
+      "cierre": []
+    }
+  ]
+}

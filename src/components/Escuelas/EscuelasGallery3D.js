@@ -58,36 +58,25 @@ export default function EscuelasGallery3D() {
     useEffect(() => {
         const fetchSchools = async () => {
             try {
-                // 1. Fetch Scheduled/Completed Schools from proximas_escuelas
-                const { data: scheduledData, error: scheduledError } = await supabaseNew
-                    .from('proximas_escuelas')
-                    .select('nombre_escuela');
+                // 1. Fetch completed missions verified by staff (Single Source of Truth)
+                const { data: closedMissions, error: missionsError } = await supabaseNew
+                    .from('cierres_mision')
+                    .select('school_name_snapshot');
 
-                if (scheduledError) console.error('Error fetching scheduled schools:', scheduledError);
+                if (missionsError) {
+                    console.error('Error fetching closed missions:', missionsError);
+                }
 
-                // 2. Fetch Extra/Historical Schools from escuelas_extras
-                const { data: extrasData, error: extrasError } = await supabaseNew
-                    .from('escuelas_extras')
-                    .select('nombre');
-
-                if (extrasError) console.error('Error fetching extra schools:', extrasError);
-
-                // 3. Combine and Dedup with Sanitation
+                // 2. Combine and Dedup with Sanitation
                 const allNames = new Set();
 
-                // Add scheduled
-                (scheduledData || []).forEach(item => {
-                    const clean = sanitizeSchoolName(item.nombre_escuela);
+                // Add verified schools
+                (closedMissions || []).forEach(item => {
+                    const clean = sanitizeSchoolName(item.school_name_snapshot);
                     if (clean && clean.length > 2) allNames.add(clean);
                 });
 
-                // Add extras
-                (extrasData || []).forEach(item => {
-                    const clean = sanitizeSchoolName(item.nombre);
-                    if (clean && clean.length > 2) allNames.add(clean);
-                });
-
-                // 4. Update State and trigger animation activation
+                // 3. Update State and trigger animation activation
                 const namesArray = Array.from(allNames);
                 setSchools(namesArray);
 

@@ -731,22 +731,23 @@ export default function CheckoutScreen({
 
             if (updateError) throw updateError;
 
-            // [BUG-FIX] Auto-insert cierres_mision when all team checked out
+            // [BUG-FIX] UPSERT cierres_mision when all team checked out
+            // Uses UPSERT to avoid duplicates if pilot already sealed via handleCloseDay
             if (allTeamCheckedOut) {
                 try {
                     const schoolId = missionInfo?.id || missionInfo?.mission_id || missionId;
                     const schoolName = (missionInfo?.school_name || missionInfo?.nombre_escuela || '').trim();
-                    await supabase.from('cierres_mision').insert({
-                        mission_id: String(journeyId),
+                    await supabase.from('cierres_mision').upsert({
+                        journey_id: journeyId,
+                        mission_id: missionId || null,
                         school_id: schoolId ? Number(schoolId) : null,
                         school_name_snapshot: schoolName || null,
-                        total_flights: 0,
                         total_students: studentsCount || 0,
                         end_time: now
-                    });
-                    console.log('✅ cierres_mision record created for journey:', journeyId);
+                    }, { onConflict: 'journey_id', ignoreDuplicates: false });
+                    console.log('✅ cierres_mision upserted for journey:', journeyId);
                 } catch (cierreErr) {
-                    console.warn('⚠️ Could not create cierres_mision record (non-blocking):', cierreErr);
+                    console.warn('⚠️ Could not upsert cierres_mision record (non-blocking):', cierreErr);
                 }
             }
 

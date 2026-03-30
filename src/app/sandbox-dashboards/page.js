@@ -6,6 +6,7 @@ import PanelImpacto from '@/components/dashboard/PanelImpacto';
 import PanelOperacion from '@/components/dashboard/PanelOperacion';
 import PanelEscuelas from '@/components/dashboard/PanelEscuelas';
 import PanelPatrocinios from '@/components/dashboard/PanelPatrocinios';
+import PanelReportes from '@/components/dashboard/PanelReportes';
 
 /* ── Tab Config ── */
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
     { id: 'operacion', label: 'Operación', icon: '⚡', description: 'Eficiencia operativa' },
     { id: 'escuelas', label: 'Escuelas', icon: '🏫', description: 'Operación por escuela' },
     { id: 'patrocinios', label: 'Patrocinios', icon: '💎', description: 'Fondo de patrocinadores' },
+    { id: 'reportes', label: 'Reportes', icon: '📄', description: 'Impact Studio & Dossiers' },
 ];
 
 /* ── Period Selector UI ── */
@@ -232,7 +234,7 @@ function TopBar({ activeTab, filter, setFilter }) {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {activeTab !== 'impacto' && <PeriodSelector filter={filter} setFilter={setFilter} />}
+                    {activeTab !== 'impacto' && activeTab !== 'reportes' && <PeriodSelector filter={filter} setFilter={setFilter} />}
                     <ThemeSwitch />
                 </div>
             </div>
@@ -286,6 +288,7 @@ export default function SandboxDashboardsPage() {
         operacion: <PanelOperacion data={data?.operacion} loading={loading} />,
         escuelas: <PanelEscuelas data={data?.escuelas} loading={loading} />,
         patrocinios: <PanelPatrocinios data={data?.patrocinios} loading={loading} />,
+        reportes: <PanelReportes data={data} filter={filter} setFilter={setFilter} loading={loading} />,
     };
 
     return (

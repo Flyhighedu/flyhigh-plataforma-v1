@@ -54,7 +54,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState([]);
   const [expanded, setExpanded] = useState({});
-  const [sorting, setSorting] = useState([]);
+  const [sorting, setSorting] = useState([{ id: "date", desc: true }]);
   const [columnSizing, setColumnSizing] = useState({});
 
   const table = useReactTable({
@@ -229,17 +229,24 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
         </div>
       </div>
 
-      {/* Table Wrapper for horizontal scroll background fix */}
-      <div className="rounded-lg border bg-slate-50/50">
-        <div className="min-w-max bg-card pb-2">
-          <Table style={{ width: table.getCenterTotalSize() }}>
+      {/* Removed local overflow wrapper to force native window scrolling */}
+      <div className="w-full">
+        <div className="bg-card w-full">
+          <Table style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
             <TableHeader className="sticky top-0 z-20 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.08)]">
               {table.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => {
                     const isCalc = header.column.columnDef.meta?.isCalculated;
+                    const isSticky = header.column.columnDef.meta?.sticky;
+                    const stickyLeft = header.column.columnDef.meta?.stickyLeft;
+                    const stickyBorder = header.column.columnDef.meta?.stickyBorder;
+                    const stickyStyle = isSticky ? { position: 'sticky', left: stickyLeft, zIndex: 30 } : {};
+                    const stickyClass = isSticky ? 'bg-white' : '';
+                    const borderClass = stickyBorder ? 'border-r-2 border-slate-300' : '';
+                    const sizeStyle = { width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() };
                     return (
-                    <TableHead key={header.id} className={`${isCalc ? "bg-slate-100" : "bg-white"} relative group select-none`} style={{ width: header.getSize() }}>
+                    <TableHead key={header.id} className={`${isCalc ? "bg-slate-100" : "bg-white"} relative group select-none overflow-hidden ${stickyClass} ${borderClass}`} style={{ ...sizeStyle, ...stickyStyle }}>
                       {header.isPlaceholder ? null : (
                         <div className={header.column.getCanSort() ? "cursor-pointer flex items-center gap-1" : ""} onClick={header.column.getToggleSortingHandler()}>
                           {flexRender(header.column.columnDef.header, header.getContext())}
@@ -261,9 +268,16 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
                   )})}
                 </TableRow>
               ))}
-              <TableRow className="bg-slate-50/80">
-                {table.getAllLeafColumns().map((col) => (
-                  <TableHead key={col.id} className="py-1 px-1 bg-slate-50/80" style={{ width: col.getSize() }}>
+              <TableRow className="bg-slate-50">
+                {table.getAllLeafColumns().map((col) => {
+                  const isSticky = col.columnDef.meta?.sticky;
+                  const stickyLeft = col.columnDef.meta?.stickyLeft;
+                  const stickyBorder = col.columnDef.meta?.stickyBorder;
+                  const stickyStyle = isSticky ? { position: 'sticky', left: stickyLeft, zIndex: 30 } : {};
+                  const borderClass = stickyBorder ? 'border-r-2 border-slate-300' : '';
+                  const sizeStyle = { width: col.getSize(), minWidth: col.getSize(), maxWidth: col.getSize() };
+                  return (
+                  <TableHead key={col.id} className={`py-1 px-1 bg-slate-50 overflow-hidden ${borderClass}`} style={{ ...sizeStyle, ...stickyStyle }}>
                     {col.getCanFilter() ? (
                       <input
                         value={(col.getFilterValue() ?? "")}
@@ -273,7 +287,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
                       />
                     ) : null}
                   </TableHead>
-                ))}
+                )})}
               </TableRow>
             </TableHeader>
 
@@ -283,11 +297,22 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <Fragment key={row.id}>
-                    <TableRow className={row.getIsExpanded() ? "bg-muted/30 border-b-0" : ""}>
+                    <TableRow className={`group transition-colors ${row.getIsExpanded() ? "bg-muted/30 border-b-0" : "hover:bg-muted/50"}`}>
                       {row.getVisibleCells().map((cell) => {
                         const isCalc = cell.column.columnDef.meta?.isCalculated;
+                        const isSticky = cell.column.columnDef.meta?.sticky;
+                        const stickyLeft = cell.column.columnDef.meta?.stickyLeft;
+                        const stickyBorder = cell.column.columnDef.meta?.stickyBorder;
+                        const stickyStyle = isSticky ? { position: 'sticky', left: stickyLeft, zIndex: 10 } : {};
+                        
+                        // Enforce totally solid background for sticky cols to prevent gaps, 
+                        // while simulating row hover natively since it overlaps the row
+                        const stickyClass = isSticky ? `bg-white group-hover:bg-slate-50` : ''; 
+                        const borderClass = stickyBorder ? 'border-r-2 border-slate-300' : '';
+                        const sizeStyle = { width: cell.column.getSize(), minWidth: cell.column.getSize(), maxWidth: cell.column.getSize() };
+                        
                         return (
-                        <TableCell key={cell.id} style={{ width: cell.column.getSize() }} className={isCalc ? "bg-slate-100/80" : ""}>
+                        <TableCell key={cell.id} style={{ ...sizeStyle, ...stickyStyle }} className={`overflow-hidden ${isCalc ? "bg-slate-100" : ""} ${stickyClass} ${borderClass}`}>
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       )})}
@@ -316,8 +341,15 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, renderSubCo
                 <TableRow key={fg.id}>
                   {fg.headers.map((header) => {
                     const isCalc = header.column.columnDef.meta?.isCalculated;
+                    const isSticky = header.column.columnDef.meta?.sticky;
+                    const stickyLeft = header.column.columnDef.meta?.stickyLeft;
+                    const stickyBorder = header.column.columnDef.meta?.stickyBorder;
+                    const stickyStyle = isSticky ? { position: 'sticky', left: stickyLeft, zIndex: 30 } : {};
+                    const stickyClass = isSticky ? 'bg-slate-100' : '';
+                    const borderClass = stickyBorder ? 'border-r-2 border-slate-300' : '';
+                    const sizeStyle = { width: header.getSize(), minWidth: header.getSize(), maxWidth: header.getSize() };
                     return (
-                    <TableCell key={header.id} style={{ width: header.getSize() }} className={`py-2.5 font-semibold text-slate-800 border-t border-slate-200 ${isCalc ? "bg-slate-200" : ""}`}>
+                    <TableCell key={header.id} style={{ ...sizeStyle, ...stickyStyle }} className={`py-2.5 font-semibold text-slate-800 border-t border-slate-200 overflow-hidden ${isCalc ? "bg-slate-200" : ""} ${stickyClass} ${borderClass}`}>
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
                     </TableCell>
                   )})}

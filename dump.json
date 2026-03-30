@@ -1,0 +1,93 @@
+{
+  "p": [
+    {
+      "id": 58,
+      "nombre_escuela": "Prueba ",
+      "colonia": "Emilio Carranza ",
+      "fecha_programada": "2026-03-16",
+      "estatus": "archivado",
+      "created_at": "2026-03-16T21:48:21.221078+00:00",
+      "is_archived": true,
+      "archived_at": "2026-03-25T06:49:16.537508+00:00",
+      "cct": null,
+      "nombre_director": null,
+      "telefono_director": null,
+      "cuota_alumno": null,
+      "tarifa_base": 80,
+      "subsidio_patrocinador": null,
+      "ubicacion_lat": null,
+      "ubicacion_lng": null,
+      "numero_zona": null,
+      "numero_sector": null,
+      "nombre_maestro_delegado": null,
+      "telefono_maestro_delegado": null,
+      "registrado_via": "manual",
+      "notas": null
+    },
+    {
+      "id": 56,
+      "nombre_escuela": "prueba 123",
+      "colonia": "",
+      "fecha_programada": "2026-03-13",
+      "estatus": "archivado",
+      "created_at": "2026-03-14T05:07:59.769467+00:00",
+      "is_archived": true,
+      "archived_at": "2026-03-25T06:49:16.537508+00:00",
+      "cct": null,
+      "nombre_director": null,
+      "telefono_director": null,
+      "cuota_alumno": null,
+      "tarifa_base": 80,
+      "subsidio_patrocinador": null,
+      "ubicacion_lat": null,
+      "ubicacion_lng": null,
+      "numero_zona": null,
+      "numero_sector": null,
+      "nombre_maestro_delegado": null,
+      "telefono_maestro_delegado": null,
+      "registrado_via": "manual",
+      "notas": null
+    },
+    {
+      "id": 61,
+      "nombre_escuela": "GRAL IGNACIO ZARAGOZA",
+      "colonia": "Constituyentes ",
+      "fecha_programada": "2026-03-25",
+      "estatus": "completada",
+      "created_at": "2026-03-24T13:26:26.797707+00:00",
+      "is_archived": false,
+      "archived_at": null,
+      "cct": "16DPR5015H",
+      "nombre_director": null,
+      "telefono_director": null,
+      "cuota_alumno": null,
+      "tarifa_base": 80,
+      "subsidio_patrocinador": null,
+      "ubicacion_lat": null,
+      "ubicacion_lng": null,
+      "numero_zona": null,
+      "numero_sector": null,
+      "nombre_maestro_delegado": null,
+      "telefono_maestro_delegado": null,
+      "registrado_via": "manual",
+      "notas": null
+    }
+  ],
+  "j": [
+    {
+      "id": "d87080d6-47f0-488c-832a-385cac744b72",
+      "school_id": 57,
+      "status": "closed"
+    },
+    {
+      "id": "d8438a1e-d245-46e5-816e-284c1663bae3",
+      "school_id": 13,
+      "status": "closed"
+    },
+    {
+      "id": "40720f31-0070-40c2-845a-593c3ceafed0",
+      "school_id": 18,
+      "status": "closed"
+    }
+  ]
+}
