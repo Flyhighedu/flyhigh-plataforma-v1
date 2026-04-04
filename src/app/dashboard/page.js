@@ -552,6 +552,80 @@ const SchoolsMap = ({ flights }) => {
     );
 };
 
+// --- COMPONENTE: Tarjeta de Misión EN VIVO (SSoT: staff_journeys + bitacora_vuelos) ---
+const LiveMissionCard = ({ liveMission }) => {
+    if (!liveMission) return null;
+
+    return (
+        <section className="px-4 w-full mb-12">
+            <div className="max-w-4xl mx-auto">
+                <motion.div
+                    initial={{ opacity: 0, y: 30, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    className="relative rounded-[2.5rem] p-8 md:p-10 overflow-hidden border border-emerald-200/60 shadow-[0_20px_60px_-15px_rgba(16,185,129,0.25)]"
+                    style={{ background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 40%, #ffffff 100%)' }}
+                >
+                    {/* Glow decorativos */}
+                    <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-bl from-emerald-100/60 to-transparent rounded-full blur-3xl pointer-events-none -mt-32 -mr-32"></div>
+                    <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-gradient-to-tr from-cyan-50/40 to-transparent rounded-full blur-3xl pointer-events-none -mb-24 -ml-24"></div>
+
+                    <div className="relative z-10">
+                        {/* Header con badge EN VIVO */}
+                        <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                    <Radio size={22} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-800 tracking-tight">Misión en Curso</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Datos en tiempo real</p>
+                                </div>
+                            </div>
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/30">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                                </span>
+                                <span className="text-white text-xs font-black uppercase tracking-widest">EN VIVO</span>
+                            </div>
+                        </div>
+
+                        {/* Nombre de la escuela */}
+                        <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-8 leading-tight">
+                            {liveMission.schoolName}
+                        </h2>
+
+                        {/* Métricas en vivo */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Niños volados */}
+                            <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-emerald-100/80 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Users size={16} className="text-emerald-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Niños Volados</span>
+                                </div>
+                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">
+                                    {(liveMission.studentsFlown || 0).toLocaleString()}
+                                </span>
+                            </div>
+                            {/* Vuelos realizados */}
+                            <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-emerald-100/80 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Plane size={16} className="text-cyan-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Vuelos</span>
+                                </div>
+                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">
+                                    {(liveMission.flightsCompleted || 0).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </section>
+    );
+};
+
 // --- COMPONENTE: Cronograma de Misiones (Tabs: Pendientes / Historial) ---
 const TRASH_PATTERNS = /demo|prueba|test|ejemplo|sandbox|asdf/i;
 const TRASH_IDS = new Set([999999, 44, 45, 46, 48]); // Duplicates/demo IDs from audit
@@ -569,8 +643,8 @@ const NextMissions = ({ missions }) => {
         return true;
     });
 
-    // Split into tabs: Pendientes = NOT completada, Historial = completada
-    const pendientes = cleanMissions.filter((m) => m.estatus !== 'completada');
+    // Split into tabs: Pendientes = pending only, Historial = completada
+    const pendientes = cleanMissions.filter((m) => m.estatus !== 'completada' && m.estatus !== 'en_progreso');
     const historial = cleanMissions.filter((m) => m.estatus === 'completada');
 
     const activeMissions = activeTab === 'pendientes' ? pendientes : historial;
@@ -897,7 +971,8 @@ const TransparencyTable = ({ flights, isLoading }) => {
 export default function DashboardPage({ previewMode = false }) {
     const [impactData, setImpactData] = useState({ ninosVolados: 0, ninosPatrocinados: 0 });
     const [flights, setFlights] = useState([]);
-    const [nextMissions, setNextMissions] = useState([]); // <--- New State
+    const [nextMissions, setNextMissions] = useState([]);
+    const [liveMission, setLiveMission] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sponsorName, setSponsorName] = useState(null);
@@ -1060,7 +1135,7 @@ export default function DashboardPage({ previewMode = false }) {
                 // ── FUENTE ÚNICA DE VERDAD: server-side API (bypasses RLS) ──
                 const res = await fetch('/api/dashboard-data');
                 if (!res.ok) throw new Error('Error al cargar datos del dashboard');
-                const { journeys, cierres, schools, totals, liveStudentsMap } = await res.json();
+                const { journeys, cierres, schools, totals, liveStudentsMap, cronograma, liveMission: lm } = await res.json();
 
                 // Build enriched flight list from real data
                 const enrichedFlights = buildFlightList(journeys, cierres, schools, liveStudentsMap);
@@ -1072,23 +1147,17 @@ export default function DashboardPage({ previewMode = false }) {
                     ninosPatrocinados: totals.ninosPatrocinados,
                 });
 
-                // ── CRITICAL FIX: SSoT for Cronograma ──
-                // Use actual operational staff_journeys instead of hypothetical proximas_escuelas
-                const schoolMap = {};
-                (schools || []).forEach(s => { schoolMap[s.id] = s; });
-                
-                const realMissions = (journeys || []).map(j => {
-                    const school = schoolMap[j.school_id];
-                    return {
-                        id: j.id,
-                        estatus: j.status === 'closed' ? 'completada' : 'programada',
-                        nombre_escuela: j.school_name || school?.nombre_escuela || 'Sin nombre',
-                        colonia: school?.colonia || '',
-                        fecha_programada: j.date,
-                    };
-                });
-                
-                setNextMissions(realMissions);
+                // ── SSoT: Cronograma directo de proximas_escuelas ──
+                setNextMissions((cronograma || []).map(s => ({
+                    id: s.id,
+                    estatus: s.estatus || 'pendiente',
+                    nombre_escuela: s.nombre_escuela,
+                    colonia: s.colonia || '',
+                    fecha_programada: s.fecha_programada,
+                })));
+
+                // ── SSoT: Live Mission (same data as sandbox-vuelos) ──
+                setLiveMission(lm || null);
 
             } catch (err) {
                 console.error('Error fetching dashboard data:', err);
@@ -1101,32 +1170,83 @@ export default function DashboardPage({ previewMode = false }) {
         fetchData();
     }, []);
 
-    // ── Real-time: staff_journeys updates → auto-move Pendientes↔Historial ──
+    // ── SSoT Real-time: proximas_escuelas → Cronograma instant sync ──
+    // ── SSoT Real-time: bitacora_vuelos → Live student/flight count ──
+    // ── SSoT Real-time: staff_journeys → Live mission status ──
     useEffect(() => {
         const channel = supabaseNew
-            .channel('cronograma-realtime')
+            .channel('sponsor-dashboard-ssot')
+            // 1) proximas_escuelas: cronograma SSoT
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
-                table: 'staff_journeys'
+                table: 'proximas_escuelas'
             }, (payload) => {
-                if (payload.eventType === 'UPDATE' && payload.new) {
+                if (payload.eventType === 'INSERT' && payload.new) {
+                    const s = payload.new;
+                    if (s.is_archived || s.estatus === 'en_progreso') return;
+                    setNextMissions((prev) => {
+                        if (prev.some(m => m.id === s.id)) return prev;
+                        return [...prev, {
+                            id: s.id,
+                            estatus: s.estatus || 'pendiente',
+                            nombre_escuela: s.nombre_escuela,
+                            colonia: s.colonia || '',
+                            fecha_programada: s.fecha_programada,
+                        }];
+                    });
+                } else if (payload.eventType === 'UPDATE' && payload.new) {
+                    const s = payload.new;
                     setNextMissions((prev) =>
-                        prev.map((m) => m.id === payload.new.id ? { 
-                            ...m, 
-                            estatus: payload.new.status === 'closed' ? 'completada' : 'programada',
-                            fecha_programada: payload.new.date
+                        prev.map((m) => m.id === s.id ? {
+                            ...m,
+                            estatus: s.estatus,
+                            nombre_escuela: s.nombre_escuela || m.nombre_escuela,
+                            colonia: s.colonia || m.colonia,
+                            fecha_programada: s.fecha_programada || m.fecha_programada,
                         } : m)
                     );
-                } else if (payload.eventType === 'INSERT' && payload.new) {
-                    const newMission = {
-                        id: payload.new.id,
-                        estatus: payload.new.status === 'closed' ? 'completada' : 'programada',
-                        nombre_escuela: payload.new.school_name || 'Nueva Escuela',
-                        colonia: '',
-                        fecha_programada: payload.new.date,
+                } else if (payload.eventType === 'DELETE' && payload.old) {
+                    setNextMissions((prev) => prev.filter((m) => m.id !== payload.old.id));
+                }
+            })
+            // 2) bitacora_vuelos INSERT: live student accumulation for live card
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'bitacora_vuelos'
+            }, (payload) => {
+                const row = payload.new;
+                if (!row?.journey_id) return;
+                setLiveMission((prev) => {
+                    if (!prev || prev.journeyId !== row.journey_id) return prev;
+                    return {
+                        ...prev,
+                        studentsFlown: (prev.studentsFlown || 0) + (Number(row.student_count) || 0),
+                        flightsCompleted: (prev.flightsCompleted || 0) + 1,
                     };
-                    setNextMissions((prev) => [newMission, ...prev]);
+                });
+            })
+            // 3) staff_journeys UPDATE: detect operation start/end
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'staff_journeys'
+            }, (payload) => {
+                const j = payload.new;
+                if (!j?.id) return;
+                if (j.status === 'operation') {
+                    // Mission started → show live card
+                    setLiveMission((prev) => ({
+                        journeyId: j.id,
+                        schoolName: j.school_name || prev?.schoolName || 'Escuela en curso',
+                        studentsFlown: prev?.journeyId === j.id ? (prev.studentsFlown || 0) : 0,
+                        flightsCompleted: prev?.journeyId === j.id ? (prev.flightsCompleted || 0) : 0,
+                        status: 'operation',
+                    }));
+                } else if (j.status === 'closed' || j.status === 'report') {
+                    // Mission ended → hide live card
+                    setLiveMission((prev) => prev?.journeyId === j.id ? null : prev);
                 }
             })
             .subscribe();
@@ -1326,6 +1446,9 @@ export default function DashboardPage({ previewMode = false }) {
                 ninosPatrocinados={impactData.ninosPatrocinados}
                 isLoading={isLoading}
             />
+
+            {/* ── SSoT: Tarjeta EN VIVO (misma fuente que sandbox-vuelos) ── */}
+            <LiveMissionCard liveMission={liveMission} />
 
             {/* Registro de Vuelos (Mapa y Tabla) */}
             <SchoolsMap flights={flights} />

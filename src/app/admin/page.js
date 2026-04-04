@@ -11,11 +11,12 @@ import HRCommandCenter from '@/components/admin/HRCommandCenter';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     Globe, Zap, School, Gem, FileText, Database, ArrowLeft,
-    MapPin, Camera, Lock, KeyRound, ShieldCheck,
+    MapPin, Camera, Lock, KeyRound, ShieldCheck, Palette,
     Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar,
     ChevronDown, ChevronUp, UserPlus, Shield, ToggleLeft, ToggleRight, Copy, ExternalLink,
-    Gamepad2, BookOpen, Package, Settings, Smartphone
+    Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign
 } from 'lucide-react';
+import { processBackgroundRemoval } from '@/lib/bgRemover';
 
 import SandboxEscuelasPage from '@/app/sandbox-escuelas/page';
 import SandboxVuelosPage from '@/app/sandbox-vuelos/page';
@@ -233,6 +234,12 @@ export default function AdminPage() {
     const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
     const [editingSchoolId, setEditingSchoolId] = useState(null);
 
+    // --- ESTADO DE FECHAS DISPONIBLES (Bot WhatsApp) ---
+    const [availableDates, setAvailableDates] = useState([]);
+    const [fetchingDates, setFetchingDates] = useState(false);
+    const [newDateForm, setNewDateForm] = useState({ fecha: '', notas: '' });
+    const [addingDate, setAddingDate] = useState(false);
+
     // --- ESTADO DEL CATÁLOGO DE ESCUELAS ---
     const [catalogoEscuelas, setCatalogoEscuelas] = useState([]);
     const [catalogoLoading, setCatalogoLoading] = useState(false);
@@ -247,7 +254,9 @@ export default function AdminPage() {
         nombre: '',
         email: '',
         password: '',
-        aportacion: '' // Nuevo campo para inversión
+        aportacion: '', // Nuevo campo para inversión
+        logo_url: null,
+        mantener_logo_original: false
     });
     const [sponsors, setSponsors] = useState([]);
     const [sponsorLoading, setSponsorLoading] = useState(false);
@@ -255,6 +264,8 @@ export default function AdminPage() {
     const [fetchingSponsors, setFetchingSponsors] = useState(true);
     const [showPasswords, setShowPasswords] = useState(false);
     const [editingSponsorId, setEditingSponsorId] = useState(null);
+    const [isProcessingLogo, setIsProcessingLogo] = useState(false);
+    const [logoProgress, setLogoProgress] = useState("");
 
     // --- ESTADO DE IMPACTO DE BECAS REMOVIDO (Calculado desde SSoT) ---
 
@@ -315,6 +326,7 @@ export default function AdminPage() {
         fetchSponsors();
         fetchNextSchools();
         fetchCatalogoEscuelas();
+        fetchAvailableDates();
     }, [isAuthenticated]);
 
     // Fetch catálogo oficial de escuelas
@@ -352,9 +364,68 @@ export default function AdminPage() {
     // Auto-polling para Próximas Misiones en tiempo real
     useEffect(() => {
         if (!isAuthenticated || activeTab !== 'cronograma') return;
-        const interval = setInterval(() => fetchNextSchools(true), 2500);
+        const interval = setInterval(() => { fetchNextSchools(true); fetchAvailableDates(true); }, 2500);
         return () => clearInterval(interval);
     }, [isAuthenticated, activeTab]);
+
+    // --- CRUD FECHAS DISPONIBLES ---
+    const fetchAvailableDates = async (silent = false) => {
+        if (!silent) setFetchingDates(true);
+        try {
+            const res = await fetch('/api/sandbox-fechas', { cache: 'no-store' });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Error');
+            setAvailableDates(result.data || []);
+        } catch (err) {
+            console.error('Error fetching available dates:', err);
+        } finally {
+            if (!silent) setFetchingDates(false);
+        }
+    };
+
+    const handleAddDate = async (e) => {
+        e.preventDefault();
+        if (!newDateForm.fecha) return;
+        setAddingDate(true);
+        try {
+            const res = await fetch('/api/sandbox-fechas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha: newDateForm.fecha, cupo_maximo: 2, notas: newDateForm.notas || null }),
+            });
+            if (!res.ok) { const r = await res.json(); throw new Error(r.error); }
+            setNewDateForm({ fecha: '', notas: '' });
+            fetchAvailableDates();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        } finally {
+            setAddingDate(false);
+        }
+    };
+
+    const handleToggleDate = async (id, currentActiva) => {
+        try {
+            await fetch('/api/sandbox-fechas', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, field: 'activa', value: !currentActiva }),
+            });
+            fetchAvailableDates();
+        } catch (err) {
+            console.error('Error toggling date:', err);
+        }
+    };
+
+    const handleDeleteDate = async (id) => {
+        if (!confirm('¿Eliminar este día disponible? Esta acción es irreversible.')) return;
+        try {
+            const res = await fetch(`/api/sandbox-fechas?id=${id}`, { method: 'DELETE' });
+            if (!res.ok) { const r = await res.json(); throw new Error(r.error); }
+            fetchAvailableDates();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
 
 
 
@@ -534,6 +605,55 @@ export default function AdminPage() {
         setSponsorForm(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor selecciona un archivo de imagen válido.');
+            return;
+        }
+
+        setIsProcessingLogo(true);
+        setLogoProgress("Iniciando...");
+
+        try {
+            // 1. Process with AI to remove background and convert to WebP
+            const webpBlob = await processBackgroundRemoval(file, setLogoProgress);
+
+            // 2. Upload to Supabase Storage
+            setLogoProgress("Subiendo a la nube...");
+            
+            const filename = `logo_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
+
+            const { data, error } = await supabaseNew.storage
+                .from('sponsor-logos')
+                .upload(filename, webpBlob, {
+                    contentType: 'image/webp',
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) throw error;
+
+            // 3. Get public URL
+            const { data: publicUrlData } = supabaseNew.storage
+                .from('sponsor-logos')
+                .getPublicUrl(filename);
+                
+            // 4. Update form state
+            setSponsorForm(prev => ({ ...prev, logo_url: publicUrlData.publicUrl }));
+            setLogoProgress("");
+
+        } catch (err) {
+            console.error('Logo process error:', err);
+            alert('Error al procesar el logo: ' + err.message);
+            setLogoProgress("");
+        } finally {
+            setIsProcessingLogo(false);
+        }
+    };
+
     const handleSponsorSubmit = async (e) => {
         e.preventDefault();
         setSponsorLoading(true);
@@ -548,7 +668,9 @@ export default function AdminPage() {
                         nombre: sponsorForm.nombre,
                         email: sponsorForm.email,
                         password: sponsorForm.password,
-                        aportacion_total: parseFloat(sponsorForm.aportacion) || 0
+                        aportacion_total: parseFloat(sponsorForm.aportacion) || 0,
+                        logo_url: sponsorForm.logo_url || null,
+                        mantener_logo_original: sponsorForm.mantener_logo_original
                     })
                     .eq('id', editingSponsorId);
 
@@ -562,14 +684,16 @@ export default function AdminPage() {
                         nombre: sponsorForm.nombre,
                         email: sponsorForm.email,
                         password: sponsorForm.password,
-                        aportacion_total: parseFloat(sponsorForm.aportacion) || 0
+                        aportacion_total: parseFloat(sponsorForm.aportacion) || 0,
+                        logo_url: sponsorForm.logo_url || null,
+                        mantener_logo_original: sponsorForm.mantener_logo_original
                     });
 
                 if (error) throw new Error(`Error guardando patrocinador: ${error.message}`);
                 setSponsorMessage({ type: 'success', text: '¡Patrocinador registrado exitosamente!' });
             }
 
-            setSponsorForm({ nombre: '', email: '', password: '', aportacion: '' });
+            setSponsorForm({ nombre: '', email: '', password: '', aportacion: '', logo_url: null, mantener_logo_original: false });
             setEditingSponsorId(null); // Resetear modo edición
             fetchSponsors(); // Recargar lista
 
@@ -587,16 +711,24 @@ export default function AdminPage() {
             nombre: sponsor.nombre,
             email: sponsor.email,
             password: sponsor.password,
-            aportacion: sponsor.aportacion_total || ''
+            aportacion: sponsor.aportacion_total || '',
+            logo_url: sponsor.logo_url || null,
+            mantener_logo_original: sponsor.mantener_logo_original || false
         });
         setSponsorMessage({ type: '', text: '' });
-        // Scroll hacia arriba para ver el formulario
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Auto-scroll smooth inmediato a la tarjeta de edición sin cooldown de renderización
+        setTimeout(() => {
+            const formSection = document.getElementById('sponsor-form-section');
+            if (formSection) {
+                // block: 'start' para empujar la pantalla arriba garantizando la vista
+                formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 10);
     };
 
     const handleCancelEdit = () => {
         setEditingSponsorId(null);
-        setSponsorForm({ nombre: '', email: '', password: '', aportacion: '' });
+        setSponsorForm({ nombre: '', email: '', password: '', aportacion: '', logo_url: null, mantener_logo_original: false });
         setSponsorMessage({ type: '', text: '' });
     };
 
@@ -1026,25 +1158,67 @@ export default function AdminPage() {
 
 
             {
-                activeTab === 'patrocinadores' && (
+                activeTab === 'patrocinadores' && (() => {
+                    const activeThemeStyles = [
+                        { hex: '#FF6B6B', tx: '#EF4444', btnText: '#FFFFFF', shadow: 'rgba(255, 107, 107, 0.4)' },
+                        { hex: '#4EA8DE', tx: '#0284C7', btnText: '#FFFFFF', shadow: 'rgba(78, 168, 222, 0.4)' },
+                        { hex: '#FFD166', tx: '#D97706', btnText: '#0f172a', shadow: 'rgba(255, 209, 102, 0.4)' }, // Darker amber text for readability, slate text for btn
+                        { hex: '#9D4EDD', tx: '#9333EA', btnText: '#FFFFFF', shadow: 'rgba(157, 78, 221, 0.4)' },
+                        { hex: '#06D6A0', tx: '#059669', btnText: '#0f172a', shadow: 'rgba(6, 214, 160, 0.4)' }   // Emerald text for readability, slate text for btn
+                    ];
+                    let activeTheme = null;
+                    if (editingSponsorId) {
+                        const idx = sponsors.findIndex(s => s.id === editingSponsorId);
+                        if (idx !== -1) activeTheme = activeThemeStyles[idx % activeThemeStyles.length];
+                    }
+
+                    return (
                     <div className="max-w-5xl mx-auto space-y-8 animate-premium-in">
 
                         {/* --- FORMULARIO DE ALTA DE PATROCINADOR --- */}
-                        <section className="neu-card p-6 md:p-8">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                                    <Building2 className="w-5 h-5 text-violet-400" />
+                        <section id="sponsor-form-section" 
+                            className={`neu-card p-6 md:p-8 transition-all duration-700 ${editingSponsorId ? `shadow-2xl scale-[1.02]` : ''}`}
+                            style={editingSponsorId && activeTheme ? { 
+                                backgroundColor: activeTheme.hex + '0A',
+                                boxShadow: `0 25px 50px -12px ${activeTheme.shadow}, 0 0 0 4px ${activeTheme.hex}40`
+                            } : {}}
+                        >
+                            <div className={`flex flex-col items-center gap-4 mb-8 text-center ${!editingSponsorId ? 'md:flex-row md:text-left' : ''}`}>
+                                <div 
+                                    className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all duration-500 shadow-inner ${editingSponsorId ? 'bg-white shadow-xl scale-110' : 'bg-violet-50/50'}`}
+                                >
+                                    {editingSponsorId ? (
+                                        <Pencil size={28} className="drop-shadow-sm" style={{ color: activeTheme.tx }} />
+                                    ) : (
+                                        <Building2 size={24} className="text-violet-400" />
+                                    )}
                                 </div>
                                 <div>
-                                    <h2 className="text-lg md:text-xl font-bold">Nuevo Patrocinador</h2>
-                                    <p className="text-slate-400 text-xs">Registra una nueva empresa patrocinadora</p>
+                                    {editingSponsorId ? (
+                                        <h2 
+                                            className="text-2xl md:text-4xl font-black tracking-tight mt-2 uppercase"
+                                            style={{ color: activeTheme.tx }}
+                                        >
+                                            EDITANDO {sponsorForm.nombre || 'PATROCINADOR'}
+                                        </h2>
+                                    ) : (
+                                        <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-800">
+                                            Nuevo Patrocinador
+                                        </h2>
+                                    )}
+                                    <p className="text-slate-400 text-xs md:text-sm mt-1.5 font-medium tracking-wide">
+                                        {editingSponsorId ? 'Modifica los valores del inversor de manera centralizada. Los cambios modificarán la plataforma inmediatamente.' : 'Registra una nueva empresa e inicializa su fondo.'}
+                                    </p>
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSponsorSubmit} className="space-y-5">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <form onSubmit={handleSponsorSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                     <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
                                             <Building2 size={14} /> Nombre de Empresa
                                         </label>
                                         <input
@@ -1059,7 +1233,10 @@ export default function AdminPage() {
                                     </div>
 
                                     <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
                                             <Mail size={14} /> Correo Electrónico
                                         </label>
                                         <input
@@ -1074,7 +1251,10 @@ export default function AdminPage() {
                                     </div>
 
                                     <div>
-                                        <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
                                             <Lock size={14} /> Contraseña
                                         </label>
                                         <input
@@ -1089,20 +1269,96 @@ export default function AdminPage() {
                                     </div>
                                 </div>
 
-                                {/* Nueva fila para Aportación */}
-                                <div>
-                                    <label className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                                        <span className="text-emerald-400">💲</span> Aportación Económica ($)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="aportacion"
-                                        value={sponsorForm.aportacion}
-                                        onChange={handleSponsorInputChange}
-                                        placeholder="Ej: 50000"
-                                        className="w-full neu-input-inset px-4 py-3 font-mono"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-1">Esta cifra será visible solo para este patrocinador.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-6">
+                                    <div>
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
+                                            <DollarSign size={14} /> Aportación Económica ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="aportacion"
+                                            value={sponsorForm.aportacion}
+                                            onChange={handleSponsorInputChange}
+                                            placeholder="Ej: 50000"
+                                            className="w-full neu-input-inset px-4 py-3 font-mono"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">Visible internamente y para el sponsor.</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
+                                            <Camera size={14} /> Logo Inteligente (IA)
+                                        </label>
+                                        <div className="relative w-full h-[54px] neu-input-inset flex items-center justify-center p-2 rounded-xl border border-dashed border-slate-300 overflow-hidden group">
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleLogoUpload}
+                                                disabled={isProcessingLogo}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                                            />
+                                            {isProcessingLogo ? (
+                                                <div className="flex items-center gap-2 text-blue-500">
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider">{logoProgress}</span>
+                                                </div>
+                                            ) : sponsorForm.logo_url ? (
+                                                <div className="w-full h-full flex items-center justify-between px-2 bg-white/50 rounded-lg">
+                                                    <img src={sponsorForm.logo_url} alt="Logo preview" className="h-8 w-auto object-contain shrink-0 mix-blend-multiply" />
+                                                    <div className="text-right ml-2 flex-1">
+                                                        <p className="text-[10px] font-bold text-emerald-600 uppercase">Logo Listo</p>
+                                                        <p className="text-[9px] text-slate-400">Cambiar</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 text-slate-400 group-hover:text-blue-500 transition-colors">
+                                                    <Upload size={16} />
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider">Subir & Quitar Fondo</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label 
+                                            className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2"
+                                            style={{ color: editingSponsorId && activeTheme ? activeTheme.tx : '' }}
+                                        >
+                                            <Palette size={14} /> Estilo Visual
+                                        </label>
+                                        <div className="flex gap-2 h-[54px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSponsorForm(prev => ({ ...prev, mantener_logo_original: false }))}
+                                                className={`flex-1 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider flex flex-col items-center justify-center transition-all ${
+                                                    !sponsorForm.mantener_logo_original
+                                                        ? 'bg-slate-800 text-white shadow-lg shadow-slate-800/20'
+                                                        : 'neu-input-inset text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                <span className="mb-0.5">Automático</span>
+                                                <span className="text-[9px] opacity-70 font-normal normal-case">(Monocromo)</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSponsorForm(prev => ({ ...prev, mantener_logo_original: true }))}
+                                                className={`flex-1 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-wider flex flex-col items-center justify-center transition-all ${
+                                                    sponsorForm.mantener_logo_original
+                                                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30'
+                                                        : 'neu-input-inset text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                <span className="mb-0.5">Original</span>
+                                                <span className="text-[9px] opacity-70 font-normal normal-case">(Logo a Color)</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {sponsorMessage.text && (
@@ -1115,15 +1371,20 @@ export default function AdminPage() {
                                 <button
                                     type="submit"
                                     disabled={sponsorLoading}
-                                    className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSponsorId
-                                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30 hover:shadow-amber-500/50 text-white'
-                                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-emerald-500/30 hover:shadow-emerald-500/50 text-white'
+                                    className={`w-full font-black tracking-wide py-4 text-sm md:text-base rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingSponsorId
+                                        ? 'hover:-translate-y-1 hover:brightness-110 active:scale-95'
+                                        : 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 text-white hover:-translate-y-1'
                                         }`}
+                                    style={editingSponsorId && activeTheme ? { 
+                                        backgroundColor: activeTheme.hex, 
+                                        color: activeTheme.btnText,
+                                        boxShadow: `0 10px 25px -5px ${activeTheme.shadow}`
+                                    } : {}}
                                 >
                                     {sponsorLoading ? (
-                                        <><Loader2 size={18} className="animate-spin" /> {editingSponsorId ? 'Actualizando...' : 'Guardando...'} </>
+                                        <><Loader2 size={20} className="animate-spin" /> {editingSponsorId ? 'Procesando Cambios...' : 'Generando Registro...'} </>
                                     ) : (
-                                        <>{editingSponsorId ? <RefreshCw size={18} /> : <Building2 size={18} />} {editingSponsorId ? 'Actualizar Datos' : 'Registrar Patrocinador'}</>
+                                        <>{editingSponsorId ? <RefreshCw size={20} /> : <Building2 size={20} />} {editingSponsorId ? 'Confirmar y Actualizar Datos' : 'Registrar Nuevo Patrocinador'}</>
                                     )}
                                 </button>
 
@@ -1131,7 +1392,7 @@ export default function AdminPage() {
                                     <button
                                         type="button"
                                         onClick={handleCancelEdit}
-                                        className="w-full mt-3 bg-slate-700 text-slate-300 font-bold py-3 rounded-xl hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                                        className="w-full mt-3 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border-2 border-slate-100 font-bold tracking-wide py-3.5 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 shadow-sm hover:shadow active:scale-95"
                                     >
                                         <X size={18} /> Cancelar Edición
                                     </button>
@@ -1182,43 +1443,73 @@ export default function AdminPage() {
                                     <div className="space-y-3">
                                         {sponsors.map((sponsor, idx) => {
                                             const themes = [
-                                                { bg: '#FF6B6B', text: 'text-white', sub: 'text-rose-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
-                                                { bg: '#4EA8DE', text: 'text-white', sub: 'text-sky-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
-                                                { bg: '#FFD166', text: 'text-slate-900', sub: 'text-amber-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900' },
-                                                { bg: '#9D4EDD', text: 'text-white', sub: 'text-fuchsia-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white' },
-                                                { bg: '#06D6A0', text: 'text-slate-900', sub: 'text-emerald-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900' }
+                                                { bg: '#FF6B6B', text: 'text-white', sub: 'text-rose-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white', logoLight: true },
+                                                { bg: '#4EA8DE', text: 'text-white', sub: 'text-sky-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white', logoLight: true },
+                                                { bg: '#FFD166', text: 'text-slate-900', sub: 'text-amber-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900', logoLight: false },
+                                                { bg: '#9D4EDD', text: 'text-white', sub: 'text-fuchsia-100/90', accent: 'bg-white/10 hover:bg-white/30 text-white border border-white/10', iconbg: 'bg-white/20', money: 'text-white', logoLight: true },
+                                                { bg: '#06D6A0', text: 'text-slate-900', sub: 'text-emerald-900/80', accent: 'bg-black/5 hover:bg-black/15 text-slate-900 border border-black/5', iconbg: 'bg-white/50', money: 'text-slate-900', logoLight: false }
                                             ];
                                             const theme = themes[idx % themes.length];
+                                            const isEditingThis = editingSponsorId === sponsor.id;
+                                            const isEditingOther = editingSponsorId && editingSponsorId !== sponsor.id;
+                                            
                                             return (
                                             <div
                                                 key={sponsor.id}
-                                                className="neu-list-item group flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 md:p-4 transition-all duration-300 hover:-translate-y-0.5"
-                                                style={{ background: theme.bg, borderColor: 'transparent' }}
+                                                className={`neu-list-item group flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-5 transition-all duration-500 relative ${
+                                                    isEditingThis 
+                                                        ? 'ring-4 ring-white/60 shadow-2xl scale-[1.02] z-10' 
+                                                        : isEditingOther 
+                                                            ? 'opacity-40 grayscale-[50%] hover:opacity-75' 
+                                                            : 'hover:-translate-y-0.5'
+                                                }`}
+                                                style={{ background: theme.bg, borderColor: isEditingThis ? '#ffffff' : 'transparent' }}
                                             >
-                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-center pl-1">
-                                                    <div className="min-w-0">
-                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Empresa</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`hidden lg:flex flex-shrink-0 w-8 h-8 rounded-lg items-center justify-center ${theme.iconbg} transition-transform duration-300 group-hover:scale-110`}>
-                                                                <Building2 size={16} className={theme.text} />
+                                                <div className="flex-1 flex items-center gap-4 md:gap-5">
+                                                    {/* Logo / Avatar */}
+                                                    <div className={`flex-shrink-0 w-11 h-11 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 overflow-hidden ${isEditingThis ? 'animate-bounce' : 'group-hover:scale-110'}`}>
+                                                        {sponsor.logo_url ? (
+                                                            <img 
+                                                                src={sponsor.logo_url} 
+                                                                alt={sponsor.nombre} 
+                                                                className="w-full h-full object-contain"
+                                                                style={{ filter: sponsor.mantener_logo_original ? 'none' : (theme.logoLight ? 'brightness(0) invert(1)' : 'brightness(0)') }}
+                                                            />
+                                                        ) : (
+                                                            <div className={`w-full h-full rounded-2xl flex items-center justify-center ${theme.iconbg}`}>
+                                                                {isEditingThis ? <Pencil size={22} className={theme.text} /> : <Building2 size={22} className={theme.text} />}
                                                             </div>
-                                                            <p className={`font-black text-base truncate ${theme.text}`}>{sponsor.nombre}</p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Data Grid */}
+                                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 items-center min-w-0">
+                                                        <div className="min-w-0">
+                                                            <p className={`text-[9px] uppercase tracking-wider mb-0.5 font-bold ${theme.sub}`}>Empresa</p>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <p className={`font-black text-base md:text-lg ${isEditingThis ? 'whitespace-normal' : 'truncate'} ${theme.text}`}>{sponsor.nombre}</p>
+                                                                {isEditingThis && (
+                                                                    <span className="animate-pulse bg-white/20 text-white backdrop-blur-sm shadow-sm text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full flex items-center justify-center flex-shrink-0">
+                                                                        EDITANDO
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                    <div>
-                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Correo</p>
-                                                        <p className={`text-xs font-semibold truncate ${theme.text}`}>{sponsor.email}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Contraseña</p>
-                                                        <p className={`text-xs font-mono tracking-widest font-black ${theme.text}`}>
-                                                            {showPasswords ? sponsor.password : '••••••••'}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className={`text-[9px] uppercase tracking-wider mb-1 font-bold ${theme.sub}`}>Inversión</p>
-                                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-lg font-black font-mono text-xs shadow-sm ${theme.iconbg} ${theme.money} transition-transform duration-300 group-hover:scale-105`}>
-                                                            ${(sponsor.aportacion_total || 0).toLocaleString()}
+                                                        <div>
+                                                            <p className={`text-[9px] uppercase tracking-wider mb-0.5 font-bold ${theme.sub}`}>Correo</p>
+                                                            <p className={`text-xs font-semibold truncate ${theme.text}`}>{sponsor.email}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-[9px] uppercase tracking-wider mb-0.5 font-bold ${theme.sub}`}>Contraseña</p>
+                                                            <p className={`text-xs font-mono tracking-widest font-black ${theme.text}`}>
+                                                                {showPasswords ? sponsor.password : '••••••••'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-[9px] uppercase tracking-wider mb-0.5 font-bold ${theme.sub}`}>Inversión</p>
+                                                            <div className={`inline-flex items-center px-3 py-1.5 rounded-lg font-black font-mono text-xs shadow-sm ${theme.iconbg} ${theme.money} transition-transform duration-300 group-hover:scale-105`}>
+                                                                ${(sponsor.aportacion_total || 0).toLocaleString()}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1226,24 +1517,24 @@ export default function AdminPage() {
                                                 <div className="flex justify-end gap-1.5 mt-3 md:mt-0 pr-1">
                                                     <button
                                                         onClick={() => window.open(`/dashboard?action=test_login&email=${encodeURIComponent(sponsor.email)}&password=${encodeURIComponent(sponsor.password)}`, '_blank')}
-                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
+                                                        className={`p-2.5 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
                                                         title="Probar Login"
                                                     >
-                                                        <ExternalLink size={16} />
+                                                        <ExternalLink size={17} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleEditSponsor(sponsor)}
-                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
+                                                        className={`p-2.5 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95`}
                                                         title="Editar Datos"
                                                     >
-                                                        <Pencil size={16} />
+                                                        <Pencil size={17} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteSponsor(sponsor.id)}
-                                                        className={`p-2 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95 hover:!bg-red-500 hover:!text-white hover:!border-red-500`}
+                                                        className={`p-2.5 rounded-xl transition-all duration-200 ${theme.accent} hover:scale-110 active:scale-95 hover:!bg-red-500 hover:!text-white hover:!border-red-500`}
                                                         title="Eliminar"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={17} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -1280,13 +1571,146 @@ export default function AdminPage() {
                             )}
                         </div>
                     </div>
-                )
+                    );
+                })()
             }
 
             {/* CONTENIDO CRONOGRAMA */}
             {
                 activeTab === 'cronograma' && (
                     <div className="max-w-5xl mx-auto space-y-8 animate-premium-in">
+
+                        {/* === PANEL: DISPONIBILIDAD BOT WHATSAPP === */}
+                        <section className="neu-card p-6 md:p-8 border-2 border-emerald-500/20">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                                        <Calendar className="w-5 h-5 text-emerald-500" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg md:text-xl font-bold neu-text">Disponibilidad Bot WhatsApp</h2>
+                                        <p className="text-xs neu-text-sub">Días que el bot puede ofrecer a directores · Máx 2 escuelas/día (1 matutino + 1 vespertino)</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => fetchAvailableDates()} className="p-2 neu-list-item text-slate-400 hover:text-emerald-500 transition-all hover:rotate-180 duration-300">
+                                    <RefreshCw size={18} />
+                                </button>
+                            </div>
+
+                            {/* Mini Form: Abrir nuevo día */}
+                            <form onSubmit={handleAddDate} className="flex flex-col sm:flex-row gap-3 mb-6">
+                                <div className="flex-1">
+                                    <input
+                                        type="date"
+                                        value={newDateForm.fecha}
+                                        onChange={(e) => setNewDateForm(prev => ({ ...prev, fecha: e.target.value }))}
+                                        className="w-full neu-input-inset px-4 py-3 uppercase"
+                                        required
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        value={newDateForm.notas}
+                                        onChange={(e) => setNewDateForm(prev => ({ ...prev, notas: e.target.value }))}
+                                        placeholder="Nota opcional (ej. Zona Norte)"
+                                        className="w-full neu-input-inset px-4 py-3"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={addingDate || !newDateForm.fecha}
+                                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    {addingDate ? <Loader2 size={16} className="animate-spin" /> : <Calendar size={16} />}
+                                    Abrir Día
+                                </button>
+                            </form>
+
+                            {/* Date List */}
+                            {fetchingDates ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 size={28} className="animate-spin text-slate-400" />
+                                </div>
+                            ) : availableDates.length === 0 ? (
+                                <div className="text-center py-8 text-slate-400">
+                                    <Calendar size={40} className="mx-auto mb-3 opacity-30" />
+                                    <p className="font-medium">No hay días abiertos para el bot</p>
+                                    <p className="text-xs mt-1">Usa el formulario de arriba para abrir una nueva fecha.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {availableDates.map((d) => {
+                                        const dateFormatted = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+                                        const isFull = d.cupo_usado >= 2;
+                                        const isPast = new Date(d.fecha) < new Date(new Date().toISOString().split('T')[0]);
+
+                                        return (
+                                            <div
+                                                key={d.id}
+                                                className={`neu-list-item p-4 flex flex-col sm:flex-row sm:items-center gap-3 transition-all duration-300 ${
+                                                    !d.activa ? 'opacity-50 grayscale' : isPast ? 'opacity-60' : isFull ? 'border-l-4 border-red-400' : 'border-l-4 border-emerald-400'
+                                                } hover:-translate-y-0.5`}
+                                            >
+                                                {/* Date & Status */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <p className="font-bold neu-text capitalize truncate">{dateFormatted}</p>
+                                                        {isPast && <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 px-2 py-0.5 rounded-full">Pasada</span>}
+                                                        {!d.activa && <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">Pausada</span>}
+                                                        {isFull && d.activa && <span className="text-[9px] font-bold uppercase tracking-wider bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Lleno</span>}
+                                                    </div>
+                                                    {d.notas && <p className="text-[11px] neu-text-sub truncate">{d.notas}</p>}
+                                                </div>
+
+                                                {/* Turno Slots */}
+                                                <div className="flex gap-2 flex-shrink-0">
+                                                    {/* Matutino */}
+                                                    <div className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 min-w-[130px] justify-center ${
+                                                        d.matutino
+                                                            ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
+                                                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                    }`}>
+                                                        <span className="text-[10px]">☀️</span>
+                                                        {d.matutino ? d.matutino.nombre.substring(0, 14) : '— Libre —'}
+                                                    </div>
+                                                    {/* Vespertino */}
+                                                    <div className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 min-w-[130px] justify-center ${
+                                                        d.vespertino
+                                                            ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20'
+                                                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                    }`}>
+                                                        <span className="text-[10px]">🌙</span>
+                                                        {d.vespertino ? d.vespertino.nombre.substring(0, 14) : '— Libre —'}
+                                                    </div>
+                                                </div>
+
+                                                {/* Actions */}
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                    <button
+                                                        onClick={() => handleToggleDate(d.id, d.activa)}
+                                                        className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 ${
+                                                            d.activa ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-slate-400 hover:bg-slate-200'
+                                                        }`}
+                                                        title={d.activa ? 'Pausar fecha' : 'Activar fecha'}
+                                                    >
+                                                        {d.activa ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteDate(d.id)}
+                                                        className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-all duration-200 hover:scale-110 active:scale-95"
+                                                        title="Eliminar día"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
                         {/* --- ALTA DE PRÓXIMA MISIÓN --- */}
                         <section className="neu-card p-6 md:p-8">
                             <div className="flex items-center justify-between mb-6">
@@ -1398,30 +1822,34 @@ export default function AdminPage() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                             {/* --- COLUMNA 1: PRÓXIMAS MISIONES --- */}
-                            <section className="neu-card p-6 md:p-8">
-                                <div className="flex items-center justify-between mb-6">
+                            <section className="bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-600/20 p-6 md:p-8 self-start sticky top-24 transition-all duration-500 relative overflow-hidden">
+                                {/* Decoración de fondo suave (opcional, para darle más feeling 'playful' y profundidad a la tarjeta azul) */}
+                                <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+                                <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
+
+                                <div className="relative flex items-center justify-between mb-6 z-10">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                                            <Calendar className="w-5 h-5 text-amber-500" />
+                                        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+                                            <Calendar className="w-5 h-5 text-white" />
                                         </div>
                                         <div>
-                                            <h2 className="text-lg md:text-xl font-bold neu-text">Próximas Misiones</h2>
-                                            <p className="neu-text-sub text-xs">Misiones pendientes por completar</p>
+                                            <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">Próximas Misiones</h2>
+                                            <p className="text-blue-100/80 text-xs font-medium mt-0.5">Misiones pendientes por completar</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => fetchNextSchools()} className="p-2 neu-list-item text-amber-500">
+                                    <button onClick={() => fetchNextSchools()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md transition-all duration-300 hover:rotate-180 active:scale-95">
                                         <RefreshCw size={18} />
                                     </button>
                                 </div>
 
                                 {fetchingNextSchools ? (
-                                    <div className="flex items-center justify-center py-12">
-                                        <Loader2 size={32} className="animate-spin text-slate-400" />
+                                    <div className="flex items-center justify-center py-12 relative z-10">
+                                        <Loader2 size={32} className="animate-spin text-white/50" />
                                     </div>
                                 ) : nextSchools.filter(s => s.estatus !== 'completada').length === 0 ? (
-                                    <div className="text-center py-12 text-slate-400">
+                                    <div className="text-center py-12 text-blue-200/60 relative z-10">
                                         <Calendar size={48} className="mx-auto mb-4 opacity-30" />
-                                        <p>No hay misiones próximas pendientes</p>
+                                        <p className="font-medium">No hay misiones próximas pendientes</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -1437,16 +1865,17 @@ export default function AdminPage() {
                                                 borderClass = 'border-red-500';
                                                 pillClass = 'bg-red-500/10 text-red-600 border-red-500/20 line-through';
                                             } else if (isArchived) {
-                                                borderClass = 'border-slate-500';
-                                                pillClass = 'bg-slate-500/10 text-slate-600 border-slate-500/20';
+                                                borderClass = 'border-slate-400';
+                                                pillClass = 'bg-slate-100 text-slate-600 border-slate-300';
                                             }
 
                                             return (
-                                            <div key={school.id} className={`neu-list-item flex flex-col gap-2 p-4 border-l-4 ${borderClass} ${opacityClass}`}>
-                                                <div className="flex items-start justify-between">
+                                            <div key={school.id} className={`bg-white rounded-2xl flex flex-col gap-2 p-4 border-l-4 ${borderClass} ${opacityClass} group hover:-translate-y-1 hover:shadow-xl hover:shadow-black/5 transition-all duration-300 relative overflow-hidden z-10`}>
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                                                <div className="flex items-start justify-between relative z-10">
                                                     <div>
-                                                        <p className={`font-bold neu-text pr-2 ${isCanceled ? 'line-through' : ''}`}>{school.nombre_escuela}</p>
-                                                        <span className={`mt-1 inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border uppercase ${pillClass}`}>
+                                                        <p className={`font-bold text-slate-800 pr-2 tracking-tight ${isCanceled ? 'line-through' : ''}`}>{school.nombre_escuela}</p>
+                                                        <span className={`mt-1 inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md border uppercase shadow-sm ${pillClass}`}>
                                                             {school.estatus || 'pendiente'}
                                                         </span>
                                                     </div>
@@ -1454,22 +1883,22 @@ export default function AdminPage() {
                                                     {/* Botones de Administración de la Misión */}
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <button
-                                                            onClick={() => handleEditNextSchool(school)}
-                                                            className="p-1.5 rounded-lg hover:bg-slate-500/10 text-slate-400 hover:text-amber-500 transition-colors"
+                                                            onClick={(e) => { e.stopPropagation(); handleEditNextSchool(school); }}
+                                                            className="p-1.5 rounded-lg hover:bg-amber-500/10 text-slate-400 hover:text-amber-500 transition-all duration-200 hover:scale-110 active:scale-95"
                                                             title="Editar Misión"
                                                         >
                                                             <Pencil size={14} />
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteNextSchool(school.id)}
-                                                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-colors"
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteNextSchool(school.id); }}
+                                                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-all duration-200 hover:scale-110 active:scale-95"
                                                             title="Archivar"
                                                         >
                                                             <Trash2 size={14} />
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs neu-text-sub font-medium mt-1">
+                                                <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mt-1 relative z-10">
                                                     <span className="flex items-center gap-1">
                                                         <MapPin size={12} className="text-blue-500" /> {school.colonia}
                                                     </span>
@@ -1484,7 +1913,7 @@ export default function AdminPage() {
                             </section>
 
                             {/* --- COLUMNA 2: MISIONES COMPLETADAS --- */}
-                            <section className="neu-card p-6 md:p-8">
+                            <section className="neu-card p-6 md:p-8 self-start">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
@@ -1509,7 +1938,8 @@ export default function AdminPage() {
                                 ) : (
                                     <div className="space-y-3">
                                         {nextSchools.filter(s => s.estatus === 'completada').map((school) => (
-                                            <div key={school.id} className="neu-list-item flex flex-col gap-2 p-4 border-l-4 border-emerald-500 opacity-80">
+                                            <div key={school.id} className="neu-list-item flex flex-col gap-2 p-4 border-l-4 border-emerald-500 opacity-80 group hover:-translate-y-1 hover:opacity-100 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                                 <div className="flex items-center justify-between">
                                                     <p className="font-bold neu-text opacity-70 truncate pr-2">{school.nombre_escuela}</p>
                                                     <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase shrink-0">

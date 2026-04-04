@@ -19,7 +19,7 @@ export default function SandboxCronogramaPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al cargar datos");
       const fetched = json.data || [];
-      setData(fetched.filter(s => s.estatus !== 'completada'));
+      setData(fetched.filter(s => s.estatus !== 'completada' && s.estatus !== 'en_progreso'));
     } catch (err) {
       toast.error("Error al cargar datos", { description: err.message });
       console.error("Fetch error:", err);
@@ -45,7 +45,7 @@ export default function SandboxCronogramaPage() {
         const res = await fetch("/api/sandbox-cronograma", { cache: "no-store", headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
         const json = await res.json();
         if (unmounted || !json.data) return;
-        const incoming = json.data.filter(s => s.estatus !== 'completada');
+        const incoming = json.data.filter(s => s.estatus !== 'completada' && s.estatus !== 'en_progreso');
 
         setData(prev => {
           let hasChange = false;

@@ -10,7 +10,7 @@ function getAdminSupabase() {
 }
 
 const editableFields = [
-    'nombre', 'email', 'password', 'aportacion_total'
+    'nombre', 'email', 'password', 'aportacion_total', 'mantener_logo_original'
 ];
 
 export async function GET() {

@@ -20,10 +20,11 @@ export async function GET() {
             { data: cierres, error: cErr },
             { data: schools },
             { data: bitacora },
+            { data: cronograma, error: cronErr },
         ] = await Promise.all([
             supabase
                 .from('staff_journeys')
-                .select('id, date, school_name, school_id, status')
+                .select('id, date, school_name, school_id, status, mission_state')
                 .order('date', { ascending: false }),
             supabase
                 .from('cierres_mision')
@@ -35,7 +36,13 @@ export async function GET() {
             supabase
                 .from('bitacora_vuelos')
                 .select('journey_id, student_count')
-                .not('journey_id', 'is', null)
+                .not('journey_id', 'is', null),
+            // ── SSoT: Cronograma directo de proximas_escuelas ──
+            supabase
+                .from('proximas_escuelas')
+                .select('id, nombre_escuela, colonia, fecha_programada, estatus')
+                .eq('is_archived', false)
+                .order('fecha_programada', { ascending: true }),
         ]);
 
         if (jErr) throw jErr;
@@ -65,11 +72,39 @@ export async function GET() {
             (sum, c) => sum + (c.becados || 0), 0
         );
 
+        // ── SSoT: Live Mission Detection ──
+        // Find ANY journey currently in 'operation' status (active field mission)
+        const activeJourney = (journeys || []).find(j => j.status === 'operation');
+        let liveMission = null;
+
+        if (activeJourney) {
+            const liveStudents = studentSumMap[activeJourney.id] || 0;
+            // Count individual flights for this journey from bitacora
+            const liveFlightCount = (bitacora || []).filter(b => b.journey_id === activeJourney.id).length;
+            
+            // Resolve school name
+            const schoolMap = {};
+            (schools || []).forEach(s => { schoolMap[s.id] = s; });
+            const school = schoolMap[activeJourney.school_id];
+            
+            liveMission = {
+                journeyId: activeJourney.id,
+                schoolName: activeJourney.school_name || school?.nombre_escuela || 'Escuela en curso',
+                studentsFlown: liveStudents,
+                flightsCompleted: liveFlightCount,
+                status: activeJourney.status,
+            };
+        }
+
         return NextResponse.json({
             journeys: journeys || [],
             cierres: cierres || [],
             schools: schools || [],
             liveStudentsMap: studentSumMap,
+            // ── NEW: SSoT Cronograma from proximas_escuelas ──
+            cronograma: cronograma || [],
+            // ── NEW: Live Mission Data ──
+            liveMission,
             totals: {
                 ninosVolados: totalNinosVolados,
                 ninosPatrocinados: totalBecados,
