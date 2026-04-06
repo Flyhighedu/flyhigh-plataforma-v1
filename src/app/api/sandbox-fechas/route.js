@@ -100,7 +100,7 @@ export async function PATCH(request) {
             return NextResponse.json({ error: 'id and field are required' }, { status: 400 });
         }
 
-        const allowed = ['activa', 'cupo_maximo', 'notas'];
+        const allowed = ['activa', 'cupo_maximo', 'notas', 'matutino_bloqueado', 'vespertino_bloqueado'];
         if (!allowed.includes(field)) {
             return NextResponse.json({ error: `Field "${field}" is not editable` }, { status: 403 });
         }

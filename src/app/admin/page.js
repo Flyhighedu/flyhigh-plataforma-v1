@@ -403,12 +403,12 @@ export default function AdminPage() {
         }
     };
 
-    const handleToggleDate = async (id, currentActiva) => {
+    const handleToggleDate = async (id, value, field = 'activa') => {
         try {
             await fetch('/api/sandbox-fechas', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, field: 'activa', value: !currentActiva }),
+                body: JSON.stringify({ id, field, value }),
             });
             fetchAvailableDates();
         } catch (err) {
@@ -1666,29 +1666,41 @@ export default function AdminPage() {
                                                 {/* Turno Slots */}
                                                 <div className="flex gap-2 flex-shrink-0">
                                                     {/* Matutino */}
-                                                    <div className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 min-w-[130px] justify-center ${
-                                                        d.matutino
-                                                            ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
-                                                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                                    }`}>
-                                                        <span className="text-[10px]">☀️</span>
-                                                        {d.matutino ? d.matutino.nombre.substring(0, 14) : '— Libre —'}
-                                                    </div>
+                                                    <button
+                                                        onClick={() => handleToggleDate(d.id, !d.matutino_bloqueado, 'matutino_bloqueado')}
+                                                        className={`px-3 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                                                            d.matutino_bloqueado
+                                                                ? 'bg-red-500/10 text-red-600 border border-red-500/30 line-through opacity-60'
+                                                                : d.matutino
+                                                                    ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20'
+                                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                        title={d.matutino_bloqueado ? 'Click para desbloquear matutino' : d.matutino ? 'Matutino ocupado' : 'Click para bloquear matutino'}
+                                                    >
+                                                        <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70">Matutino</span>
+                                                        <span className="text-[11px]">{d.matutino_bloqueado ? 'Bloqueado' : d.matutino ? d.matutino.nombre.substring(0, 14) : 'Libre'}</span>
+                                                    </button>
                                                     {/* Vespertino */}
-                                                    <div className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 min-w-[130px] justify-center ${
-                                                        d.vespertino
-                                                            ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20'
-                                                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                                    }`}>
-                                                        <span className="text-[10px]">🌙</span>
-                                                        {d.vespertino ? d.vespertino.nombre.substring(0, 14) : '— Libre —'}
-                                                    </div>
+                                                    <button
+                                                        onClick={() => handleToggleDate(d.id, !d.vespertino_bloqueado, 'vespertino_bloqueado')}
+                                                        className={`px-3 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                                                            d.vespertino_bloqueado
+                                                                ? 'bg-red-500/10 text-red-600 border border-red-500/30 line-through opacity-60'
+                                                                : d.vespertino
+                                                                    ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20'
+                                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                        title={d.vespertino_bloqueado ? 'Click para desbloquear vespertino' : d.vespertino ? 'Vespertino ocupado' : 'Click para bloquear vespertino'}
+                                                    >
+                                                        <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70">Vespertino</span>
+                                                        <span className="text-[11px]">{d.vespertino_bloqueado ? 'Bloqueado' : d.vespertino ? d.vespertino.nombre.substring(0, 14) : 'Libre'}</span>
+                                                    </button>
                                                 </div>
 
                                                 {/* Actions */}
                                                 <div className="flex items-center gap-1 flex-shrink-0">
                                                     <button
-                                                        onClick={() => handleToggleDate(d.id, d.activa)}
+                                                        onClick={() => handleToggleDate(d.id, !d.activa)}
                                                         className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 ${
                                                             d.activa ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-slate-400 hover:bg-slate-200'
                                                         }`}
@@ -1979,11 +1991,12 @@ export default function AdminPage() {
                         <div id="portal-mascot-container" className="hidden lg:block fixed top-0 left-0 z-[99999] pointer-events-none group will-change-transform">
                             <style>{`
                                 @keyframes waveArm {
-                                    0%, 100% { transform: rotate(0deg); }
+                                    0% { transform: rotate(0deg); }
                                     25% { transform: rotate(15deg); }
                                     35% { transform: rotate(-10deg); }
                                     50% { transform: rotate(15deg); }
                                     75% { transform: rotate(-10deg); }
+                                    100% { transform: rotate(0deg); }
                                 }
                                 .group:hover .hand-wave {
                                     animation: waveArm 1.5s ease-in-out infinite;

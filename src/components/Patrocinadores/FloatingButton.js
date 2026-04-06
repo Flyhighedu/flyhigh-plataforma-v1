@@ -55,8 +55,7 @@ export default function FloatingButton({ onClick, className = "fixed bottom-0 ri
                     y: { type: "spring", stiffness: 300, damping: 20 },
                     scale: {
                         duration: 2.5,
-                        ease: "easeInOut",
-                        times: [0, 0.5, 1]
+                        ease: "easeInOut"
                     }
                 }}
                 style={{
@@ -73,8 +72,7 @@ export default function FloatingButton({ onClick, className = "fixed bottom-0 ri
                     transition={{
                         rotate: {
                             duration: 2.5,
-                            ease: "easeInOut",
-                            times: [0, 0.5, 1]
+                            ease: "easeInOut"
                         }
                     }}
                     className="absolute bottom-[42%] right-[42%] translate-x-1/2 translate-y-1/2 drop-shadow-md"
