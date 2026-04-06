@@ -12,6 +12,7 @@ const testimonials = [
 ];
 
 function TestimonialCard({ item, index, scrollXProgress, onClick }) {
+    const cardRef = useRef(null);
     const step = 1 / (testimonials.length - 1);
     const center = index * step;
     const margin = step * 0.8;
@@ -28,16 +29,30 @@ function TestimonialCard({ item, index, scrollXProgress, onClick }) {
         [0.7, 1, 0.7]
     );
 
+    // Bypass WAAPI: apply transforms via direct DOM manipulation
+    useEffect(() => {
+        const el = cardRef.current;
+        if (!el) return;
+        const unsubScale = scale.on('change', (v) => {
+            el.style.transform = `scale(${v})`;
+        });
+        const unsubOpacity = opacity.on('change', (v) => {
+            el.style.opacity = v;
+        });
+        // Set initial values
+        el.style.transform = `scale(${scale.get()})`;
+        el.style.opacity = opacity.get();
+        return () => {
+            unsubScale();
+            unsubOpacity();
+        };
+    }, [scale, opacity]);
+
     return (
-        <motion.div
+        <div
+            ref={cardRef}
             onClick={onClick}
-            style={{
-                scale,
-                opacity,
-                willChange: 'transform, opacity',
-                transform: 'translate3d(0,0,0)',
-                transformStyle: 'preserve-3d'
-            }}
+            style={{ willChange: 'transform, opacity' }}
             className="relative shrink-0 rounded-2xl overflow-hidden bg-white/95 border border-white/20 shadow-xl w-[200px] h-[280px] md:w-[260px] md:h-[340px] cursor-pointer snap-center"
         >
             <Image
@@ -57,11 +72,12 @@ function TestimonialCard({ item, index, scrollXProgress, onClick }) {
                 </p>
                 <div className="h-0.5 w-6 bg-violet-400 rounded-full mt-1.5 overflow-hidden"></div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
 function PaginationDot({ index, scrollXProgress, testimonialsCount }) {
+    const dotRef = useRef(null);
     const step = 1 / (testimonialsCount - 1);
     const center = index * step;
     const margin = step / 2;
@@ -72,15 +88,33 @@ function PaginationDot({ index, scrollXProgress, testimonialsCount }) {
         [8, 24, 8]
     );
 
-    const opacity = useTransform(
+    const dotOpacity = useTransform(
         scrollXProgress,
         [center - margin, center, center + margin],
         [0.3, 1, 0.3]
     );
 
+    // Bypass WAAPI: apply styles via direct DOM manipulation
+    useEffect(() => {
+        const el = dotRef.current;
+        if (!el) return;
+        const unsubW = width.on('change', (v) => {
+            el.style.width = `${v}px`;
+        });
+        const unsubO = dotOpacity.on('change', (v) => {
+            el.style.opacity = v;
+        });
+        el.style.width = `${width.get()}px`;
+        el.style.opacity = dotOpacity.get();
+        return () => {
+            unsubW();
+            unsubO();
+        };
+    }, [width, dotOpacity]);
+
     return (
-        <motion.div
-            style={{ width, opacity }}
+        <div
+            ref={dotRef}
             className="h-2 rounded-full bg-violet-600 shadow-sm"
         />
     );
@@ -402,11 +436,23 @@ export default function FlyHighTestimonialGallery() {
         return () => unsubscribe();
     }, [scrollXProgress, activeCardIndex]);
 
+    const buttonRef = useRef(null);
     const buttonScale = useTransform(
         scrollXProgress,
         [0, 0.05, 0.2, 0.25, 0.3, 0.45, 0.5, 0.55, 0.7, 0.75, 0.8, 0.95, 1],
         [1.25, 1, 1, 1.25, 1, 1, 1.25, 1, 1, 1.25, 1, 1, 1.25]
     );
+
+    // Bypass WAAPI for button scale
+    useEffect(() => {
+        const el = buttonRef.current;
+        if (!el) return;
+        const unsub = buttonScale.on('change', (v) => {
+            el.style.transform = `scale(${v})`;
+        });
+        el.style.transform = `scale(${buttonScale.get()})`;
+        return () => unsub();
+    }, [buttonScale]);
 
     const handleCardClick = (index) => {
         setCurrentIndex(index);
@@ -498,19 +544,16 @@ export default function FlyHighTestimonialGallery() {
 
             {/* CTA Button */}
             <div className="flex justify-center px-4 mt-6">
-                <motion.button
+                <button
+                    ref={buttonRef}
                     type="button"
-                    suppressHydrationWarning
                     onClick={() => handleCardClick(activeCardIndex)}
-                    style={{
-                        scale: buttonScale,
-                        willChange: 'transform'
-                    }}
+                    style={{ willChange: 'transform' }}
                     className="flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold text-xs tracking-wider uppercase border border-white/20 active:scale-95 transition-transform duration-200"
                 >
                     <Play className="w-4 h-4 fill-white" />
                     <span>Ver Momento</span>
-                </motion.button>
+                </button>
             </div>
 
             {/* TikTok/Reels Style Player */}
