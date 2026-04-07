@@ -13,6 +13,14 @@ export function GhostRow({ columnCount, onCreateRow }) {
     fecha_programada: new Date().toISOString().split('T')[0],
     tarifa_base: 80,
     turno: "",
+    cuota_alumno: 50,
+    subsidio_patrocinador: "",
+    nombre_director: "",
+    telefono_director: "",
+    nombre_maestro_delegado: "",
+    telefono_maestro_delegado: "",
+    numero_zona: "",
+    numero_sector: "",
   };
   const [form, setForm] = useState(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
@@ -104,7 +112,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
              onKeyDown={kd}
              className={`${cls} text-[11px] font-semibold px-2 uppercase outline-none select-none border rounded-md min-w-[200px] bg-white`}
            >
-             <option value="">Seleccione Misión...</option>
+             <option value="">Seleccione Escuela...</option>
              <option value="MANUAL_ENTRY" className="font-bold bg-amber-100 text-amber-900 border-b border-amber-200">➕ Ingresar escuela (fuera de catálogo)</option>
              {catalog.map((c) => (
                <option key={c.cct} value={c.nombre_escuela}>{c.nombre_escuela}</option>
@@ -178,14 +186,94 @@ export function GhostRow({ columnCount, onCreateRow }) {
       </TableCell>
       
       {/* Spacers for the rest of the columns (Cuota Alm, Subsidio, Director, Tel Director, Delegado, Tel, Zona, Sector, Origen) = 9 columns */}
-      <TableCell className="p-1"></TableCell> {/* Cuota */}
-      <TableCell className="p-1"></TableCell> {/* Subsidio */}
-      <TableCell className="p-1"></TableCell> {/* Director */}
-      <TableCell className="p-1"></TableCell> {/* Tel Director */}
-      <TableCell className="p-1"></TableCell> {/* Delegado */}
-      <TableCell className="p-1"></TableCell> {/* Tel Delegado */}
-      <TableCell className="p-1"></TableCell> {/* Zona */}
-      <TableCell className="p-1"></TableCell> {/* Sector */}
+      {/* Cuota Alm */}
+      <TableCell className="p-1 min-w-[70px]">
+         <Input
+          type="number"
+          placeholder="50"
+          value={form.cuota_alumno}
+          onChange={(e) => setForm((f) => ({ ...f, cuota_alumno: e.target.value }))}
+          onKeyDown={kd}
+          className={`${cls} text-center`}
+        />
+      </TableCell>
+      {/* Subsidio */}
+      <TableCell className="p-1 min-w-[80px]">
+         <Input
+          type="number"
+          placeholder="0"
+          value={form.subsidio_patrocinador}
+          onChange={(e) => setForm((f) => ({ ...f, subsidio_patrocinador: e.target.value }))}
+          onKeyDown={kd}
+          className={`${cls} text-center`}
+        />
+      </TableCell>
+      {/* Director */}
+      <TableCell className="p-1 min-w-[120px]">
+         <Input
+          type="text"
+          placeholder="Director..."
+          value={form.nombre_director}
+          onChange={(e) => setForm((f) => ({ ...f, nombre_director: e.target.value }))}
+          onKeyDown={kd}
+          className={cls}
+        />
+      </TableCell>
+      {/* Tel Director */}
+      <TableCell className="p-1 min-w-[100px]">
+         <Input
+          type="text"
+          placeholder="Tel..."
+          value={form.telefono_director}
+          onChange={(e) => setForm((f) => ({ ...f, telefono_director: e.target.value }))}
+          onKeyDown={kd}
+          className={cls}
+        />
+      </TableCell>
+      {/* Delegado */}
+      <TableCell className="p-1 min-w-[120px]">
+         <Input
+          type="text"
+          placeholder="Delegado..."
+          value={form.nombre_maestro_delegado}
+          onChange={(e) => setForm((f) => ({ ...f, nombre_maestro_delegado: e.target.value }))}
+          onKeyDown={kd}
+          className={cls}
+        />
+      </TableCell>
+      {/* Tel Delegado */}
+      <TableCell className="p-1 min-w-[100px]">
+         <Input
+          type="text"
+          placeholder="Tel..."
+          value={form.telefono_maestro_delegado}
+          onChange={(e) => setForm((f) => ({ ...f, telefono_maestro_delegado: e.target.value }))}
+          onKeyDown={kd}
+          className={cls}
+        />
+      </TableCell>
+      {/* Zona */}
+      <TableCell className="p-1 min-w-[60px]">
+         <Input
+          type="text"
+          placeholder="Zona"
+          value={form.numero_zona}
+          onChange={(e) => setForm((f) => ({ ...f, numero_zona: e.target.value }))}
+          onKeyDown={kd}
+          className={`${cls} text-center`}
+        />
+      </TableCell>
+      {/* Sector */}
+      <TableCell className="p-1 min-w-[60px]">
+         <Input
+          type="text"
+          placeholder="Sector"
+          value={form.numero_sector}
+          onChange={(e) => setForm((f) => ({ ...f, numero_sector: e.target.value }))}
+          onKeyDown={kd}
+          className={`${cls} text-center`}
+        />
+      </TableCell>
       <TableCell className="p-1"><span className="text-xs text-slate-400 italic">manual</span></TableCell> {/* Origen */}
 
       {/* Acción: Insertar */}
