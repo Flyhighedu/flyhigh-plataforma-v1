@@ -105,7 +105,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
              className={`${cls} text-[11px] font-semibold px-2 uppercase outline-none select-none border rounded-md min-w-[200px] bg-white`}
            >
              <option value="">Seleccione Misión...</option>
-             <option value="MANUAL_ENTRY" className="font-bold bg-amber-100 text-amber-900 border-b border-amber-200">➕ Ingresar Nueva (Foránea)</option>
+             <option value="MANUAL_ENTRY" className="font-bold bg-amber-100 text-amber-900 border-b border-amber-200">➕ Ingresar escuela (fuera de catálogo)</option>
              {catalog.map((c) => (
                <option key={c.cct} value={c.nombre_escuela}>{c.nombre_escuela}</option>
              ))}
@@ -116,7 +116,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
                ref={firstRef}
                autoFocus
                type="text"
-               placeholder="Ingresar foránea..."
+               placeholder="Ingresar escuela..."
                value={form.nombre_escuela}
                onChange={(e) => setForm(f => ({ ...f, nombre_escuela: e.target.value }))}
                onKeyDown={kd}
@@ -178,14 +178,15 @@ export function GhostRow({ columnCount, onCreateRow }) {
       </TableCell>
       
       {/* Spacers for the rest of the columns (Cuota Alm, Subsidio, Director, Tel Director, Delegado, Tel, Zona, Sector, Origen) = 9 columns */}
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"></TableCell>
-      <TableCell className="p-1"><span className="text-xs text-slate-400 italic">manual</span></TableCell>
+      <TableCell className="p-1"></TableCell> {/* Cuota */}
+      <TableCell className="p-1"></TableCell> {/* Subsidio */}
+      <TableCell className="p-1"></TableCell> {/* Director */}
+      <TableCell className="p-1"></TableCell> {/* Tel Director */}
+      <TableCell className="p-1"></TableCell> {/* Delegado */}
+      <TableCell className="p-1"></TableCell> {/* Tel Delegado */}
+      <TableCell className="p-1"></TableCell> {/* Zona */}
+      <TableCell className="p-1"></TableCell> {/* Sector */}
+      <TableCell className="p-1"><span className="text-xs text-slate-400 italic">manual</span></TableCell> {/* Origen */}
 
       {/* Acción: Insertar */}
       <TableCell className="p-1">
