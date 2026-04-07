@@ -12,6 +12,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
     estatus: "pendiente",
     fecha_programada: new Date().toISOString().split('T')[0],
     tarifa_base: 80,
+    turno: "",
   };
   const [form, setForm] = useState(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,6 +35,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
       ...f,
       nombre_escuela: val,
       cct: match ? match.cct : f.cct,
+      turno: match && match.turno ? match.turno : f.turno,
     }));
   };
 
@@ -96,6 +98,18 @@ export function GhostRow({ columnCount, onCreateRow }) {
           ))}
         </datalist>
       </TableCell>
+      {/* Turno */}
+      <TableCell className="p-1">
+        <select
+          value={form.turno || ""}
+          onChange={(e) => setForm((f) => ({ ...f, turno: e.target.value }))}
+          className={`h-8 text-[11px] font-semibold rounded-md border px-1 outline-none text-slate-600 bg-white border-emerald-200 focus:ring-emerald-500 w-full cursor-pointer uppercase`}
+        >
+          <option value="">No Definido</option>
+          <option value="Matutino">Matutino</option>
+          <option value="Vespertino">Vespertino</option>
+        </select>
+      </TableCell>
       {/* CCT */}
       <TableCell className="p-1">
         <Input
@@ -131,7 +145,6 @@ export function GhostRow({ columnCount, onCreateRow }) {
       </TableCell>
       
       {/* Spacers for the rest of the columns (Cuota Alm, Subsidio, Director, Tel Director, Delegado, Tel, Zona, Sector, Origen) = 9 columns */}
-      <TableCell className="p-1"></TableCell>
       <TableCell className="p-1"></TableCell>
       <TableCell className="p-1"></TableCell>
       <TableCell className="p-1"></TableCell>

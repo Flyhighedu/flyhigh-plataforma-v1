@@ -25,7 +25,32 @@ export async function GET() {
             .order('fecha_programada', { ascending: false });
 
         if (error) throw error;
-        return NextResponse.json({ data: data || [] });
+        // Try to enrich any empty turnos with dat from catalog
+        const { data: catalogoRaw } = await supabase
+            .from('catalogo_escuelas')
+            .select('cct, turno');
+
+        const catalogoMap = new Map();
+        if (catalogoRaw) {
+            catalogoRaw.forEach(c => {
+                if (c.cct && c.turno) {
+                    catalogoMap.set(c.cct.toUpperCase(), c.turno);
+                }
+            });
+        }
+
+        const enrichedData = (data || []).map(row => {
+            let turnoFinal = row.turno;
+            if (!turnoFinal && row.cct) {
+                 turnoFinal = catalogoMap.get(row.cct.toUpperCase()) || "";
+            }
+            return {
+                ...row,
+                turno: turnoFinal
+            };
+        });
+
+        return NextResponse.json({ data: enrichedData });
     } catch (err) {
         console.error('[API] sandbox-cronograma GET error:', err);
         return NextResponse.json({ error: err.message }, { status: 500 });
