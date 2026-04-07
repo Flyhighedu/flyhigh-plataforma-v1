@@ -130,10 +130,17 @@ const TURNO_OPTIONS = [
 ];
 
 function TurnoSelectCell({ getValue, row, column, table }) {
-  const initialValue = getValue();
-  const [value, setValue] = useState(initialValue || "");
+  const normalizeTurno = (v) => {
+    if (!v) return "";
+    const lower = String(v).toLowerCase();
+    if (lower.includes("matutino")) return "Matutino";
+    if (lower.includes("vespertino")) return "Vespertino";
+    return "";
+  };
+  const initialValue = normalizeTurno(getValue());
+  const [value, setValue] = useState(initialValue);
   const [isSaving, setIsSaving] = useState(false);
-  useEffect(() => setValue(initialValue || ""), [initialValue]);
+  useEffect(() => setValue(normalizeTurno(getValue())), [getValue()]);
 
   const handleChange = async (e) => {
     const nv = e.target.value;
