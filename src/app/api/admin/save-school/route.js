@@ -13,7 +13,7 @@ function getAdminSupabase() {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { nombre_escuela, colonia, fecha_programada, cct, id } = body;
+        const { nombre_escuela, colonia, fecha_programada, cct, turno, id } = body;
 
         // Validate required fields
         if (!nombre_escuela || !fecha_programada) {
@@ -30,6 +30,7 @@ export async function POST(request) {
             colonia: colonia || '',
             fecha_programada,
             cct: cct || null,
+            turno: turno || null,
         };
 
         let result;

@@ -13,7 +13,7 @@ const editableFields = [
     'nombre_escuela', 'cct', 'colonia', 'fecha_programada', 'estatus', 
     'nombre_director', 'telefono_director', 'cuota_alumno', 'tarifa_base', 
     'subsidio_patrocinador', 'numero_zona', 'numero_sector', 
-    'nombre_maestro_delegado', 'telefono_maestro_delegado', 'notas'
+    'nombre_maestro_delegado', 'telefono_maestro_delegado', 'notas', 'turno'
 ];
 
 export async function GET() {

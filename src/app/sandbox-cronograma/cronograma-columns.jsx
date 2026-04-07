@@ -123,6 +123,42 @@ function DeleteActionCell({ row, table }) {
   );
 }
 
+const TURNO_OPTIONS = [
+  { value: "", label: "No Definido" },
+  { value: "Matutino", label: "Matutino" },
+  { value: "Vespertino", label: "Vespertino" }
+];
+
+function TurnoSelectCell({ getValue, row, column, table }) {
+  const initialValue = getValue();
+  const [value, setValue] = useState(initialValue || "");
+  const [isSaving, setIsSaving] = useState(false);
+  useEffect(() => setValue(initialValue || ""), [initialValue]);
+
+  const handleChange = async (e) => {
+    const nv = e.target.value;
+    if (nv === value) return;
+    setValue(nv);
+    setIsSaving(true);
+    try { await table.options.meta?.updateData(row.original.id, column.id, nv); }
+    catch { setValue(initialValue || ""); }
+    finally { setIsSaving(false); }
+  };
+
+  const isMatutino = value?.toLowerCase() === "matutino";
+  const isVespertino = value?.toLowerCase() === "vespertino";
+  let classes = "bg-slate-100 text-slate-600 border border-slate-200";
+  if (isMatutino) classes = "bg-blue-50 text-blue-700 border border-blue-200";
+  if (isVespertino) classes = "bg-orange-50 text-orange-700 border border-orange-200";
+
+  return (
+    <select value={value} onChange={handleChange} disabled={isSaving}
+      className={`text-xs font-semibold rounded-md px-2 py-1.5 outline-none cursor-pointer text-center w-full transition-colors ${classes} ${isSaving ? "opacity-50" : ""}`}>
+      {TURNO_OPTIONS.map(o => <option key={o.value} value={o.value} className="bg-white text-slate-900">{o.label}</option>)}
+    </select>
+  );
+}
+
 export const cronogramaColumns = [
   {
     accessorKey: "estatus",
@@ -153,6 +189,12 @@ export const cronogramaColumns = [
     header: "Misión (Escuela)",
     cell: EditableCell,
     size: 300,
+  },
+  {
+    accessorKey: "turno",
+    header: "Turno",
+    cell: TurnoSelectCell,
+    size: 110,
   },
   {
     accessorKey: "cct",

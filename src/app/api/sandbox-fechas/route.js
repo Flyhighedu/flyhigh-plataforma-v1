@@ -25,7 +25,7 @@ export async function GET() {
         // 2. All scheduled schools (to cross-reference turno occupancy)
         const { data: escuelas, error: escErr } = await supabase
             .from('proximas_escuelas')
-            .select('id, nombre_escuela, cct, fecha_programada, estatus')
+            .select('id, nombre_escuela, cct, fecha_programada, estatus, turno')
             .not('estatus', 'eq', 'cancelada');
 
         if (escErr) throw escErr;
@@ -47,7 +47,7 @@ export async function GET() {
             const slots = schoolsOnDate.map(e => ({
                 id: e.id,
                 nombre: e.nombre_escuela,
-                turno: turnoMap[e.cct] || 'sin turno',
+                turno: e.turno || turnoMap[e.cct] || 'sin turno',
             }));
             const matutino = slots.find(s => s.turno?.toLowerCase().includes('matutino'));
             const vespertino = slots.find(s => s.turno?.toLowerCase().includes('vespertino'));

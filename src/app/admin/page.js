@@ -228,7 +228,8 @@ export default function AdminPage() {
         nombre_escuela: '',
         colonia: '',
         fecha_programada: '',
-        cct: ''
+        cct: '',
+        turno: ''
     });
     const [nextSchoolLoading, setNextSchoolLoading] = useState(false);
     const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
@@ -496,6 +497,7 @@ export default function AdminPage() {
                 colonia: nextSchoolForm.colonia,
                 fecha_programada: nextSchoolForm.fecha_programada,
                 cct: selectedCatalogoSchool?.cct || nextSchoolForm.cct || null,
+                turno: selectedCatalogoSchool?.turno || nextSchoolForm.turno || null,
             };
 
             if (editingSchoolId) {
@@ -520,7 +522,7 @@ export default function AdminPage() {
                 alert('Escuela programada exitosamente');
             }
 
-            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '' });
+            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '' });
             setSelectedCatalogoSchool(null);
         } catch (err) {
             console.error('Error saving next school:', err);
@@ -535,7 +537,8 @@ export default function AdminPage() {
             nombre_escuela: school.nombre_escuela,
             colonia: school.colonia,
             fecha_programada: school.fecha_programada,
-            cct: school.cct || ''
+            cct: school.cct || '',
+            turno: school.turno || ''
         });
         // Try to find and pre-select the school from catalogo
         if (school.cct) {
@@ -549,7 +552,7 @@ export default function AdminPage() {
     };
 
     const handleCancelNextSchoolEdit = () => {
-        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '' });
+        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '' });
         setSelectedCatalogoSchool(null);
         setEditingSchoolId(null);
     };
@@ -1782,7 +1785,7 @@ export default function AdminPage() {
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-0">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-0">
                                         <div>
                                             <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                                                 <MapPin size={14} /> Colonia / Detalles
@@ -1808,6 +1811,21 @@ export default function AdminPage() {
                                                 className="w-full neu-input-inset px-4 py-3 uppercase"
                                                 required
                                             />
+                                        </div>
+
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <CheckCircle size={14} /> Turno
+                                            </label>
+                                            <select
+                                                value={nextSchoolForm.turno}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, turno: e.target.value }))}
+                                                className="w-full neu-input-inset px-4 py-3 appearance-none cursor-pointer bg-white dark:bg-slate-900 font-semibold"
+                                            >
+                                                <option value="">Infiere del Catálogo</option>
+                                                <option value="Matutino">Matutino</option>
+                                                <option value="Vespertino">Vespertino</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
