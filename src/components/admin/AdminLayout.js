@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart
+    Globe, Zap, School, Gem, FileText, Database, Heart, Mail
 } from 'lucide-react';
 
 export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, onLogout, children }) {
@@ -55,6 +55,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
     const TABS = [
         { id: 'bd', label: 'Base de Datos', icon: <Database size={18} />, color: '#f43f5e' }, // Rose
+        { id: 'crm', label: 'Leads WhatsApp', icon: <Mail size={18} />, color: '#f97316' }, // Orange CRM
 
         { id: 'patrocinadores', label: 'Patrocinadores', icon: <CreditCard size={18} />, color: '#c084fc' }, // Violet
         { id: 'cronograma', label: 'Cronograma', icon: <Calendar size={18} />, color: '#34d399' }, // Emerald
@@ -273,35 +274,43 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
             <main className={`flex-1 flex flex-col relative z-10 w-full overflow-hidden ${fluidTransition}`}>
                 
                 {/* Header superior: el título "Vuelos HQ" se empuja condicionalmente para evitar el Logo Absoluto */}
-                <header className={`h-28 flex items-center justify-between shrink-0 ${fluidTransition} pr-12 ${isCollapsed ? 'pl-[300px]' : 'pl-12'}`}>
-                    <div className="flex items-center gap-5">
-                        <div 
-                            className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center ${fluidTransition}`}
-                            style={{ 
-                                boxShadow: shadowInnerPlain, 
-                                color: activeTabConfig?.color || textLogo 
-                            }}
-                        >
-                            {activeTabConfig?.icon ? React.cloneElement(activeTabConfig.icon, { size: 24, strokeWidth: 2.5 }) : <Plane size={24} strokeWidth={2.5} />}
+                {activeTab !== 'crm' && (
+                    <header className={`h-28 flex items-center justify-between shrink-0 ${fluidTransition} pr-12 ${isCollapsed ? 'pl-[300px]' : 'pl-12'}`}>
+                        <div className="flex items-center gap-5">
+                            <div 
+                                className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center ${fluidTransition}`}
+                                style={{ 
+                                    boxShadow: shadowInnerPlain, 
+                                    color: activeTabConfig?.color || textLogo 
+                                }}
+                            >
+                                {activeTabConfig?.icon ? React.cloneElement(activeTabConfig.icon, { size: 24, strokeWidth: 2.5 }) : <Plane size={24} strokeWidth={2.5} />}
+                            </div>
+                            <h2 className={`text-3xl font-black tracking-tight ${fluidTransition} flex items-center gap-2`} style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
+                                {activeTabConfig?.label || 'Dashboard'}
+                            </h2>
                         </div>
-                        <h2 className={`text-3xl font-black tracking-tight ${fluidTransition} flex items-center gap-2`} style={{ color: isDark ? '#ffffff' : '#1e293b' }}>
-                            {activeTabConfig?.label || 'Dashboard'}
-                        </h2>
-                    </div>
-                    <div 
-                        className={`flex items-center gap-3 px-5 py-2.5 rounded-full ${fluidTransition}`}
-                        style={{ boxShadow: shadowOuter }}
-                    >
-                        <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#10b981' }} />
-                        <span className="text-[13px] font-black tracking-widest uppercase" style={{ color: '#10b981' }}>En Línea</span>
-                    </div>
-                </header>
+                        <div 
+                            className={`flex items-center gap-3 px-5 py-2.5 rounded-full ${fluidTransition}`}
+                            style={{ boxShadow: shadowOuter }}
+                        >
+                            <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#10b981' }} />
+                            <span className="text-[13px] font-black tracking-widest uppercase" style={{ color: '#10b981' }}>En Línea</span>
+                        </div>
+                    </header>
+                )}
 
-                <div className="flex-1 overflow-y-auto w-full no-scrollbar px-12 pb-32 pt-2 relative">
-                    <div className="max-w-[1400px] mx-auto w-full">
+                {activeTab === 'crm' ? (
+                    <div className="flex-1 overflow-hidden w-full h-full relative">
                         {children}
                     </div>
-                </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto w-full no-scrollbar px-12 pb-32 pt-2 relative">
+                        <div className="max-w-[1400px] mx-auto w-full h-full">
+                            {children}
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

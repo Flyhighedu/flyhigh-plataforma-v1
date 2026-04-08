@@ -23,7 +23,7 @@ import { GhostRow } from "./ghost-row";
 
 // Excel formatting constants
 const INTEGER_COLS = new Set(["ninos"]);
-const WIDE_COLS = { nombre_escuela: 36, cct: 18, codigo_postal: 10, tipo: 22, turno: 14 };
+const WIDE_COLS = { nombre_escuela: 36, cct: 18, codigo_postal: 10, tipo: 22, turno: 14, estado_pipeline: 32 };
 
 const HEADER_STYLE = {
   fill: { fgColor: { rgb: "1E3A8A" } },
@@ -63,7 +63,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
     },
   });
 
-  // Professional Excel export
+  // Professional Excel export — with native dropdowns, totals, and conditional formatting
   const handleExportExcel = useCallback(async () => {
     try {
       const mod = await import("xlsx-js-style");
@@ -88,6 +88,28 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
         });
       };
 
+      // Pipeline state labels for Excel display
+      const PIPELINE_LABELS = {
+        sin_contacto: '□□□□□□ Sin contacto (0/6)',
+        contactada: '■□□□□□ En conversación (1/6)',
+        agendada: '■■□□□□ Agendada (2/6)',
+        en_preparacion: '■■■□□□ En preparación (3/6)',
+        en_ruta: '■■■■□□ En ruta (4/6)',
+        operando: '■■■■■□ Operando (5/6)',
+        visitada: '■■■■■■ Completada ✓ (6/6)',
+      };
+
+      // Pipeline state fill colors for conditional formatting
+      const PIPELINE_FILLS = {
+        sin_contacto: null,
+        contactada: { fgColor: { rgb: "DBEAFE" } },    // light blue
+        agendada: { fgColor: { rgb: "BFDBFE" } },      // blue
+        en_preparacion: { fgColor: { rgb: "FEF3C7" } }, // light amber
+        en_ruta: { fgColor: { rgb: "FDE68A" } },        // amber
+        operando: { fgColor: { rgb: "FCD34D" } },       // dark amber
+        visitada: { fgColor: { rgb: "D1FAE5" } },       // light green
+      };
+
       // Header row
       writeRow(R, headers.map((h) => ({ v: h, t: "s", s: HEADER_STYLE })));
       R++;
@@ -106,7 +128,15 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
             s.numFmt = "#,##0";
           }
 
-          if ((R - 1) % 2 === 1) s.fill = { fgColor: { rgb: "F1F5F9" } };
+          // Pipeline column: show human-readable label + conditional fill
+          if (col.id === "estado_pipeline") {
+            const pipelineKey = val || "sin_contacto";
+            val = PIPELINE_LABELS[pipelineKey] || PIPELINE_LABELS.sin_contacto;
+            const fill = PIPELINE_FILLS[pipelineKey];
+            if (fill) s.fill = fill;
+          }
+
+          if ((R - 1) % 2 === 1 && !s.fill) s.fill = { fgColor: { rgb: "F1F5F9" } };
 
           return { v: val ?? "", t, s };
         });
@@ -114,14 +144,90 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
         R++;
       }
 
+      // --- Footer row: Totals ---
+      const FOOTER_STYLE = {
+        font: { bold: true, sz: 11, name: "Calibri", color: { rgb: "1E3A8A" } },
+        fill: { fgColor: { rgb: "E2E8F0" } },
+        alignment: { vertical: "center" },
+        border: { top: { style: "medium", color: { rgb: "1E3A8A" } } },
+      };
+
+      const footerCells = visibleCols.map((col, ci) => {
+        const colLetter = XLSX.utils.encode_col(ci);
+
+        if (col.id === "nombre_escuela") {
+          return { v: "TOTALES", t: "s", s: FOOTER_STYLE };
+        }
+
+        if (col.id === "ninos") {
+          // SUM formula for niños column
+          return { f: `SUM(${colLetter}2:${colLetter}${R})`, t: "n", s: { ...FOOTER_STYLE, numFmt: "#,##0" } };
+        }
+
+        if (col.id === "estado_pipeline") {
+          // COUNTIF for completed schools  
+          const completedLabel = PIPELINE_LABELS.visitada;
+          return {
+            f: `COUNTIF(${colLetter}2:${colLetter}${R},"${completedLabel}")&"/"&COUNTA(${colLetter}2:${colLetter}${R})&" completadas"`,
+            t: "s",
+            s: { ...FOOTER_STYLE, font: { ...FOOTER_STYLE.font, color: { rgb: "059669" } } }
+          };
+        }
+
+        return { v: "", t: "s", s: FOOTER_STYLE };
+      });
+      writeRow(R, footerCells);
+      R++;
+
+      // --- Sheet metadata ---
       ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R - 1, c: C - 1 } });
       ws["!cols"] = visibleCols.map((col) => ({
         wch: WIDE_COLS[col.id] || 12,
       }));
 
+      // Autofilter on header row
       const lastColLetter = XLSX.utils.encode_col(C - 1);
-      ws["!autofilter"] = { ref: `A1:${lastColLetter}${R}` };
+      ws["!autofilter"] = { ref: `A1:${lastColLetter}1` };
 
+      // --- Native Excel Data Validation (Dropdowns) ---
+      const dataValidations = [];
+      const lastDataRow = R - 1; // exclude footer
+
+      visibleCols.forEach((col, ci) => {
+        const colLetter = XLSX.utils.encode_col(ci);
+        const range = `${colLetter}2:${colLetter}${lastDataRow}`;
+
+        if (col.id === "turno") {
+          dataValidations.push({
+            sqref: range,
+            type: "list",
+            formula1: '"MATUTINO,VESPERTINO,NOCTURNO,DISCONTINUO"',
+          });
+        }
+
+        if (col.id === "tipo") {
+          dataValidations.push({
+            sqref: range,
+            type: "list",
+            formula1: '"PRIVADO,FEDERAL TRANSFERIDO"',
+          });
+        }
+
+        if (col.id === "estado_pipeline") {
+          const labels = Object.values(PIPELINE_LABELS).join(",");
+          dataValidations.push({
+            sqref: range,
+            type: "list",
+            formula1: `"${labels}"`,
+          });
+        }
+      });
+
+      if (dataValidations.length > 0) {
+        ws["!dataValidation"] = dataValidations;
+      }
+
+      // --- Build and save workbook ---
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Catálogo Escuelas");
 

@@ -118,27 +118,71 @@ function DeleteActionCell({ row, table }) {
   );
 }
 
-// --- Visitada indicator cell (read-only, driven by trigger) ---
-function VisitadaIndicator({ getValue }) {
-  const value = !!getValue();
+
+// --- Pipeline progress cell (editable dropdown + Unicode bar) ---
+const PIPELINE_STAGES = [
+  { key: 'sin_contacto',   label: 'Sin contacto',    step: 0 },
+  { key: 'contactada',     label: 'En conversación', step: 1 },
+  { key: 'agendada',       label: 'Agendada',        step: 2 },
+  { key: 'en_preparacion', label: 'En preparación',  step: 3 },
+  { key: 'en_ruta',        label: 'En ruta',         step: 4 },
+  { key: 'operando',       label: 'Operando',        step: 5 },
+  { key: 'visitada',       label: 'Completada ✓',    step: 6 },
+];
+
+function getBarAndClass(stageKey) {
+  const stage = PIPELINE_STAGES.find(s => s.key === stageKey) || PIPELINE_STAGES[0];
+  const filled = stage.step;
+  const total = PIPELINE_STAGES.length - 1;
+  const bar = '■'.repeat(filled) + '□'.repeat(total - filled);
+  const textClass = stage.step === 0 ? 'text-slate-400'
+    : stage.step <= 2 ? 'text-blue-700'
+    : stage.step <= 5 ? 'text-amber-700'
+    : 'text-emerald-700';
+  return { bar, textClass, stage, total };
+}
+
+function PipelineProgressCell({ getValue, row, column, table }) {
+  const initialValue = getValue() || 'sin_contacto';
+  const [value, setValue] = useState(initialValue);
+  const [isSaving, setIsSaving] = useState(false);
+  useEffect(() => setValue(getValue() || 'sin_contacto'), [getValue()]);
+
+  const { bar, textClass, stage, total } = getBarAndClass(value);
+
+  const handleChange = async (e) => {
+    const nv = e.target.value;
+    if (nv === value) return;
+    setValue(nv);
+    setIsSaving(true);
+    try { await table.options.meta?.updateData(row.original.cct, column.id, nv); }
+    catch { setValue(initialValue); }
+    finally { setIsSaving(false); }
+  };
 
   return (
-    <div
-      className="inline-flex items-center justify-center w-8 h-8 rounded-full"
-      title={value ? "Misión completada (automático)" : "Pendiente de visita"}
-    >
-      {value ? (
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 drop-shadow-sm">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" />
-        </svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
-          <circle cx="12" cy="12" r="10" />
-        </svg>
-      )}
+    <div className={`relative text-xs font-mono whitespace-nowrap ${textClass} ${isSaving ? 'opacity-50' : ''}`}>
+      <select
+        value={value}
+        onChange={handleChange}
+        disabled={isSaving}
+        className="absolute inset-0 opacity-0 cursor-pointer w-full"
+        title="Cambiar estado pipeline"
+      >
+        {PIPELINE_STAGES.map(s => (
+          <option key={s.key} value={s.key}>
+            {'■'.repeat(s.step) + '□'.repeat(total - s.step)} {s.label} ({s.step}/{total})
+          </option>
+        ))}
+      </select>
+      <span>{bar}</span>
+      <span className="ml-1.5 font-sans font-medium">{stage.label}</span>
+      <span className="ml-1 text-[10px] opacity-60">({stage.step}/{total})</span>
     </div>
   );
 }
+
+
 
 // --- Columns definition ---
 export const escuelasColumns = [
@@ -201,23 +245,20 @@ export const escuelasColumns = [
     enableGlobalFilter: false,
   },
   {
-    accessorKey: "visitada",
-    header: "✈️ Visitada",
-    cell: (props) => <VisitadaIndicator {...props} />,
-    size: 90,
+    accessorKey: "estado_pipeline",
+    header: "Estado Pipeline",
+    cell: (props) => <PipelineProgressCell {...props} />,
+    size: 230,
     enableGlobalFilter: false,
     enableSorting: true,
-    filterFn: (row, columnId, filterValue) => {
-      if (!filterValue) return true;
-      const v = row.getValue(columnId);
-      if (filterValue === "si") return v === true;
-      if (filterValue === "no") return v === false;
-      return true;
+    sortingFn: (rowA, rowB) => {
+      const order = { sin_contacto: 0, contactada: 1, agendada: 2, en_preparacion: 3, en_ruta: 4, operando: 5, visitada: 6 };
+      return (order[rowA.original.estado_pipeline] || 0) - (order[rowB.original.estado_pipeline] || 0);
     },
     footer: ({ table }) => {
       const total = table.getFilteredRowModel().rows.length;
-      const done = table.getFilteredRowModel().rows.filter((r) => r.getValue("visitada") === true).length;
-      return <span className="font-bold text-xs text-emerald-600">{done}/{total}</span>;
+      const done = table.getFilteredRowModel().rows.filter((r) => r.getValue("estado_pipeline") === "visitada").length;
+      return <span className="font-bold text-xs text-emerald-600">{done}/{total} completadas</span>;
     },
   },
   {

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 export async function middleware(request) {
     if (request.nextUrl.pathname.startsWith('/staff-v2')) {
@@ -8,6 +9,24 @@ export async function middleware(request) {
         return NextResponse.redirect(redirectUrl)
     }
 
+    // ─── SANDBOX ROUTE PROTECTION ───────────────────────────
+    // Protect all /sandbox-* routes with admin cookie auth.
+    // This block is COMPLETELY INDEPENDENT from /staff auth.
+    if (request.nextUrl.pathname.startsWith('/sandbox-')) {
+        const adminCookie = request.cookies.get('flyhigh_admin_auth')?.value;
+        const isValid = verifyAdminToken(adminCookie);
+
+        if (!isValid) {
+            // No valid admin cookie → redirect to admin login
+            const loginUrl = new URL('/admin', request.url);
+            return NextResponse.redirect(loginUrl);
+        }
+
+        // Valid cookie → allow through
+        return NextResponse.next();
+    }
+
+    // ─── STAFF/SUPERVISOR ROUTES (existing, unchanged) ──────
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -82,16 +101,17 @@ export async function middleware(request) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
         '/staff/:path*',
         '/staff-v2/:path*',
         '/supervisor/:path*',
+        '/sandbox-escuelas/:path*',
+        '/sandbox-vuelos/:path*',
+        '/sandbox-cronograma/:path*',
+        '/sandbox-hr/:path*',
+        '/sandbox-patrocinadores/:path*',
+        '/sandbox-crm/:path*',
         '/sandbox-dashboards/:path*',
         '/api/:path*',
     ],
 }
+

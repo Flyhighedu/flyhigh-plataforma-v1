@@ -23,6 +23,7 @@ import SandboxVuelosPage from '@/app/sandbox-vuelos/page';
 import SandboxCronogramaPage from '@/app/sandbox-cronograma/page';
 import SandboxHRPage from '@/app/sandbox-hr/page';
 import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
+import SandboxCRMPage from '@/app/sandbox-crm/page';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
 const DashboardPage = dynamic(() => import('../dashboard/page'), {
@@ -34,8 +35,7 @@ const DashboardPage = dynamic(() => import('../dashboard/page'), {
     )
 });
 
-// Contraseña fija (en producción, usar autenticación real)
-const ADMIN_PASSWORD = 'Flyhigh2026';
+// Auth is now handled server-side via /api/admin-auth cookie
 
 export default function AdminPage() {
     // ============================================
@@ -300,11 +300,11 @@ export default function AdminPage() {
     };
 
     // --- EFFECTS ---
-    // Verificar si ya está autenticado (sessionStorage)
+    // Verificar si ya está autenticado (cookie)
     useEffect(() => {
         setIsMounted(true); // Hydration fix
-        const authStatus = sessionStorage.getItem('flyHighAdminAuth');
-        if (authStatus === 'authenticated') {
+        const hasCookie = document.cookie.includes('flyhigh_admin_auth=');
+        if (hasCookie) {
             setIsAuthenticated(true);
         }
     }, []);
@@ -462,21 +462,30 @@ export default function AdminPage() {
     // HANDLERS
     // ============================================
 
-    // Handler de Login
-    const handleLogin = (e) => {
+    // Handler de Login — server-side validation via API
+    const handleLogin = async (e) => {
         e.preventDefault();
         setLoginLoading(true);
         setLoginError('');
 
-        setTimeout(() => {
-            if (password === ADMIN_PASSWORD) {
-                sessionStorage.setItem('flyHighAdminAuth', 'authenticated');
+        try {
+            const res = await fetch('/api/admin-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            });
+
+            if (res.ok) {
                 setIsAuthenticated(true);
             } else {
-                setLoginError('Contraseña incorrecta. Intenta de nuevo.');
+                const data = await res.json();
+                setLoginError(data.error || 'Contraseña incorrecta. Intenta de nuevo.');
             }
+        } catch (err) {
+            setLoginError('Error de conexión. Intenta de nuevo.');
+        } finally {
             setLoginLoading(false);
-        }, 500);
+        }
     };
 
 
@@ -939,8 +948,8 @@ export default function AdminPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             isAuthenticated={isAuthenticated}
-            onLogout={() => {
-                sessionStorage.removeItem('flyHighAdminAuth');
+            onLogout={async () => {
+                await fetch('/api/admin-auth', { method: 'DELETE' });
                 setIsAuthenticated(false);
                 setPassword('');
             }}
@@ -1159,6 +1168,16 @@ export default function AdminPage() {
                 </div>
             )}
 
+
+            {/* TAB: CRM Pipeline Principal */}
+            {activeTab === 'crm' && (
+                <div className="animate-premium-in w-full h-full">
+                    {/* Hacemos que ocupe todo el ancho igual que las bd */}
+                    <div className="max-w-[100vw] h-full">
+                        <SandboxCRMPage />
+                    </div>
+                </div>
+            )}
 
             {
                 activeTab === 'patrocinadores' && (() => {

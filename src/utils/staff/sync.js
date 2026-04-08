@@ -221,6 +221,20 @@ export async function syncMissionClosure(closureData) {
                 .from('proximas_escuelas')
                 .update({ estatus: 'completada' })
                 .eq('id', closureData.mission_id);
+
+            // 4. Close the tunnel: update catalogo_escuelas.estado_pipeline → 'visitada'
+            const { data: missionRow } = await supabase
+                .from('proximas_escuelas')
+                .select('cct')
+                .eq('id', closureData.mission_id)
+                .single();
+
+            if (missionRow?.cct) {
+                await supabase
+                    .from('catalogo_escuelas')
+                    .update({ estado_pipeline: 'visitada' })
+                    .eq('cct', missionRow.cct);
+            }
         }
 
         return { success: true };
