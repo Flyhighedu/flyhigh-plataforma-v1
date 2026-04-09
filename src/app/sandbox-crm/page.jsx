@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import KanbanBoard from "./kanban-board";
-import InboxPanel from "./inbox-panel";
+import InboxView from "./inbox-view";
 import ListView from "./list-view";
 import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check } from "lucide-react";
 
@@ -23,7 +23,7 @@ export default function SandboxCRMPage() {
   const [activeFilter, setActiveFilter] = useState("all"); // all | paused | new | rotting
   
   // ─── Navigation State ─────────────────────────────────────
-  const [viewMode, setViewMode] = useState("board"); // board | won | lost
+  const [viewMode, setViewMode] = useState("inbox"); // inbox | board
 
   // ─── Notifications ──────────────────────────────────────
   const notifPermRef = useRef("default");
@@ -192,6 +192,18 @@ export default function SandboxCRMPage() {
       paused: contacts.filter(c => c.bot_paused).length,
       new: contacts.filter(c => c._hasNewMessage).length,
       rotting: contacts.filter(c => c.last_message_at && (Date.now() - new Date(c.last_message_at).getTime()) > ROTTING_MS).length,
+      attention: contacts.filter(c => {
+          // Rule 1: Bot paused — human must respond
+          if (c.bot_paused) return true;
+          // Rule 2: Brand new / exploring lead
+          if (c.pipeline_stage === '1_nuevo' || c.pipeline_stage === '1_explorando') return true;
+          // Rule 3: Has recent activity (message in last 24h)
+          if (c.last_message_at) {
+              const hoursSinceMsg = (Date.now() - new Date(c.last_message_at).getTime()) / (1000 * 60 * 60);
+              if (hoursSinceMsg <= 24) return true;
+          }
+          return false;
+      }).length,
     };
   }, [contacts]);
 
@@ -270,6 +282,46 @@ export default function SandboxCRMPage() {
     }
   }, [fetchData]);
 
+  const handleSaveNotes = useCallback(async (contactId, notes) => {
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, notes } : c))
+    );
+    setSelectedContact((prev) => 
+      prev?.id === contactId ? { ...prev, notes } : prev
+    );
+
+    try {
+      await fetch("/api/crm-contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contactId, notes }),
+      });
+    } catch (err) {
+      console.error("[CRM] Save notes error:", err);
+      fetchData();
+    }
+  }, [fetchData]);
+
+  const handleSaveReminder = useCallback(async (contactId, reminder_at, reminder_note) => {
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, reminder_at, reminder_note } : c))
+    );
+    setSelectedContact((prev) => 
+      prev?.id === contactId ? { ...prev, reminder_at, reminder_note } : prev
+    );
+
+    try {
+      await fetch("/api/crm-contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contactId, reminder_at, reminder_note }),
+      });
+    } catch (err) {
+      console.error("[CRM] Save reminder error:", err);
+      fetchData();
+    }
+  }, [fetchData]);
+
   const handleAssignToMe = useCallback(async (contactId) => {
     // Sandbox default username
     const username = "yo";
@@ -303,9 +355,7 @@ export default function SandboxCRMPage() {
   // ─── Layout ───────────────────────────────────────────────
   const FILTERS = [
     { id: "all", label: "Vista General", icon: <LayoutDashboard size={20} strokeWidth={2.5} />, activeColor: "bg-blue-500 text-white shadow-lg shadow-blue-500/40", activeBg: "bg-white text-blue-700" },
-    { id: "mine", label: "Mis Leads", icon: <MessageSquare size={20} strokeWidth={2.5} />, activeColor: "bg-indigo-500 text-white shadow-lg shadow-indigo-500/40", activeBg: "bg-white text-indigo-700" },
     { id: "paused", label: "Bots Pausados", icon: <PauseCircle size={20} strokeWidth={2.5} />, activeColor: "bg-amber-500 text-white shadow-lg shadow-amber-500/40", activeBg: "bg-white text-amber-700" },
-    { id: "new", label: "Nuevos Mensajes", icon: <Activity size={20} strokeWidth={2.5} />, activeColor: "bg-emerald-500 text-white shadow-lg shadow-emerald-500/40", activeBg: "bg-white text-emerald-700" },
     { id: "rotting", label: "Leads en Riesgo", icon: <Flame size={20} strokeWidth={2.5} />, activeColor: "bg-rose-500 text-white shadow-lg shadow-rose-500/40", activeBg: "bg-white text-rose-700" },
   ];
 
@@ -356,7 +406,7 @@ export default function SandboxCRMPage() {
           </div>
           <div className="neu-card flex flex-col items-center justify-center px-6 py-3 rounded-[1.25rem] min-w-[110px]">
              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Requiere Atención</span>
-             <span className="text-xl font-black text-rose-500 animate-pulse">{filterCounts.rotting}</span>
+             <span className="text-xl font-black text-rose-500 animate-pulse">{filterCounts.attention}</span>
           </div>
         </div>
       </div>
@@ -365,27 +415,20 @@ export default function SandboxCRMPage() {
       <div className="pb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0 relative z-20 animate-hypnotic stagger-2">
         
         {/* TABS Neumórficas Elevadas */}
-        <div className="flex items-center gap-3 p-1.5 rounded-2xl neu-input-inset">
+        <div className="flex items-center gap-3 p-1.5 rounded-2xl neu-input-inset overflow-x-auto">
+          <button 
+            onClick={() => setViewMode('inbox')}
+            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === 'inbox' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/40' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+          >
+            <MessageSquare size={16} />
+            Bandeja WhatsApp
+          </button>
           <button 
             onClick={() => setViewMode('board')}
-            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 flex items-center gap-2 ${viewMode === 'board' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/40' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 flex items-center gap-2 whitespace-nowrap ${viewMode === 'board' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/40' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
             Tablero Kanban
             <span className={`px-2 py-0.5 rounded-full text-xs font-black ${viewMode === 'board' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}>{contacts.filter(c => c.lead_status === 'open' || !c.lead_status).length}</span>
-          </button>
-          <button 
-            onClick={() => setViewMode('won')}
-            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 flex items-center gap-2 ${viewMode === 'won' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Ganados
-            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${viewMode === 'won' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}>{contacts.filter(c => c.lead_status === 'won').length}</span>
-          </button>
-          <button 
-            onClick={() => setViewMode('lost')}
-            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 flex items-center gap-2 ${viewMode === 'lost' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            Descartados
-            <span className={`px-2 py-0.5 rounded-full text-xs font-black ${viewMode === 'lost' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}>{contacts.filter(c => c.lead_status === 'lost').length}</span>
           </button>
         </div>
 
@@ -444,57 +487,50 @@ export default function SandboxCRMPage() {
         </div>
       </div>
 
-    {/* ─── ESPACIO DE TRABAJO (Tablero Kanban / Lista) ─── */}
+    {/* ─── ESPACIO DE TRABAJO (Inbox / Kanban) ─── */}
       <div className="flex-1 overflow-hidden relative pb-6 animate-hypnotic stagger-3">
-        <div className="w-full h-full rounded-[2.5rem] p-4 md:p-6 flex flex-col neu-input-inset overflow-x-auto overflow-y-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center h-full flex-col gap-4">
-              <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin shadow-lg" />
-              <p className="font-bold neu-text-sub uppercase tracking-widest text-xs">Cargando Inbox...</p>
-            </div>
-          ) : viewMode === "board" ? (
-            <KanbanBoard
-              contacts={filteredContacts}
-              stages={stages}
-              onMoveContact={handleMoveContact}
-              onSelectContact={handleSelectContact}
-              selectedContactId={selectedContact?.id}
-            />
-          ) : (
-            <ListView 
-              contacts={filteredContacts}
-              statusFilter={viewMode} 
-              onSelectContact={handleSelectContact} 
-            />
-          )}
-        </div>
-
-        {/* Modal Backdrop / Overlay para enfocar el Inbox */}
-        {selectedContact && (
-          <div 
-            className="absolute inset-0 bg-white/20 dark:bg-black/20 z-40 backdrop-blur-sm transition-all duration-500 neu-list-item m-4 rounded-[2rem]" 
-            onClick={() => setSelectedContact(null)}
-          />
-        )}
-
-        {/* Panel Deslizante (Inbox) - Se abrirá por encima del Kanban */}
-        <div
-          className={`absolute top-4 right-4 bottom-4 w-full md:w-[480px] z-50 transform transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-            selectedContact ? "translate-x-0 opacity-100 pointer-events-auto" : "translate-x-[110%] opacity-0 pointer-events-none"
-          }`}
-        >
-          {selectedContact && (
-            <div className="w-full h-full neu-card rounded-[2rem] overflow-hidden">
-              <InboxPanel
-                contact={selectedContact}
-                onToggleBotPause={handleToggleBotPause}
-                onChangeStatus={handleChangeStatus}
-                onAssignToMe={handleAssignToMe}
-                onClose={() => setSelectedContact(null)}
+        {viewMode === "inbox" ? (
+          <div className="w-full h-full rounded-[2.5rem] flex flex-col overflow-hidden">
+             {loading ? (
+                <div className="flex items-center justify-center h-full flex-col gap-4">
+                  <div className="w-12 h-12 border-4 border-slate-200 border-t-orange-500 rounded-full animate-spin shadow-lg" />
+                  <p className="font-bold neu-text-sub uppercase tracking-widest text-xs">Cargando Inbox...</p>
+                </div>
+             ) : (
+                <InboxView 
+                  contacts={filteredContacts}
+                  stages={stages}
+                  selectedContactId={selectedContact?.id}
+                  onSelectContact={handleSelectContact}
+                  onToggleBotPause={handleToggleBotPause}
+                  onChangeStatus={handleChangeStatus}
+                  onMoveContact={handleMoveContact}
+                  onSaveNotes={handleSaveNotes}
+                  onSaveReminder={handleSaveReminder}
+                />
+             )}
+          </div>
+        ) : (
+          <div className="w-full h-full rounded-[2.5rem] p-4 md:p-6 flex flex-col neu-input-inset overflow-x-auto overflow-y-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center h-full flex-col gap-4">
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin shadow-lg" />
+                <p className="font-bold neu-text-sub uppercase tracking-widest text-xs">Cargando Kanban...</p>
+              </div>
+            ) : (
+              <KanbanBoard
+                contacts={filteredContacts}
+                stages={stages}
+                onMoveContact={handleMoveContact}
+                onSelectContact={(c) => {
+                   handleSelectContact(c);
+                   setViewMode('inbox'); // Jump into inbox mode when clicking a card
+                }}
+                selectedContactId={selectedContact?.id}
               />
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
     </>

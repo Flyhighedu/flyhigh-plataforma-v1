@@ -2,43 +2,27 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { Bot, User, CheckCheck, Send, CheckCircle2, AlertTriangle, Building, Briefcase, Zap, Pause, LockOpen, Bell, AlarmClock } from "lucide-react";
 
-import { MessageCircle, FileText, Info, History, Sparkles, Pause, User, Check, Trash2, Send, Building, Bot } from "lucide-react";
-
-const TABS = [
-  { id: "chat", label: "Chat", icon: <MessageCircle size={16} strokeWidth={2.5} /> },
-  { id: "notes", label: "Notas", icon: <FileText size={16} strokeWidth={2.5} /> },
-  { id: "ficha", label: "Info", icon: <Info size={16} strokeWidth={2.5} /> },
-  { id: "history", label: "Historial", icon: <History size={16} strokeWidth={2.5} /> },
-];
-
-export default function InboxPanel({ contact, onToggleBotPause, onChangeStatus, onAssignToMe, onClose }) {
-  const [activeTab, setActiveTab] = useState("chat");
+export default function InboxPanel({ contact, stages = [], onToggleBotPause, onChangeStatus, onMoveContact, onSaveNotes, onSaveReminder }) {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
+  const [notesText, setNotesText] = useState(contact?.notes || "");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [reminderAt, setReminderAt] = useState(contact?.reminder_at ? contact.reminder_at.substring(0, 16) : "");
+  const [reminderNote, setReminderNote] = useState(contact?.reminder_note || "");
+  const [savingReminder, setSavingReminder] = useState(false);
   const scrollRef = useRef(null);
 
-  // ─── Notes state ──────────────────────────────────────────
-  const [notes, setNotes] = useState("");
-  const [notesOriginal, setNotesOriginal] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [notesSaved, setNotesSaved] = useState(false);
-
-  // Reset tab when contact changes
+  // Sync state if contact changes
   useEffect(() => {
-    setActiveTab("chat");
-  }, [contact?.id]);
-
-  // Load notes from contact
-  useEffect(() => {
-    if (contact) {
-      setNotes(contact.notes || "");
-      setNotesOriginal(contact.notes || "");
-      setNotesSaved(false);
-    }
-  }, [contact?.id, contact?.notes]);
+    setMessageText("");
+    setNotesText(contact?.notes || "");
+    setReminderAt(contact?.reminder_at ? contact.reminder_at.substring(0, 16) : "");
+    setReminderNote(contact?.reminder_note || "");
+  }, [contact]);
 
   // Fetch messages when contact changes
   useEffect(() => {
@@ -54,7 +38,7 @@ export default function InboxPanel({ contact, onToggleBotPause, onChangeStatus, 
       .then((res) => res.json())
       .then((json) => {
         if (!cancelled && json.data) {
-          setMessages(json.data);
+          setMessages(json.data.sort((a,b) => new Date(a.created_at) - new Date(b.created_at)));
         }
       })
       .catch(console.error)
@@ -96,10 +80,10 @@ export default function InboxPanel({ contact, onToggleBotPause, onChangeStatus, 
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    if (scrollRef.current && activeTab === "chat") {
+    if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, activeTab]);
+  }, [messages]);
 
   // Send human message
   const handleSend = useCallback(async () => {
@@ -130,478 +114,275 @@ export default function InboxPanel({ contact, onToggleBotPause, onChangeStatus, 
     }
   }, [messageText, contact, sending]);
 
-  // Save notes
-  const handleSaveNotes = useCallback(async () => {
-    if (!contact || savingNotes) return;
-    setSavingNotes(true);
-    try {
-      await fetch("/api/crm-contacts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: contact.id, notes }),
-      });
-      setNotesOriginal(notes);
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2000);
-    } catch (err) {
-      console.error("[Inbox] Notes save error:", err);
-    } finally {
-      setSavingNotes(false);
-    }
-  }, [contact, notes, savingNotes]);
+  if (!contact) return null;
 
-  const notesChanged = notes !== notesOriginal;
-
-  // ─── Timeline Generation ─────────────────────────────────
-  const getTimeline = useCallback(() => {
-    if (!contact) return [];
-    const events = [];
-
-    // 1. Created At
-    if (contact.created_at) {
-      events.push({
-        id: "created",
-        date: new Date(contact.created_at),
-        icon: <Sparkles size={12} strokeWidth={2.5} />,
-        title: "Prospecto registrado",
-        desc: "Ingresó al sistema vía WhatsApp",
-        color: "bg-blue-500",
-      });
-    }
-
-    // 2. First Message
-    if (messages.length > 0 && messages[0].created_at) {
-      events.push({
-        id: "first_msg",
-        date: new Date(messages[0].created_at),
-        icon: <MessageCircle size={12} strokeWidth={2.5} />,
-        title: "Inició conversación",
-        desc: "Primer mensaje detectado",
-        color: "bg-slate-500",
-      });
-    }
-
-    // 3. Paused / Human Escapement (Estimate based on current flag)
-    if (contact.bot_paused && messages.length > 0) {
-      // Just put it near the last message for now
-      const lastMsgDate = new Date(messages[messages.length - 1].created_at);
-      events.push({
-        id: "paused",
-        date: new Date(lastMsgDate.getTime() + 1000), // slightly after last msg
-        icon: <Pause size={12} strokeWidth={2.5} />,
-        title: "Bot Pausado",
-        desc: "Requiere atención humana",
-        color: "bg-amber-500",
-      });
-    }
-
-    // 4. Assigned To
-    if (contact.assigned_to) {
-      events.push({
-        id: "assigned",
-        date: new Date(Date.now() - 60000), // Fake past event since we don't track assign time yet
-        icon: <User size={12} strokeWidth={2.5} />,
-        title: `Asignado a ${contact.assigned_to}`,
-        desc: "El asesor tomó propiedad",
-        color: "bg-indigo-500",
-      });
-    }
-
-    // 5. Deal Closed
-    if (contact.lead_status === 'won') {
-      events.push({
-        id: "won",
-        date: new Date(Date.now() - 30000), // Simulated near present
-        icon: <Check size={12} strokeWidth={2.5} />,
-        title: "Marcado como Agendado",
-        desc: "Venta cerrada exitosamente",
-        color: "bg-green-500",
-      });
-    } else if (contact.lead_status === 'lost') {
-      events.push({
-        id: "lost",
-        date: new Date(Date.now() - 30000),
-        icon: <Trash2 size={12} strokeWidth={2.5} />,
-        title: "Descartado",
-        desc: "El lead fue desechado",
-        color: "bg-red-500",
-      });
-    }
-
-    // Sort by date ascending
-    events.sort((a, b) => a.date.getTime() - b.date.getTime());
-    return events;
-  }, [contact, messages]);
-
-  const timelineEvents = getTimeline();
-
-  // ─── Empty state ──────────────────────────────────────────
-  if (!contact) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-8">
-        <span className="text-slate-300 dark:text-slate-700 mb-4"><MessageCircle size={48} strokeWidth={1} /></span>
-        <h3 className="text-sm font-bold text-foreground mb-1">
-          Selecciona un Contacto
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          Haz clic en una tarjeta del Kanban para ver su historial de chat y enviar mensajes.
-        </p>
-      </div>
-    );
-  }
-
-  // ─── Main Panel ────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-full bg-slate-50 dark:bg-[#0f172a] rounded-3xl overflow-hidden shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.7)] dark:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.8),inset_-4px_-4px_8px_rgba(255,255,255,0.02)]">
-      {/* Contact header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground truncate">
-            {contact.contact_name || contact.phone_number}
-          </p>
-          <p className="text-[11px] text-muted-foreground font-mono">
-            {contact.phone_number}
-            {contact.cct && ` · ${contact.cct}`}
-          </p>
+    <div className="flex w-full h-full relative">
+      {/* ─── CENTRAL CHAT COLUMN (65%) ─── */}
+      <div className="w-[65%] h-full flex flex-col border-r border-slate-200/50 dark:border-slate-800/50 relative overflow-hidden backdrop-blur-sm bg-white/40 dark:bg-black/40">
+        
+        {/* Chat Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-white/20 dark:border-white/5 z-10 shadow-sm">
+           <div>
+              <h2 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                {contact.contact_name || contact.phone_number}
+                {contact.lead_status === 'won' && <CheckCircle2 size={16} className="text-emerald-500" />}
+                {contact.lead_status === 'lost' && <AlertTriangle size={16} className="text-rose-500" />}
+              </h2>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                {contact.phone_number} {contact.school_name ? `• ${contact.school_name}` : ''}
+              </span>
+           </div>
+
+           {/* Bot Pilot Toggle */}
+           <button 
+             onClick={() => onToggleBotPause(contact.id, !contact.bot_paused)}
+             className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center gap-2 border ${
+               contact.bot_paused 
+                 ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200" 
+                 : "bg-[#25D366]/10 border-[#25D366]/30 text-[#005c4b] dark:text-[#25D366] hover:bg-[#25D366]/20"
+             }`}
+           >
+             {contact.bot_paused ? (
+               <><LockOpen size={14}/> Humano al Mando</>
+             ) : (
+               <><Bot size={14}/> Bot Activo</>
+             )}
+           </button>
         </div>
 
-        {/* Bot Pause Toggle */}
-        <div className="flex gap-2 flex-col items-stretch">
-          <button
-            onClick={() => onToggleBotPause(contact.id, !contact.bot_paused)}
-            className={`text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border flex items-center justify-center gap-1.5 ${
-              contact.bot_paused
-                ? "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-400"
-                : "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:border-emerald-700 dark:text-emerald-400"
-            }`}
-            title={contact.bot_paused ? "Reactivar Bot" : "Pausar Bot (modo humano)"}
-          >
-            {contact.bot_paused ? <><Pause size={12} strokeWidth={2.5} /> Bot Pausado</> : <><Bot size={12} strokeWidth={2.5} /> Bot Activo</>}
-          </button>
-          
-          <button
-            onClick={() => onAssignToMe(contact.id)}
-            className={`text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border flex items-center justify-center gap-1.5 ${
-              contact.assigned_to === 'yo'
-                ? "bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200"
-                : "bg-muted border-border text-muted-foreground hover:bg-black hover:text-white"
-            }`}
-          >
-            {contact.assigned_to === 'yo' ? <><User size={12} strokeWidth={2.5} /> Mío</> : "✋ Tomar"}
-          </button>
-        </div>
-
-        {/* Deal Status Buttons */}
-        {contact.lead_status === 'open' ? (
-          <div className="flex gap-1">
-            <button
-              onClick={() => onChangeStatus(contact.id, 'won')}
-              className="text-[10px] flex items-center gap-1 font-bold px-3 py-1.5 rounded-full transition-all border bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-              title="Marcar como Agendado (Ganado)"
-            >
-              <Check size={12} strokeWidth={2.5} /> Cerrar
-            </button>
-            <button
-              onClick={() => onChangeStatus(contact.id, 'lost')}
-              className="text-[10px] flex items-center gap-1 font-bold px-3 py-1.5 rounded-full transition-all border bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-              title="Descartar (Perdido/Spam)"
-            >
-              <Trash2 size={12} strokeWidth={2.5} /> Descartar
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => onChangeStatus(contact.id, 'open')}
-            className={`text-[10px] flex items-center gap-1 font-bold px-3 py-1.5 rounded-full transition-all border ${
-              contact.lead_status === 'won' 
-                ? 'bg-green-100 border-green-300 text-green-800' 
-                : 'bg-red-100 border-red-300 text-red-800'
-            }`}
-          >
-            {contact.lead_status === 'won' ? <><Check size={12} strokeWidth={2.5} /> Reabrir</> : <><Trash2 size={12} strokeWidth={2.5} /> Reabrir</>}
-          </button>
-        )}
-
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted transition-colors"
-          title="Cerrar"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 px-4 py-3 shrink-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 text-[11px] font-black uppercase tracking-widest transition-all rounded-xl ${
-              activeTab === tab.id
-                ? "neu-input-inset text-orange-500 opacity-100"
-                : "neu-card text-slate-500 hover:text-slate-700 opacity-60 hover:opacity-100"
-            }`}
-          >
-            <span className="text-sm">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ━━━ Tab: Chat ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {activeTab === "chat" && (
-        <>
-          {/* Messages area */}
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
-          >
-            {loadingMessages ? (
-              <div className="flex justify-center py-8">
-                <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center text-xs text-muted-foreground py-8 italic">
-                Sin historial de mensajes.
-              </div>
-            ) : (
-              messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))
-            )}
-          </div>
-
-          {/* Input area */}
-          <div className="px-4 pb-4 pt-2 shrink-0">
-            {!contact.bot_paused && (
-              <div className="text-[10px] uppercase font-bold tracking-widest text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1 opacity-70">
-                ⚠️ Pausa el bot antes de escribir
-              </div>
-            )}
-            <div className={`p-1.5 flex gap-2 rounded-2xl transition-all ${contact.bot_paused ? 'neu-input-inset shadow-inner focus-within:ring-2 focus-within:ring-orange-500/50 bg-white/50 dark:bg-slate-900/50' : 'opacity-50 grayscale neu-card'}`}>
-              <input
-                type="text"
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={
-                  contact.bot_paused
-                    ? "Escribe un mensaje..."
-                    : "Bot operando..."
-                }
-                disabled={!contact.bot_paused || sending}
-                className="flex-1 h-10 px-3 text-sm bg-transparent !outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium disabled:cursor-not-allowed"
-              />
-              <button
-                onClick={handleSend}
-                disabled={!contact.bot_paused || !messageText.trim() || sending}
-                className="w-10 h-10 flex items-center justify-center neu-list-item text-orange-500 disabled:opacity-40 disabled:cursor-not-allowed hover:text-orange-600 active:scale-95 transition-all"
-              >
-                {sending ? "..." : <Send size={16} strokeWidth={2.5} className="ml-1" />}
-              </button>
+        {/* Chat Body */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+          {loadingMessages ? (
+            <div className="m-auto opacity-50 flex items-center gap-2 font-bold uppercase tracking-widest text-xs text-slate-500">
+              <Zap size={14} className="animate-pulse" /> Sincronizando Chat...
             </div>
-          </div>
-        </>
-      )}
+          ) : messages.length === 0 ? (
+            <div className="m-auto opacity-50 flex flex-col items-center gap-2">
+              <span className="text-xs uppercase font-bold tracking-widest">Aún no hay mensajes</span>
+            </div>
+          ) : (
+            messages.map((msg) => {
+              const isInbound = msg.direction === "inbound";
+              const isBot = msg.sender_type === "bot";
 
-      {/* ━━━ Tab: Notas ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {activeTab === "notes" && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-4 pt-4 pb-2">
-            <p className="text-[11px] text-muted-foreground">
-              Notas internas visibles solo para el equipo. El contacto nunca las verá.
-            </p>
-          </div>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Ej: Habló con el director, quiere que vayamos el lunes. No cobrar cuota..."
-            className="flex-1 mx-4 mb-3 p-3 text-sm rounded-xl border border-border bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none leading-relaxed"
-          />
-          <div className="flex items-center justify-between px-4 pb-4">
-            <span className="text-[10px] text-muted-foreground">
-              {notesSaved && "✅ Guardado"}
-              {notesChanged && !notesSaved && "● Sin guardar"}
-            </span>
+              const time = new Date(msg.created_at).toLocaleTimeString("es-MX", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+
+              return (
+                <div key={msg.id} className={`max-w-[75%] rounded-2xl p-2.5 shadow-sm text-[13px] leading-snug border border-black/5 dark:border-white/5 relative group ${
+                  isInbound 
+                   ? "self-start bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] rounded-tl-sm"
+                   : "self-end bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef] rounded-tr-sm"
+                }`}>
+                  {!isInbound && (
+                    <span className="block text-[9px] font-black uppercase tracking-widest mb-1 flex items-center gap-1 opacity-70">
+                      {isBot ? <><Bot size={10} /> FlyHigh Bot</> : <><User size={10} /> Operador</>}
+                    </span>
+                  )}
+                  {isInbound && contact.contact_name && (
+                    <span className="block text-[9px] font-black tracking-widest mb-1 text-[#ea580c] dark:text-[#f97316]">
+                      {contact.contact_name}
+                    </span>
+                  )}
+                  
+                  <span className="break-words whitespace-pre-wrap">{msg.content}</span>
+                  
+                  <div className={`text-[9px] mt-1 flex items-center gap-1 opacity-70 justify-end`}>
+                    {time}
+                    {!isInbound && <CheckCheck size={12} className="text-blue-500" />}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Chat Footer (Composer) */}
+        <div className="px-6 pb-6 pt-2 bg-gradient-to-t from-white/90 dark:from-slate-900/90 to-transparent">
+          <div className={`p-1.5 flex gap-2 rounded-2xl transition-all shadow-sm ${
+             contact.bot_paused 
+              ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-offset-2 ring-blue-500'
+              : 'bg-white/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 opacity-60 grayscale cursor-not-allowed'
+          }`}>
+            <textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={contact.bot_paused ? "Escribe un mensaje al lead..." : "Bot controlando la conversación. Pausa el bot para intervenir."}
+              disabled={!contact.bot_paused || sending}
+              className="flex-1 max-h-[120px] min-h-[40px] px-3 py-2 text-sm bg-transparent !outline-none resize-none text-slate-800 dark:text-slate-100 placeholder:text-slate-400 font-medium"
+              rows={1}
+            />
             <button
-              onClick={handleSaveNotes}
-              disabled={!notesChanged || savingNotes}
-              className="text-[11px] font-bold px-4 py-1.5 rounded-lg bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-all active:scale-95"
+              onClick={handleSend}
+              disabled={!contact.bot_paused || !messageText.trim() || sending}
+              className={`w-12 h-10 flex items-center justify-center rounded-xl transition-all ${
+                contact.bot_paused && messageText.trim() 
+                 ? "bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95" 
+                 : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+              }`}
             >
-              {savingNotes ? "Guardando..." : "💾 Guardar Notas"}
+              {sending ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"/> : <Send size={16} strokeWidth={2.5} />}
             </button>
           </div>
         </div>
-      )}
-
-      {/* ━━━ Tab: Ficha Técnica ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {activeTab === "ficha" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="space-y-4">
-            {/* Contact Details */}
-            <section>
-              <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                Datos del Contacto
-              </h4>
-              <div className="space-y-2">
-                <FichaRow label="Nombre" value={contact.contact_name} />
-                <FichaRow label="Teléfono" value={contact.phone_number} mono />
-                <FichaRow label="Pipeline" value={contact.pipeline_stage} tag />
-                <FichaRow label="Bot" value={contact.bot_paused ? "Pausado" : "Activo"} icon={contact.bot_paused ? <Pause size={12}/> : <Bot size={12}/>} />
-                <FichaRow label="Último Mensaje" value={
-                  contact.last_message_at 
-                    ? new Date(contact.last_message_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
-                    : "—"
-                } />
-                <FichaRow label="Creado" value={
-                  contact.created_at 
-                    ? new Date(contact.created_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
-                    : "—"
-                } />
-              </div>
-            </section>
-
-            {/* School Details */}
-            {(contact.cct || contact.school_name) && (
-              <section>
-                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                  Datos de la Escuela
-                </h4>
-                <div className="space-y-2">
-                  <FichaRow label="CCT" value={contact.cct} mono />
-                  <FichaRow label="Nombre" value={contact.school_name} />
-                  <FichaRow label="Turno" value={contact.school_turno} />
-                </div>
-              </section>
-            )}
-
-            {/* Empty state for school */}
-            {!contact.cct && !contact.school_name && (
-              <section className="text-center py-6">
-                <span className="mb-2 flex justify-center text-slate-300 dark:text-slate-700">
-                  <Building size={32} strokeWidth={1.5}/>
-                </span>
-                <p className="text-xs text-muted-foreground italic">
-                  Escuela aún no identificada. El bot la enlazará automáticamente cuando el contacto proporcione su CCT.
-                </p>
-              </section>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ━━━ Tab: Historial (Timeline) ━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {activeTab === "history" && (
-        <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-50/50 dark:bg-black/20">
-          <div className="relative border-l-2 border-muted pl-6 space-y-8">
-            {timelineEvents.map((evt, idx) => (
-              <div key={evt.id} className="relative">
-                {/* Dot */}
-                <div className={`absolute -left-[35px] top-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] shadow-sm text-white ${evt.color}`}>
-                  {evt.icon}
-                </div>
-                {/* Content */}
-                <div>
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <h4 className="text-sm font-bold text-foreground">{evt.title}</h4>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {evt.date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{evt.desc}</p>
-                </div>
-              </div>
-            ))}
-
-            {/* Pulsing indicator if open */}
-            {contact.lead_status === 'open' && (
-              <div className="relative pt-2">
-                <div className="absolute -left-[31px] top-4 w-4 h-4 rounded-full bg-primary/20 animate-ping"></div>
-                <div className="absolute -left-[29px] top-5 w-2 h-2 rounded-full bg-primary"></div>
-                <p className="text-xs text-muted-foreground italic opacity-70">Esperando el próximo evento...</p>
-              </div>
-            )}
-            
-            {/* End indicator if closed */}
-            {contact.lead_status !== 'open' && (
-              <div className="relative pt-2">
-                <div className="absolute -left-[29px] top-5 w-2 h-2 rounded-full bg-muted-foreground"></div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-50">FIN DEL CICLO</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Ficha Row Component ───────────────────────────────────
-function FichaRow({ label, value, mono = false, tag = false, icon }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-[11px] text-muted-foreground shrink-0">{label}</span>
-      {tag ? (
-        <span className="text-[10px] font-semibold bg-muted text-foreground px-2 py-0.5 rounded-full">
-          {value}
-        </span>
-      ) : (
-        <span className={`text-[12px] text-foreground text-right flex items-center justify-end gap-1 ${mono ? "font-mono" : ""}`}>
-          {icon} {value}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ─── Message Bubble Component ───────────────────────────────
-function MessageBubble({ message }) {
-  const isInbound = message.direction === "inbound";
-  const isBot = message.sender_type === "bot";
-  const isHuman = message.sender_type === "human";
-
-  const time = new Date(message.created_at).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  let bubbleClass = "";
-  let label = "";
-
-  if (isInbound) {
-    bubbleClass = "neu-card bg-white dark:bg-slate-800 self-start";
-  } else if (isBot) {
-    bubbleClass = "neu-input-inset bg-slate-100/50 dark:bg-slate-900/50 text-blue-900 dark:text-blue-100 self-end border border-white/40 dark:border-white/5";
-    label = "BOT";
-  } else if (isHuman) {
-    bubbleClass = "neu-list-item text-orange-900 dark:text-orange-100 self-end ring-1 ring-orange-500/30";
-    label = "HUMANO";
-  } else {
-    bubbleClass = "neu-list-item self-end";
-  }
-
-  return (
-    <div className={`flex flex-col max-w-[85%] ${isInbound ? "" : "ml-auto"}`}>
-      {label && (
-        <span className={`text-[9px] font-black uppercase tracking-widest mb-1 ${
-          isBot ? "text-blue-500 opacity-60" : "text-orange-500 opacity-80"
-        } ${isInbound ? "" : "text-right"}`}>
-          {label}
-        </span>
-      )}
-      <div className={`rounded-3xl px-4 py-3 text-[13px] font-medium leading-relaxed shadow-sm ${bubbleClass}`}>
-        {message.content}
       </div>
-      <span className={`text-[9px] font-bold uppercase tracking-widest opacity-40 mt-1.5 ${isInbound ? "ml-2" : "text-right mr-2"}`}>
-        {time}
-      </span>
+
+      {/* ─── RIGHT CONTEXT COLUMN (35%) ─── */}
+      <div className="w-[35%] h-full bg-white dark:bg-slate-900 border-l border-white/20 overflow-y-auto px-6 py-6 pb-24">
+        
+        {/* Core Info */}
+        <div className="flex flex-col items-center mb-8">
+           <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 border-4 border-slate-50 dark:border-slate-900 shadow-md">
+             <User size={32} className="text-slate-400" />
+           </div>
+           <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 text-center leading-tight">
+             {contact.contact_name || "Sin Titular"}
+           </h3>
+           <p className="text-sm font-bold text-slate-500 mt-1 font-mono tracking-wider">{contact.phone_number}</p>
+        </div>
+
+        {/* Pipeline Control */}
+        <div className="mb-6 relative group">
+           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Zap size={12} className="text-amber-500" /> Etapa del Embudo</span>
+           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-0.5 border border-slate-200 dark:border-slate-800 relative z-10 transition-all group-hover:border-blue-500/50 group-hover:shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+             <select 
+               className="w-full bg-transparent p-2.5 text-[13px] font-bold outline-none cursor-pointer text-slate-700 dark:text-slate-200 capitalize"
+               value={contact.pipeline_stage || ""}
+               onChange={(e) => {
+                 if(onMoveContact) onMoveContact(contact.id, e.target.value);
+               }}
+             >
+               <option value="" disabled>Seleccionar etapa...</option>
+               {[...stages].sort((a,b) => a.sort_order - b.sort_order).map(s => {
+                 const cleanTitle = (s.title || s.id || "").replace(/^\d+_?/, '').replace(/_/g, ' ');
+                 return (
+                   <option key={s.id} value={s.id} className="capitalize">
+                     {cleanTitle}
+                   </option>
+                 );
+               })}
+             </select>
+           </div>
+        </div>
+
+        {/* Notas Internas (Operador) */}
+        <div className="mb-8">
+           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><Briefcase size={12} className="text-indigo-400" /> Notas Libres</span>
+           <div className="relative">
+             <textarea 
+               value={notesText}
+               onChange={(e) => setNotesText(e.target.value)}
+               onBlur={() => {
+                 if(contact.notes !== notesText && notesText.trim() !== "") {
+                   setSavingNotes(true);
+                   if(onSaveNotes) onSaveNotes(contact.id, notesText).finally(() => setSavingNotes(false));
+                 }
+               }}
+               placeholder="Escribe recordatorios o contexto del lead..."
+               className="w-full min-h-[90px] bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-[13px] text-slate-700 dark:text-slate-300 outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-400/50 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-y"
+             />
+             {savingNotes && <div className="absolute bottom-3 right-3 w-3 h-3 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />}
+           </div>
+        </div>
+
+        {/* Recordatorios (Operador) */}
+        <div className="mb-8">
+           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5"><AlarmClock size={12} className="text-amber-500" /> Recordatorio</span>
+           <div className="relative flex flex-col gap-2">
+             <input 
+               type="datetime-local" 
+               className="w-full bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[12px] text-slate-700 dark:text-slate-200 outline-none transition-all focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 cursor-pointer"
+               value={reminderAt}
+               onChange={(e) => setReminderAt(e.target.value)}
+             />
+             <div className="relative">
+               <textarea 
+                 value={reminderNote}
+                 onChange={(e) => setReminderNote(e.target.value)}
+                 placeholder="¿Qué hay que recordar?"
+                 className="w-full bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-[13px] text-slate-700 dark:text-slate-300 outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-amber-400/50 focus:ring-4 focus:ring-amber-500/10 transition-all resize-none min-h-[60px]"
+               />
+             </div>
+             
+             <button
+               disabled={savingReminder || (!reminderAt && !!reminderNote)}
+               onClick={() => {
+                 setSavingReminder(true);
+                 if (onSaveReminder) {
+                   onSaveReminder(contact.id, reminderAt || null, reminderNote || null).finally(() => setSavingReminder(false));
+                 } else {
+                   setSavingReminder(false);
+                 }
+               }}
+               className="mt-1 w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-amber-50 text-amber-600 dark:bg-slate-800/30 dark:hover:bg-amber-900/30 dark:text-amber-500 p-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all border border-slate-200 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-800 disabled:opacity-50"
+             >
+               {savingReminder ? (
+                 <>
+                   <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                   <span>Guardando...</span>
+                 </>
+               ) : (
+                 <>
+                   <Bell size={12} />
+                   <span>Fijar Alarma</span>
+                 </>
+               )}
+             </button>
+           </div>
+        </div>
+
+        {/* Details Card */}
+        <div className="space-y-4 mb-8">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Insights Recuperados</span>
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+             <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+               <Building size={16} />
+             </div>
+             <div>
+               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Escuela</p>
+               <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{contact.school_name || "Pendiente de captura"}</p>
+             </div>
+          </div>
+          {contact.cct && (
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 flex items-center justify-center shrink-0">
+                 <Briefcase size={16} />
+               </div>
+               <div>
+                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Clave CCT</p>
+                 <p className="text-sm font-bold font-mono tracking-wider text-slate-800 dark:text-slate-200">{contact.cct}</p>
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Win/Loss Record Actions */}
+        <div className="space-y-2">
+           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Cierre Administrativo</span>
+           <button 
+             onClick={() => onChangeStatus(contact.id, 'won')}
+             className="w-full py-3 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 font-bold text-sm transition-all hover:bg-emerald-100"
+           >
+             Marcar como Ganado
+           </button>
+           <button 
+             onClick={() => onChangeStatus(contact.id, 'lost')}
+             className="w-full py-3 rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 font-bold text-sm transition-all hover:bg-rose-100"
+           >
+             Descartar Lead
+           </button>
+        </div>
+
+      </div>
     </div>
   );
 }

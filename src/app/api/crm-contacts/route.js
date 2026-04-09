@@ -84,7 +84,7 @@ export async function PATCH(request) {
             return NextResponse.json({ error: 'id is required' }, { status: 400 });
         }
 
-        const allowed = ['pipeline_stage', 'bot_paused', 'notes', 'assigned_to', 'cct', 'contact_name', 'lead_status'];
+        const allowed = ['pipeline_stage', 'bot_paused', 'notes', 'assigned_to', 'cct', 'contact_name', 'lead_status', 'reminder_at', 'reminder_note'];
         const filtered = {};
         for (const key of Object.keys(updates)) {
             if (allowed.includes(key)) filtered[key] = updates[key];

@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Flame, Building, Bot, User, ArrowRight } from "lucide-react";
+import { Flame, Building, Bot, User, ArrowRight, CheckCheck } from "lucide-react";
 
 function timeAgo(dateStr) {
   if (!dateStr) return "—";
@@ -117,18 +117,28 @@ export default function KanbanCard({ contact, onClick, isSelected, isDragging })
         </div>
       </div>
 
-      {/* Message preview: Bot question + User answer */}
+      {/* WhatsApp Message preview bubble UI */}
       {(contact.last_bot_message || contact.last_user_message) && (
-        <div className="mt-3 mb-3 pl-3 border-l-2 border-slate-200 dark:border-slate-700 space-y-1.5 text-[11.5px] leading-tight">
-          {contact.last_bot_message && (
-            <p className="neu-text-sub opacity-70 truncate font-medium flex items-center gap-1.5" title={contact.last_bot_message}>
-              <Bot size={12} className="shrink-0" /> {truncate(contact.last_bot_message, 45)}
-            </p>
-          )}
+        <div className="mt-3 mb-3 bg-[#efeae2] dark:bg-[#0b141a] rounded-xl p-2.5 flex flex-col gap-2 relative overflow-hidden" 
+             style={{ backgroundImage: "url('https://i.ibb.co/3M3K6bB/whatsapp-bg.png')", backgroundSize: '60px', backgroundBlendMode: 'multiply' }}>
+          
+          {/* User Message (Received) - Appears first chronologically */}
           {contact.last_user_message && (
-            <p className="neu-text truncate font-bold flex items-center gap-1.5" title={contact.last_user_message}>
-              <User size={12} className="shrink-0" /> {truncate(contact.last_user_message, 45)}
-            </p>
+            <div className="self-start relative max-w-[90%] bg-white dark:bg-[#202c33] text-[#111b21] dark:text-[#e9edef] px-2.5 py-1.5 rounded-2xl rounded-tl-sm shadow-sm text-[11px] leading-snug break-words border border-black/5 dark:border-white/5">
+              <span className="font-bold text-[#ea580c] dark:text-[#f97316] text-[9px] mb-0.5 block">{contact.contact_name ? contact.contact_name.split(' ')[0] : 'Cliente'}</span>
+              {truncate(contact.last_user_message, 50)}
+            </div>
+          )}
+
+          {/* Bot Message (Sent) - Appears last chronologically */}
+          {contact.last_bot_message && (
+            <div className="self-end relative max-w-[90%] bg-[#d9fdd3] dark:bg-[#005c4b] text-[#111b21] dark:text-[#e9edef] px-2.5 py-1.5 rounded-2xl rounded-tr-sm shadow-sm text-[11px] leading-snug break-words border border-black/5 dark:border-white/5">
+              <span className="font-bold text-[#16a34a] dark:text-[#4ade80] text-[9px] mb-0.5 flex items-center justify-end gap-1">FlyHigh Bot <Bot size={10} /></span>
+              {truncate(contact.last_bot_message, 50)}
+              <div className="text-right mt-0.5">
+                <span className="inline-block text-[#53bdeb] dark:text-[#53bdeb]"><CheckCheck size={14} /></span>
+              </div>
+            </div>
           )}
         </div>
       )}

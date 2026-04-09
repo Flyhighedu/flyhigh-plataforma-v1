@@ -5,18 +5,42 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart, Mail
+    Globe, Zap, School, Gem, FileText, Database, Heart
 } from 'lucide-react';
+import AdminAlarms from './AdminAlarms';
+
+const WhatsAppIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.888-.788-1.489-1.761-1.663-2.06-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+  </svg>
+);
 
 export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, onLogout, children }) {
     const { theme, setTheme } = useTheme();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [expandedTabs, setExpandedTabs] = useState([]);
     const [mounted, setMounted] = useState(false);
+    const [unreadCrm, setUnreadCrm] = useState(0);
 
     useEffect(() => {
         setMounted(true);
-    }, []);
+        
+        let interval;
+        if (isAuthenticated) {
+            const fetchUnread = async () => {
+                try {
+                    const res = await fetch('/api/crm-unread-count');
+                    if (res.ok) {
+                        const { unreadCount } = await res.json();
+                        setUnreadCrm(unreadCount || 0);
+                    }
+                } catch(e) { }
+            };
+            fetchUnread();
+            interval = setInterval(fetchUnread, 15000);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [isAuthenticated]);
 
     if (!mounted) return null;
 
@@ -55,7 +79,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
     const TABS = [
         { id: 'bd', label: 'Base de Datos', icon: <Database size={18} />, color: '#f43f5e' }, // Rose
-        { id: 'crm', label: 'Leads WhatsApp', icon: <Mail size={18} />, color: '#f97316' }, // Orange CRM
+        { id: 'crm', label: 'Leads WhatsApp', icon: <WhatsAppIcon size={18} />, color: '#25D366' }, // Whatsapp Green
 
         { id: 'patrocinadores', label: 'Patrocinadores', icon: <CreditCard size={18} />, color: '#c084fc' }, // Violet
         { id: 'cronograma', label: 'Cronograma', icon: <Calendar size={18} />, color: '#34d399' }, // Emerald
@@ -105,15 +129,15 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
         <div style={{ backgroundColor: bgColor, color: textColor }} className={`flex h-screen w-full font-sans overflow-hidden text-sm ${fluidTransition} relative`}>
             
             {/* ── LOGO FIJO ESTÁTICO (NO SE PLIEGA) ── */}
-            <div className="absolute top-0 left-0 h-28 flex items-center px-8 z-50 pointer-events-none w-[320px]">
+            <div className={`absolute top-0 left-0 h-28 flex items-center px-8 z-50 pointer-events-none transition-all duration-[600ms] ease-out ${isCollapsed ? 'w-20' : 'w-[320px]'}`}>
                 <div 
                     className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 pointer-events-auto ${fluidTransition}`}
                     style={{ boxShadow: shadowOuter, background: bgColor }}
                 >
                     <Shield size={22} color={textLogo} strokeWidth={2.5} />
                 </div>
-                <div className="ml-5 flex flex-col justify-center pointer-events-auto">
-                    <h1 className="font-black text-lg tracking-tight" style={{ color: textLogo }}>
+                <div className={`ml-5 flex flex-col justify-center pointer-events-auto transition-opacity duration-300 ${isCollapsed ? 'opacity-0 select-none' : 'opacity-100'}`}>
+                    <h1 className="font-black text-lg tracking-tight whitespace-nowrap" style={{ color: textLogo }}>
                         FlyHigh
                     </h1>
                     <span className="text-[10px] uppercase font-bold tracking-widest opacity-70 mt-0.5 whitespace-nowrap">Control Admin</span>
@@ -179,17 +203,27 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                                     }}
                                 >
                                     <div 
-                                        className={`shrink-0 flex items-center justify-center ${fluidTransition}`}
+                                        className={`shrink-0 flex items-center justify-center ${fluidTransition} relative`}
                                         style={{ color: isPrimaryActive ? tab.color : 'inherit' }}
                                     >
                                         <div className={!isPrimaryActive ? "group-hover:text-white transition-colors duration-300" : ""}>
                                             {React.cloneElement(tab.icon, { strokeWidth: isPrimaryActive ? 3 : 2 })}
                                         </div>
+                                        {isCollapsed && tab.id === 'crm' && unreadCrm > 0 && (
+                                            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full border-2 border-[#172f6b] dark:border-slate-900 animate-pulse"></div>
+                                        )}
                                     </div>
                                     <div className={`flex-1 overflow-hidden flex items-center justify-between ${fluidTransition} ${isCollapsed ? 'w-0 opacity-0 hidden' : 'ml-4 w-auto opacity-100'}`}>
-                                        <span className={`tracking-wide whitespace-nowrap ${!isPrimaryActive ? "group-hover:text-white transition-colors duration-300" : ""}`}>
-                                            {tab.label}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`tracking-wide whitespace-nowrap ${!isPrimaryActive ? "group-hover:text-white transition-colors duration-300" : ""}`}>
+                                                {tab.label}
+                                            </span>
+                                            {tab.id === 'crm' && unreadCrm > 0 && (
+                                                <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-md animate-pulse">
+                                                    {unreadCrm}
+                                                </span>
+                                            )}
+                                        </div>
                                         {tab.subTabs && (
                                             <svg className={`shrink-0 w-4 h-4 ml-2 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : 'text-blue-300 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -299,6 +333,8 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                         </div>
                     </header>
                 )}
+
+                <AdminAlarms />
 
                 {activeTab === 'crm' ? (
                     <div className="flex-1 overflow-hidden w-full h-full relative">
