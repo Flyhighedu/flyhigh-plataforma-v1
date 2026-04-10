@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import KanbanBoard from "./kanban-board";
 import InboxView from "./inbox-view";
 import ListView from "./list-view";
-import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check } from "lucide-react";
+import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check, DollarSign, Plus, Trash2 } from "lucide-react";
 
 // ─── Notification sound (base64 tiny ding) ──────────────────
 const DING_SOUND = typeof Audio !== "undefined"
@@ -24,6 +24,63 @@ export default function SandboxCRMPage() {
   
   // ─── Navigation State ─────────────────────────────────────
   const [viewMode, setViewMode] = useState("inbox"); // inbox | board
+
+  // ─── Pricing Settings Modal ───────────────────────────────
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [pricingData, setPricingData] = useState({ publica: [], privada: [] });
+  const [newPrice, setNewPrice] = useState({ tipo: "pública", monto: "" });
+  const [pricingLoading, setPricingLoading] = useState(false);
+
+  // ─── Fetch Pricing ────────────────────────────────────────
+  const fetchPricing = useCallback(async () => {
+    setPricingLoading(true);
+    try {
+      const res = await fetch("/api/crm-precios");
+      const json = await res.json();
+      if (json.data) {
+        setPricingData({
+          publica: json.data.filter(p => p.tipo_escuela === "pública"),
+          privada: json.data.filter(p => p.tipo_escuela === "privada")
+        });
+      }
+    } catch (err) {
+      console.error("[CRM] Fetch pricing error:", err);
+    } finally {
+      setPricingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPricingModal) {
+      fetchPricing();
+    }
+  }, [showPricingModal, fetchPricing]);
+
+  const handleAddPrice = async () => {
+    if (!newPrice.monto) return;
+    try {
+      const res = await fetch("/api/crm-precios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo_escuela: newPrice.tipo, precio: newPrice.monto })
+      });
+      if (res.ok) {
+        setNewPrice({ ...newPrice, monto: "" });
+        fetchPricing();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeletePrice = async (id) => {
+    try {
+      const res = await fetch(`/api/crm-precios?id=${id}`, { method: "DELETE" });
+      if (res.ok) fetchPricing();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // ─── Notifications ──────────────────────────────────────
   const notifPermRef = useRef("default");
@@ -408,6 +465,13 @@ export default function SandboxCRMPage() {
              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Requiere Atención</span>
              <span className="text-xl font-black text-rose-500 animate-pulse">{filterCounts.attention}</span>
           </div>
+          <button 
+            onClick={() => setShowPricingModal(true)}
+            className="neu-card flex flex-col items-center justify-center px-4 py-3 rounded-[1.25rem] hover:scale-105 transition-all text-slate-500 hover:text-blue-600 shadow-sm"
+          >
+             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Precios</span>
+             <DollarSign size={20} strokeWidth={2.5} />
+          </button>
         </div>
       </div>
 
@@ -532,7 +596,112 @@ export default function SandboxCRMPage() {
           </div>
         )}
       </div>
-    </div>
+      {/* ─── MODAL DE PRECIOS ─── */}
+      {showPricingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm px-4">
+          <div className="neu-card rounded-[2rem] w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-hypnotic">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 flex items-center justify-center">
+                  <DollarSign size={20} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 dark:text-white">Configuración de Precios</h2>
+                  <p className="text-xs font-semibold text-slate-500">Variables dinámicas para el bot de WhatsApp</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPricingModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full neu-list-item text-slate-500 hover:text-rose-500"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50">
+              {pricingLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <div className="w-8 h-8 border-4 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Columna Escuelas Públicas */}
+                  <div className="flex flex-col gap-4">
+                    <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      Escuelas Públicas
+                    </h3>
+                    <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
+                      {pricingData.publica.map(p => (
+                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
+                          <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {pricingData.publica.length === 0 && (
+                        <div className="flex-1 flex items-center justify-center text-sm font-semibold text-slate-400">Sin precios configurados</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Columna Escuelas Privadas */}
+                  <div className="flex flex-col gap-4">
+                    <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                      Escuelas Privadas
+                    </h3>
+                    <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
+                      {pricingData.privada.map(p => (
+                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
+                          <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      {pricingData.privada.length === 0 && (
+                        <div className="flex-1 flex items-center justify-center text-sm font-semibold text-slate-400">Sin precios configurados</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Agregar Nuevo */}
+            <div className="p-6 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 flex flex-col sm:flex-row items-center gap-4">
+              <select
+                value={newPrice.tipo}
+                onChange={(e) => setNewPrice({ ...newPrice, tipo: e.target.value })}
+                className="neu-input-inset h-12 px-4 rounded-xl font-bold text-slate-700 w-full sm:w-auto outline-none"
+              >
+                <option value="pública">E. Pública</option>
+                <option value="privada">E. Privada</option>
+              </select>
+              <div className="flex-1 relative w-full">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black">$</span>
+                <input 
+                  type="number"
+                  placeholder="Monto de recuperación"
+                  value={newPrice.monto}
+                  onChange={(e) => setNewPrice({ ...newPrice, monto: e.target.value })}
+                  className="neu-input-inset w-full h-12 pl-8 pr-4 rounded-xl font-bold outline-none"
+                />
+              </div>
+              <button 
+                onClick={handleAddPrice}
+                disabled={!newPrice.monto || pricingLoading}
+                className="h-12 px-6 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2 w-full sm:w-auto justify-center transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={18} strokeWidth={3} />
+                Agregar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
