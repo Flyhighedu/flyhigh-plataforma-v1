@@ -66,3 +66,36 @@ export async function DELETE(req) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function PATCH(req) {
+  try {
+    const body = await req.json();
+    const { id, tipo_escuela, destacado } = body;
+
+    if (!id || !tipo_escuela) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // If making this one highlighted, clear others of the same type
+    if (destacado) {
+      await supabaseAdmin
+        .from("precios_cuotas")
+        .update({ destacado: false })
+        .eq("tipo_escuela", tipo_escuela);
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("precios_cuotas")
+      .update({ destacado })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return NextResponse.json({ data });
+  } catch (err) {
+    console.error("[CRM-Precios] PATCH error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+

@@ -6,7 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import KanbanBoard from "./kanban-board";
 import InboxView from "./inbox-view";
 import ListView from "./list-view";
-import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check, DollarSign, Plus, Trash2 } from "lucide-react";
+import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check, DollarSign, Plus, Trash2, Star } from "lucide-react";
 
 // ─── Notification sound (base64 tiny ding) ──────────────────
 const DING_SOUND = typeof Audio !== "undefined"
@@ -83,6 +83,19 @@ export default function SandboxCRMPage() {
   const handleDeletePrice = async (id) => {
     try {
       const res = await fetch(`/api/crm-precios?id=${id}`, { method: "DELETE" });
+      if (res.ok) fetchPricing();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleDestacado = async (id, tipo_escuela, actualDestacado) => {
+    try {
+      const res = await fetch(`/api/crm-precios`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, tipo_escuela, destacado: !actualDestacado })
+      });
       if (res.ok) fetchPricing();
     } catch (err) {
       console.error(err);
@@ -640,9 +653,18 @@ export default function SandboxCRMPage() {
                     <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
                       {pricingData.publica.map(p => (
                         <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
-                          <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
+                              className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
+                              title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
+                            >
+                              <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                            </button>
+                            <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          </div>
                           <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       ))}
@@ -660,9 +682,18 @@ export default function SandboxCRMPage() {
                     <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
                       {pricingData.privada.map(p => (
                         <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
-                          <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
+                              className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
+                              title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
+                            >
+                              <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                            </button>
+                            <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                          </div>
                           <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       ))}
