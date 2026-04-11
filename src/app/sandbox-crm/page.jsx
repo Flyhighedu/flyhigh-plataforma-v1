@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/utils/supabase/client";
 import KanbanBoard from "./kanban-board";
 import InboxView from "./inbox-view";
@@ -13,6 +14,12 @@ const DING_SOUND = typeof Audio !== "undefined"
   : null;
 
 export default function SandboxCRMPage() {
+  const [portalTarget, setPortalTarget] = useState(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
   const [contacts, setContacts] = useState([]);
   const [stages, setStages] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -467,10 +474,13 @@ export default function SandboxCRMPage() {
           </div>
           <button 
             onClick={() => setShowPricingModal(true)}
-            className="neu-card flex flex-col items-center justify-center px-4 py-3 rounded-[1.25rem] hover:scale-105 transition-all text-slate-500 hover:text-blue-600 shadow-sm"
+            className="flex items-center gap-2 h-[68px] px-6 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-[1.25rem] font-black shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
           >
-             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Precios</span>
-             <DollarSign size={20} strokeWidth={2.5} />
+             <DollarSign size={24} strokeWidth={3} />
+             <div className="flex flex-col items-start translate-y-0.5">
+               <span className="text-[10px] uppercase tracking-widest text-emerald-100 mb-0.5">Gestión de</span>
+               <span className="text-sm leading-none">PRECIOS</span>
+             </div>
           </button>
         </div>
       </div>
@@ -596,13 +606,12 @@ export default function SandboxCRMPage() {
           </div>
         )}
       </div>
-      {/* ─── MODAL DE PRECIOS ─── */}
-      {showPricingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm px-4">
-          <div className="neu-card rounded-[2rem] w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-hypnotic">
+      {portalTarget && showPricingModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-md px-4 pointer-events-auto">
+          <div className="neu-card rounded-[2rem] w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-premium-in shadow-2xl">
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center">
                   <DollarSign size={20} strokeWidth={2.5} />
                 </div>
                 <div>
@@ -610,22 +619,19 @@ export default function SandboxCRMPage() {
                   <p className="text-xs font-semibold text-slate-500">Variables dinámicas para el bot de WhatsApp</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowPricingModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full neu-list-item text-slate-500 hover:text-rose-500"
-              >
+              <button onClick={() => setShowPricingModal(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 transition-colors">
                 <XCircle size={20} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 dark:bg-slate-900/50">
               {pricingLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <div className="w-8 h-8 border-4 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+                <div className="flex items-center justify-center h-48">
+                  <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Columna Escuelas Públicas */}
+                  {/* Publica */}
                   <div className="flex flex-col gap-4">
                     <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -645,8 +651,7 @@ export default function SandboxCRMPage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Columna Escuelas Privadas */}
+                  {/* Privada */}
                   <div className="flex flex-col gap-4">
                     <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-orange-500"></span>
@@ -693,15 +698,17 @@ export default function SandboxCRMPage() {
               <button 
                 onClick={handleAddPrice}
                 disabled={!newPrice.monto || pricingLoading}
-                className="h-12 px-6 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 flex items-center gap-2 w-full sm:w-auto justify-center transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-12 px-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/30 flex items-center gap-2 w-full sm:w-auto justify-center transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus size={18} strokeWidth={3} />
                 Agregar
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        portalTarget
       )}
+      </div>
     </>
   );
 }
