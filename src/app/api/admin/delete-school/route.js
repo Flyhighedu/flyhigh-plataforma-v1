@@ -23,6 +23,13 @@ export async function POST(request) {
 
         const supabase = getAdminSupabase();
 
+        // Paso preventivo: Eliminar conversaciones de WhatsApp que apunten a esta escuela
+        // para evitar "violates foreign key constraint".
+        await supabase
+            .from('whatsapp_conversations')
+            .delete()
+            .eq('proxima_escuela_id', id);
+
         const { error } = await supabase
             .from('proximas_escuelas')
             .delete()

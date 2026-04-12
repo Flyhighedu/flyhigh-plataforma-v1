@@ -6,7 +6,136 @@ import { createClient } from "@/utils/supabase/client";
 import KanbanBoard from "./kanban-board";
 import InboxView from "./inbox-view";
 import ListView from "./list-view";
-import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check, DollarSign, Plus, Trash2, Star } from "lucide-react";
+import { Mail, MessageSquare, PauseCircle, Flame, Search, CheckCircle, XCircle, LayoutDashboard, Activity, Check, DollarSign, Plus, Trash2, Star, Smile } from "lucide-react";
+import EmojiPicker from 'emoji-picker-react';
+
+const PriceDescriptionEditor = ({ priceItem, onUpdate }) => {
+  const [value, setValue] = useState(priceItem.descripcion || "");
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState({ top: 0, left: 0 });
+  const containerRef = useRef(null);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    setValue(priceItem.descripcion || "");
+  }, [priceItem.descripcion]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      const clickedOutside = 
+        containerRef.current && !containerRef.current.contains(e.target) &&
+        (!pickerRef.current || !pickerRef.current.contains(e.target));
+
+      if (clickedOutside && showPicker) {
+        setShowPicker(false);
+        if (value !== (priceItem.descripcion || "")) {
+          onUpdate(priceItem.id, priceItem.tipo_escuela, value);
+        }
+      }
+    };
+
+    const handleScroll = (e) => {
+      // Don't close if scrolling inside the emoji picker itself
+      if (pickerRef.current && pickerRef.current.contains(e.target)) return;
+      
+      if (showPicker) {
+        setShowPicker(false);
+        if (value !== (priceItem.descripcion || "")) {
+          onUpdate(priceItem.id, priceItem.tipo_escuela, value);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [showPicker, value, priceItem.descripcion, priceItem.id, priceItem.tipo_escuela, onUpdate]);
+
+  const handleBlur = (e) => {
+    const focusInPickerOrContainer = e.relatedTarget && (
+      (containerRef.current && containerRef.current.contains(e.relatedTarget)) ||
+      (pickerRef.current && pickerRef.current.contains(e.relatedTarget))
+    );
+
+    if (focusInPickerOrContainer) return;
+    
+    if (value !== (priceItem.descripcion || "")) {
+      onUpdate(priceItem.id, priceItem.tipo_escuela, value);
+    }
+  };
+
+  const handleTogglePicker = (e) => {
+    e.preventDefault();
+    if (showPicker) {
+      setShowPicker(false);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const pickerWidth = 300;
+      const pickerHeight = 350;
+      
+      let top = rect.bottom + 8;
+      let left = rect.right - pickerWidth;
+      
+      // Prevent bleeding below
+      if (top + pickerHeight > window.innerHeight) {
+        top = rect.top - pickerHeight - 8;
+      }
+      // Prevent bleeding left
+      if (left < 16) {
+        left = 16;
+      }
+
+      setPickerPos({ top, left });
+      setShowPicker(true);
+    }
+  };
+
+  return (
+    <div className="relative w-full flex flex-col" ref={containerRef}>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder="Ej. Los patrocinadores subsidian el resto..."
+        className="w-full text-xs font-medium text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-slate-800/50 rounded-lg p-2 pr-8 resize-none h-14 outline-none focus:ring-2 focus:ring-blue-500/50 transition-all border border-slate-200/50 dark:border-slate-700/50"
+      />
+      <button 
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleTogglePicker}
+        className="absolute bottom-2 right-2 text-slate-400 hover:text-amber-500 transition-colors z-10 p-1"
+        title="Agregar Emoji"
+      >
+        <Smile size={16} strokeWidth={2.5} />
+      </button>
+
+      {showPicker && typeof document !== 'undefined' && createPortal(
+        <div 
+          ref={pickerRef}
+          className="fixed z-[100000] shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-premium-in"
+          style={{ top: pickerPos.top + 'px', left: pickerPos.left + 'px' }}
+          tabIndex="-1"
+        >
+          <EmojiPicker 
+            onEmojiClick={(emojiData) => {
+              setValue(prev => prev + emojiData.emoji);
+            }} 
+            autoFocusSearch={false}
+            theme="auto"
+            searchDisabled={false}
+            skinTonesDisabled={true}
+            width={300}
+            height={350}
+          />
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 // ─── Notification sound (base64 tiny ding) ──────────────────
 const DING_SOUND = typeof Audio !== "undefined"
@@ -39,8 +168,8 @@ export default function SandboxCRMPage() {
   const [pricingLoading, setPricingLoading] = useState(false);
 
   // ─── Fetch Pricing ────────────────────────────────────────
-  const fetchPricing = useCallback(async () => {
-    setPricingLoading(true);
+  const fetchPricing = useCallback(async (background = false) => {
+    if (!background) setPricingLoading(true);
     try {
       const res = await fetch("/api/crm-precios");
       const json = await res.json();
@@ -53,7 +182,7 @@ export default function SandboxCRMPage() {
     } catch (err) {
       console.error("[CRM] Fetch pricing error:", err);
     } finally {
-      setPricingLoading(false);
+      if (!background) setPricingLoading(false);
     }
   }, []);
 
@@ -73,7 +202,7 @@ export default function SandboxCRMPage() {
       });
       if (res.ok) {
         setNewPrice({ ...newPrice, monto: "" });
-        fetchPricing();
+        fetchPricing(true);
       }
     } catch (err) {
       console.error(err);
@@ -83,7 +212,7 @@ export default function SandboxCRMPage() {
   const handleDeletePrice = async (id) => {
     try {
       const res = await fetch(`/api/crm-precios?id=${id}`, { method: "DELETE" });
-      if (res.ok) fetchPricing();
+      if (res.ok) fetchPricing(true);
     } catch (err) {
       console.error(err);
     }
@@ -96,7 +225,20 @@ export default function SandboxCRMPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, tipo_escuela, destacado: !actualDestacado })
       });
-      if (res.ok) fetchPricing();
+      if (res.ok) fetchPricing(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateDescription = async (id, tipo_escuela, newDescription) => {
+    try {
+      const res = await fetch(`/api/crm-precios`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, tipo_escuela, descripcion: newDescription })
+      });
+      if (res.ok) fetchPricing(true);
     } catch (err) {
       console.error(err);
     }
@@ -451,7 +593,7 @@ export default function SandboxCRMPage() {
         .stagger-2 { animation-delay: 0.2s; }
         .stagger-3 { animation-delay: 0.3s; }
       `}} />
-      <div className="w-full h-full flex flex-col overflow-hidden animate-hypnotic z-10 px-4 md:px-6 lg:px-8 pt-6">
+      <div className="w-full flex-1 flex flex-col overflow-hidden animate-hypnotic z-10 px-4 md:px-6 lg:px-8 pt-6">
         {/* ─── BARRA DE CONTROL PRINCIPAL NEUMÓRFICA ─── */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between pb-6 gap-6 shrink-0 relative z-20 w-full animate-hypnotic stagger-1">
         <div className="flex items-center gap-4">
@@ -652,20 +794,23 @@ export default function SandboxCRMPage() {
                     </h3>
                     <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
                       {pricingData.publica.map(p => (
-                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
-                              className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
-                              title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
-                            >
-                              <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex flex-col gap-2 group">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
+                                className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
+                                title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
+                              >
+                                <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                              </button>
+                              <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                            </div>
+                            <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Trash2 size={18} />
                             </button>
-                            <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
                           </div>
-                          <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={18} />
-                          </button>
+                          <PriceDescriptionEditor priceItem={p} onUpdate={handleUpdateDescription} />
                         </div>
                       ))}
                       {pricingData.publica.length === 0 && (
@@ -681,20 +826,23 @@ export default function SandboxCRMPage() {
                     </h3>
                     <div className="neu-input-inset p-4 rounded-[1.5rem] flex flex-col gap-3 min-h-[200px]">
                       {pricingData.privada.map(p => (
-                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex items-center justify-between group">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
-                              className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
-                              title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
-                            >
-                              <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                        <div key={p.id} className="neu-list-item rounded-xl p-3 flex flex-col gap-2 group">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleToggleDestacado(p.id, p.tipo_escuela, p.destacado)} 
+                                className={`transition-colors ${p.destacado ? "text-amber-400" : "text-slate-300 hover:text-amber-400"}`}
+                                title={p.destacado ? "Precio Destacado" : "Marcar como destacado"}
+                              >
+                                <Star size={18} fill={p.destacado ? "currentColor" : "none"} strokeWidth={p.destacado ? 0 : 2} />
+                              </button>
+                              <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
+                            </div>
+                            <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Trash2 size={18} />
                             </button>
-                            <span className="font-black text-lg text-slate-700 dark:text-slate-200">${p.precio} MXN</span>
                           </div>
-                          <button onClick={() => handleDeletePrice(p.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={18} />
-                          </button>
+                          <PriceDescriptionEditor priceItem={p} onUpdate={handleUpdateDescription} />
                         </div>
                       ))}
                       {pricingData.privada.length === 0 && (

@@ -25,7 +25,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { tipo_escuela, precio } = body;
+    const { tipo_escuela, precio, descripcion } = body;
 
     if (!tipo_escuela || !precio) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -33,7 +33,7 @@ export async function POST(req) {
 
     const { data, error } = await supabaseAdmin
       .from("precios_cuotas")
-      .insert({ tipo_escuela, precio: Number(precio) })
+      .insert({ tipo_escuela, precio: Number(precio), descripcion: descripcion || null })
       .select()
       .single();
 
@@ -70,11 +70,15 @@ export async function DELETE(req) {
 export async function PATCH(req) {
   try {
     const body = await req.json();
-    const { id, tipo_escuela, destacado } = body;
+    const { id, tipo_escuela, destacado, descripcion } = body;
 
     if (!id || !tipo_escuela) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    const updates = {};
+    if (destacado !== undefined) updates.destacado = destacado;
+    if (descripcion !== undefined) updates.descripcion = descripcion;
 
     // If making this one highlighted, clear others of the same type
     if (destacado) {
@@ -86,7 +90,7 @@ export async function PATCH(req) {
 
     const { data, error } = await supabaseAdmin
       .from("precios_cuotas")
-      .update({ destacado })
+      .update(updates)
       .eq("id", id)
       .select()
       .single();

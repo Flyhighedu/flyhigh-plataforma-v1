@@ -337,7 +337,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                 <AdminAlarms />
 
                 {activeTab === 'crm' ? (
-                    <div className="flex-1 overflow-hidden w-full h-full relative">
+                    <div className="flex-1 flex flex-col overflow-hidden w-full relative">
                         {children}
                     </div>
                 ) : (

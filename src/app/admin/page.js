@@ -240,6 +240,11 @@ export default function AdminPage() {
     const [fetchingDates, setFetchingDates] = useState(false);
     const [newDateForm, setNewDateForm] = useState({ fecha: '', notas: '' });
     const [addingDate, setAddingDate] = useState(false);
+    
+    // Auto-Scheduler & Filters
+    const [dateFilter, setDateFilter] = useState('proximas'); // 'proximas' | 'ganadas' | 'perdidas'
+    const [autoScheduleEnabled, setAutoScheduleEnabled] = useState(false);
+    const [isAutoScheduling, setIsAutoScheduling] = useState(false);
 
     // --- ESTADO DEL CATÁLOGO DE ESCUELAS ---
     const [catalogoEscuelas, setCatalogoEscuelas] = useState([]);
@@ -304,9 +309,9 @@ export default function AdminPage() {
     useEffect(() => {
         setIsMounted(true); // Hydration fix
         const hasCookie = document.cookie.includes('flyhigh_admin_auth=');
-        if (hasCookie) {
-            setIsAuthenticated(true);
-        }
+        if (hasCookie) setIsAuthenticated(true);
+        const storedAutopilot = localStorage.getItem('flyhigh_autopilot_fechas');
+        if (storedAutopilot === 'true') setAutoScheduleEnabled(true);
     }, []);
 
     // Fetch tab-specific data on tab switch
@@ -428,9 +433,66 @@ export default function AdminPage() {
         }
     };
 
+    const runAutoSchedule = async (currentDates = availableDates) => {
+        if (isAutoScheduling) return;
+        setIsAutoScheduling(true);
+        try {
+            let maxDateStr = new Date().toISOString().split('T')[0];
+            if (currentDates && currentDates.length > 0) {
+                const max = currentDates.reduce((prev, curr) => (curr.fecha > prev.fecha ? curr : prev));
+                if (max.fecha > maxDateStr) maxDateStr = max.fecha;
+            }
 
+            const targetDate = new Date(maxDateStr + 'T12:00:00');
+            targetDate.setDate(targetDate.getDate() + 21); // +3 weeks
+            
+            let dateCursor = new Date(); // Start filling from today
+            dateCursor.setHours(12, 0, 0, 0);
 
+            const datesToAdd = [];
+            while (dateCursor <= targetDate) {
+                const dayOfWeek = dateCursor.getDay(); // 0 = Sunday, 6 = Saturday
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    const isoStr = dateCursor.toISOString().split('T')[0];
+                    const exists = currentDates.some(d => d.fecha === isoStr);
+                    if (!exists) datesToAdd.push(isoStr);
+                }
+                dateCursor.setDate(dateCursor.getDate() + 1);
+            }
 
+            if (datesToAdd.length > 0) {
+                console.log('Auto-scheduler inyectando fechas faltantes:', datesToAdd);
+                for (const d of datesToAdd) {
+                    await fetch('/api/sandbox-fechas', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fecha: d, cupo_maximo: 2, notas: 'Piloto Automático' }),
+                    });
+                }
+                fetchAvailableDates(); // Refrescar todas
+            }
+        } catch (err) {
+            console.error('Error auto-scheduling:', err);
+        } finally {
+            setIsAutoScheduling(false);
+        }
+    };
+
+    const handleToggleAutoSchedule = () => {
+        const newVal = !autoScheduleEnabled;
+        setAutoScheduleEnabled(newVal);
+        localStorage.setItem('flyhigh_autopilot_fechas', newVal ? 'true' : 'false');
+        if (newVal) runAutoSchedule(availableDates);
+    };
+
+    // Monitor AutoSchedule
+    useEffect(() => {
+        if (autoScheduleEnabled && availableDates.length > 0) {
+            runAutoSchedule(availableDates);
+        }
+        // Solo ejecutamos si hay un cambio en el array de fechas (inserciones, deletes) o en el switch
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoScheduleEnabled, availableDates.length]);
 
     const fetchSponsors = async () => {
         setFetchingSponsors(true);
@@ -1171,9 +1233,9 @@ export default function AdminPage() {
 
             {/* TAB: CRM Pipeline Principal */}
             {activeTab === 'crm' && (
-                <div className="animate-premium-in w-full h-full">
+                <div className="animate-premium-in w-full h-full flex flex-col pt-4 overflow-hidden relative">
                     {/* Hacemos que ocupe todo el ancho igual que las bd */}
-                    <div className="max-w-[100vw] h-full">
+                    <div className="max-w-[100vw] flex-1 flex flex-col overflow-hidden relative">
                         <SandboxCRMPage />
                     </div>
                 </div>
@@ -1649,21 +1711,72 @@ export default function AdminPage() {
                                 </button>
                             </form>
 
+                            {/* Control de Auto-Piloto y Filtros Históricos */}
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                                {/* Pestañas de Histórico */}
+                                <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl">
+                                    <button onClick={() => setDateFilter('proximas')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${dateFilter === 'proximas' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                        Próximas
+                                    </button>
+                                    <button onClick={() => setDateFilter('ganadas')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${dateFilter === 'ganadas' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                        Ganadas
+                                    </button>
+                                    <button onClick={() => setDateFilter('perdidas')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${dateFilter === 'perdidas' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                                        Perdidas
+                                    </button>
+                                </div>
+
+                                {/* Toggle Auto-Schedule */}
+                                <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 pl-4 rounded-xl shadow-sm">
+                                    <div className="flex items-center gap-2">
+                                        <Bot size={16} className={autoScheduleEnabled ? "text-indigo-500" : "text-slate-400"} />
+                                        <div className="text-xs">
+                                            <p className="font-bold text-slate-700 dark:text-slate-300">Piloto Automático</p>
+                                            <p className="text-[10px] text-slate-500">Auto-rellena 3 semanas</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleAutoSchedule}
+                                        className={`ml-2 p-1.5 rounded-xl transition-all duration-300 ${autoScheduleEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                                        title={autoScheduleEnabled ? "Desactivar automatización" : "Activar automatización"}
+                                    >
+                                        {isAutoScheduling ? <Loader2 size={24} className="animate-spin" /> : autoScheduleEnabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Date List */}
-                            {fetchingDates ? (
+                            {fetchingDates && availableDates.length === 0 ? (
                                 <div className="flex items-center justify-center py-8">
                                     <Loader2 size={28} className="animate-spin text-slate-400" />
                                 </div>
-                            ) : availableDates.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400">
-                                    <Calendar size={40} className="mx-auto mb-3 opacity-30" />
-                                    <p className="font-medium">No hay días abiertos para el bot</p>
-                                    <p className="text-xs mt-1">Usa el formulario de arriba para abrir una nueva fecha.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {availableDates.map((d) => {
-                                        const dateFormatted = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+                            ) : (() => {
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                const filteredDatesList = availableDates.filter(d => {
+                                    const isPast = d.fecha < todayStr;
+                                    if (dateFilter === 'proximas') return !isPast;
+                                    if (dateFilter === 'ganadas') return isPast && d.cupo_usado > 0;
+                                    if (dateFilter === 'perdidas') return isPast && d.cupo_usado === 0;
+                                    return true;
+                                }).sort((a, b) => {
+                                    if (dateFilter === 'proximas') return a.fecha.localeCompare(b.fecha);
+                                    return b.fecha.localeCompare(a.fecha);
+                                });
+
+                                if (filteredDatesList.length === 0) {
+                                    return (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <Calendar size={40} className="mx-auto mb-3 opacity-30" />
+                                            <p className="font-medium">No hay fechas en esta vista</p>
+                                            <p className="text-xs mt-1">Intenta con otro filtro o agrega fechas.</p>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div className="space-y-3">
+                                        {filteredDatesList.map((d) => {
+                                            const dateFormatted = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
                                         const isFull = d.cupo_usado >= 2;
                                         const isPast = new Date(d.fecha) < new Date(new Date().toISOString().split('T')[0]);
 
@@ -1742,7 +1855,8 @@ export default function AdminPage() {
                                         );
                                     })}
                                 </div>
-                            )}
+                                );
+                            })()}
                         </section>
 
                         {/* --- ALTA DE PRÓXIMA MISIÓN --- */}
@@ -1901,7 +2015,7 @@ export default function AdminPage() {
                                         <p className="font-medium">No hay misiones próximas pendientes</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
+                                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 relative z-10">
                                         {nextSchools.filter(s => s.estatus !== 'completada').map((school) => {
                                             const isCanceled = school.estatus === 'cancelada';
                                             const isArchived = school.estatus === 'archivado';
@@ -1985,7 +2099,7 @@ export default function AdminPage() {
                                         <p>Aún no hay misiones completadas</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
+                                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 relative z-10">
                                         {nextSchools.filter(s => s.estatus === 'completada').map((school) => (
                                             <div key={school.id} className="neu-list-item flex flex-col gap-2 p-4 border-l-4 border-emerald-500 opacity-80 group hover:-translate-y-1 hover:opacity-100 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
                                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />

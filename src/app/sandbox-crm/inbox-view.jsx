@@ -56,7 +56,7 @@ export default function InboxView({ contacts, stages = [], selectedContactId, on
   const selectedContact = contacts.find(c => c.id === selectedContactId);
 
   return (
-    <div className="flex w-full h-[calc(100vh-140px)] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+    <div className="flex w-full h-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
       
       {/* ─── COLUMNA IZQUIERDA: LISTA DE CHATS (30%) ─── */}
       <div className="w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900">
