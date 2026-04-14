@@ -14,7 +14,7 @@ import {
     MapPin, Camera, Lock, KeyRound, ShieldCheck, Palette,
     Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar,
     ChevronDown, ChevronUp, UserPlus, Shield, ToggleLeft, ToggleRight, Copy, ExternalLink,
-    Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign
+    Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign, Bot
 } from 'lucide-react';
 import { processBackgroundRemoval } from '@/lib/bgRemover';
 
@@ -437,14 +437,9 @@ export default function AdminPage() {
         if (isAutoScheduling) return;
         setIsAutoScheduling(true);
         try {
-            let maxDateStr = new Date().toISOString().split('T')[0];
-            if (currentDates && currentDates.length > 0) {
-                const max = currentDates.reduce((prev, curr) => (curr.fecha > prev.fecha ? curr : prev));
-                if (max.fecha > maxDateStr) maxDateStr = max.fecha;
-            }
-
-            const targetDate = new Date(maxDateStr + 'T12:00:00');
-            targetDate.setDate(targetDate.getDate() + 21); // +3 weeks
+            const today = new Date();
+            const targetDate = new Date();
+            targetDate.setDate(targetDate.getDate() + 21); // Hasta 3 semanas desde HOY.
             
             let dateCursor = new Date(); // Start filling from today
             dateCursor.setHours(12, 0, 0, 0);
@@ -485,14 +480,7 @@ export default function AdminPage() {
         if (newVal) runAutoSchedule(availableDates);
     };
 
-    // Monitor AutoSchedule
-    useEffect(() => {
-        if (autoScheduleEnabled && availableDates.length > 0) {
-            runAutoSchedule(availableDates);
-        }
-        // Solo ejecutamos si hay un cambio en el array de fechas (inserciones, deletes) o en el switch
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoScheduleEnabled, availableDates.length]);
+    // Monitor AutoSchedule (Bug eliminado: No usar useEffect atado a length)
 
     const fetchSponsors = async () => {
         setFetchingSponsors(true);
