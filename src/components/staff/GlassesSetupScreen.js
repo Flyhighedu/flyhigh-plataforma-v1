@@ -743,6 +743,7 @@ export default function GlassesSetupScreen({
     return (
         <div className="relative flex min-h-screen flex-col bg-slate-100 text-slate-800 antialiased">
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={localFirstName}
                 roleName={roleName}
                 role={profile?.role}

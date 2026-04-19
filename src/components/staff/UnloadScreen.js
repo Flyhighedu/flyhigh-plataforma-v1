@@ -310,6 +310,7 @@ export default function UnloadScreen({
         }}>
             {/* ─── Header (UNTOUCHED) ─── */}
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={profile?.full_name?.split(' ')[0]}
                 roleName={profile?.role === 'pilot' ? 'Piloto' : (profile?.role === 'teacher' ? 'Docente' : 'Auxiliar')}
                 role={profile?.role}

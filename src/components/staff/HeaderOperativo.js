@@ -1,8 +1,10 @@
 'use client';
 
 import { forwardRef } from 'react';
-import { CheckCheck, ClipboardList, GraduationCap, School, Send, Truck, Wrench } from 'lucide-react';
+import { CheckCheck, ClipboardList, GraduationCap, School, Send, Truck, User, Wrench } from 'lucide-react';
 import { HEADER_PHASES, getHeaderPhaseForState } from '../../constants/headerPhases';
+import { MiniAvatar } from '@/components/ui/MiniAvatar';
+import Link from 'next/link';
 
 function toRgba(hexColor, alpha) {
     if (typeof hexColor !== 'string') return `rgba(34,197,94,${alpha})`;
@@ -55,6 +57,7 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
         missionState,
         missionMeta,
         dateLabel,
+        avatarConfig = null,
         checkInGreetingText = null,
         checkInHeadlineText = null,
         schoolName = '',
@@ -206,42 +209,69 @@ const HeaderOperativo = forwardRef(function HeaderOperativo(
                                 <span className="uppercase text-xs tracking-wider opacity-80">{displayDate}</span>
                             </div>
 
-                            <div className="flex flex-wrap items-end gap-x-1 gap-y-0.5">
-                                <h2 className="text-3xl font-extrabold leading-none tracking-tight text-white">
-                                    {checkInHeadline}
-                                </h2>
-                                <span className="mb-[1px] text-[9px] font-semibold uppercase tracking-[0.08em] text-blue-100/75 sm:text-[10px]">
-                                    {roleText}
-                                </span>
+                            <div className="flex items-center gap-3.5 mt-2">
+                                <Link
+                                    href="/staff/hub"
+                                    className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-lg border border-white/25 flex items-center justify-center shrink-0 overflow-hidden shadow-lg hover:bg-white/20 active:scale-95 transition-all group relative"
+                                    title="Ver mi perfil"
+                                >
+                                    {avatarConfig ? (
+                                        <>
+                                            <div className="absolute inset-0 rounded-full border-[3px] border-transparent group-hover:border-white/40 transition-colors pointer-events-none"></div>
+                                            <MiniAvatar config={avatarConfig} size={64} className="scale-[1.3] translate-y-2" />
+                                        </>
+                                    ) : (
+                                        <User size={28} className="text-white/80 drop-shadow-md" />
+                                    )}
+                                </Link>
+                                <div className="flex flex-col items-start gap-0.5">
+                                    <h2 className="text-[34px] font-black leading-none tracking-tight text-white drop-shadow-md">
+                                        {checkInHeadline}
+                                    </h2>
+                                    <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-[#A6E3FF] drop-shadow-sm ml-0.5">
+                                        {roleText}
+                                    </span>
+                                </div>
                             </div>
                         </>
                     ) : (
                         <>
                             <div
-                                className="flex justify-center overflow-hidden"
+                                className="flex justify-center overflow-hidden transition-all duration-300"
                                 style={{
-                                    maxHeight: `${Math.round(38 * compactAmount)}px`,
+                                    height: `${Math.round(50 * compactAmount)}px`,
                                     opacity: compactAmount
                                 }}
                             >
-                                <div className="flex max-w-full flex-col items-center gap-px">
-                                    <div className="inline-flex max-w-full items-center gap-2">
-                                        <span className="max-w-[130px] truncate text-[16px] font-black leading-none tracking-tight text-white sm:max-w-[180px] sm:text-[17px]">
-                                            {name}
-                                        </span>
+                                <div className="flex max-w-full items-center gap-3 pb-1">
+                                    {avatarConfig && (
+                                        <Link
+                                            href="/staff/hub"
+                                            className="w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center shrink-0 overflow-hidden shadow-md active:scale-95 hover:scale-105 transition-transform"
+                                            title="Ver mi Perfil"
+                                        >
+                                            <MiniAvatar config={avatarConfig} size={44} className="scale-[1.3] translate-y-[3px]" />
+                                        </Link>
+                                    )}
+                                    <div className="flex flex-col items-start gap-px">
+                                        <div className="inline-flex max-w-full items-center gap-2">
+                                            <span className="max-w-[150px] truncate text-[17px] font-black leading-none tracking-tight text-white drop-shadow-sm sm:max-w-[200px]">
+                                                {name}
+                                            </span>
 
-                                        <span className="h-1 w-1 rounded-full bg-blue-100/70" />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-[#A6E3FF] shadow-sm" />
 
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-100/86 sm:text-[11px]">
-                                            {roleText}
+                                            <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#A6E3FF] drop-shadow-sm">
+                                                {roleText}
+                                            </span>
+                                        </div>
+
+                                        <span
+                                            className={`max-w-[240px] truncate text-[11px] font-bold leading-none sm:max-w-[320px] ${compactSecondaryIsDate ? 'uppercase tracking-widest text-[#A6E3FF]/90' : 'text-white/95'}`}
+                                        >
+                                            {compactSecondaryText}
                                         </span>
                                     </div>
-
-                                    <span
-                                        className={`max-w-[220px] truncate text-[9px] font-semibold leading-none sm:max-w-[300px] sm:text-[10px] ${compactSecondaryIsDate ? 'uppercase tracking-[0.08em] text-blue-100/78' : 'text-blue-100/83'}`}
-                                    >
-                                        {compactSecondaryText}
-                                    </span>
                                 </div>
                             </div>
 

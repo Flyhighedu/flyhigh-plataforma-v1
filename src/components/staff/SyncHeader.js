@@ -179,6 +179,7 @@ export default function SyncHeader({
     userId,
     missionInfo,
     missionState,
+    avatarConfig = null,
     isWaitScreen = false,
     waitPhase = null,
     chipOverride = null,
@@ -848,6 +849,7 @@ export default function SyncHeader({
                 missionState={effectiveMissionState}
                 missionMeta={headerMeta}
                 schoolName={missionInfo?.school_name || missionInfo?.nombre_escuela || ''}
+                avatarConfig={avatarConfig}
                 compactProgress={isCheckInHeaderPhase ? compactProgress : 1}
                 waitModeActive={isWaitModeVisual}
                 waitModeText="Te esperan"

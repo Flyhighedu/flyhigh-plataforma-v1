@@ -1362,6 +1362,7 @@ export default function StaffOperationLegacy({
                     onRefresh={onRefresh}
                 >
                     <SyncHeader
+                        avatarConfig={profile?.avatar_config}
                         firstName={firstName}
                         roleName={roleName}
                         role={currentRole}

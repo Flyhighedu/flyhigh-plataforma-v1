@@ -280,6 +280,7 @@ export default function PilotMusicAmbienceScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={pilotFirstName}
                 roleName={roleName}
                 role={profile?.role}

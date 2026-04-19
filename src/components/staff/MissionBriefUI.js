@@ -87,6 +87,7 @@ export default function MissionBriefUI({
     journeyId, // [NEW] for Reset Process
     userId, // [NEW] for emergency sync
     onDemoStart, // [NEW] for Demo Fab
+    avatarConfig,
     children // [NEW] Content (Fallback)
 }) {
     const router = useRouter();
@@ -330,6 +331,7 @@ export default function MissionBriefUI({
                 dateLabel={capitalizedDate}
                 actionsSlot={headerActions}
                 style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
+                avatarConfig={avatarConfig}
             />
 
             {/* --- BODY --- */}

@@ -182,6 +182,7 @@ export default function IDStudio() {
             if (res.ok) {
                 setSaveSuccess(true);
                 setTimeout(() => {
+                    router.refresh();
                     router.push('/staff/hub');
                 }, 2000);
             } else {

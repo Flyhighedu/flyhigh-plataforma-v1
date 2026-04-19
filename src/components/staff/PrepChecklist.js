@@ -420,6 +420,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
             minHeight: '100vh', display: 'flex', flexDirection: 'column'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={role}

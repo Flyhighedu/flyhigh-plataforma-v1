@@ -129,6 +129,7 @@ export default function OperationStartBridgeScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={first}
                 roleName={roleName}
                 role={profile?.role}

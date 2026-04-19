@@ -511,6 +511,7 @@ export default function MissionBrief({
                 journeyId={journeyId} // [NEW]
                 userId={userId} // [NEW]
                 onDemoStart={onRefresh} // [NEW] (Uses refresh logic)
+                avatarConfig={profile?.avatar_config}
             >
                 {/* Fallback Content como Children */}
                 {(locationStatus === 'error' || locationStatus === 'denied' || isOffline) && (

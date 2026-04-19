@@ -105,6 +105,7 @@ export default function MomentoDeCargarScreen({
     return (
         <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#F3F6F8] text-slate-800">
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstNameLabel}
                 roleName={roleName}
                 role={profile?.role}

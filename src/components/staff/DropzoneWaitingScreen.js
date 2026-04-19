@@ -83,6 +83,7 @@ export default function DropzoneWaitingScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={profile?.full_name?.split(' ')[0]}
                 roleName={profile?.role === 'pilot' ? 'Piloto' : 'Docente'}
                 role={profile?.role}

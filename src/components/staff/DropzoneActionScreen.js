@@ -125,6 +125,7 @@ export default function DropzoneActionScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={profile?.full_name?.split(' ')[0]}
                 roleName="Auxiliar"
                 role={profile?.role}

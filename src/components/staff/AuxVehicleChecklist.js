@@ -302,6 +302,7 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
             <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onFileSelected} />
 
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={missionInfo?.profile?.role}

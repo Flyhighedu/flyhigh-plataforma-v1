@@ -372,6 +372,7 @@ export default function AuxParkingVehicleScreen({
         }}>
             {/* ─── Header (UNTOUCHED) ─── */}
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={profile?.role}

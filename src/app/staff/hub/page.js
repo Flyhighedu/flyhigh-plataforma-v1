@@ -682,12 +682,18 @@ export default function HRHubPage() {
                     </button>
 
                     <div className="flex items-center gap-5">
-                        <div className="w-16 h-16 rounded-[22px] bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/20 shrink-0 overflow-hidden relative">
-                            {profile?.avatar_config ? (
-                                <MiniAvatar config={profile.avatar_config} size={64} className="scale-[1.25] translate-y-3" />
-                            ) : (
-                                <User size={32} className="text-white" />
-                            )}
+                        <div className="relative group/avatar cursor-pointer shrink-0">
+                            <Link href="/staff/id-studio" className="w-16 h-16 rounded-[22px] bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/20 overflow-hidden relative block hover:shadow-lg transition-shadow">
+                                {profile?.avatar_config ? (
+                                    <MiniAvatar config={profile.avatar_config} size={64} className="scale-[1.25] translate-y-3 pointer-events-none" />
+                                ) : (
+                                    <User size={32} className="text-white" />
+                                )}
+                            </Link>
+
+                            <Link href="/staff/id-studio" className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md border-[2px] border-blue-600 text-blue-600 group-hover/avatar:scale-110 group-active/avatar:scale-95 transition-transform" title="Editar Avatar">
+                                <Camera size={12} strokeWidth={3} />
+                            </Link>
                         </div>
                         <div className="flex-1 min-w-0">
                             <h1 className="text-[22px] font-black tracking-tight truncate">

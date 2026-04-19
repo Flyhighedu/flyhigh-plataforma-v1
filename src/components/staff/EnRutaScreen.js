@@ -137,6 +137,7 @@ export default function EnRutaScreen({
 
             {/* Premium Synchronizable Header */}
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={role}

@@ -300,6 +300,7 @@ export default function SeatFoldingScreen({
             }}
         >
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstNameLabel}
                 roleName={roleName}
                 role={profile?.role}

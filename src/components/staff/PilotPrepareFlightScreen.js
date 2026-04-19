@@ -523,6 +523,7 @@ export default function PilotPrepareFlightScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={profile?.full_name?.split(' ')[0]}
                 roleName="Piloto"
                 role={profile?.role}

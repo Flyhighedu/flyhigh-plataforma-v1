@@ -232,6 +232,7 @@ export default function AuxWaitingScreen({
             position: 'relative', overflow: 'hidden'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={profile?.role}

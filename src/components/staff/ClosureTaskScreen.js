@@ -732,6 +732,7 @@ export default function ClosureTaskScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={actorName}
                 roleName={roleName}
                 role={profile?.role}

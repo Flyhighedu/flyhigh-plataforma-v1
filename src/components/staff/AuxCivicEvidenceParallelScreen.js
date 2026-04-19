@@ -134,6 +134,7 @@ export default function AuxCivicEvidenceParallelScreen({
         <div className="min-h-dvh flex flex-col bg-slate-50">
 
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 journeyId={journeyId}
                 userId={userId}
                 profile={profile}

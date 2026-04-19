@@ -154,6 +154,7 @@ export default function PilotPrepChecklist({ journeyId, userId, onComplete, prev
             minHeight: '100vh', display: 'flex', flexDirection: 'column'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={missionInfo?.profile?.role}

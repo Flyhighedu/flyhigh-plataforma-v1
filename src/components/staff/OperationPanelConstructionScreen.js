@@ -300,6 +300,7 @@ export default function OperationPanelConstructionScreen({
                 position: 'relative'
             }}>
                 <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                     firstName={first}
                     roleName={roleName}
                     role={profile?.role}
@@ -583,6 +584,7 @@ export default function OperationPanelConstructionScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={first}
                 roleName={roleName}
                 role={profile?.role}

@@ -38,6 +38,7 @@ export default function WaitingUnloadAssignmentScreen({
             position: 'relative'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={profile?.role}

@@ -67,6 +67,7 @@ export default function ApoyoBodegaScreen({
     return (
         <div className="flex min-h-screen flex-col overflow-hidden bg-[#F3F6F8] text-slate-800">
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstNameLabel}
                 roleName={roleName}
                 role={profile?.role}

@@ -15,6 +15,7 @@ import PrepChecklist from '@/components/staff/PrepChecklist';
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
 // [REMOVED] ClosureLegacy — closure logic now lives in StaffOperationLegacy.handleCloseDay()
 import WaitingAuxLoad from '@/components/staff/WaitingAuxLoad';
+import { MiniAvatar } from '@/components/ui/MiniAvatar';
 import AuxWaitingScreen from '@/components/staff/AuxWaitingScreen';
 import AuxVehicleChecklist from '@/components/staff/AuxVehicleChecklist';
 import MissionSelector from '@/components/staff/MissionSelector';
@@ -1974,48 +1975,67 @@ export default function StaffDashboard() {
             <div className="min-h-screen bg-slate-50 p-4">
                 <div className="max-w-md mx-auto space-y-6 pt-6">
                     {/* Header */}
-                    {/* Premium Playful Header */}
+                    {/* Premium Profile Header & Top Bar */}
                     {profile && (
-                        <div 
-                            onClick={() => router.push('/staff/hub')}
-                            className="bg-blue-600 px-5 py-5 rounded-[28px] shadow-[0_12px_35px_rgba(37,99,235,0.25)] relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer mb-6"
-                        >
-                            {/* Decorative playful elements */}
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl pointer-events-none transform translate-x-12 -translate-y-12"></div>
-                            <div className="absolute bottom-0 left-10 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl pointer-events-none transform -translate-x-12 translate-y-8"></div>
+                        <div className="flex flex-col gap-3 mb-8">
                             
-                            <div className="flex items-start justify-between relative z-10 w-full">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/20 shrink-0">
-                                        <User className="w-7 h-7 text-white" />
+                            {/* Top Bar: Date & Actions */}
+                            <div className="flex justify-between items-center px-1">
+                                <div className="text-left">
+                                    <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                                        {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' })}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={handleLogout} 
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 active:scale-95 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                                    title="Cerrar sesión"
+                                >
+                                    <LogOut size={15} strokeWidth={2.5} />
+                                </button>
+                            </div>
+
+                            {/* Premium Neumorphic Profile Card */}
+                            <div 
+                                onClick={() => router.push('/staff/hub')}
+                                className="bg-blue-600 px-6 py-6 rounded-[32px] border border-blue-500 shadow-[0_16px_40px_-12px_rgba(37,99,235,0.4)] relative overflow-hidden group active:scale-[0.98] transition-all cursor-pointer flex items-center justify-between"
+                            >
+                                {/* Subtle background glow */}
+                                <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/50 rounded-full blur-3xl pointer-events-none transform translate-x-12 -translate-y-12"></div>
+                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-700/50 rounded-full blur-2xl pointer-events-none transform -translate-x-12 translate-y-12"></div>
+                                
+                                {/* Text Info */}
+                                <div className="flex flex-col z-10 text-white">
+                                    <div className="flex items-center gap-2 mb-1.5 opacity-90">
+                                        <span className="text-[11px] font-black text-blue-200 uppercase tracking-widest">{ROLE_LABELS[profile.role] || profile.role}</span>
+                                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full shadow-[0_0_6px_rgba(74,222,128,0.8)] animate-pulse"></div>
                                     </div>
-                                    <div className="text-left flex flex-col">
-                                        <p className="font-extrabold text-white text-[16px] tracking-tight">{profile.full_name}</p>
-                                        <p className="text-[11px] font-bold text-blue-200 uppercase tracking-widest">{ROLE_LABELS[profile.role] || profile.role}</p>
-                                        <div className="mt-3 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-white/70 group-hover:text-white transition-colors">
-                                            <span>Ver Perfil</span>
-                                            <ChevronLeft className="w-3 h-3 rotate-180 group-hover:translate-x-1 transition-transform" />
+                                    <h2 className="text-[22px] font-extrabold tracking-tight leading-none mb-3 drop-shadow-sm">
+                                        Hola, {profile.full_name.split(' ')[0]}
+                                    </h2>
+                                    
+                                    <div className="flex items-center gap-1.5 text-blue-100 font-bold text-[13px] group-hover:text-white transition-colors">
+                                        <span>Ver Perfil</span>
+                                        <div className="w-5 h-5 rounded-full bg-blue-500/50 group-hover:bg-blue-500 flex items-center justify-center transition-colors">
+                                            <ChevronLeft className="w-3 h-3 rotate-180" strokeWidth={3} />
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); handleLogout(); }} 
-                                    className="w-10 h-10 flex shrink-0 items-center justify-center rounded-[14px] bg-white/10 border border-white/10 text-white hover:bg-red-50 hover:text-red-500 hover:border-red-100 hover:shadow-lg transition-all"
-                                    title="Cerrar sesión"
-                                >
-                                    <LogOut size={16} />
-                                </button>
+
+                                {/* Mega Avatar Display */}
+                                <div className="relative w-24 h-24 bg-white/10 rounded-full flex items-center justify-center shadow-inner shrink-0 group-hover:scale-105 transition-transform duration-500 z-10 border-4 border-white/20">
+                                    {profile.avatar_config ? (
+                                        <div className="w-full h-full scale-[1.35] transform translate-y-1 origin-bottom">
+                                            <MiniAvatar config={profile.avatar_config} border={false} size={96} />
+                                        </div>
+                                    ) : (
+                                        <User className="w-10 h-10 text-white/50" />
+                                    )}
+                                </div>
                             </div>
+
                         </div>
                     )}
-
-                    {/* Today's date banner */}
-                    <div className="text-center">
-                        <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-                            {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' })}
-                        </p>
-                    </div>
 
                     {/* Mission Cards or Empty State */}
                     {todaySchools.length > 0 ? (

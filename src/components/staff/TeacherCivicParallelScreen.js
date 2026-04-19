@@ -453,6 +453,7 @@ export default function TeacherCivicParallelScreen({
             WebkitFontSmoothing: 'antialiased'
         }}>
             <SyncHeader
+                avatarConfig={missionInfo?.profile?.avatar_config}
                 firstName={firstName}
                 roleName={roleName}
                 role={profile?.role}
