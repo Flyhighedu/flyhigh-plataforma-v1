@@ -86,7 +86,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
       <img
         src="/flyers/El-cielo-llega-a-nuestra-escuela.png"
         alt="Portada"
-        crossOrigin="anonymous"
+        
         style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "auto", zIndex: 0, pointerEvents: "none" }}
       />
 
@@ -155,7 +155,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", padding: "0 8px", marginTop: "6px", height: "44px" }}>
           {allyImgs.map((a, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-              <img src={a.src} alt={a.label} crossOrigin="anonymous" style={{ height: "28px", width: "auto", objectFit: "contain", mixBlendMode: "multiply", opacity: 0.8 }} />
+              <img src={a.src} alt={a.label}  style={{ height: "28px", width: "auto", objectFit: "contain", mixBlendMode: "multiply", opacity: 0.8 }} />
               <span style={{ fontSize: "4.5px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.1em", color: "#9ca3af", textAlign: "center", lineHeight: 1 }}>{a.label}</span>
             </div>
           ))}
@@ -233,7 +233,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
           {/* Sponsor row */}
           <div style={{ width: "calc(100% + 2rem)", margin: "0 -16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", marginBottom: "48px", padding: "0 8px", height: "55px" }}>
             {sponsorImgs.map((s, i) => (
-              <img key={i} src={s.src} alt={s.alt} crossOrigin="anonymous" style={{ height: "80%", width: "auto", maxWidth: "13%", objectFit: "contain", mixBlendMode: "multiply" }} />
+              <img key={i} src={s.src} alt={s.alt}  style={{ height: "80%", width: "auto", maxWidth: "13%", objectFit: "contain", mixBlendMode: "multiply" }} />
             ))}
           </div>
         </div>

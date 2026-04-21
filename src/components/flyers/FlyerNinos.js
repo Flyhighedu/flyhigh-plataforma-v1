@@ -26,7 +26,6 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
     flexDirection: "column",
     color: "#000000",
     overflow: "hidden",
-    filter: "grayscale(100%)",
     fontFamily: "'Open Sans', sans-serif",
   };
 
@@ -51,7 +50,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
           <img
             src="/flyers/1000x200.png"
             alt="Fly High EDU"
-            crossOrigin="anonymous"
+            
             style={{
               filter: "grayscale(100%) contrast(2) brightness(0)",
               mixBlendMode: "multiply", maxHeight: "38px", width: "auto",
@@ -234,13 +233,13 @@ export function SponsorLogos() {
       alignItems: "center", gap: "0.2rem", zIndex: 10,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-        <img src="/flyers/Logo-Madobox.png" alt="Madobox" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="/flyers/Logo-La-Bonanza-Avocados-pdf.png" alt="La Bonanza" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="/flyers/Logo-Global-Frut-png.png" alt="Global Frut" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="/flyers/Diseno-sin-tituloww.png" alt="Patrocinador" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="/flyers/51d89e34-3d94-448c-9b34-16abb3360127.png" alt="Aztecavo" crossOrigin="anonymous" style={{ ...sponsorStyle, maxHeight: "42px" }} />
-        <img src="/flyers/logo-Strong-plastic-pdf.png" alt="Strong Plastic" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="/flyers/logo-RV-Fresh.png" alt="RV Fresh" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/Logo-Madobox.png" alt="Madobox"  style={sponsorStyle} />
+        <img src="/flyers/Logo-La-Bonanza-Avocados-pdf.png" alt="La Bonanza"  style={sponsorStyle} />
+        <img src="/flyers/Logo-Global-Frut-png.png" alt="Global Frut"  style={sponsorStyle} />
+        <img src="/flyers/Diseno-sin-tituloww.png" alt="Patrocinador"  style={sponsorStyle} />
+        <img src="/flyers/51d89e34-3d94-448c-9b34-16abb3360127.png" alt="Aztecavo"  style={{ ...sponsorStyle, maxHeight: "42px" }} />
+        <img src="/flyers/logo-Strong-plastic-pdf.png" alt="Strong Plastic"  style={sponsorStyle} />
+        <img src="/flyers/logo-RV-Fresh.png" alt="RV Fresh"  style={sponsorStyle} />
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "0 0.2in" }}>
         {[
@@ -250,7 +249,7 @@ export function SponsorLogos() {
           { src: "/flyers/logo-ccfdsp.png", label: "Fábrica de\nSan Pedro" },
         ].map((ally, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-            <img src={ally.src} alt={ally.label} crossOrigin="anonymous" style={allyLogoStyle} />
+            <img src={ally.src} alt={ally.label}  style={allyLogoStyle} />
             <span style={allyLabelStyle}>{ally.label.split('\n').map((line, j) => <React.Fragment key={j}>{line}{j === 0 && <br />}</React.Fragment>)}</span>
           </div>
         ))}

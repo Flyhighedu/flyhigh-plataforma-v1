@@ -51,7 +51,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
           <img
             src="/flyers/1000x200.png"
             alt="Fly High EDU"
-            crossOrigin="anonymous"
+            
             style={{
               filter: "grayscale(100%) contrast(2) brightness(0)",
               mixBlendMode: "multiply", maxHeight: "38px", width: "auto",
@@ -190,7 +190,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                         <img
                           src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://flyhighedu.com.mx/"
                           alt="QR"
-                          crossOrigin="anonymous"
+                          
                           style={{ width: "100%", height: "auto", mixBlendMode: "multiply", opacity: 0.9 }}
                         />
                       </div>

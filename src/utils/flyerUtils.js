@@ -93,7 +93,7 @@ async function fetchImageAsDataUri(src, timeoutMs = 8000) {
  * This prevents CORS/tainted-canvas errors during html2canvas capture.
  */
 async function inlineExternalImages(element) {
-  // 1. Inline all <img> tags
+// 1. Inline all <img> tags
   const images = element.querySelectorAll('img');
   const imgPromises = Array.from(images).map(async (img) => {
     const src = img.getAttribute('src') || img.src;
@@ -193,7 +193,6 @@ async function captureAsDataURL(element, scale = 3) {
     const dataUrl = await htmlToImage.toPng(element, {
       pixelRatio: scale,
       backgroundColor: '#ffffff',
-      cacheBust: true,
       skipFonts: false,
     });
     return dataUrl;
@@ -228,7 +227,9 @@ export async function captureAsPDF(element, filename = 'flyer.pdf') {
  * We use a scale of 5 for PNGs to ensure high-quality, crisp text on digital circulars.
  */
 export async function captureAsPNG(element, filename = 'circular.png') {
-  const imgData = await captureAsDataURL(element, 5);
+  // Use scale=3.5 to stay safely under iOS Safari's 4096px canvas dimension limit
+  // (height: ~1000px * 3.5 = 3500px)
+  const imgData = await captureAsDataURL(element, 3.5);
 
   const link = document.createElement('a');
   link.download = filename;
