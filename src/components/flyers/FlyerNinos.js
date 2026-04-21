@@ -13,7 +13,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
     minHeight: "11in",
     flexShrink: 0,
     backgroundColor: "white",
-    backgroundImage: "url('https://i.postimg.cc/yd1qPBQZ/Gemini-Generated-Image-2c1w2j2c1w2j2c1w.png')",
+    backgroundImage: "url('/flyers/Gemini-Generated-Image-2c1w2j2c1w2j2c1w.png')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
@@ -49,7 +49,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
         {/* Header */}
         <header style={{ textAlign: "center", marginBottom: "8px", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <img
-            src="https://i.postimg.cc/4dm7tdc0/1000x200.png"
+            src="/flyers/1000x200.png"
             alt="Fly High EDU"
             crossOrigin="anonymous"
             style={{
@@ -234,20 +234,20 @@ export function SponsorLogos() {
       alignItems: "center", gap: "0.2rem", zIndex: 10,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-        <img src="https://i.postimg.cc/DwmMPT99/Logo-Madobox.png" alt="Madobox" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="https://i.postimg.cc/8zs0mS29/Logo-La-Bonanza-Avocados-pdf.png" alt="La Bonanza" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="https://i.postimg.cc/0yrB0sTX/Logo-Global-Frut-png.png" alt="Global Frut" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="https://i.postimg.cc/kXjJfW4x/Diseno-sin-tituloww.png" alt="Patrocinador" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="https://i.postimg.cc/QtpNbP97/51d89e34-3d94-448c-9b34-16abb3360127.png" alt="Aztecavo" crossOrigin="anonymous" style={{ ...sponsorStyle, maxHeight: "42px" }} />
-        <img src="https://i.postimg.cc/Gm95xCWf/logo-Strong-plastic-pdf.png" alt="Strong Plastic" crossOrigin="anonymous" style={sponsorStyle} />
-        <img src="https://i.postimg.cc/rwzPNT6X/logo-RV-Fresh.png" alt="RV Fresh" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/Logo-Madobox.png" alt="Madobox" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/Logo-La-Bonanza-Avocados-pdf.png" alt="La Bonanza" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/Logo-Global-Frut-png.png" alt="Global Frut" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/Diseno-sin-tituloww.png" alt="Patrocinador" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/51d89e34-3d94-448c-9b34-16abb3360127.png" alt="Aztecavo" crossOrigin="anonymous" style={{ ...sponsorStyle, maxHeight: "42px" }} />
+        <img src="/flyers/logo-Strong-plastic-pdf.png" alt="Strong Plastic" crossOrigin="anonymous" style={sponsorStyle} />
+        <img src="/flyers/logo-RV-Fresh.png" alt="RV Fresh" crossOrigin="anonymous" style={sponsorStyle} />
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "0 0.2in" }}>
         {[
-          { src: "https://i.postimg.cc/25nfRWzG/logo-parque.png", label: "Parque\nNacional" },
-          { src: "https://i.postimg.cc/Pq1ksDtQ/logo-secretaria-cultura-y-turismo.png", label: "Secretaría\nde Cultura" },
-          { src: "https://i.postimg.cc/vm5dFnQ3/logo-huatapera.png", label: "Museo de la\nHuatapera" },
-          { src: "https://i.postimg.cc/xdLSDm0y/logo-ccfdsp.png", label: "Fábrica de\nSan Pedro" },
+          { src: "/flyers/logo-parque.png", label: "Parque\nNacional" },
+          { src: "/flyers/logo-secretaria-cultura-y-turismo.png", label: "Secretaría\nde Cultura" },
+          { src: "/flyers/logo-huatapera.png", label: "Museo de la\nHuatapera" },
+          { src: "/flyers/logo-ccfdsp.png", label: "Fábrica de\nSan Pedro" },
         ].map((ally, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
             <img src={ally.src} alt={ally.label} crossOrigin="anonymous" style={allyLogoStyle} />

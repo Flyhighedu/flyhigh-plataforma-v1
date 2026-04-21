@@ -14,7 +14,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
     minHeight: "11in",
     flexShrink: 0,
     backgroundColor: "white",
-    backgroundImage: "url('https://i.postimg.cc/yd1qPBQZ/Gemini-Generated-Image-2c1w2j2c1w2j2c1w.png')",
+    backgroundImage: "url('/flyers/Gemini-Generated-Image-2c1w2j2c1w2j2c1w.png')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
@@ -49,7 +49,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
         {/* Header */}
         <header style={{ textAlign: "center", marginBottom: "16px", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <img
-            src="https://i.postimg.cc/4dm7tdc0/1000x200.png"
+            src="/flyers/1000x200.png"
             alt="Fly High EDU"
             crossOrigin="anonymous"
             style={{

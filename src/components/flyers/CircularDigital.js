@@ -64,27 +64,27 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
   );
 
   const sponsorImgs = [
-    { src: "https://i.postimg.cc/0yrB0sTX/Logo-Global-Frut-png.png", alt: "Global Frut" },
-    { src: "https://i.postimg.cc/8zs0mS29/Logo-La-Bonanza-Avocados-pdf.png", alt: "La Bonanza" },
-    { src: "https://i.postimg.cc/DwmMPT99/Logo-Madobox.png", alt: "Madobox" },
-    { src: "https://i.postimg.cc/rwzPNT6X/logo-RV-Fresh.png", alt: "RV Fresh" },
-    { src: "https://i.postimg.cc/Gm95xCWf/logo-Strong-plastic-pdf.png", alt: "Strong Plastic" },
-    { src: "https://i.postimg.cc/kXjJfW4x/Diseno-sin-tituloww.png", alt: "Círculo" },
-    { src: "https://i.postimg.cc/QtpNbP97/51d89e34-3d94-448c-9b34-16abb3360127.png", alt: "Aztecavo" },
+    { src: "/flyers/Logo-Global-Frut-png.png", alt: "Global Frut" },
+    { src: "/flyers/Logo-La-Bonanza-Avocados-pdf.png", alt: "La Bonanza" },
+    { src: "/flyers/Logo-Madobox.png", alt: "Madobox" },
+    { src: "/flyers/logo-RV-Fresh.png", alt: "RV Fresh" },
+    { src: "/flyers/logo-Strong-plastic-pdf.png", alt: "Strong Plastic" },
+    { src: "/flyers/Diseno-sin-tituloww.png", alt: "Círculo" },
+    { src: "/flyers/51d89e34-3d94-448c-9b34-16abb3360127.png", alt: "Aztecavo" },
   ];
 
   const allyImgs = [
-    { src: "https://i.postimg.cc/xdLSDm0y/logo-ccfdsp.png", label: "Fábrica de San Pedro" },
-    { src: "https://i.postimg.cc/vm5dFnQ3/logo-huatapera.png", label: "Huatapera" },
-    { src: "https://i.postimg.cc/25nfRWzG/logo-parque.png", label: "Parque Nacional" },
-    { src: "https://i.postimg.cc/Pq1ksDtQ/logo-secretaria-cultura-y-turismo.png", label: "Secretaría de Cultura" },
+    { src: "/flyers/logo-ccfdsp.png", label: "Fábrica de San Pedro" },
+    { src: "/flyers/logo-huatapera.png", label: "Huatapera" },
+    { src: "/flyers/logo-parque.png", label: "Parque Nacional" },
+    { src: "/flyers/logo-secretaria-cultura-y-turismo.png", label: "Secretaría de Cultura" },
   ];
 
   return (
     <div ref={ref} style={containerStyle}>
       {/* Cover image */}
       <img
-        src="https://i.postimg.cc/L6g2DV4v/El-cielo-llega-a-nuestra-escuela.png"
+        src="/flyers/El-cielo-llega-a-nuestra-escuela.png"
         alt="Portada"
         crossOrigin="anonymous"
         style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "auto", zIndex: 0, pointerEvents: "none" }}
