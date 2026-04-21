@@ -8,9 +8,13 @@ import { DataTable } from "./data-table";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 
+import FlyerDownloadModal from "@/components/flyers/FlyerDownloadModal";
+
 export default function SandboxCronogramaPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
+  const [flyerSchoolData, setFlyerSchoolData] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -158,6 +162,48 @@ export default function SandboxCronogramaPage() {
     }
   }, []);
 
+  const handleOpenFlyerModal = useCallback(async (school) => {
+    let updatedSchool = { ...school };
+    let needsUpdate = false;
+
+    if (!updatedSchool.nombre_escuela) {
+      const val = prompt("Falta: Nombre de la escuela");
+      if (!val) return;
+      updatedSchool.nombre_escuela = val;
+      needsUpdate = true;
+    }
+    if (!updatedSchool.fecha_programada) {
+      const val = prompt("Falta: Fecha programada (YYYY-MM-DD)");
+      if (!val) return;
+      updatedSchool.fecha_programada = val;
+      needsUpdate = true;
+    }
+    if (updatedSchool.tarifa_base == null || updatedSchool.tarifa_base === "") {
+      const val = prompt("Falta: Tarifa Base/Fija ($)");
+      if (!val) return;
+      updatedSchool.tarifa_base = parseFloat(val) || 100;
+      needsUpdate = true;
+    }
+    if (updatedSchool.cuota_alumno == null || updatedSchool.cuota_alumno === "") {
+      const val = prompt("Falta: Cuota por alumno ($)");
+      if (!val) return;
+      updatedSchool.cuota_alumno = parseFloat(val) || 50;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      // Opt update in DB for missing fields
+      for (const [key, value] of Object.entries(updatedSchool)) {
+         if (school[key] !== value) {
+            await handleUpdateRow(school.id, key, value);
+         }
+      }
+    }
+
+    setFlyerSchoolData(updatedSchool);
+    setShowFlyerModal(true);
+  }, [handleUpdateRow]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12 w-full h-full bg-slate-50">
@@ -175,8 +221,18 @@ export default function SandboxCronogramaPage() {
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onCreateRow={handleCreateRow}
+          openFlyerModal={handleOpenFlyerModal}
         />
       </div>
+      {showFlyerModal && flyerSchoolData && (
+        <FlyerDownloadModal
+          schoolData={flyerSchoolData}
+          onClose={() => {
+            setShowFlyerModal(false);
+            setFlyerSchoolData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

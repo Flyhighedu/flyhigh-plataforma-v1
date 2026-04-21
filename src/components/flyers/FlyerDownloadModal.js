@@ -3,11 +3,11 @@ import React, { useRef, useState, useCallback } from "react";
 import FlyerNinos from "./FlyerNinos";
 import FlyerPadres from "./FlyerPadres";
 import CircularDigital from "./CircularDigital";
-import { formatFlyerDate, formatMoney, captureAsPDF, captureAsJPEG, downloadAll } from "@/utils/flyerUtils";
+import { formatFlyerDate, formatMoney, captureAsPDF, captureAsPNG, downloadAll } from "@/utils/flyerUtils";
 
 /**
  * FlyerDownloadModal — Full-screen modal that renders flyer previews
- * and provides download buttons for PDF/JPEG.
+ * and provides download buttons for PDF/PNG.
  * 
  * Flyers render off-screen at full size for html2canvas capture,
  * and scaled-down for visual preview.
@@ -42,17 +42,15 @@ export default function FlyerDownloadModal({ schoolData, onClose }) {
     try {
       switch (type) {
         case "ninos":
-          await captureAsPDF(ninosRef.current, `Flyer_Ninos_${safeName}.pdf`);
+          await captureAsPDF(ninosRef.current, `Flyer imprimible para salones - ${escuela}.pdf`);
           break;
         case "padres":
-          await captureAsPDF(padresRef.current, `Flyer_Padres_${safeName}.pdf`);
+          await captureAsPDF(padresRef.current, `Flyer imprimible para exterior - ${escuela}.pdf`);
           break;
         case "digital":
-          await captureAsJPEG(
+          await captureAsPNG(
             digitalRef.current,
-            `Circular_Digital_${safeName}.jpg`,
-            0.92,
-            { width: 450, height: 975 }
+            `Circular digital para padres de familia - ${escuela}.png`
           );
           break;
         case "all":
@@ -80,7 +78,7 @@ export default function FlyerDownloadModal({ schoolData, onClose }) {
       {/* Google Fonts for flyer rendering */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" crossOrigin="anonymous" />
 
       {/* Close button */}
       <button
@@ -154,7 +152,7 @@ export default function FlyerDownloadModal({ schoolData, onClose }) {
         {/* Circular Digital preview */}
         <PreviewCard
           title="Circular Digital"
-          subtitle="WhatsApp · Color · JPEG"
+          subtitle="WhatsApp · Color · PNG"
           icon="📱"
           buttonLabel="🖼️ Descargar Imagen"
           loading={downloading.digital}

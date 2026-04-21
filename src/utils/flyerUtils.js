@@ -1,6 +1,9 @@
 /**
  * Flyer Generation Utilities
  * Used by FlyerDownloadModal to capture and export flyers as PDF/JPEG.
+ * 
+ * KEY DESIGN: All external images are inlined as base64 data URIs BEFORE
+ * html2canvas capture, preventing CORS/tainted-canvas errors on mobile PWA.
  */
 
 const MONTHS_ES = [
@@ -35,67 +38,169 @@ export async function waitForFonts() {
     await document.fonts.ready;
   }
   // Extra safety delay for external font rendering
-  await new Promise(resolve => setTimeout(resolve, 800));
+  await new Promise(resolve => setTimeout(resolve, 500));
 }
 
 /**
- * Preload all cross-origin images in a container so they're in browser cache.
- * This prevents CORS/tainted canvas issues during html2canvas capture.
+ * Fetch an image and return it as a base64 data URI.
+ * Tries CORS first, then no-cors fallback via canvas redraw.
  */
-async function preloadImages(element) {
-  const images = element.querySelectorAll('img[crossorigin]');
-  const promises = Array.from(images).map(img => {
-    return new Promise((resolve) => {
-      if (img.complete && img.naturalWidth > 0) {
-        resolve();
-        return;
-      }
-      const timeout = setTimeout(resolve, 5000); // 5s max per image
-      img.onload = () => { clearTimeout(timeout); resolve(); };
-      img.onerror = () => { clearTimeout(timeout); console.warn('Failed to load:', img.src); resolve(); };
-    });
-  });
-  await Promise.all(promises);
-}
-
-/**
- * Core capture function with robust error handling
- */
-async function captureElement(element) {
-  if (!element) {
-    throw new Error('Element ref is null — cannot capture');
-  }
-
-  const html2canvas = (await import('html2canvas')).default;
-
-  await waitForFonts();
-  await preloadImages(element);
-
-  // Temporarily move element on-screen for capture (some browsers
-  // have issues with off-screen elements)
-  const originalStyle = element.parentElement?.style?.cssText || '';
-  if (element.parentElement) {
-    element.parentElement.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;opacity:0.01;pointer-events:none;';
-  }
-
-  // Small delay to let the browser reflow
-  await new Promise(r => setTimeout(r, 200));
+async function fetchImageAsDataUri(src, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const canvas = await html2canvas(element, {
-      scale: 3,
-      useCORS: true,
-      allowTaint: true,       // Fallback: allow tainted canvas
-      backgroundColor: '#ffffff',
-      logging: false,
-      imageTimeout: 10000,     // 10s timeout for images
-      removeContainer: true,
+    const response = await fetch(src, { mode: 'cors', signal: controller.signal });
+    clearTimeout(timer);
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     });
-    return canvas;
+  } catch (e) {
+    clearTimeout(timer);
+    console.warn(`CORS fetch failed for ${src}, trying img-canvas fallback:`, e.message);
+    // Fallback: load image via <img> tag without crossOrigin, draw to canvas
+    return await new Promise((resolve) => {
+      const img = new Image();
+      // Don't set crossOrigin — lets the image load even without CORS headers
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        } catch {
+          console.warn(`Canvas fallback also failed for ${src}`);
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        console.warn(`Image load completely failed for ${src}`);
+        resolve(null);
+      };
+      img.src = src;
+    });
+  }
+}
+
+/**
+ * Convert all external <img> sources in a container to base64 data URIs.
+ * This prevents CORS/tainted-canvas errors during html2canvas capture.
+ */
+async function inlineExternalImages(element) {
+  // 1. Inline all <img> tags
+  const images = element.querySelectorAll('img');
+  const imgPromises = Array.from(images).map(async (img) => {
+    const src = img.getAttribute('src') || img.src;
+    if (!src || src.startsWith('data:') || src.startsWith('blob:')) return;
+
+    const dataUri = await fetchImageAsDataUri(src);
+    if (dataUri) {
+      img.src = dataUri;
+      img.removeAttribute('crossorigin');
+      img.removeAttribute('crossOrigin');
+    }
+  });
+
+  // 2. Inline all background-images for children
+  const allElements = element.querySelectorAll('*');
+  const bgPromises = Array.from(allElements).map(async (el) => {
+    const style = window.getComputedStyle(el);
+    const bgImage = style.getPropertyValue('background-image');
+    if (bgImage && bgImage !== 'none' && bgImage.includes('url(')) {
+      const match = bgImage.match(/url\(['"]?(.*?)['"]?\)/);
+      if (match && match[1]) {
+        const src = match[1];
+        if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+          const dataUri = await fetchImageAsDataUri(src);
+          if (dataUri) {
+            el.style.backgroundImage = `url(${dataUri})`;
+          }
+        }
+      }
+    }
+  });
+
+  // 3. Inline background-image for the root element
+  const rootBgPromise = (async () => {
+    const style = window.getComputedStyle(element);
+    const bgImage = style.getPropertyValue('background-image');
+    if (bgImage && bgImage !== 'none' && bgImage.includes('url(')) {
+      const match = bgImage.match(/url\(['"]?(.*?)['"]?\)/);
+      if (match && match[1]) {
+        const src = match[1];
+        if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+          const dataUri = await fetchImageAsDataUri(src);
+          if (dataUri) {
+            element.style.backgroundImage = `url(${dataUri})`;
+          }
+        }
+      }
+    }
+  })();
+
+  await Promise.all([...imgPromises, ...bgPromises, rootBgPromise]);
+  // Let the browser render the new data-URI sources
+  await new Promise(r => setTimeout(r, 300));
+}
+
+/**
+ * Core capture function with robust error handling.
+ * 1. Waits for fonts
+ * 2. Inlines all external images as base64
+ * 3. Moves element on-screen (fully visible) for capture
+ * 4. Captures with html-to-image
+ * 5. Restores element position
+ */
+async function captureAsDataURL(element, scale = 3) {
+  if (!element) {
+    throw new Error('Element ref is null — el componente no se ha montado todavía.');
+  }
+
+  const htmlToImage = await import('html-to-image');
+
+  await waitForFonts();
+
+  // CRITICAL: Inline all external images as base64 data URIs
+  // This helps html-to-image and prevents CORS issues.
+  await inlineExternalImages(element);
+
+  // Move the off-screen container on-screen for capture.
+  // Use full opacity so the capture is clean.
+  const parent = element.parentElement;
+  const originalStyle = parent?.style?.cssText || '';
+  if (parent) {
+    parent.style.cssText = [
+      'position: fixed',
+      'left: 0',
+      'top: 0',
+      'z-index: -1',
+      'opacity: 1',            // ← FULL opacity for clean capture
+      'pointer-events: none',
+      'overflow: visible',
+    ].join('; ') + ';';
+  }
+
+  // Let the browser reflow with the new position
+  await new Promise(r => setTimeout(r, 300));
+
+  try {
+    const dataUrl = await htmlToImage.toPng(element, {
+      pixelRatio: scale,
+      backgroundColor: '#ffffff',
+      cacheBust: true,
+      skipFonts: false,
+    });
+    return dataUrl;
   } finally {
     // Restore original off-screen position
-    if (element.parentElement) {
-      element.parentElement.style.cssText = originalStyle;
+    if (parent) {
+      parent.style.cssText = originalStyle;
     }
   }
 }
@@ -106,23 +211,8 @@ async function captureElement(element) {
 export async function captureAsPDF(element, filename = 'flyer.pdf') {
   const { jsPDF } = await import('jspdf');
   
-  const canvas = await captureElement(element);
+  const imgData = await captureAsDataURL(element);
   
-  // Try toDataURL — if tainted, use toBlob fallback
-  let imgData;
-  try {
-    imgData = canvas.toDataURL('image/png');
-  } catch (e) {
-    console.warn('toDataURL failed (tainted canvas), trying blob approach:', e.message);
-    // Convert canvas to blob then to data URL
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    imgData = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
-    });
-  }
-
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'in',
@@ -134,47 +224,34 @@ export async function captureAsPDF(element, filename = 'flyer.pdf') {
 }
 
 /**
- * Capture a DOM element as JPEG and trigger download.
+ * Capture a DOM element as PNG and trigger download.
+ * We use a scale of 5 for PNGs to ensure high-quality, crisp text on digital circulars.
  */
-export async function captureAsJPEG(element, filename = 'circular.jpg', quality = 0.92, sizeOverride = null) {
-  const canvas = await captureElement(element);
+export async function captureAsPNG(element, filename = 'circular.png') {
+  const imgData = await captureAsDataURL(element, 5);
 
-  try {
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = canvas.toDataURL('image/jpeg', quality);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (e) {
-    console.warn('toDataURL failed, trying blob:', e.message);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = url;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = imgData;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 /**
  * Download all 3 flyers in sequence
  */
 export async function downloadAll(ninosRef, padresRef, digitalRef, escuela) {
-  const safeName = (escuela || 'escuela').replace(/\s+/g, '_').toUpperCase();
+  const nombreEscuela = escuela || 'Escuela';
   
-  await captureAsPDF(ninosRef.current, `Flyer_Ninos_${safeName}.pdf`);
+  await captureAsPDF(ninosRef.current, `Flyer imprimible para salones - ${nombreEscuela}.pdf`);
   await new Promise(r => setTimeout(r, 1000));
   
-  await captureAsPDF(padresRef.current, `Flyer_Padres_${safeName}.pdf`);
+  await captureAsPDF(padresRef.current, `Flyer imprimible para exterior - ${nombreEscuela}.pdf`);
   await new Promise(r => setTimeout(r, 1000));
   
-  await captureAsJPEG(
+  await captureAsPNG(
     digitalRef.current,
-    `Circular_Digital_${safeName}.jpg`,
-    0.92
+    `Circular digital para padres de familia - ${nombreEscuela}.png`
   );
 }

@@ -14,7 +14,7 @@ import {
     MapPin, Camera, Lock, KeyRound, ShieldCheck, Palette,
     Building2, Mail, Eye, EyeOff, Trash2, RefreshCw, Heart, Pencil, X, Calendar,
     ChevronDown, ChevronUp, UserPlus, Shield, ToggleLeft, ToggleRight, Copy, ExternalLink,
-    Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign, Bot
+    Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign, Bot, Image
 } from 'lucide-react';
 import { processBackgroundRemoval } from '@/lib/bgRemover';
 import FlyerDownloadModal from '@/components/flyers/FlyerDownloadModal';
@@ -635,6 +635,60 @@ export default function AdminPage() {
         }
         setEditingSchoolId(school.id);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleOpenFlyerModalFromCard = async (school) => {
+        let updatedSchool = { ...school };
+        let needsUpdate = false;
+
+        if (!updatedSchool.nombre_escuela) {
+            const val = prompt("Falta: Nombre de la escuela");
+            if (!val) return;
+            updatedSchool.nombre_escuela = val;
+            needsUpdate = true;
+        }
+        if (!updatedSchool.fecha_programada) {
+            const val = prompt("Falta: Fecha programada (YYYY-MM-DD)");
+            if (!val) return;
+            updatedSchool.fecha_programada = val;
+            needsUpdate = true;
+        }
+        // Use cuota_alumno or precio
+        if (updatedSchool.cuota_alumno == null && updatedSchool.precio == null) {
+            const val = prompt("Falta: Cuota Alumno/Precio ($)");
+            if (!val) return;
+            updatedSchool.precio = parseFloat(val) || 50;
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            try {
+                const payload = {
+                    id: updatedSchool.id,
+                    nombre_escuela: updatedSchool.nombre_escuela,
+                    fecha_programada: updatedSchool.fecha_programada,
+                    precio: updatedSchool.precio || updatedSchool.cuota_alumno
+                };
+                
+                await fetch('/api/admin/save-school', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                fetchNextSchools(true);
+            } catch (e) {
+                console.error("Error actualizando datos faltantes", e);
+                alert("Error al guardar datos faltantes, pero abriremos el flyer temporalmente.");
+            }
+        }
+
+        setFlyerSchoolData({
+            nombre_escuela: updatedSchool.nombre_escuela,
+            fecha_programada: updatedSchool.fecha_programada,
+            cuota_alumno: updatedSchool.precio || updatedSchool.cuota_alumno || 50,
+            tarifa_base: 100 // Admin dashboard legacy default
+        });
+        setShowFlyerModal(true);
     };
 
     const handleCancelNextSchoolEdit = () => {
@@ -2129,13 +2183,26 @@ export default function AdminPage() {
                                                         </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mt-1 relative z-10">
-                                                    <span className="flex items-center gap-1">
-                                                        <MapPin size={12} className="text-blue-500" /> {school.colonia}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar size={12} className="text-amber-500" /> {school.fecha_programada}
-                                                    </span>
+                                                <div className="flex items-end justify-between mt-2 relative z-10">
+                                                    <div className="flex flex-col gap-1.5 text-[11px] text-slate-500 font-medium">
+                                                        <span className="flex items-center gap-1">
+                                                            <MapPin size={12} className="text-blue-500" /> {school.colonia}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar size={12} className="text-amber-500" /> {school.fecha_programada}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* Premium Flyer Button - Bottom Right */}
+                                                    {!isCanceled && !isArchived && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleOpenFlyerModalFromCard(school); }}
+                                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold tracking-wide py-1.5 px-3 rounded-lg transition-all duration-300 flex items-center gap-1.5 text-[10px] shadow-md shadow-blue-600/20 hover:shadow-lg hover:shadow-blue-600/30 hover:-translate-y-0.5 active:scale-95 group/btn"
+                                                        >
+                                                            <Image size={12} className="opacity-90 group-hover/btn:opacity-100" />
+                                                            Generar Flyers
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )})}

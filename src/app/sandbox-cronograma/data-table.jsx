@@ -37,7 +37,7 @@ const CELL_BASE = {
   border: { bottom: { style: "thin", color: { rgb: "E2E8F0" } } },
 };
 
-export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow }) {
+export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow, openFlyerModal }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState([]);
   const [sorting, setSorting] = useState([{ id: 'fecha_programada', desc: false }]);
@@ -60,6 +60,7 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
     meta: {
       updateData: onUpdateRow,
       deleteRow: onDeleteRow,
+      openFlyerModal: openFlyerModal,
     },
   });
 
