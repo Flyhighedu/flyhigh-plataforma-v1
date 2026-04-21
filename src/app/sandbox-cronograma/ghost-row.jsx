@@ -16,6 +16,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
     cuota_alumno: 50,
     subsidio_patrocinador: "",
     nombre_director: "",
+    numero_ninos: "",
     telefono_director: "",
     nombre_maestro_delegado: "",
     telefono_maestro_delegado: "",
@@ -218,6 +219,17 @@ export function GhostRow({ columnCount, onCreateRow }) {
           onKeyDown={kd}
           className={cls}
         />
+      </TableCell>
+      {/* # Niños */}
+      <TableCell className="p-1 min-w-[70px]">
+         <Input
+           type="number"
+           placeholder="0"
+           value={form.numero_ninos}
+           onChange={(e) => setForm((f) => ({ ...f, numero_ninos: e.target.value }))}
+           onKeyDown={kd}
+           className={`${cls} text-center`}
+         />
       </TableCell>
       {/* Tel Director */}
       <TableCell className="p-1 min-w-[100px]">

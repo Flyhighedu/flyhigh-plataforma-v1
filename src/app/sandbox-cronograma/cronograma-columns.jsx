@@ -264,6 +264,12 @@ export const cronogramaColumns = [
     size: 180,
   },
   {
+    accessorKey: "numero_ninos",
+    header: "# Niños",
+    cell: EditableCell,
+    size: 90,
+  },
+  {
     accessorKey: "telefono_director",
     header: "Tel Director",
     cell: EditableCell,

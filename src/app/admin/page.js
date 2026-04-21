@@ -17,6 +17,7 @@ import {
     Gamepad2, BookOpen, Package, Settings, Smartphone, DollarSign, Bot
 } from 'lucide-react';
 import { processBackgroundRemoval } from '@/lib/bgRemover';
+import FlyerDownloadModal from '@/components/flyers/FlyerDownloadModal';
 
 import SandboxEscuelasPage from '@/app/sandbox-escuelas/page';
 import SandboxVuelosPage from '@/app/sandbox-vuelos/page';
@@ -56,6 +57,10 @@ export default function AdminPage() {
     // --- ESTADO PARA LA SECCIÓN "BASES DE DATOS" ---
     const [dbView, setDbView] = useState('menu'); // 'menu' | 'catalogo' | 'vuelos'
     const [isExitingDB, setIsExitingDB] = useState(false);
+
+    // --- ESTADO PARA DESCARGA DE FLYERS ---
+    const [showFlyerModal, setShowFlyerModal] = useState(false);
+    const [flyerSchoolData, setFlyerSchoolData] = useState(null);
 
     // --- SINCRONIZADOR PIXEL-PERFECT DEL MASCOT AL SCROLL ---
     useEffect(() => {
@@ -229,7 +234,11 @@ export default function AdminPage() {
         colonia: '',
         fecha_programada: '',
         cct: '',
-        turno: ''
+        turno: '',
+        nombre_director: '',
+        telefono_director: '',
+        numero_ninos: '',
+        cuota_alumno: ''
     });
     const [nextSchoolLoading, setNextSchoolLoading] = useState(false);
     const [fetchingNextSchools, setFetchingNextSchools] = useState(false);
@@ -557,6 +566,10 @@ export default function AdminPage() {
                 fecha_programada: nextSchoolForm.fecha_programada,
                 cct: selectedCatalogoSchool?.cct || nextSchoolForm.cct || null,
                 turno: selectedCatalogoSchool?.turno || nextSchoolForm.turno || null,
+                nombre_director: nextSchoolForm.nombre_director || null,
+                telefono_director: nextSchoolForm.telefono_director || null,
+                numero_ninos: nextSchoolForm.numero_ninos ? parseInt(nextSchoolForm.numero_ninos, 10) : null,
+                precio: nextSchoolForm.cuota_alumno ? parseFloat(nextSchoolForm.cuota_alumno) : null,
             };
 
             if (editingSchoolId) {
@@ -578,10 +591,20 @@ export default function AdminPage() {
                 alert('Misión actualizada exitosamente');
             } else {
                 setNextSchools(prev => [...prev, result.data]);
-                alert('Escuela programada exitosamente');
+                // Offer flyer download for new missions
+                const wantsFlyers = confirm('✅ Escuela programada exitosamente.\n\n¿Deseas descargar el material personalizado (flyers) para esta escuela?');
+                if (wantsFlyers) {
+                    setFlyerSchoolData({
+                        nombre_escuela: payload.nombre_escuela,
+                        fecha_programada: payload.fecha_programada,
+                        cuota_alumno: payload.precio || 50,
+                        tarifa_base: 100,
+                    });
+                    setShowFlyerModal(true);
+                }
             }
 
-            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '' });
+            setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '', nombre_director: '', telefono_director: '', numero_ninos: '', cuota_alumno: '' });
             setSelectedCatalogoSchool(null);
         } catch (err) {
             console.error('Error saving next school:', err);
@@ -597,7 +620,11 @@ export default function AdminPage() {
             colonia: school.colonia,
             fecha_programada: school.fecha_programada,
             cct: school.cct || '',
-            turno: school.turno || ''
+            turno: school.turno || '',
+            nombre_director: school.nombre_director || '',
+            telefono_director: school.telefono_director || '',
+            numero_ninos: school.numero_ninos || '',
+            cuota_alumno: school.cuota_alumno || ''
         });
         // Try to find and pre-select the school from catalogo
         if (school.cct) {
@@ -611,7 +638,7 @@ export default function AdminPage() {
     };
 
     const handleCancelNextSchoolEdit = () => {
-        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '' });
+        setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '', nombre_director: '', telefono_director: '', numero_ninos: '', cuota_alumno: '' });
         setSelectedCatalogoSchool(null);
         setEditingSchoolId(null);
     };
@@ -994,6 +1021,7 @@ export default function AdminPage() {
 
     // --- PANEL DE ADMINISTRACIÓN ---
     return (
+        <>
         <AdminLayout
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -1949,6 +1977,58 @@ export default function AdminPage() {
                                             </select>
                                         </div>
                                     </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-0">
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <Users size={14} /> Nombre del Director
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={nextSchoolForm.nombre_director}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, nombre_director: e.target.value }))}
+                                                placeholder="Ej. Prof. Juan Pérez"
+                                                className="w-full neu-input-inset px-4 py-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <Users size={14} /> Tel. Director
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                value={nextSchoolForm.telefono_director}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, telefono_director: e.target.value }))}
+                                                placeholder="Ej. 4431234567"
+                                                className="w-full neu-input-inset px-4 py-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <Users size={14} /> Número de Niños
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={nextSchoolForm.numero_ninos}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, numero_ninos: e.target.value }))}
+                                                placeholder="Ej. 150"
+                                                className="w-full neu-input-inset px-4 py-3"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                                                <DollarSign size={14} /> Cuota por Alumno
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={nextSchoolForm.cuota_alumno}
+                                                onChange={(e) => setNextSchoolForm(prev => ({ ...prev, cuota_alumno: e.target.value }))}
+                                                placeholder="Ej. 50"
+                                                className="w-full neu-input-inset px-4 py-3"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button
@@ -1997,14 +2077,14 @@ export default function AdminPage() {
                                     <div className="flex items-center justify-center py-12 relative z-10">
                                         <Loader2 size={32} className="animate-spin text-white/50" />
                                     </div>
-                                ) : nextSchools.filter(s => s.estatus !== 'completada').length === 0 ? (
+                                ) : nextSchools.filter(s => s.estatus === 'pendiente' && s.fecha_programada >= new Date().toISOString().split('T')[0]).length === 0 ? (
                                     <div className="text-center py-12 text-blue-200/60 relative z-10">
                                         <Calendar size={48} className="mx-auto mb-4 opacity-30" />
                                         <p className="font-medium">No hay misiones próximas pendientes</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 relative z-10">
-                                        {nextSchools.filter(s => s.estatus !== 'completada').map((school) => {
+                                        {nextSchools.filter(s => s.estatus === 'pendiente' && s.fecha_programada >= new Date().toISOString().split('T')[0]).map((school) => {
                                             const isCanceled = school.estatus === 'cancelada';
                                             const isArchived = school.estatus === 'archivado';
                                             const opacityClass = (isCanceled || isArchived) ? 'opacity-60' : 'opacity-100';
@@ -2576,5 +2656,14 @@ export default function AdminPage() {
                 <AnalyticsView activeTab={activeTab} />
             )}
         </AdminLayout>
+
+        {/* Flyer Download Modal */}
+        {showFlyerModal && flyerSchoolData && (
+            <FlyerDownloadModal
+                schoolData={flyerSchoolData}
+                onClose={() => { setShowFlyerModal(false); setFlyerSchoolData(null); }}
+            />
+        )}
+        </>
     );
 }

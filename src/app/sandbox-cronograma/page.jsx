@@ -88,7 +88,7 @@ export default function SandboxCronogramaPage() {
     async (id, columnId, newValue) => {
       let castValue = newValue;
 
-      if (['cuota_alumno', 'tarifa_base', 'subsidio_patrocinador'].includes(columnId)) {
+      if (['cuota_alumno', 'tarifa_base', 'subsidio_patrocinador', 'numero_ninos'].includes(columnId)) {
         castValue = newValue === "" || newValue === null ? null : Number(newValue);
         if (castValue !== null && isNaN(castValue)) {
           toast.error("Valor inválido", { description: `"${newValue}" no es un número válido.` });

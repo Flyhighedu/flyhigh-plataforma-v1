@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { GhostRow } from "./ghost-row";
 
 // Excel formatting constants
-const INTEGER_COLS = new Set(["tarifa_base", "cuota_alumno", "subsidio_patrocinador"]);
+const INTEGER_COLS = new Set(["tarifa_base", "cuota_alumno", "subsidio_patrocinador", "numero_ninos"]);
 const WIDE_COLS = { nombre_escuela: 36, cct: 18, colonia: 22, fecha: 14, nombre_director: 24, estatus: 12 };
 
 const HEADER_STYLE = {

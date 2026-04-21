@@ -13,7 +13,7 @@ function getAdminSupabase() {
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { nombre_escuela, colonia, fecha_programada, cct, turno, id } = body;
+        const { nombre_escuela, colonia, fecha_programada, cct, turno, id, nombre_director, telefono_director, numero_ninos, precio } = body;
 
         // Validate required fields
         if (!nombre_escuela || !fecha_programada) {
@@ -31,6 +31,11 @@ export async function POST(request) {
             fecha_programada,
             cct: cct || null,
             turno: turno || null,
+            nombre_director: nombre_director || null,
+            telefono_director: telefono_director || null,
+            numero_ninos: numero_ninos || null,
+            // SSoT: "precio" del admin se mapea a cuota_alumno (misma columna que usa Sandbox Cronograma)
+            cuota_alumno: precio ? parseFloat(precio) : null,
         };
 
         let result;
@@ -47,10 +52,10 @@ export async function POST(request) {
             if (error) throw error;
             result = data;
         } else {
-            // INSERT new school
+            // INSERT new school — mark origin for traceability
             const { data, error } = await supabase
                 .from('proximas_escuelas')
-                .insert({ ...schoolData, estatus: 'pendiente' })
+                .insert({ ...schoolData, estatus: 'pendiente', registrado_via: 'admin' })
                 .select()
                 .single();
 
