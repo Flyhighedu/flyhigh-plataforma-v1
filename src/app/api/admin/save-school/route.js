@@ -46,21 +46,19 @@ export async function POST(request) {
                 .from('proximas_escuelas')
                 .update(schoolData)
                 .eq('id', id)
-                .select()
-                .single();
+                .select();
 
             if (error) throw error;
-            result = data;
+            result = data && data.length > 0 ? data[0] : null;
         } else {
             // INSERT new school — mark origin for traceability
             const { data, error } = await supabase
                 .from('proximas_escuelas')
                 .insert({ ...schoolData, estatus: 'pendiente', registrado_via: 'admin' })
-                .select()
-                .single();
+                .select();
 
             if (error) throw error;
-            result = data;
+            result = data && data.length > 0 ? data[0] : null;
         }
 
         return NextResponse.json({ success: true, data: result });
