@@ -7,6 +7,7 @@ import {
     BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
+import { Users, Plane, Clock, School } from 'lucide-react';
 
 /* ── Constants ── */
 const MONTH_LABELS = {
@@ -43,23 +44,25 @@ function MetricCard({ icon, label, value, sublabel, accent, isJoined }) {
         <div className={`group relative transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden ${
             isJoined 
             ? 'bg-transparent border-transparent px-4 py-3 hover:-translate-y-1' 
-            : 'neu-list-item p-5 hover:-translate-y-1'
+            : 'neu-card p-5 hover:-translate-y-1 bg-white/60 dark:bg-slate-900/40 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.4)] border border-white/40 dark:border-slate-700/50'
         }`}>
-            <div className="relative space-y-1.5">
-                <div className="flex items-center gap-3">
+            <div className="relative">
+                <div className="flex items-center gap-3 mb-3">
                     <span 
-                        className={`text-lg transition-transform duration-500 flex items-center justify-center w-8 h-8 rounded-xl text-white shadow-md ${isJoined ? 'scale-110' : ''}`} 
+                        className={`text-lg transition-transform duration-500 flex items-center justify-center w-9 h-9 rounded-[0.85rem] text-white shadow-lg ${isJoined ? 'scale-110' : 'shadow-black/5'}`} 
                         style={{ backgroundColor: accent }}
                     >
                         {icon}
                     </span>
-                    <span className={`text-[11px] font-bold uppercase tracking-wider transition-colors duration-500 ${isJoined ? 'text-foreground/90' : 'text-muted-foreground'}`}>{label}</span>
+                    <span className={`text-[10px] font-black uppercase tracking-[0.15em] transition-colors duration-500 ${isJoined ? 'text-foreground/90' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
                 </div>
-                <p className="text-3xl font-extrabold tracking-tight tabular-nums text-foreground transition-all duration-500 mt-2">
-                    {typeof value === 'number' ? value.toLocaleString() : value}
-                </p>
+                <div className="flex items-baseline gap-2">
+                    <p className="text-3xl md:text-4xl font-black tracking-tighter tabular-nums text-foreground transition-all duration-500">
+                        {typeof value === 'number' ? value.toLocaleString() : value}
+                    </p>
+                </div>
                 {sublabel && (
-                    <p className={`text-[11px] font-medium transition-colors duration-500 ${isJoined ? 'text-primary/80' : 'text-muted-foreground'}`}>{sublabel}</p>
+                    <p className={`text-[11px] font-semibold mt-1 transition-colors duration-500 ${isJoined ? 'text-primary/80' : 'text-slate-400 dark:text-slate-500'}`}>{sublabel}</p>
                 )}
             </div>
         </div>
@@ -561,15 +564,15 @@ export default function PanelImpacto({ data, loading, filter }) {
                 
                 {/* Metric Cards Row */}
                 <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                    isJoined ? 'gap-2 mb-2 p-2 bg-transparent rounded-[1.5rem]' : 'gap-4 mb-6 p-0 bg-transparent rounded-[1.5rem]'
+                    isJoined ? 'gap-3 md:gap-4 mb-2 p-2 bg-transparent rounded-[1.5rem]' : 'gap-4 md:gap-6 mb-8 p-0 bg-transparent rounded-[1.5rem]'
                 }`}>
-                    <MetricCard icon="👧🏽" label="Alumnos atendidos" value={metrics.students}
+                    <MetricCard icon={<Users size={20} strokeWidth={2.5} />} label="Alumnos atendidos" value={metrics.students}
                         sublabel={selectedEntry ? `En ${periodLabel}` : `${metrics.becados.toLocaleString()} becados`} accent={PRIMARY} isJoined={isJoined} />
-                    <MetricCard icon="🛩️" label="Vuelos realizados" value={metrics.flights}
+                    <MetricCard icon={<Plane size={20} strokeWidth={2.5} />} label="Vuelos realizados" value={metrics.flights}
                         sublabel={`${metrics.missions} misiones`} accent={ACCENT} isJoined={isJoined} />
-                    <MetricCard icon="⏱️" label="Horas de operación" value={metrics.hours}
+                    <MetricCard icon={<Clock size={20} strokeWidth={2.5} />} label="Horas de operación" value={metrics.hours}
                         sublabel="Tiempo acumulado de vuelo" accent="#ec4899" isJoined={isJoined} />
-                    <MetricCard icon="🏫" label="Total de Escuelas" value={metrics.schools}
+                    <MetricCard icon={<School size={20} strokeWidth={2.5} />} label="Total de Escuelas" value={metrics.schools}
                         sublabel={selectedEntry ? `En ${periodLabel}` : "Acumulado global"} accent="#10b981" isJoined={isJoined} />
                 </div>
 

@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { supabaseNew } from '@/lib/supabaseClientNew';
 import PanelImpacto from '@/components/dashboard/PanelImpacto';
 import PanelOperacion from '@/components/dashboard/PanelOperacion';
 import PanelEscuelas from '@/components/dashboard/PanelEscuelas';
 import PanelPatrocinios from '@/components/dashboard/PanelPatrocinios';
 import PanelReportes from '@/components/dashboard/PanelReportes';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Globe, Zap, School, Gem, FileText } from 'lucide-react';
 
 
 
@@ -136,8 +137,17 @@ function PeriodSelector({ filter, setFilter }) {
     );
 }
 
-export default function AnalyticsView({ activeTab = 'analytics-impacto' }) {
+export default function AnalyticsView({ activeTab = 'analytics-impacto', setActiveTab }) {
     const activeSubTab = activeTab.replace('analytics-', '');
+
+    // SubTabs config for mobile rendering using Lucide React SVGs
+    const analyticsSubTabs = [
+        { id: 'analytics-impacto', label: 'Impacto Global', icon: <Globe size={16} strokeWidth={2.5} /> },
+        { id: 'analytics-operacion', label: 'Operación', icon: <Zap size={16} strokeWidth={2.5} /> },
+        { id: 'analytics-escuelas', label: 'Escuelas', icon: <School size={16} strokeWidth={2.5} /> },
+        { id: 'analytics-patrocinios', label: 'Patrocinios', icon: <Gem size={16} strokeWidth={2.5} /> },
+        { id: 'analytics-reportes', label: 'Reportes', icon: <FileText size={16} strokeWidth={2.5} /> },
+    ];
     const [filter, setFilter] = useState({ type: 'month', year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -174,7 +184,22 @@ export default function AnalyticsView({ activeTab = 'analytics-impacto' }) {
         }
     }, [filter, activeSubTab]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { 
+        fetchData(); 
+        
+        // Suscripción Realtime Global para Paneles Operativos
+        const channel = supabaseNew
+            .channel('analytics-cierres-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres_mision' }, (payload) => {
+                console.log('⚡ Realtime Cierre de Misión (Analytics):', payload);
+                fetchData(); // Refrescar los paneles operativos al recibir un nuevo cierre de misión
+            })
+            .subscribe();
+
+        return () => {
+            supabaseNew.removeChannel(channel);
+        };
+    }, [fetchData]);
 
     const panelMap = {
         impacto: <PanelImpacto data={data?.impacto} loading={loading} filter={filter} />,
@@ -186,6 +211,29 @@ export default function AnalyticsView({ activeTab = 'analytics-impacto' }) {
 
     return (
         <div className="w-full max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 -mt-2">
+            {/* Mobile Sub-Tabs Navigation (Hidden on Desktop) */}
+            <div className="md:hidden flex overflow-x-auto no-scrollbar gap-3 mb-6 -mx-4 px-4 pb-2 snap-x">
+                {analyticsSubTabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab && setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 shrink-0 px-4 py-3 rounded-[1.25rem] text-[13px] font-bold transition-all duration-300 snap-center touch-manipulation border ${
+                                isActive 
+                                    ? 'bg-blue-600/90 text-white shadow-[0_8px_16px_rgb(37,99,235,0.3)] border-blue-500 scale-100' 
+                                    : 'bg-white/40 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 border-white/50 dark:border-slate-700/50 hover:bg-white/80 dark:hover:bg-slate-800/80 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] backdrop-blur-md scale-[0.98]'
+                            }`}
+                        >
+                            <span className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}>
+                                {tab.icon}
+                            </span>
+                            <span className="tracking-wide whitespace-nowrap">{tab.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Header de la vista combinada neumórfica */}
             <div className={`flex flex-col md:flex-row md:items-center ${activeSubTab !== 'impacto' && activeSubTab !== 'reportes' ? 'justify-end' : 'justify-between'} gap-6 mb-8`}>
 

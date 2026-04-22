@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import {
     Users, FileText, Clock, Shield, CheckCircle, AlertCircle,
     ChevronRight, Loader2, Calendar, Eye, XCircle, AlertTriangle, 
     RefreshCw, Search, Phone, Mail, Award, Activity,
-    Shirt, BadgeCheck, Smartphone, User, Fingerprint
+    Shirt, BadgeCheck, Smartphone, User, Fingerprint, BarChart2
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { MiniAvatar } from '@/components/ui/MiniAvatar';
 
 // ── CONSTANTS ──
@@ -76,7 +77,51 @@ export default function HRCommandCenter() {
         }
     }, []);
 
-    useEffect(() => { fetchAll(); }, [fetchAll]);
+    useEffect(() => { 
+        fetchAll(); 
+        
+        // Suscripción Realtime para Cierres de Misión
+        const channel = supabaseNew
+            .channel('hr-cierres-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres_mision' }, (payload) => {
+                console.log('⚡ Realtime Cierre de Misión:', payload);
+                if (payload.eventType === 'INSERT') {
+                    setCierres(prev => [...prev, payload.new]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setCierres(prev => prev.map(c => c.id === payload.new.id ? payload.new : c));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabaseNew.removeChannel(channel);
+        };
+    }, [fetchAll]);
+
+    // ── CHART DATA BUILDER ──
+    const chartData = useMemo(() => {
+        const checkins = prepEvents.filter(e => e.event_type === 'checkin');
+        const dayMap = {};
+        
+        checkins.forEach(e => {
+            const d = new Date(e.created_at);
+            const dateKey = d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+            if (!dayMap[dateKey]) {
+                dayMap[dateKey] = { date: dateKey, 'A Tiempo': 0, 'Retardos': 0, 'Total': 0 };
+            }
+            
+            const localHour = d.getHours();
+            const localMin = d.getMinutes();
+            if (localHour < 7 || (localHour === 7 && localMin <= 15)) {
+                dayMap[dateKey]['A Tiempo']++;
+            } else {
+                dayMap[dateKey]['Retardos']++;
+            }
+            dayMap[dateKey]['Total']++;
+        });
+
+        return Object.values(dayMap);
+    }, [prepEvents]);
 
     // ── COMPUTED DATA FUNCIONALITY ──
     const getDocsForUser = (userId) => {
@@ -642,23 +687,51 @@ export default function HRCommandCenter() {
                 </div>
             )}
 
-            {/* ── ATTENDANCE VIEW (Simplified grid) ── */}
+            {/* ── ATTENDANCE VIEW (Charts) ── */}
             {activeView === 'attendance' && (
-                <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700">
+                <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700 animate-fade-in">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500">
-                            <Calendar size={24} />
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner">
+                            <BarChart2 size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black text-slate-800 dark:text-white">Grid Punctuality</h2>
-                            <p className="text-sm text-slate-500">Visualización rápida de asistencia semanal.</p>
+                            <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">Tendencia de Asistencia</h2>
+                            <p className="text-sm font-medium text-slate-500">Volumen de pases de lista y puntualidad en los últimos 30 días.</p>
                         </div>
                     </div>
-                    {/* Contenido a escalar según necesidad futura */}
-                    <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-                        <Award size={40} className="mx-auto text-slate-300 mb-4" />
-                        <h3 className="text-lg font-black text-slate-600 dark:text-slate-300">Construcción Premium en Proceso</h3>
-                        <p className="text-slate-500 text-sm">Esta grilla será migrada a un Chart de tremor interactivo en la Fase 3.</p>
+                    
+                    <div className="h-[400px] w-full bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-6 border border-slate-100 dark:border-slate-700 shadow-inner">
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis 
+                                        dataKey="date" 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} 
+                                        dy={10}
+                                    />
+                                    <YAxis 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} 
+                                    />
+                                    <Tooltip 
+                                        cursor={{ fill: 'rgba(241, 245, 249, 0.4)' }}
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', padding: '12px 16px', fontWeight: 'bold' }}
+                                    />
+                                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontWeight: 600 }} />
+                                    <Bar dataKey="A Tiempo" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} barSize={32} />
+                                    <Bar dataKey="Retardos" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={32} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
+                                <Award size={40} className="mb-4 opacity-50" />
+                                <span className="font-bold">No hay datos de asistencia en este periodo</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -1869,11 +1869,11 @@ export default function AdminPage() {
                                                 </div>
 
                                                 {/* Turno Slots */}
-                                                <div className="flex gap-2 flex-shrink-0">
+                                                <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
                                                     {/* Matutino */}
                                                     <button
                                                         onClick={() => handleToggleDate(d.id, !d.matutino_bloqueado, 'matutino_bloqueado')}
-                                                        className={`px-3 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                                                        className={`px-2 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 w-full sm:min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
                                                             d.matutino_bloqueado
                                                                 ? 'bg-red-500/10 text-red-600 border border-red-500/30 line-through opacity-60'
                                                                 : d.matutino
@@ -1883,12 +1883,12 @@ export default function AdminPage() {
                                                         title={d.matutino_bloqueado ? 'Click para desbloquear matutino' : d.matutino ? 'Matutino ocupado' : 'Click para bloquear matutino'}
                                                     >
                                                         <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70">Matutino</span>
-                                                        <span className="text-[11px]">{d.matutino_bloqueado ? 'Bloqueado' : d.matutino ? d.matutino.nombre.substring(0, 14) : 'Libre'}</span>
+                                                        <span className="text-[11px] truncate w-full text-center">{d.matutino_bloqueado ? 'Bloqueado' : d.matutino ? d.matutino.nombre : 'Libre'}</span>
                                                     </button>
                                                     {/* Vespertino */}
                                                     <button
                                                         onClick={() => handleToggleDate(d.id, !d.vespertino_bloqueado, 'vespertino_bloqueado')}
-                                                        className={`px-3 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+                                                        className={`px-2 py-2 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 w-full sm:min-w-[130px] justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
                                                             d.vespertino_bloqueado
                                                                 ? 'bg-red-500/10 text-red-600 border border-red-500/30 line-through opacity-60'
                                                                 : d.vespertino
@@ -1898,7 +1898,7 @@ export default function AdminPage() {
                                                         title={d.vespertino_bloqueado ? 'Click para desbloquear vespertino' : d.vespertino ? 'Vespertino ocupado' : 'Click para bloquear vespertino'}
                                                     >
                                                         <span className="text-[9px] uppercase tracking-wider font-semibold opacity-70">Vespertino</span>
-                                                        <span className="text-[11px]">{d.vespertino_bloqueado ? 'Bloqueado' : d.vespertino ? d.vespertino.nombre.substring(0, 14) : 'Libre'}</span>
+                                                        <span className="text-[11px] truncate w-full text-center">{d.vespertino_bloqueado ? 'Bloqueado' : d.vespertino ? d.vespertino.nombre : 'Libre'}</span>
                                                     </button>
                                                 </div>
 
@@ -2425,16 +2425,16 @@ export default function AdminPage() {
                                         onChange={(e) => setStaffForm(prev => ({ ...prev, password: e.target.value }))}
                                         placeholder="Mínimo 6 caracteres"
                                         minLength={6}
-                                        className="flex-1 neu-input-inset px-4 py-3"
+                                        className="flex-1 min-w-0 neu-input-inset px-4 py-3"
                                     />
                                     <button type="button" onClick={generatePassword}
-                                        className="px-3 py-3 neu-input-inset hover:opacity-80 transition-colors whitespace-nowrap"
+                                        className="shrink-0 px-3 py-3 neu-input-inset hover:opacity-80 transition-colors whitespace-nowrap"
                                         title="Generar password"
                                     >
                                         <RefreshCw size={16} />
                                     </button>
                                     <button type="button" onClick={() => setShowStaffPasswords(!showStaffPasswords)}
-                                        className="px-3 py-3 neu-input-inset hover:opacity-80 transition-colors"
+                                        className="shrink-0 px-3 py-3 neu-input-inset hover:opacity-80 transition-colors"
                                     >
                                         {showStaffPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
@@ -2709,19 +2709,18 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* FOOTER */}
-            <footer className="max-w-5xl mx-auto mt-12 text-center text-slate-500 text-xs">
-                <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
-            </footer>
-
-            
             {activeTab === 'hr' && (
                 <HRCommandCenter />
             )}
 
             {activeTab.startsWith('analytics-') && (
-                <AnalyticsView activeTab={activeTab} />
+                <AnalyticsView activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
+
+            {/* FOOTER - Moved to the very bottom */}
+            <footer className="max-w-5xl mx-auto mt-12 pb-8 text-center text-slate-500 text-xs">
+                <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
+            </footer>
         </AdminLayout>
 
         {/* Flyer Download Modal */}

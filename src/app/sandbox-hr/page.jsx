@@ -321,10 +321,10 @@ export default function SandboxHRPage() {
           </div>
         ) : (
           <Tabs defaultValue="asistencias" className="w-full flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="bg-slate-100 rounded-lg p-1 h-12 shadow-sm border border-slate-200">
-                <TabsTrigger value="asistencias" className="rounded-md font-semibold text-sm px-6 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all h-full">📋 Bitácora de Asistencias (Checkin)</TabsTrigger>
-                <TabsTrigger value="directorio" className="rounded-md font-semibold text-sm px-6 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all h-full">👥 Directorio Staff</TabsTrigger>
+            <div className="flex items-center justify-between mb-4 w-full overflow-hidden">
+              <TabsList className="bg-slate-100 rounded-lg p-1 h-12 shadow-sm border border-slate-200 overflow-x-auto flex-nowrap no-scrollbar w-full md:w-auto justify-start">
+                <TabsTrigger value="asistencias" className="rounded-md font-semibold text-sm px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all h-full shrink-0">📋 Bitácora de Asistencias</TabsTrigger>
+                <TabsTrigger value="directorio" className="rounded-md font-semibold text-sm px-4 md:px-6 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm transition-all h-full shrink-0">👥 Directorio Staff</TabsTrigger>
               </TabsList>
             </div>
             
