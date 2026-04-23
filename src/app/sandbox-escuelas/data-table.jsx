@@ -90,24 +90,28 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
 
       // Pipeline state labels for Excel display
       const PIPELINE_LABELS = {
-        sin_contacto: '□□□□□□ Sin contacto (0/6)',
-        contactada: '■□□□□□ En conversación (1/6)',
-        agendada: '■■□□□□ Agendada (2/6)',
-        en_preparacion: '■■■□□□ En preparación (3/6)',
-        en_ruta: '■■■■□□ En ruta (4/6)',
-        operando: '■■■■■□ Operando (5/6)',
-        visitada: '■■■■■■ Completada ✓ (6/6)',
+        sin_contacto: '□□□□□□□ Sin contacto (0/7)',
+        llamada_sin_respuesta: '■□□□□□□ Llamada sin respuesta (1/7)',
+        contactada: '■■□□□□□ En conversación (2/7)',
+        agendada: '■■■□□□□ Agendada (3/7)',
+        en_preparacion: '■■■■□□□ En preparación (4/7)',
+        en_ruta: '■■■■■□□ En ruta (5/7)',
+        operando: '■■■■■■□ Operando (6/7)',
+        visitada: '■■■■■■■ Completada ✓ (7/7)',
+        perdida: '××××××× Perdida ✗',
       };
 
       // Pipeline state fill colors for conditional formatting
       const PIPELINE_FILLS = {
         sin_contacto: null,
+        llamada_sin_respuesta: { fgColor: { rgb: "FDBA74" } }, // orange-300
         contactada: { fgColor: { rgb: "DBEAFE" } },    // light blue
         agendada: { fgColor: { rgb: "BFDBFE" } },      // blue
         en_preparacion: { fgColor: { rgb: "FEF3C7" } }, // light amber
         en_ruta: { fgColor: { rgb: "FDE68A" } },        // amber
         operando: { fgColor: { rgb: "FCD34D" } },       // dark amber
         visitada: { fgColor: { rgb: "D1FAE5" } },       // light green
+        perdida: { fgColor: { rgb: "FECACA" } },        // light red
       };
 
       // Header row

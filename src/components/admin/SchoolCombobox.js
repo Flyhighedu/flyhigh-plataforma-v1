@@ -179,7 +179,7 @@ export default function SchoolCombobox({ schools = [], value, onChange, loading 
 
             {/* Dropdown */}
             {isOpen && !value && (
-                <div className="absolute z-50 mt-2 w-full neu-card rounded-xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700/80">
+                <div className="absolute z-[100] mt-2 w-full bg-white dark:bg-slate-900 rounded-xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700/80">
                     {loading ? (
                         <div className="flex items-center justify-center py-8 neu-text-sub gap-2">
                             <Loader2 size={18} className="animate-spin" />

@@ -121,24 +121,34 @@ function DeleteActionCell({ row, table }) {
 
 // --- Pipeline progress cell (editable dropdown + Unicode bar) ---
 const PIPELINE_STAGES = [
-  { key: 'sin_contacto',   label: 'Sin contacto',    step: 0 },
-  { key: 'contactada',     label: 'En conversación', step: 1 },
-  { key: 'agendada',       label: 'Agendada',        step: 2 },
-  { key: 'en_preparacion', label: 'En preparación',  step: 3 },
-  { key: 'en_ruta',        label: 'En ruta',         step: 4 },
-  { key: 'operando',       label: 'Operando',        step: 5 },
-  { key: 'visitada',       label: 'Completada ✓',    step: 6 },
+  { key: 'sin_contacto',          label: 'Sin contacto',          step: 0 },
+  { key: 'llamada_sin_respuesta', label: 'Llamada sin respuesta', step: 1 },
+  { key: 'contactada',            label: 'En conversación',       step: 2 },
+  { key: 'agendada',              label: 'Agendada',              step: 3 },
+  { key: 'en_preparacion',        label: 'En preparación',        step: 4 },
+  { key: 'en_ruta',               label: 'En ruta',               step: 5 },
+  { key: 'operando',              label: 'Operando',              step: 6 },
+  { key: 'visitada',              label: 'Completada ✓',          step: 7 },
+  { key: 'perdida',               label: 'Perdida ✗',             step: 0, isLost: true },
 ];
 
 function getBarAndClass(stageKey) {
   const stage = PIPELINE_STAGES.find(s => s.key === stageKey) || PIPELINE_STAGES[0];
-  const filled = stage.step;
-  const total = PIPELINE_STAGES.length - 1;
-  const bar = '■'.repeat(filled) + '□'.repeat(total - filled);
-  const textClass = stage.step === 0 ? 'text-slate-400'
-    : stage.step <= 2 ? 'text-blue-700'
-    : stage.step <= 5 ? 'text-amber-700'
-    : 'text-emerald-700';
+  const total = 7;
+  let bar, textClass;
+
+  if (stage.isLost) {
+    bar = '×'.repeat(total);
+    textClass = 'text-red-600 opacity-80';
+  } else {
+    const filled = stage.step;
+    bar = '■'.repeat(filled) + '□'.repeat(total - filled);
+    textClass = stage.step === 0 ? 'text-slate-400'
+      : stage.step === 1 ? 'text-orange-500' // llamada sin respuesta
+      : stage.step <= 3 ? 'text-blue-700'
+      : stage.step <= 6 ? 'text-amber-700'
+      : 'text-emerald-700';
+  }
   return { bar, textClass, stage, total };
 }
 
@@ -169,15 +179,19 @@ function PipelineProgressCell({ getValue, row, column, table }) {
         className="absolute inset-0 opacity-0 cursor-pointer w-full"
         title="Cambiar estado pipeline"
       >
-        {PIPELINE_STAGES.map(s => (
-          <option key={s.key} value={s.key}>
-            {'■'.repeat(s.step) + '□'.repeat(total - s.step)} {s.label} ({s.step}/{total})
-          </option>
-        ))}
+        {PIPELINE_STAGES.map(s => {
+          const optBar = s.isLost ? '×'.repeat(total) : '■'.repeat(s.step) + '□'.repeat(total - s.step);
+          const stepText = s.isLost ? '' : `(${s.step}/${total})`;
+          return (
+            <option key={s.key} value={s.key}>
+              {optBar} {s.label} {stepText}
+            </option>
+          );
+        })}
       </select>
-      <span>{bar}</span>
-      <span className="ml-1.5 font-sans font-medium">{stage.label}</span>
-      <span className="ml-1 text-[10px] opacity-60">({stage.step}/{total})</span>
+      <span className={stage.isLost ? "tracking-widest" : ""}>{bar}</span>
+      <span className={`ml-1.5 font-sans font-medium ${stage.isLost ? "line-through" : ""}`}>{stage.label}</span>
+      {!stage.isLost && <span className="ml-1 text-[10px] opacity-60">({stage.step}/{total})</span>}
     </div>
   );
 }
