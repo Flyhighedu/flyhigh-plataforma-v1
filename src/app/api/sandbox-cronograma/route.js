@@ -17,6 +17,55 @@ const editableFields = [
     'numero_ninos'
 ];
 
+/**
+ * Maps cronograma estatus → CRM pipeline stage.
+ * Only advances the pipeline (never goes backwards from a higher stage).
+ */
+const CRONOGRAMA_TO_CRM = {
+    'pendiente':     'agendada',
+    'en_progreso':   'en_ruta',
+    'completada':    'visitada',
+    'cancelada':     null, // Don't change CRM on cancel
+};
+
+// CRM stage order for "only advance" logic
+const CRM_ORDER = [
+    'sin_contacto', 'llamada_sin_respuesta', 'contactada', 'cita_ventas',
+    'agendada', 'en_preparacion', 'en_ruta', 'operando', 'visitada', 'perdida'
+];
+
+/**
+ * Syncs catalogo_escuelas.estado_pipeline based on what happened in the cronograma.
+ * @param {SupabaseClient} supabase - Admin client
+ * @param {string} cct - School CCT identifier
+ * @param {string} cronogramaEstatus - The new estatus from proximas_escuelas
+ */
+async function syncCRMPipelineState(supabase, cct, cronogramaEstatus) {
+    if (!cct) return;
+
+    const targetCRMStage = CRONOGRAMA_TO_CRM[cronogramaEstatus];
+    if (!targetCRMStage) return; // null = don't sync (e.g. cancelada)
+
+    // Fetch current CRM state to only advance, never go backwards
+    const { data: school } = await supabase
+        .from('catalogo_escuelas')
+        .select('estado_pipeline')
+        .eq('cct', cct)
+        .single();
+
+    const currentIndex = CRM_ORDER.indexOf(school?.estado_pipeline || 'sin_contacto');
+    const targetIndex  = CRM_ORDER.indexOf(targetCRMStage);
+
+    if (targetIndex > currentIndex) {
+        await supabase
+            .from('catalogo_escuelas')
+            .update({ estado_pipeline: targetCRMStage })
+            .eq('cct', cct);
+
+        console.log(`[CRM Sync] ${cct}: ${school?.estado_pipeline} → ${targetCRMStage}`);
+    }
+}
+
 export async function GET() {
     try {
         const supabase = getAdminSupabase();
@@ -87,6 +136,12 @@ export async function PATCH(request) {
             .select();
 
         if (error) throw error;
+
+        // — CRM Sync: if estatus changed, update pipeline state —
+        if (field === 'estatus' && data?.[0]?.cct) {
+            await syncCRMPipelineState(supabase, data[0].cct, castValue);
+        }
+
         return NextResponse.json({ data: data?.[0] || null });
     } catch (err) {
         console.error('[API] sandbox-cronograma PATCH error:', err);
@@ -109,6 +164,12 @@ export async function POST(request) {
             .select();
 
         if (error) throw error;
+
+        // — CRM Sync: new mission = school is now 'agendada' —
+        if (data?.[0]?.cct) {
+            await syncCRMPipelineState(supabase, data[0].cct, 'pendiente');
+        }
+
         return NextResponse.json({ data: data?.[0] || null });
     } catch (err) {
         console.error('[API] sandbox-cronograma POST error:', err);

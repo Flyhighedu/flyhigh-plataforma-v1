@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart
+    Globe, Zap, School, Gem, FileText, Database, Heart, Building2
 } from 'lucide-react';
 import AdminAlarms from './AdminAlarms';
 
@@ -80,6 +80,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
     const TABS = [
         { id: 'bd', label: 'Base de Datos', icon: <Database size={18} />, color: '#f43f5e' }, // Rose
+        { id: 'crm-escuelas', label: 'CRM Escuelas', icon: <Building2 size={18} />, color: '#38bdf8' }, // Sky
         { id: 'crm', label: 'Leads WhatsApp', icon: <WhatsAppIcon size={18} />, color: '#25D366' }, // Whatsapp Green
 
         { id: 'patrocinadores', label: 'Patrocinadores', icon: <CreditCard size={18} />, color: '#c084fc' }, // Violet
@@ -307,8 +308,8 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
             {/* ── CONTENIDO PRINCIPAL ── */}
             <main className={`flex-1 flex flex-col relative z-10 w-full overflow-hidden ${fluidTransition} pt-16 md:pt-0`}>
                 
-                {/* Header superior: el título "Vuelos HQ" se empuja condicionalmente para evitar el Logo Absoluto */}
-                {activeTab !== 'crm' && (
+                {/* Header superior: el título se empuja condicionalmente para evitar el Logo Absoluto */}
+                {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && (
                     <header className={`h-16 md:h-28 flex items-center justify-between shrink-0 ${fluidTransition} px-4 md:pr-12 md:pl-12 ${isCollapsed ? 'md:pl-[300px]' : ''}`}>
                         <div className="flex items-center gap-3 md:gap-5 ml-[140px] md:ml-0">
                             <div 
@@ -336,7 +337,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
                 <AdminAlarms />
 
-                {activeTab === 'crm' ? (
+                {activeTab === 'crm' || activeTab === 'crm-escuelas' ? (
                     <div className="flex-1 flex flex-col overflow-hidden w-full relative pb-16 md:pb-0">
                         {children}
                     </div>

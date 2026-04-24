@@ -124,17 +124,18 @@ const PIPELINE_STAGES = [
   { key: 'sin_contacto',          label: 'Sin contacto',          step: 0 },
   { key: 'llamada_sin_respuesta', label: 'Llamada sin respuesta', step: 1 },
   { key: 'contactada',            label: 'En conversación',       step: 2 },
-  { key: 'agendada',              label: 'Agendada',              step: 3 },
-  { key: 'en_preparacion',        label: 'En preparación',        step: 4 },
-  { key: 'en_ruta',               label: 'En ruta',               step: 5 },
-  { key: 'operando',              label: 'Operando',              step: 6 },
-  { key: 'visitada',              label: 'Completada ✓',          step: 7 },
+  { key: 'cita_ventas',           label: 'Presentación Agendada', step: 3 },
+  { key: 'agendada',              label: 'Agendada',              step: 4 },
+  { key: 'en_preparacion',        label: 'En preparación',        step: 5 },
+  { key: 'en_ruta',               label: 'En ruta',               step: 6 },
+  { key: 'operando',              label: 'Operando',              step: 7 },
+  { key: 'visitada',              label: 'Completada ✓',          step: 8 },
   { key: 'perdida',               label: 'Perdida ✗',             step: 0, isLost: true },
 ];
 
 function getBarAndClass(stageKey) {
   const stage = PIPELINE_STAGES.find(s => s.key === stageKey) || PIPELINE_STAGES[0];
-  const total = 7;
+  const total = 8;
   let bar, textClass;
 
   if (stage.isLost) {
@@ -144,9 +145,11 @@ function getBarAndClass(stageKey) {
     const filled = stage.step;
     bar = '■'.repeat(filled) + '□'.repeat(total - filled);
     textClass = stage.step === 0 ? 'text-slate-400'
-      : stage.step === 1 ? 'text-orange-500' // llamada sin respuesta
-      : stage.step <= 3 ? 'text-blue-700'
-      : stage.step <= 6 ? 'text-amber-700'
+      : stage.step === 1 ? 'text-orange-500'
+      : stage.step === 2 ? 'text-blue-700'
+      : stage.step === 3 ? 'text-violet-600'  // Presentación Agendada
+      : stage.step <= 4 ? 'text-blue-700'
+      : stage.step <= 7 ? 'text-amber-700'
       : 'text-emerald-700';
   }
   return { bar, textClass, stage, total };
@@ -262,12 +265,12 @@ export const escuelasColumns = [
     accessorKey: "estado_pipeline",
     header: "Estado Pipeline",
     cell: (props) => <PipelineProgressCell {...props} />,
-    size: 230,
+    size: 280,
     enableGlobalFilter: false,
     enableSorting: true,
     sortingFn: (rowA, rowB) => {
-      const order = { sin_contacto: 0, contactada: 1, agendada: 2, en_preparacion: 3, en_ruta: 4, operando: 5, visitada: 6 };
-      return (order[rowA.original.estado_pipeline] || 0) - (order[rowB.original.estado_pipeline] || 0);
+      const order = { sin_contacto: 0, llamada_sin_respuesta: 1, contactada: 2, cita_ventas: 3, agendada: 4, en_preparacion: 5, en_ruta: 6, operando: 7, visitada: 8, perdida: -1 };
+      return (order[rowA.original.estado_pipeline] ?? 0) - (order[rowB.original.estado_pipeline] ?? 0);
     },
     footer: ({ table }) => {
       const total = table.getFilteredRowModel().rows.length;

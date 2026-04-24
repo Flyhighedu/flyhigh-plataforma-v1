@@ -25,6 +25,8 @@ import SandboxCronogramaPage from '@/app/sandbox-cronograma/page';
 import SandboxHRPage from '@/app/sandbox-hr/page';
 import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
 import SandboxCRMPage from '@/app/sandbox-crm/page';
+import CRMEscuelasPage from '@/app/admin/crm/page';
+import { useRouter } from 'next/navigation';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
 const DashboardPage = dynamic(() => import('../dashboard/page'), {
@@ -42,6 +44,7 @@ export default function AdminPage() {
     // ============================================
     // TODOS LOS HOOKS DEBEN IR AL INICIO
     // ============================================
+    const router = useRouter();
 
     // --- ESTADO DE AUTENTICACIÓN ---
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -1104,7 +1107,35 @@ export default function AdminPage() {
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 md:gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                                {/* CRM Escuelas Card (NUEVO) */}
+                                <button 
+                                    onClick={() => setActiveTab('crm-escuelas')}
+                                    className="neu-card group text-left p-8 xl:p-10 relative overflow-hidden transition-all duration-500 hover:-translate-y-3 min-h-[360px] flex flex-col justify-between"
+                                    style={{ 
+                                        backgroundColor: '#3b82f6', // Blue premium
+                                        boxShadow: '12px 12px 24px rgba(0,0,0,0.15), -12px -12px 24px rgba(255,255,255,1)'
+                                    }}
+                                >
+                                    <Building2 className="absolute -right-8 -bottom-8 w-[280px] h-[280px] text-white opacity-[0.12] group-hover:opacity-[0.18] group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 pointer-events-none" />
+                                    
+                                    <div className="relative z-10 mt-2">
+                                        <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-4 group-hover:scale-[1.02] origin-left transition-transform">
+                                            CRM Escuelas
+                                        </h2>
+                                        <p className="text-blue-100 text-sm md:text-base font-medium leading-relaxed line-clamp-4 pr-2">
+                                            Gestión comercial, pipeline de ventas, recordatorios y notas detalladas por institución.
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="inline-flex items-center gap-3 text-white font-black text-xs md:text-sm tracking-widest uppercase transition-all transform group-hover:translate-x-2 relative z-10 mt-8">
+                                        <span>Abrir CRM</span>
+                                        <div className="w-8 h-1 bg-white/40 rounded-full transition-all duration-500 group-hover:w-16 group-hover:bg-white relative flex items-center">
+                                            <ArrowLeft className="w-5 h-5 text-white absolute -right-3 rotate-180 opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:-right-5" />
+                                        </div>
+                                    </div>
+                                </button>
+
                                 {/* Catálogo de Escuelas Card */}
                                 <button 
                                     onClick={() => setDbView('catalogo')}
@@ -1301,7 +1332,7 @@ export default function AdminPage() {
             )}
 
 
-            {/* TAB: CRM Pipeline Principal */}
+            {/* TAB: CRM Pipeline Principal (WhatsApp Old) */}
             {activeTab === 'crm' && (
                 <div className="animate-premium-in w-full h-full flex flex-col pt-4 overflow-hidden relative">
                     {/* Hacemos que ocupe todo el ancho igual que las bd */}
@@ -1309,6 +1340,11 @@ export default function AdminPage() {
                         <SandboxCRMPage />
                     </div>
                 </div>
+            )}
+
+            {/* TAB: Nuevo CRM de Escuelas */}
+            {activeTab === 'crm-escuelas' && (
+                <CRMEscuelasPage />
             )}
 
             {
@@ -2107,7 +2143,7 @@ export default function AdminPage() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                             {/* --- COLUMNA 1: PRÓXIMAS MISIONES --- */}
-                            <section className="bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-600/20 p-6 md:p-8 self-start sticky top-24 transition-all duration-500 relative overflow-hidden">
+                            <section className="bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-600/20 p-6 md:p-8 self-start lg:sticky lg:top-24 transition-all duration-500 relative overflow-hidden">
                                 {/* Decoración de fondo suave (opcional, para darle más feeling 'playful' y profundidad a la tarjeta azul) */}
                                 <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                                 <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />
@@ -2717,10 +2753,12 @@ export default function AdminPage() {
                 <AnalyticsView activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
 
-            {/* FOOTER - Moved to the very bottom */}
-            <footer className="max-w-5xl mx-auto mt-12 pb-8 text-center text-slate-500 text-xs">
-                <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
-            </footer>
+            {/* FOOTER - Hidden for full-canvas tabs */}
+            {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && (
+                <footer className="max-w-5xl mx-auto mt-12 pb-8 text-center text-slate-500 text-xs">
+                    <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
+                </footer>
+            )}
         </AdminLayout>
 
         {/* Flyer Download Modal */}
