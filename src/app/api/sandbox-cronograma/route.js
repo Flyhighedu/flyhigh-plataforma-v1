@@ -43,26 +43,36 @@ const CRM_ORDER = [
 async function syncCRMPipelineState(supabase, cct, cronogramaEstatus) {
     if (!cct) return;
 
+    const normalizedCCT = cct.trim().toUpperCase();
     const targetCRMStage = CRONOGRAMA_TO_CRM[cronogramaEstatus];
     if (!targetCRMStage) return; // null = don't sync (e.g. cancelada)
 
     // Fetch current CRM state to only advance, never go backwards
-    const { data: school } = await supabase
+    const { data: school, error } = await supabase
         .from('catalogo_escuelas')
         .select('estado_pipeline')
-        .eq('cct', cct)
-        .single();
+        .ilike('cct', normalizedCCT)
+        .maybeSingle();
 
-    const currentIndex = CRM_ORDER.indexOf(school?.estado_pipeline || 'sin_contacto');
+    if (error || !school) {
+        console.warn(`[CRM Sync] No se encontró la escuela ${normalizedCCT} en el catálogo.`);
+        return;
+    }
+
+    const currentIndex = CRM_ORDER.indexOf(school.estado_pipeline || 'sin_contacto');
     const targetIndex  = CRM_ORDER.indexOf(targetCRMStage);
 
     if (targetIndex > currentIndex) {
-        await supabase
+        const { error: updateError } = await supabase
             .from('catalogo_escuelas')
             .update({ estado_pipeline: targetCRMStage })
-            .eq('cct', cct);
+            .ilike('cct', normalizedCCT);
 
-        console.log(`[CRM Sync] ${cct}: ${school?.estado_pipeline} → ${targetCRMStage}`);
+        if (!updateError) {
+            console.log(`[CRM Sync] ${normalizedCCT}: ${school.estado_pipeline} → ${targetCRMStage}`);
+        } else {
+            console.error(`[CRM Sync Error] ${normalizedCCT}:`, updateError);
+        }
     }
 }
 

@@ -6,7 +6,21 @@ import React from "react";
  * All Lucide icons replaced with inline SVGs for html2canvas compatibility.
  * All styles inline for capture reliability.
  */
-const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fecha, monto, valorReal, subsidio }, ref) {
+export const CIRCULAR_DIGITAL_DEFAULTS = {
+  tituloExperiencia: 'La Experiencia',
+  copyExperiencia: 'Convertiremos nuestro patio escolar en una pista de despegue. A través de un dron que se elevará desde nuestra escuela y gafas de última generación, llevaremos a nuestros niños a volar hacia las nubes para redescubrir Uruapan totalmente en vivo, como si fueran ellos mismos los que estuvieran surcando el cielo.',
+  feature1Titulo: 'Relator Maestro en Vivo',
+  feature1Copy: 'Un guía pedagógico narra cada punto de interés, transformando el asombro en aprendizaje directo por sus audífonos.',
+  feature2Titulo: 'Aprendizaje al aterrizar',
+  feature2Copy: 'Al bajar, la aventura sigue con talleres educativos dirigidos por personal del Parque Nacional y Cultura.',
+  corazonTitulo: 'El Corazón de Fly High EDU',
+  narrativaPricing: '7 empresas comprometidas con los sueños de la niñez en Uruapan financian la mayor parte de este proyecto.',
+  transparenciaCopy: 'La escuela y sus maestros no retienen ningún ingreso. El 100% de la aportación financia directamente la campaña.',
+  tipAhorro: 'Cada niño puede aportar incluso $1 peso diario con su maestro.',
+};
+
+const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fecha, monto, valorReal, subsidio, texts = {} }, ref) {
+  const t = { ...CIRCULAR_DIGITAL_DEFAULTS, ...texts };
   const containerStyle = {
     width: "450px",
     height: "975px",
@@ -117,7 +131,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.2)", paddingBottom: "8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <NavigationIcon />
-              <h3 style={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.1em", color: "#ffffff", textTransform: "uppercase", margin: 0 }}>La Experiencia</h3>
+              <h3 style={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.1em", color: "#ffffff", textTransform: "uppercase", margin: 0 }}>{t.tituloExperiencia}</h3>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#ffffff" }}>
               <span style={{ fontSize: "8px", fontWeight: 900, textTransform: "uppercase" }}>6 Minutos</span>
@@ -127,25 +141,22 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
           </div>
 
           <div style={{ fontSize: "9.5px", color: "#ffffff", lineHeight: 1.6, textAlign: "justify", fontWeight: 500 }}>
-            Convertiremos nuestro patio escolar en una <strong style={{ fontWeight: 900 }}>pista de despegue</strong>. A través de un dron que se elevará desde nuestra escuela y{" "}
-            <strong style={{ fontWeight: 900, textDecoration: "underline" }}>gafas de última generación</strong>, llevaremos a nuestros niños a volar hacia las nubes para redescubrir{" "}
-            <strong style={{ fontWeight: 900, color: "#e0f2fe", textTransform: "uppercase" }}>Uruapan</strong>{" "}
-            <strong style={{ fontWeight: 900, textTransform: "uppercase" }}>totalmente en vivo</strong>, como si fueran ellos mismos los que estuvieran surcando el cielo.
+            {t.copyExperiencia}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
               <div style={{ backgroundColor: "#0c4a6e", padding: "6px", borderRadius: "50%", flexShrink: 0 }}><HeadphonesIcon /></div>
               <div style={{ fontSize: "8.5px", color: "#ffffff", lineHeight: 1.3 }}>
-                <strong style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "2px" }}>Relator Maestro en Vivo</strong>
-                Un guía pedagógico narra cada punto de interés, transformando el asombro en aprendizaje directo por sus audífonos.
+                <strong style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "2px" }}>{t.feature1Titulo}</strong>
+                {t.feature1Copy}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
               <div style={{ backgroundColor: "#f59e0b", padding: "6px", borderRadius: "50%", flexShrink: 0 }}><BookIcon /></div>
               <div style={{ fontSize: "8.5px", color: "#ffffff", lineHeight: 1.3 }}>
-                <strong style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "2px" }}>Aprendizaje al aterrizar</strong>
-                Al bajar, la aventura sigue con talleres educativos dirigidos por personal del <strong>Parque Nacional</strong> y <strong>Cultura</strong>.
+                <strong style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "2px" }}>{t.feature2Titulo}</strong>
+                {t.feature2Copy}
               </div>
             </div>
           </div>
@@ -165,7 +176,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "2px", padding: "0 4px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginBottom: "4px" }}>
             <HeartIcon />
-            <span style={{ fontSize: "10px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.15em", color: "#0c4a6e" }}>El Corazón de Fly High EDU</span>
+            <span style={{ fontSize: "10px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.15em", color: "#0c4a6e" }}>{t.corazonTitulo}</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -195,7 +206,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
             {/* Narrative */}
             <div style={{ width: "62%", display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px", paddingRight: "4px" }}>
               <p style={{ fontSize: "8px", color: "#1f2937", lineHeight: 1.3, textAlign: "justify", margin: 0 }}>
-                <strong style={{ color: "#0c4a6e", fontWeight: 900 }}>7 empresas comprometidas</strong> con los sueños de la niñez en Uruapan financian la mayor parte de este proyecto.
+                {t.narrativaPricing}
               </p>
               <p style={{ fontSize: "8px", color: "#1f2937", lineHeight: 1.3, textAlign: "justify", margin: 0 }}>
                 Así como otros padres aportaron para tu hijo, hoy tus{" "}
@@ -217,7 +228,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
               <div style={{ width: "60%", display: "flex", alignItems: "flex-start", gap: "6px", paddingLeft: "4px" }}>
                 <PiggyIcon />
                 <p style={{ fontSize: "7.5px", color: "#1f2937", lineHeight: 1.3, fontWeight: 500, margin: 0 }}>
-                  Cada niño puede aportar <strong style={{ color: "#0c4a6e", fontWeight: 900, fontSize: "8px", textDecoration: "underline" }}>incluso $1 peso</strong> diario con su maestro.
+                  {t.tipAhorro}
                 </p>
               </div>
             </div>
@@ -225,7 +236,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
               <ShieldIcon />
               <p style={{ fontSize: "6.5px", color: "rgba(255,255,255,0.95)", lineHeight: 1.2, margin: 0 }}>
                 <strong style={{ fontWeight: 900, color: "#ffffff", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "7px" }}>Transparencia Total:</strong>{" "}
-                La escuela <strong>{escuela}</strong> y sus maestros no retienen ningún ingreso. El 100% de la aportación financia directamente la campaña.
+                {t.transparenciaCopy}
               </p>
             </div>
           </div>

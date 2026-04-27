@@ -6,7 +6,21 @@ import { SponsorLogos } from "./FlyerNinos";
  * FlyerPadres — Exterior flyer for parents (B/W, letter size, with QR)
  * All styles inline for html2canvas compatibility.
  */
-const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, monto, valorReal, subsidio }, ref) {
+export const FLYER_PADRES_DEFAULTS = {
+  titulo: '¡El cielo llega a nuestra escuela!',
+  subtitulo: '¡Estimados padres de familia!',
+  copyPrincipal: 'Volar es el sueño más grande de la infancia. Hoy, a nuestra escuela le enorgullece ser sede de la campaña Fly High EDU 2026-2027, donde nuestros niños harán realidad este anhelo. Gracias a la tecnología, convertiremos nuestro patio en una verdadera pista de despegue. A través de drones y gafas de realidad virtual, los llevaremos a volar sobre Uruapan en tiempo real, viviendo la increíble experiencia de surcar el cielo.',
+  ticketFechaLabel: 'FECHA DEL EVENTO',
+  ticketEscuelaLabel: 'LUGAR',
+  valorLabel: 'Valor real de la experiencia:',
+  paseLabel: 'APOYO PARA LA CAMPAÑA',
+  disclaimer: '* Este monto es exclusivo para llevar la campaña a más escuelas. La institución no retiene ningún porcentaje.',
+  sponsorCallout: 'La educación es el universo que construimos juntos',
+  sponsorSubtitle: 'Esta campaña es posible gracias a:',
+};
+
+const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, monto, valorReal, subsidio, texts = {} }, ref) {
+  const t = { ...FLYER_PADRES_DEFAULTS, ...texts };
   const pageStyle = {
     width: "8.5in",
     height: "11in",
@@ -69,7 +83,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
             lineHeight: 1.1, letterSpacing: "-0.02em", color: "#000000",
             margin: 0, ...titleFont,
           }}>
-            ¡El cielo llega a<br />nuestra escuela!
+            {t.titulo}
           </h1>
         </header>
 
@@ -79,15 +93,13 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
             fontSize: "1.5rem", fontWeight: 800, marginBottom: "12px",
             letterSpacing: "0.05em", textTransform: "uppercase", color: "#000000", ...titleFont,
           }}>
-            ¡Estimados padres de familia!
+            {t.subtitulo}
           </h2>
           <p style={{
             fontSize: "1.15rem", lineHeight: 1.6, textAlign: "justify",
             marginBottom: 0, color: "#111827",
           }}>
-            <strong>Volar es el sueño</strong> más grande de la infancia. Hoy, a nuestra escuela{" "}
-            <strong>{escuela}</strong>{" "}
-            le enorgullece ser sede de la campaña <strong>Fly High EDU 2026-2027</strong>, donde nuestros niños harán realidad este anhelo. Gracias a la tecnología, convertiremos nuestro patio en una verdadera <strong>pista de despegue</strong>. A través de drones y <strong>gafas de realidad virtual</strong>, los llevaremos a <strong>volar sobre Uruapan</strong> en tiempo real, viviendo la increíble experiencia de surcar el cielo.
+            {t.copyPrincipal}
           </p>
         </main>
 
@@ -106,7 +118,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
               <span style={{
                 display: "block", fontWeight: 800, fontSize: "0.45rem",
                 letterSpacing: "0.1em", color: "#6b7280", marginBottom: "2px", ...titleFont,
-              }}>FECHA DEL EVENTO</span>
+              }}>{t.ticketFechaLabel}</span>
               <span style={{ fontWeight: 700, fontSize: "0.7rem", display: "block", color: "#000000" }}>
                 {fecha}
               </span>
@@ -118,7 +130,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
               <span style={{
                 display: "block", fontWeight: 800, fontSize: "0.45rem",
                 letterSpacing: "0.1em", color: "#6b7280", marginBottom: "2px", ...titleFont,
-              }}>LUGAR</span>
+              }}>{t.ticketEscuelaLabel}</span>
               <span style={{
                 fontWeight: 700, fontSize: "0.65rem", display: "block",
                 color: "#000000", lineHeight: 1.2, textTransform: "uppercase",
@@ -132,7 +144,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                 <span style={{
                   fontWeight: 800, fontSize: "0.42rem", textTransform: "uppercase",
                   letterSpacing: "0.05em", marginRight: "4px", color: "#374151", ...titleFont,
-                }}>Valor real de la experiencia:</span>
+                }}>{t.valorLabel}</span>
                 <svg width="48" height="12" viewBox="0 0 48 12" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible", transform: "translateY(1px)" }}>
                   <text x="0" y="11" fill="#1f2937" fontFamily="'Montserrat', sans-serif" fontWeight="800" fontSize="10.5">{valorReal}</text>
                   <line x1="0" y1="8" x2="44" y2="8" stroke="#1f2937" strokeWidth="1.2" pointerEvents="none" />
@@ -143,7 +155,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                 <span style={{
                   display: "block", fontWeight: 800, fontSize: "0.55rem",
                   letterSpacing: "0.1em", color: "#000000", marginBottom: "2px", ...titleFont,
-                }}>APOYO PARA LA CAMPAÑA</span>
+                }}>{t.paseLabel}</span>
                 <div style={{ display: "flex", alignItems: "baseline", lineHeight: 1 }}>
                   <span style={{ color: "#374151", fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Solo</span>
                   <span style={{ fontWeight: 900, fontSize: "2.1rem", color: "#000000", letterSpacing: "-0.02em", lineHeight: 0.8 }}>{monto}</span>
@@ -171,7 +183,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                   </tbody>
                 </table>
                 <p style={{ fontSize: "0.45rem", lineHeight: 1.3, textAlign: "left", color: "#6b7280", fontStyle: "italic", margin: 0, marginTop: "5px" }}>
-                  * Este monto es exclusivo para llevar la campaña a más escuelas. La institución no retiene ningún porcentaje.
+                  {t.disclaimer}
                 </p>
               </div>
             </div>
@@ -219,10 +231,10 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
           textShadow: "0px 0px 12px rgba(255,255,255,1), 0px 0px 20px rgba(255,255,255,0.9)",
         }}>
           <p style={{ fontWeight: 700, fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#111827", marginBottom: "2px", ...titleFont }}>
-            La educación es el universo que construimos juntos
+            {t.sponsorCallout}
           </p>
           <p style={{ fontWeight: 800, fontSize: "0.45rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#374151", ...titleFont }}>
-            Esta campaña es posible gracias a:
+            {t.sponsorSubtitle}
           </p>
         </div>
       </div>

@@ -5,7 +5,21 @@ import React from "react";
  * FlyerNinos — Interior flyer for kids (B/W, letter size)
  * All styles are inline to guarantee html2canvas captures them correctly.
  */
-const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto, valorReal, subsidio }, ref) {
+export const FLYER_NINOS_DEFAULTS = {
+  titulo: '¡El cielo llega a nuestra escuela!',
+  subtitulo: '¡PREPÁRATE PARA VOLAR!',
+  copyPrincipal: '¡Tu patio se convertirá en una increíble pista de despegue! Usando gafas de realidad virtual y drones, te llevaremos a volar a ti, a tus compañeros y a tu maestr@ por todo Uruapan en tiempo real, despegando desde tu escuela. ¡Sentirán lo que se siente volar! Además, con tu pase de vuelo ayudas a que más niños también vivan este sueño.',
+  ticketFechaLabel: '¡El día del despegue es!',
+  ticketEscuelaLabel: 'Nuestra pista será en:',
+  valorLabel: 'Valor real del vuelo:',
+  paseLabel: 'TU PASE DE VUELO',
+  tipAhorro: 'TIP: ¡Puedes darle a tu maestr@ $1 o $2 pesitos diarios hasta juntarlo!',
+  sponsorCallout: '¡Gracias a estas empresas e instituciones, podrás conocer el cielo!',
+  sponsorSubtitle: 'ESTE SUEÑO ES POSIBLE GRACIAS A:',
+};
+
+const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto, valorReal, subsidio, texts = {} }, ref) {
+  const t = { ...FLYER_NINOS_DEFAULTS, ...texts };
   const pageStyle = {
     width: "8.5in",
     height: "11in",
@@ -68,7 +82,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
             lineHeight: 1.1, letterSpacing: "-0.02em", color: "#000000",
             margin: 0, ...titleFont,
           }}>
-            ¡El cielo llega a<br />nuestra escuela!
+            {t.titulo}
           </h1>
         </header>
 
@@ -80,14 +94,14 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
             textShadow: "0px 0px 12px rgba(255,255,255,1), 0px 0px 20px rgba(255,255,255,1)",
             ...titleFont,
           }}>
-            ¡PREPÁRATE PARA VOLAR!
+            {t.subtitulo}
           </h2>
           <p style={{
             fontSize: "1.35rem", lineHeight: "1.4", textAlign: "center", marginBottom: 0,
             color: "#000000", fontWeight: 600,
             textShadow: "0px 0px 12px rgba(255,255,255,1), 0px 0px 20px rgba(255,255,255,0.9)",
           }}>
-            ¡Tu patio se convertirá en una increíble <strong style={{ fontWeight: 900 }}>pista de despegue</strong>! Usando <strong style={{ fontWeight: 900 }}>gafas de realidad virtual</strong> y <strong style={{ fontWeight: 900 }}>drones</strong>, te llevaremos a volar a ti, a tus compañeros y a tu maestr@ por todo Uruapan en tiempo real, despegando desde tu escuela. ¡Sentirán lo que se siente volar! Además, con tu pase de vuelo <strong style={{ fontWeight: 900 }}>ayudas a que más niños también vivan este sueño</strong>.
+            {t.copyPrincipal}
           </p>
         </main>
 
@@ -107,7 +121,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
                 display: "block", fontWeight: 900, fontSize: "0.55rem",
                 letterSpacing: "0.1em", textTransform: "uppercase", color: "#4b5563",
                 marginBottom: "2px", ...titleFont,
-              }}>¡El día del despegue es!</span>
+              }}>¡{t.ticketFechaLabel}!</span>
               <span style={{
                 fontWeight: 900, fontSize: "0.8rem", display: "block",
                 color: "#000000", textTransform: "uppercase",
@@ -121,7 +135,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
                 display: "block", fontWeight: 900, fontSize: "0.55rem",
                 letterSpacing: "0.1em", textTransform: "uppercase", color: "#4b5563",
                 marginBottom: "2px", ...titleFont,
-              }}>Nuestra pista será en:</span>
+              }}>¡{t.ticketEscuelaLabel}:</span>
               <span style={{
                 fontWeight: 900, fontSize: "0.75rem", display: "block",
                 color: "#000000", lineHeight: 1.2, textTransform: "uppercase",
@@ -135,7 +149,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
                 <span style={{
                   fontWeight: 800, fontSize: "0.45rem", textTransform: "uppercase",
                   letterSpacing: "0.05em", marginRight: "4px", color: "#1f2937", ...titleFont,
-                }}>Valor real del vuelo:</span>
+                }}>{t.valorLabel}</span>
                 <svg width="48" height="12" viewBox="0 0 48 12" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible", transform: "translateY(1px)" }}>
                   <text x="0" y="11" fill="#000000" fontFamily="'Montserrat', sans-serif" fontWeight="800" fontSize="10.5">{valorReal}</text>
                   <line x1="0" y1="8" x2="44" y2="8" stroke="#000000" strokeWidth="1.5" pointerEvents="none" />
@@ -146,7 +160,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
                 <span style={{
                   display: "block", fontWeight: 900, fontSize: "0.6rem",
                   letterSpacing: "0.1em", color: "#000000", marginBottom: "2px", ...titleFont,
-                }}>TU PASE DE VUELO</span>
+                }}>{t.paseLabel}</span>
                 <div style={{ display: "flex", alignItems: "baseline", lineHeight: 1 }}>
                   <span style={{ color: "#1f2937", fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "6px" }}>Solo</span>
                   <span style={{ fontWeight: 900, fontSize: "2.4rem", color: "#000000", letterSpacing: "-0.02em", lineHeight: 0.8 }}>{monto}</span>
@@ -162,7 +176,7 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
                   fontSize: "0.52rem", lineHeight: 1.3, textAlign: "center",
                   color: "#000000", fontWeight: 900, textTransform: "uppercase", margin: 0,
                 }}>
-                  TIP: ¡Puedes darle a tu maestr@ $1 o $2 pesitos diarios hasta juntarlo!
+                  {t.tipAhorro}
                 </p>
               </div>
 
@@ -196,10 +210,10 @@ const FlyerNinos = React.forwardRef(function FlyerNinos({ escuela, fecha, monto,
           textShadow: "0px 0px 12px rgba(255,255,255,1), 0px 0px 20px rgba(255,255,255,0.9)",
         }}>
           <p style={{ fontWeight: 900, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "#000000", marginBottom: "4px", ...titleFont }}>
-            ¡Gracias a estas empresas e instituciones, podrás conocer el cielo!
+            {t.sponsorCallout}
           </p>
           <p style={{ fontWeight: 800, fontSize: "0.45rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#1f2937", ...titleFont }}>
-            ESTE SUEÑO ES POSIBLE GRACIAS A:
+            {t.sponsorSubtitle}
           </p>
         </div>
       </div>

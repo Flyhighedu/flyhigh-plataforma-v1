@@ -13,32 +13,35 @@ export const ImpactProvider = ({ children }) => {
     // 1. Fetch Initial Data & Subscribe to Realtime
     useEffect(() => {
         const fetchStats = async () => {
-            const { data, error } = await supabase
-                .from('stats')
-                .select('total_sponsored_kids')
-                .single();
-
-            if (error) {
-                console.log('Error Supabase:', error);
-            }
-
-            if (data) {
-                setServerTotal(data.total_sponsored_kids);
+            try {
+                const res = await fetch('/api/sandbox-dashboards');
+                const json = await res.json();
+                if (json?.impacto?.totalStudents !== undefined) {
+                    setServerTotal(json.impacto.totalStudents);
+                }
+            } catch (err) {
+                console.error('Error fetching SSoT impact:', err);
             }
         };
 
         fetchStats();
 
-        // Realtime Subscription
         const channel = supabase
-            .channel('stats-updates')
+            .channel('cierres-updates')
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'stats' },
-                (payload) => {
-                    if (payload.new && payload.new.total_sponsored_kids) {
-                        setServerTotal(payload.new.total_sponsored_kids);
-                    }
+                { event: '*', schema: 'public', table: 'cierres_mision' },
+                () => {
+                    // Refetch all to recalculate sum
+                    fetchStats();
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'bitacora_vuelos' },
+                () => {
+                    // Refetch all to recalculate sum
+                    fetchStats();
                 }
             )
             .subscribe();

@@ -26,6 +26,7 @@ import SandboxHRPage from '@/app/sandbox-hr/page';
 import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
 import SandboxCRMPage from '@/app/sandbox-crm/page';
 import CRMEscuelasPage from '@/app/admin/crm/page';
+import ImprimiblesPage from '@/app/admin/imprimibles/page';
 import { useRouter } from 'next/navigation';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
@@ -1347,6 +1348,11 @@ export default function AdminPage() {
                 <CRMEscuelasPage />
             )}
 
+            {/* TAB: Estudio de Imprimibles */}
+            {activeTab === 'imprimibles' && (
+                <ImprimiblesPage />
+            )}
+
             {
                 activeTab === 'patrocinadores' && (() => {
                     const activeThemeStyles = [
@@ -2143,7 +2149,7 @@ export default function AdminPage() {
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                             {/* --- COLUMNA 1: PRÓXIMAS MISIONES --- */}
-                            <section className="bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-600/20 p-6 md:p-8 self-start lg:sticky lg:top-24 transition-all duration-500 relative overflow-hidden">
+                            <section className="bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-600/20 p-6 md:p-8 transition-all duration-500 relative overflow-hidden">
                                 {/* Decoración de fondo suave (opcional, para darle más feeling 'playful' y profundidad a la tarjeta azul) */}
                                 <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
                                 <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none" />

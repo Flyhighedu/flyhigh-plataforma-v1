@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart, Building2
+    Globe, Zap, School, Gem, FileText, Database, Heart, Building2, Printer
 } from 'lucide-react';
 import AdminAlarms from './AdminAlarms';
 
@@ -85,6 +85,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
         { id: 'patrocinadores', label: 'Patrocinadores', icon: <CreditCard size={18} />, color: '#c084fc' }, // Violet
         { id: 'cronograma', label: 'Cronograma', icon: <Calendar size={18} />, color: '#34d399' }, // Emerald
+        { id: 'imprimibles', label: 'Imprimibles', icon: <Printer size={18} />, color: '#f97316' }, // Orange
         { id: 'operativos', label: 'FlyHigh Ops', icon: <Users size={18} />, color: '#2563eb' }, // Blue
         { id: 'hr', label: 'Recursos Humanos', icon: <Heart size={18} />, color: '#ec4899' }, // Pink
         { 
@@ -309,7 +310,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
             <main className={`flex-1 flex flex-col relative z-10 w-full overflow-hidden ${fluidTransition} pt-16 md:pt-0`}>
                 
                 {/* Header superior: el título se empuja condicionalmente para evitar el Logo Absoluto */}
-                {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && (
+                {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && activeTab !== 'cronograma' && activeTab !== 'imprimibles' && (
                     <header className={`h-16 md:h-28 flex items-center justify-between shrink-0 ${fluidTransition} px-4 md:pr-12 md:pl-12 ${isCollapsed ? 'md:pl-[300px]' : ''}`}>
                         <div className="flex items-center gap-3 md:gap-5 ml-[140px] md:ml-0">
                             <div 
@@ -337,12 +338,12 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
 
                 <AdminAlarms />
 
-                {activeTab === 'crm' || activeTab === 'crm-escuelas' ? (
-                    <div className="flex-1 flex flex-col overflow-hidden w-full relative pb-16 md:pb-0">
+                {activeTab === 'crm' || activeTab === 'crm-escuelas' || activeTab === 'cronograma' || activeTab === 'imprimibles' ? (
+                    <div className="flex-1 flex flex-col overflow-hidden w-full relative pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
                         {children}
                     </div>
                 ) : (
-                    <div className="flex-1 overflow-y-auto w-full no-scrollbar px-4 md:px-12 pb-24 md:pb-32 pt-2 relative">
+                    <div className="flex-1 overflow-y-auto w-full no-scrollbar px-4 md:px-12 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-32 pt-2 relative">
                         <div className="max-w-[1400px] mx-auto w-full h-full">
                             {children}
                         </div>
