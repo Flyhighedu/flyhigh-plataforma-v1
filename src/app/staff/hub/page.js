@@ -810,6 +810,27 @@ export default function HRHubPage() {
                             </div>
                         </div>
 
+                        {/* MAPEO TÁCTICO BANNER — Pilot only */}
+                        {profile?.role === 'pilot' && (
+                            <div className="bg-cyan-600 rounded-[28px] shadow-[8px_8px_16px_#cbd5e1,-8px_-8px_16px_#ffffff] p-6 mb-8 text-center animate-in fade-in duration-500 overflow-hidden relative border border-cyan-500 text-white">
+                                <div className="absolute -right-4 -bottom-4 text-cyan-400/40 z-0">
+                                    <MapPin size={120} strokeWidth={1} />
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="w-14 h-14 mx-auto bg-cyan-700 text-white shadow-[inset_4px_4px_8px_rgba(8,145,178,0.3),inset_-4px_-4px_8px_rgba(103,232,249,0.3)] rounded-[20px] flex items-center justify-center mb-5">
+                                        <MapPin size={26} strokeWidth={2.5}/>
+                                    </div>
+                                    <h3 className="text-[13px] font-black text-white uppercase tracking-widest mb-2 drop-shadow-sm">Mapeo Táctico</h3>
+                                    <p className="text-[12px] text-cyan-100 font-bold mb-6 px-2 leading-relaxed tracking-wide">
+                                        Guarda puntos de interés en el mapa para tus operaciones de campo.
+                                    </p>
+                                    <Link href="/staff/mapeo" className="inline-flex items-center justify-center bg-white text-cyan-700 px-6 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-[6px_6px_16px_rgba(8,145,178,0.2),-6px_-6px_16px_rgba(103,232,249,0.2)] hover:shadow-[inset_4px_4px_8px_rgba(8,145,178,0.1),inset_-4px_-4px_8px_rgba(103,232,249,0.1)] transition-all w-full select-none cursor-pointer">
+                                        Abrir Mapa <ChevronRight size={16} className="ml-1" strokeWidth={3}/>
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <TrendingUp size={14} className="text-blue-500" />

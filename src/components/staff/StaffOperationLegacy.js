@@ -21,6 +21,12 @@ import ResumeProtocolModal from '@/components/staff/ResumeProtocolModal';
 import SyncHeader from '@/components/staff/SyncHeader';
 import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
+// ── Escuadrón de Vuelo (Surgical Layer) ──
+import EscuadronBriefingOverlay from '@/components/staff/EscuadronBriefingOverlay';
+import SquadronBitacoraModal, { BitacoraPilotBanner } from '@/components/staff/SquadronBitacoraModal';
+import EmotionRatingModal from '@/components/staff/EmotionRatingModal';
+import EscuadronDebriefModal from '@/components/staff/EscuadronDebriefModal';
+import { ROLE_TO_ESCUADRON, LOCAL_KEYS, META_KEYS } from '@/config/escuadronConfig';
 
 const ACTIVE_FLIGHT_KEY = 'flyhigh_active_flight';
 const CLOSED_FLIGHTS_KEY = 'flyhigh_recently_closed_flights';
@@ -262,6 +268,18 @@ export default function StaffOperationLegacy({
     const [closeHoldProgress, setCloseHoldProgress] = useState(0);
     const [isClosingOperation, setIsClosingOperation] = useState(false);
     const [closeOperationError, setCloseOperationError] = useState(null);
+
+    // ── Escuadrón de Vuelo State (Isolated Layer) ──
+    const [escuadronBriefingDone, setEscuadronBriefingDone] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem(LOCAL_KEYS.BRIEFING_DONE) === 'true';
+        }
+        return false;
+    });
+    const [showBitacoraModal, setShowBitacoraModal] = useState(false);
+    const [showEmotionModal, setShowEmotionModal] = useState(false);
+    const [pendingFlightForEmotion, setPendingFlightForEmotion] = useState(null);
+    const [showDebriefModal, setShowDebriefModal] = useState(false);
 
     // Pause State
     const [showPauseMenu, setShowPauseMenu] = useState(false);
@@ -673,9 +691,23 @@ export default function StaffOperationLegacy({
 
     const openCloseConfirmModal = useCallback(() => {
         setShowMenu(false);
+        // ── Escuadrón Debrief Intercept ──
+        // Show debrief modal BEFORE the close confirmation if not done yet
+        const escuadronRole = ROLE_TO_ESCUADRON[profile?.role];
+        const debriefLocalKey = `flyhigh_escuadron_debrief_${journeyId || 'local'}`;
+        let debriefAlreadyDone = false;
+        try {
+            const localDebrief = JSON.parse(localStorage.getItem(debriefLocalKey) || '{}');
+            debriefAlreadyDone = Boolean(localDebrief[escuadronRole]);
+        } catch { /* non-blocking */ }
+
+        if (!debriefAlreadyDone && escuadronRole) {
+            setShowDebriefModal(true);
+            return;
+        }
         setShowCloseConfirmModal(true);
         resetCloseDayHold();
-    }, [resetCloseDayHold]);
+    }, [resetCloseDayHold, profile?.role, journeyId]);
 
     const finalizeCloseDay = useCallback(async () => {
         if (closeHoldTriggeredRef.current) return;
@@ -1424,9 +1456,26 @@ export default function StaffOperationLegacy({
             )}
 
             <div className="px-4 py-6 space-y-8 max-w-lg mx-auto">
+                {/* ── Escuadrón: Bitácora Banner for Pilot (read-only) ── */}
+                {currentRole === 'pilot' && (
+                    <BitacoraPilotBanner 
+                        missionInfo={currentMission} 
+                        activeFlight={activeFlight}
+                        nextFlightNumber={nextFlightNumber}
+                    />
+                )}
+
                 <FlightLogger
                     key={activeFlight?.flightId ? `active-${activeFlight.flightId}` : 'idle-flight-logger'}
-                    onFlightComplete={handleFlightComplete}
+                    onFlightComplete={(data) => {
+                        // ── Escuadrón: Intercept for Auxiliar Emocionómetro ──
+                        if (currentRole === 'assistant' || currentRole === 'auxiliar') {
+                            setPendingFlightForEmotion(data);
+                            setShowEmotionModal(true);
+                            return;
+                        }
+                        return handleFlightComplete(data);
+                    }}
                     onFlightStart={handleFlightStart}
                     onFlightCancel={handleFlightCancel}
                     initialActiveFlight={activeFlight}
@@ -1448,6 +1497,25 @@ export default function StaffOperationLegacy({
                         onRequestEditFlight={canEditCompletedFlights ? handleRequestEditFlight : null}
                     />
                 </div>
+
+                {/* ── Escuadrón: Bitácora FAB for Supervisor (Teacher) ── */}
+                {(currentRole === 'teacher') && (
+                    <button
+                        onClick={() => setShowBitacoraModal(true)}
+                        style={{
+                            position: 'fixed', bottom: 100, right: 20, zIndex: 45,
+                            width: 56, height: 56, borderRadius: 18,
+                            background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                            border: 'none', color: 'white',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 12px 28px -6px rgba(124,58,237,0.5)',
+                            cursor: 'pointer'
+                        }}
+                        title="Bitácora Digital"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 24, fontVariationSettings: "'FILL' 1" }}>edit_note</span>
+                    </button>
+                )}
 
                 <section className="rounded-2xl border border-blue-200 bg-white px-4 py-4 shadow-[0_18px_36px_-24px_rgba(30,64,175,0.35)]">
                     <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
@@ -1629,6 +1697,74 @@ export default function StaffOperationLegacy({
                 isOpen={showResumeModal}
                 onClose={() => setShowResumeModal(false)}
                 onConfirmResume={handleConfirmResume}
+            />
+
+            {/* ── Escuadrón de Vuelo: Briefing Overlay ── */}
+            {!escuadronBriefingDone && !preview && currentMission && (
+                <EscuadronBriefingOverlay
+                    journeyId={journeyId}
+                    profile={profile}
+                    onComplete={() => setEscuadronBriefingDone(true)}
+                />
+            )}
+
+            {/* ── Escuadrón de Vuelo: Bitácora Modal (Supervisor) ── */}
+            <SquadronBitacoraModal
+                isOpen={showBitacoraModal}
+                onClose={() => setShowBitacoraModal(false)}
+                journeyId={journeyId}
+                flightNumber={nextFlightNumber}
+                missionInfo={currentMission}
+            />
+
+            {/* ── Escuadrón de Vuelo: Emocionómetro Modal (Auxiliar) ── */}
+            <EmotionRatingModal
+                isOpen={showEmotionModal}
+                flightNumber={missionFlights.length + 1}
+                flightStudentCount={pendingFlightForEmotion?.studentCount || 0}
+                onSubmit={async (scoreData) => {
+                    setShowEmotionModal(false);
+                    // Process the original flight after scoring
+                    if (pendingFlightForEmotion) {
+                        try {
+                            await handleFlightComplete({
+                                ...pendingFlightForEmotion,
+                                _escuadronEmotionScore: scoreData.score,
+                                _escuadronCompliance: scoreData.compliance
+                            });
+                        } catch (err) {
+                            console.warn('⚠️ Flight complete after emotion failed:', err);
+                        }
+                        setPendingFlightForEmotion(null);
+                    }
+                }}
+                onSkip={() => {
+                    setShowEmotionModal(false);
+                    // Process flight without emotion score
+                    if (pendingFlightForEmotion) {
+                        handleFlightComplete(pendingFlightForEmotion).catch(() => {});
+                        setPendingFlightForEmotion(null);
+                    }
+                }}
+            />
+
+            {/* ── Escuadrón de Vuelo: Debrief Modal ── */}
+            <EscuadronDebriefModal
+                isOpen={showDebriefModal}
+                journeyId={journeyId}
+                profile={profile}
+                onComplete={() => {
+                    setShowDebriefModal(false);
+                    // After debrief, proceed to the actual close confirmation
+                    setShowCloseConfirmModal(true);
+                    resetCloseDayHold();
+                }}
+                onSkip={() => {
+                    setShowDebriefModal(false);
+                    // Skip debrief and go directly to close confirmation
+                    setShowCloseConfirmModal(true);
+                    resetCloseDayHold();
+                }}
             />
         </div>
     );

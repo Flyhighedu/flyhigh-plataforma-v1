@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Menu, X, LogOut, Clock, Plane, Repeat, TrendingUp } from 'lucide-react';
+import { Menu, X, LogOut, Clock, Plane, Repeat, TrendingUp, MapPin } from 'lucide-react';
 import StartDemoFab from './StartDemoFab';
 import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
@@ -143,6 +143,25 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                 <p className="text-[10px] text-emerald-500/80 font-medium tracking-tight">Simulador y registro rápido</p>
                             </div>
                         </button>
+
+                        {/* Mapeo Táctico — Pilot only */}
+                        {normalizedRole === 'pilot' && (
+                            <button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    router.push('/staff/mapeo');
+                                }}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-cyan-50 transition-colors rounded-lg text-cyan-700 group border-t border-slate-50"
+                            >
+                                <div className="p-2 bg-cyan-50 rounded-lg transition-colors group-hover:bg-cyan-100">
+                                    <MapPin size={18} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold">Mapeo Táctico</p>
+                                    <p className="text-[10px] text-cyan-500/80 font-medium tracking-tight">Puntos de interés guardados</p>
+                                </div>
+                            </button>
+                        )}
 
                         <p className="px-4 pt-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 border-t border-slate-100 mt-1 flex items-center gap-1.5 text-red-500">
                             <span className="shrink-0 size-2 rounded-full bg-red-500" /> Contingencia

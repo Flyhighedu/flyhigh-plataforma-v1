@@ -5738,20 +5738,155 @@ export default function SupervisorDashboard() {
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
-                            <div className="bg-surface-dark rounded-xl border border-dashed border-slate-700/70 px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-slate-500">school</span>
-                                    <p className="text-sm font-bold text-slate-300">Docente (próximamente)</p>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">Espacio reservado para registro operativo docente.</p>
-                            </div>
-                            <div className="bg-surface-dark rounded-xl border border-dashed border-slate-700/70 px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-sm text-slate-500">flight</span>
-                                    <p className="text-sm font-bold text-slate-300">Piloto (próximamente)</p>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">Espacio reservado para registro operativo del piloto.</p>
-                            </div>
+                            {/* ── Telemetría de Audio (Supervisor) ── */}
+                            {(() => {
+                                const rawMeta = sel?.journey?.meta;
+                                const parsedMeta = typeof rawMeta === 'string'
+                                    ? (() => { try { return JSON.parse(rawMeta); } catch { return {}; } })()
+                                    : (rawMeta || {});
+                                const recordings = Array.isArray(parsedMeta.telemetry_recordings) ? parsedMeta.telemetry_recordings : [];
+
+                                return (
+                                    <div className="bg-surface-dark rounded-xl border border-slate-800 overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="material-symbols-outlined text-sm text-violet-400" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
+                                                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Telemetría de Audio</h3>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${recordings.length > 0 ? 'text-violet-300 bg-violet-500/10' : 'text-slate-500 bg-slate-800'}`}>
+                                                    {recordings.length} {recordings.length === 1 ? 'grabación' : 'grabaciones'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-0.5">Audios capturados por el Supervisor durante el pre-vuelo.</p>
+                                        </div>
+
+                                        <div className="p-4">
+                                            {recordings.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {[...recordings].reverse().map((rec, idx) => (
+                                                        <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-800/40 px-3 py-2.5">
+                                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="material-symbols-outlined text-xs text-violet-400">graphic_eq</span>
+                                                                    <p className="text-xs font-bold text-slate-200">
+                                                                        Grupo #{rec.flightNumber || (recordings.length - idx)}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                                    {rec.durationSeconds > 0 && (
+                                                                        <span className="text-[10px] font-bold text-slate-400 tabular-nums">
+                                                                            {fmtMMSS(rec.durationSeconds)}
+                                                                        </span>
+                                                                    )}
+                                                                    {rec.fileSizeKB > 0 && (
+                                                                        <span className="text-[10px] font-bold text-slate-500">
+                                                                            {rec.fileSizeKB}KB
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {rec.url && (
+                                                                <audio
+                                                                    controls
+                                                                    preload="none"
+                                                                    className="w-full h-8"
+                                                                    style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.7 }}
+                                                                >
+                                                                    <source src={rec.url} type="audio/webm" />
+                                                                    Tu navegador no soporta audio.
+                                                                </audio>
+                                                            )}
+                                                            {rec.timestamp && (
+                                                                <p className="text-[10px] text-slate-500 mt-1.5">{fmtClock(rec.timestamp)}</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-xl border border-dashed border-slate-700/50 px-3 py-4 text-center">
+                                                    <span className="material-symbols-outlined text-2xl text-slate-600 mb-1">mic_off</span>
+                                                    <p className="text-xs text-slate-500">Sin grabaciones de audio para esta misión.</p>
+                                                    <p className="text-[10px] text-slate-600 mt-0.5">Se capturan automáticamente cuando el Supervisor usa el timer.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ── Bitácora Digital (Escuadrones) ── */}
+                            {(() => {
+                                const rawMeta = sel?.journey?.meta;
+                                const parsedMeta = typeof rawMeta === 'string'
+                                    ? (() => { try { return JSON.parse(rawMeta); } catch { return {}; } })()
+                                    : (rawMeta || {});
+                                const bitacoras = Array.isArray(parsedMeta.escuadron_bitacora_history) ? parsedMeta.escuadron_bitacora_history : [];
+
+                                return (
+                                    <div className="bg-surface-dark rounded-xl border border-slate-800 overflow-hidden">
+                                        <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="material-symbols-outlined text-sm text-amber-400" style={{ fontVariationSettings: "'FILL' 1" }}>edit_note</span>
+                                                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Bitácora Digital</h3>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bitacoras.length > 0 ? 'text-amber-300 bg-amber-500/10' : 'text-slate-500 bg-slate-800'}`}>
+                                                    {bitacoras.length} {bitacoras.length === 1 ? 'escuadrón' : 'escuadrones'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-0.5">Grupos registrados por el Supervisor antes de cada vuelo.</p>
+                                        </div>
+
+                                        <div className="p-4">
+                                            {bitacoras.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    {[...bitacoras].reverse().map((entry, idx) => (
+                                                        <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-800/40 px-3 py-2.5">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="flex items-center justify-center size-6 rounded-md bg-amber-500/15 text-[10px] font-black text-amber-300 flex-shrink-0">
+                                                                        #{entry.flightNumber || (bitacoras.length - idx)}
+                                                                    </span>
+                                                                    <p className="text-xs font-bold text-slate-200 truncate">
+                                                                        &ldquo;{entry.nombreClave || 'Sin nombre'}&rdquo;
+                                                                    </p>
+                                                                </div>
+                                                                {entry.timestamp && (
+                                                                    <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">{fmtClock(entry.timestamp)}</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-1.5 flex items-center gap-3 flex-wrap">
+                                                                {entry.capitan && (
+                                                                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-xs text-amber-400/70">military_tech</span>
+                                                                        {entry.capitan}
+                                                                    </span>
+                                                                )}
+                                                                {entry.destinos && (
+                                                                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                                                                        <span className="material-symbols-outlined text-xs text-sky-400/70">map</span>
+                                                                        {entry.destinos}
+                                                                    </span>
+                                                                )}
+                                                                {!entry.capitan && !entry.destinos && (
+                                                                    <span className="text-[10px] text-slate-600 italic">Sin datos adicionales</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-xl border border-dashed border-slate-700/50 px-3 py-4 text-center">
+                                                    <span className="material-symbols-outlined text-2xl text-slate-600 mb-1">groups</span>
+                                                    <p className="text-xs text-slate-500">Sin escuadrones registrados para esta misión.</p>
+                                                    <p className="text-[10px] text-slate-600 mt-0.5">El Supervisor registra cada grupo antes de iniciar su vuelo.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </section>

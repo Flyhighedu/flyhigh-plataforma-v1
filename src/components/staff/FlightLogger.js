@@ -205,8 +205,7 @@ export default function FlightLogger({
                 lastCompletedFlightIdRef.current = currentFlightId;
 
                 // Auto-Reset Logic
-                setStudents(0);
-                setStaff(0);
+                // We intentionally do NOT reset students and staff here so they persist for the next flight
                 setIncidents([]);
                 setElapsed(0);
                 setStartTime(null);
@@ -235,8 +234,7 @@ export default function FlightLogger({
                 });
             }
             setStatus('idle');
-            setStudents(0);
-            setStaff(0);
+            // We intentionally do NOT reset students and staff here so they persist
             setIncidents([]);
             setElapsed(0);
             setStartTime(null);

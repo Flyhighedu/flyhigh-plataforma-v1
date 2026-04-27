@@ -339,7 +339,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                 <AdminAlarms />
 
                 {activeTab === 'crm' || activeTab === 'crm-escuelas' || activeTab === 'cronograma' || activeTab === 'imprimibles' ? (
-                    <div className="flex-1 flex flex-col overflow-hidden w-full relative pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+                    <div className="flex-1 flex flex-col overflow-y-auto w-full relative pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
                         {children}
                     </div>
                 ) : (

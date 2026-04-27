@@ -42,6 +42,7 @@ import TeacherOperationReadyScreen from '@/components/staff/TeacherOperationRead
 import AuxOperationReadyScreen from '@/components/staff/AuxOperationReadyScreen';
 import OperationStartBridgeScreen from '@/components/staff/OperationStartBridgeScreen';
 import OperationPanelConstructionScreen from '@/components/staff/OperationPanelConstructionScreen';
+import SupervisorBitacoraScreen from '@/components/staff/SupervisorBitacoraScreen';
 import TeacherCivicParallelScreen from '@/components/staff/TeacherCivicParallelScreen';
 import AuxCivicEvidenceParallelScreen from '@/components/staff/AuxCivicEvidenceParallelScreen';
 import AdWallDismantleScreen from '@/components/staff/AdWallDismantleScreen';
@@ -2773,7 +2774,7 @@ export default function StaffDashboard() {
         );
     }
 
-    if (currentStep === 2 && profile?.role === 'teacher') {
+    if (currentStep === 2 && profile?.role === 'pilot') {
         return withDependencyOverlay(
             <StaffOperationLegacy
                 initialMission={todaySchool}
@@ -2789,7 +2790,20 @@ export default function StaffDashboard() {
         );
     }
 
-    if (currentStep === 2 && (profile?.role === 'pilot' || profile?.role === 'assistant')) {
+    if (currentStep === 2 && profile?.role === 'teacher') {
+        return withDependencyOverlay(
+            <SupervisorBitacoraScreen
+                journeyId={journeyId}
+                userId={userId}
+                profile={profile}
+                missionInfo={todaySchool}
+                missionState={missionState}
+                onRefresh={refreshMission}
+            />
+        );
+    }
+
+    if (currentStep === 2 && profile?.role === 'assistant') {
         return withDependencyOverlay(
             <OperationPanelConstructionScreen
                 journeyId={journeyId}
