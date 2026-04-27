@@ -55,7 +55,8 @@ export default function RootLayout({ children }) {
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
                 <link rel="apple-touch-icon" href="/img/app-icon.png" />
-                <link href="https://fonts.googleapis.com/css2?family=Anton&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet" crossOrigin="anonymous" />
+                <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" crossOrigin="anonymous" />
             </head>
             <body className={`${inter.className} antialiased bg-[#F5F7FA] text-slate-800`} suppressHydrationWarning>
                 <ImpactProvider>

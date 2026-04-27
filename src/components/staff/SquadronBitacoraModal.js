@@ -264,11 +264,12 @@ export function BitacoraPilotBanner({ missionInfo, activeFlight, nextFlightNumbe
     const upcomingSquads = history.filter(b => Number(b.flightNumber) > Number(currentFlightNum))
                                   .sort((a, b) => Number(a.flightNumber) - Number(b.flightNumber));
 
-    if (!activeSquad && upcomingSquads.length === 0) return null;
+    // Total squads created for context
+    const totalSquadsCreated = history.length;
 
     return (
         <div style={{ marginBottom: 16 }}>
-            {/* Active Squad Card */}
+            {/* Active Squad Card OR Warning */}
             {activeSquad ? (
                 <div style={{
                     background: activeFlight ? 'linear-gradient(135deg, #10B981, #059669)' : 'linear-gradient(135deg, #EDE9FE, #F5F3FF)',
@@ -306,13 +307,44 @@ export function BitacoraPilotBanner({ missionInfo, activeFlight, nextFlightNumbe
                     </div>
                 </div>
             ) : (
+                /* ── WARNING: No squadron for current flight ── */
                 <div style={{
-                    background: '#F8FAFC', border: '2px dashed #E2E8F0',
-                    borderRadius: 16, padding: '16px', textAlign: 'center'
+                    background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+                    border: '2px solid #F59E0B',
+                    borderRadius: 16,
+                    padding: '14px 16px',
+                    boxShadow: '0 4px 12px rgba(245,158,11,0.15)',
+                    animation: 'squadWarningPulse 3s ease-in-out infinite'
                 }}>
-                    <p style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Esperando datos del Vuelo #{currentFlightNum}...
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: 12,
+                            background: '#F59E0B', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <span style={{ fontSize: 18 }}>⚠️</span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 12, fontWeight: 900, color: '#92400E', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Sin Escuadrón · Vuelo #{currentFlightNum}
+                            </p>
+                            <p style={{ fontSize: 11, fontWeight: 600, color: '#B45309', margin: 0, lineHeight: 1.4 }}>
+                                El supervisor aún no ha nombrado al escuadrón para este vuelo. Confirma con tu equipo antes de despegar.
+                            </p>
+                        </div>
+                    </div>
+                    {totalSquadsCreated > 0 && (
+                        <div style={{
+                            marginTop: 10, paddingTop: 10,
+                            borderTop: '1px solid #FCD34D',
+                            display: 'flex', alignItems: 'center', gap: 6
+                        }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                📋 {totalSquadsCreated} escuadrón{totalSquadsCreated !== 1 ? 'es' : ''} registrado{totalSquadsCreated !== 1 ? 's' : ''} en total
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -347,6 +379,13 @@ export function BitacoraPilotBanner({ missionInfo, activeFlight, nextFlightNumbe
                     ))}
                 </div>
             )}
+
+            <style>{`
+                @keyframes squadWarningPulse {
+                    0%, 100% { box-shadow: 0 4px 12px rgba(245,158,11,0.15); }
+                    50% { box-shadow: 0 4px 20px rgba(245,158,11,0.3); }
+                }
+            `}</style>
         </div>
     );
 }
