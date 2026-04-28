@@ -574,33 +574,201 @@ export default function SupervisorBitacoraScreen({
 
 
 
-                {/* BRIEFING FINAL (OUTRO) */}
+                {/* BRIEFING FINAL — MISIÓN ESPECIAL: ¡SUBE, SUBE! */}
                 {masterStep === 'briefing_final' && (
-                    <div style={{ animation: 'fadeIn 0.3s ease-out', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontSize: 48, marginBottom: 8 }}>📣</div>
-                        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', marginBottom: 8 }}>
-                            Aviso a los Pasajeros
-                        </h2>
-                        <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.4, marginBottom: 16, padding: '0 8px' }}>
-                            Lee este mensaje en voz alta para los niños antes de terminar la operación:
-                        </p>
-
+                    <div style={{ animation: 'fadeIn 0.4s ease-out', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+                        
+                        {/* ── HERO HEADER ── */}
                         <div style={{
-                            background: '#F8FAFC', border: '2px solid #E2E8F0', borderRadius: 16,
-                            padding: '16px', marginBottom: 16, position: 'relative'
+                            background: 'linear-gradient(160deg, #0F172A 0%, #1E3A5F 50%, #7C3AED 100%)',
+                            borderRadius: '0 0 32px 32px',
+                            padding: '28px 20px 32px',
+                            textAlign: 'center',
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}>
-                            <span style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#3B82F6', color: 'white', fontSize: 10, fontWeight: 800, padding: '4px 10px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Mensaje para leer</span>
-                            <p style={{ fontSize: 16, fontWeight: 800, color: '#1E293B', fontStyle: 'italic', margin: 0, lineHeight: 1.4 }}>
-                                "¡Muy bien, <span style={{ color: '#7C3AED' }}>Escuadrón {nombreClave}</span>!<br/>
-                                <br/>
-                                Sus lugares ya están asignados. Vamos a tener que esperar a que el <strong style={{ color: '#2563EB' }}>Escuadrón {equipoEnVueloName}</strong> termine su vuelo y baje.<br/>
-                                <br/>
-                                Después de eso, el piloto los llamará por su nombre de equipo para que pasen al área de despegue."
+                            {/* Glow orbs */}
+                            <div style={{ position: 'absolute', top: -30, right: -30, width: 100, height: 100, background: 'radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+                            <div style={{ position: 'absolute', bottom: -20, left: -20, width: 80, height: 80, background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+
+                            <div style={{ fontSize: 52, marginBottom: 4, animation: 'heroFloat 3s ease-in-out infinite', filter: 'drop-shadow(0 0 20px rgba(124,58,237,0.6))' }}>🚀</div>
+                            <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#A78BFA', marginBottom: 4 }}>Misión Especial</p>
+                            <h2 style={{ fontSize: 26, fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-0.02em', textShadow: '0 2px 12px rgba(124,58,237,0.5)' }}>
+                                ¡SUBE, SUBE! 🔊
+                            </h2>
+                            <p style={{ fontSize: 12, color: '#94A3B8', fontWeight: 600, marginTop: 8, lineHeight: 1.4 }}>
+                                Explica esta dinámica al <strong style={{ color: '#E0E7FF' }}>Escuadrón {nombreClave}</strong>
                             </p>
                         </div>
 
-                        <div style={{ padding: '0 8px 16px' }}>
-                            <label style={{ display: 'block', textAlign: 'left' }}>
+                        {/* ── SCRIPT CARD: What to tell the kids ── */}
+                        <div style={{ padding: '20px 16px 0' }}>
+                            <div style={{
+                                background: 'linear-gradient(135deg, #EFF6FF, #F5F3FF)',
+                                border: '2px solid #C7D2FE',
+                                borderRadius: 20,
+                                padding: '20px 18px',
+                                position: 'relative'
+                            }}>
+                                <span style={{
+                                    position: 'absolute', top: -11, left: 20,
+                                    background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', color: 'white',
+                                    fontSize: 9, fontWeight: 900, padding: '5px 12px', borderRadius: 100,
+                                    textTransform: 'uppercase', letterSpacing: '0.15em',
+                                    boxShadow: '0 4px 12px rgba(124,58,237,0.3)'
+                                }}>📖 Lee en voz alta</span>
+
+                                <p style={{ fontSize: 16, fontWeight: 700, color: '#1E293B', lineHeight: 1.55, margin: '4px 0 0' }}>
+                                    "¡<span style={{ color: '#7C3AED', fontWeight: 900 }}>Escuadrón {nombreClave}</span>, tenemos una misión especial!
+                                </p>
+                                <p style={{ fontSize: 16, fontWeight: 700, color: '#334155', lineHeight: 1.55, margin: '12px 0 0' }}>
+                                    Nuestro piloto necesita de <strong style={{ color: '#0F172A' }}>USTEDES</strong> para que el dron pueda seguir volando. ✈️
+                                </p>
+                                <p style={{ fontSize: 16, fontWeight: 700, color: '#334155', lineHeight: 1.55, margin: '12px 0 0' }}>
+                                    A veces, el dron se empezará a detener y necesitará su energía para seguir..."
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* ── STEP-BY-STEP INSTRUCTIONS ── */}
+                        <div style={{ padding: '16px 16px 0' }}>
+                            <p style={{ fontSize: 11, fontWeight: 900, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12, paddingLeft: 4 }}>
+                                ¿Cómo funciona?
+                            </p>
+
+                            {/* Step 1 */}
+                            <div style={{
+                                background: 'white', borderRadius: 16, padding: '16px',
+                                border: '1.5px solid #E2E8F0', marginBottom: 10,
+                                display: 'flex', gap: 14, alignItems: 'flex-start',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                            }}>
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                                    background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'white', fontWeight: 900, fontSize: 18,
+                                    boxShadow: '0 4px 12px rgba(59,130,246,0.3)'
+                                }}>1</div>
+                                <div>
+                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>El piloto dice por la bocina:</p>
+                                    <p style={{
+                                        fontSize: 20, fontWeight: 900, color: '#7C3AED', margin: '6px 0 0',
+                                        textShadow: '0 1px 4px rgba(124,58,237,0.15)'
+                                    }}>
+                                        "¡SUBE, SUBE, SUBE!" 📢
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Step 2 */}
+                            <div style={{
+                                background: 'white', borderRadius: 16, padding: '16px',
+                                border: '1.5px solid #E2E8F0', marginBottom: 10,
+                                display: 'flex', gap: 14, alignItems: 'flex-start',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                            }}>
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'white', fontWeight: 900, fontSize: 18,
+                                    boxShadow: '0 4px 12px rgba(245,158,11,0.3)'
+                                }}>2</div>
+                                <div>
+                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Los niños gritan lo más fuerte:</p>
+                                    <p style={{
+                                        fontSize: 20, fontWeight: 900, color: '#F59E0B', margin: '6px 0 0',
+                                        animation: 'pulseGlow 2s ease-in-out infinite'
+                                    }}>
+                                        "¡¡¡SUBE!!!" 🗣️🔥
+                                    </p>
+                                    <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '4px 0 0' }}>
+                                        Entre más fuerte griten, más alto vuela el dron
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div style={{
+                                background: 'white', borderRadius: 16, padding: '16px',
+                                border: '1.5px solid #E2E8F0', marginBottom: 10,
+                                display: 'flex', gap: 14, alignItems: 'flex-start',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                            }}>
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                                    background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'white', fontWeight: 900, fontSize: 18,
+                                    boxShadow: '0 4px 12px rgba(239,68,68,0.3)'
+                                }}>!</div>
+                                <div>
+                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Si no gritan suficiente...</p>
+                                    <p style={{ fontSize: 14, fontWeight: 700, color: '#EF4444', margin: '4px 0 0' }}>
+                                        ¡El dron ya no podrá avanzar! 😱
+                                    </p>
+                                    <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '4px 0 0' }}>
+                                        Necesita toda la energía del escuadrón
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Visual: Energy meter */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, #0F172A, #1E293B)',
+                                borderRadius: 20, padding: '18px 16px', marginBottom: 10,
+                                textAlign: 'center', position: 'relative', overflow: 'hidden'
+                            }}>
+                                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center bottom, rgba(124,58,237,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                                <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94A3B8', margin: '0 0 10px', position: 'relative' }}>
+                                    Nivel de Energía del Dron
+                                </p>
+                                <div style={{
+                                    display: 'flex', gap: 4, height: 32, alignItems: 'flex-end',
+                                    justifyContent: 'center', marginBottom: 8, position: 'relative'
+                                }}>
+                                    {[
+                                        { h: 12, color: '#EF4444' },
+                                        { h: 16, color: '#EF4444' },
+                                        { h: 20, color: '#F59E0B' },
+                                        { h: 24, color: '#F59E0B' },
+                                        { h: 28, color: '#22C55E' },
+                                        { h: 32, color: '#22C55E' },
+                                        { h: 32, color: '#10B981' },
+                                    ].map((bar, i) => (
+                                        <div key={i} style={{
+                                            width: 22, height: bar.h, borderRadius: 6,
+                                            background: bar.color,
+                                            animation: `barBounce 1.5s ease-in-out ${i * 0.15}s infinite`,
+                                            boxShadow: `0 0 8px ${bar.color}55`
+                                        }} />
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', padding: '0 4px' }}>
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#EF4444' }}>🔇 Bajo</span>
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B' }}>🔉 Medio</span>
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#22C55E' }}>🔊 ¡MÁXIMO!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── NOTA PARA EL DOCENTE ── */}
+                        <div style={{ padding: '0 16px 12px' }}>
+                            <div style={{
+                                background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 14,
+                                padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start'
+                            }}>
+                                <span style={{ fontSize: 20, flexShrink: 0 }}>💡</span>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: '#92400E', margin: 0, lineHeight: 1.45 }}>
+                                    <strong>Tip:</strong> El piloto activará esta dinámica varias veces durante el vuelo. Motiva a los niños a gritar cada vez más fuerte. ¡Es un momento clave de engagement!
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* ── CAPITÁN (OPCIONAL) ── */}
+                        <div style={{ padding: '0 16px 16px' }}>
+                            <label style={{ display: 'block' }}>
                                 <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <User size={14} /> (Opcional) Capitán Seleccionado
                                 </span>
@@ -621,21 +789,22 @@ export default function SupervisorBitacoraScreen({
                             </label>
                         </div>
 
-                        <div style={{ marginTop: 'auto', marginBottom: 16 }}>
+                        {/* ── CTA ── */}
+                        <div style={{ marginTop: 'auto', padding: '0 16px 24px' }}>
                             <button
                                 onClick={handleSaveBitacora}
                                 disabled={isSaving || saved}
                                 style={{
                                     width: '100%', padding: '20px', borderRadius: 20, border: 'none',
-                                    background: saved ? '#10B981' : 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white',
-                                    fontSize: 16, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                                    background: saved ? '#10B981' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+                                    color: 'white', fontSize: 16, fontWeight: 900, textTransform: 'uppercase',
+                                    letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
                                     cursor: isSaving || saved ? 'not-allowed' : 'pointer',
-                                    boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.3)' : '0 15px 30px rgba(15,23,42,0.4)',
+                                    boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.3)' : '0 15px 30px rgba(124,58,237,0.4)',
                                     transition: 'all 0.3s'
                                 }}
                             >
-                                {isSaving ? 'Guardando...' : saved ? '✅ ENVIADO AL PILOTO' : <><Send size={24} /> GUARDAR Y ENVIAR AL PILOTO</>}
+                                {isSaving ? 'Guardando...' : saved ? '✅ ¡ESCUADRÓN LISTO!' : <><Send size={22} /> ESCUADRÓN LISTO</>}
                             </button>
                         </div>
                     </div>
@@ -690,6 +859,18 @@ export default function SupervisorBitacoraScreen({
                 @keyframes navSlideUp {
                     from { opacity: 0; transform: translateY(12px) scale(0.95); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes heroFloat {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-8px) scale(1.05); }
+                }
+                @keyframes pulseGlow {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.8; transform: scale(1.03); }
+                }
+                @keyframes barBounce {
+                    0%, 100% { transform: scaleY(1); opacity: 0.85; }
+                    50% { transform: scaleY(1.25); opacity: 1; }
                 }
             `}</style>
         </div>
