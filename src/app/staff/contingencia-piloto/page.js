@@ -48,7 +48,6 @@ import FinalParkingScreen from '@/components/staff/FinalParkingScreen';
 import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import PilotOperationalWaitScreen from '@/components/staff/PilotOperationalWaitScreen';
 import OperationPanelConstructionScreen from '@/components/staff/OperationPanelConstructionScreen';
-import StartDemoFab from '@/components/staff/StartDemoFab';
 
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -404,10 +403,9 @@ export default function ContingenciaPilotoPage() {
     const meta = parseMeta(missionInfo?.meta);
 
     // ═══════════════════════════════════════════════════════════════
-    // MAIN CONTENT RENDERER
+    // DISMANTLING PHASE — Closure with redistributed pilot tasks
     // ═══════════════════════════════════════════════════════════════
-    const renderContent = () => {
-        if (missionState === 'dismantling') {
+    if (missionState === 'dismantling') {
         const dismantlingRoute = resolveContingencyDismantlingRoute(role, missionInfo?.meta);
 
         if (dismantlingRoute.kind === 'wait') {
@@ -967,27 +965,17 @@ export default function ContingenciaPilotoPage() {
     // ═══════════════════════════════════════════════════════════════
     // FALLBACK — Unknown state: auto-resolve to prep instead of error
     // ═══════════════════════════════════════════════════════════════
-        return (
-            <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
-                <PrepChecklist
-                    role={role}
-                    journeyId={journeyId}
-                    userId={userId}
-                    onComplete={refreshMission}
-                    missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
-                    preview={false}
-                    onRefresh={refreshMission}
-                />
-            </div>
-        );
-    };
-
     return (
-        <>
-            {renderContent()}
-            {missionInfo && (
-                <StartDemoFab schoolId={missionInfo?.id || missionInfo?.school_id} />
-            )}
-        </>
+        <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+            <PrepChecklist
+                role={role}
+                journeyId={journeyId}
+                userId={userId}
+                onComplete={refreshMission}
+                missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
+                preview={false}
+                onRefresh={refreshMission}
+            />
+        </div>
     );
 }
