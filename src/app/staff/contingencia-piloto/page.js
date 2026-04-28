@@ -322,6 +322,16 @@ export default function ContingenciaPilotoPage() {
         },
     };
 
+    // ── Pilot-override props for contingency ──
+    // When assistant/teacher absorbs pilot-exclusive tasks (DroneStorage,
+    // ContainerLoading, ReturnInventory, ChargingStation), the component's
+    // allowedRoles={['pilot']} would block them. Override role to 'pilot'
+    // so ClosureTaskScreen grants edit access.
+    const closurePropsAsPilot = {
+        ...closureProps,
+        profile: { ...profile, role: 'pilot' },
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -378,7 +388,7 @@ export default function ContingenciaPilotoPage() {
             case DISMANTLING_ROUTE_IDS.AD_WALL_DISMANTLE:
                 return <AdWallDismantleScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.DRONE_STORAGE:
-                return <DroneStorageScreen {...closureProps} />;
+                return <DroneStorageScreen {...closurePropsAsPilot} />;
             case DISMANTLING_ROUTE_IDS.GLASSES_STORAGE:
                 return <GlassesStorageScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.HEADPHONES_STORAGE:
@@ -390,7 +400,7 @@ export default function ContingenciaPilotoPage() {
             case DISMANTLING_ROUTE_IDS.GLOBAL_LOADING:
             case DISMANTLING_ROUTE_IDS.CONTAINER_LOADING:
                 if (normalizeDismantlingRole(role) === 'assistant') {
-                    return <GlobalLoadingScreen {...closureProps} />;
+                    return <GlobalLoadingScreen {...closurePropsAsPilot} />;
                 }
                 return <MomentoDeCargarScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.RETURN_ROUTE:
@@ -400,9 +410,9 @@ export default function ContingenciaPilotoPage() {
             case DISMANTLING_ROUTE_IDS.EQUIPMENT_UNLOAD:
                 return <EquipmentUnloadScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.RETURN_INVENTORY:
-                return <ReturnInventoryScreen {...closureProps} />;
+                return <ReturnInventoryScreen {...closurePropsAsPilot} />;
             case DISMANTLING_ROUTE_IDS.ELECTRONICS_CHARGING:
-                return <ChargingStationScreen {...closureProps} />;
+                return <ChargingStationScreen {...closurePropsAsPilot} />;
             case DISMANTLING_ROUTE_IDS.AUX_RECORDING_CHARGING:
                 return <AuxRecordingChargingScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.FINAL_PARKING:
