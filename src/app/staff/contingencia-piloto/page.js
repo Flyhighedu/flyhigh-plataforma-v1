@@ -400,7 +400,9 @@ export default function ContingenciaPilotoPage() {
             case DISMANTLING_ROUTE_IDS.GLOBAL_LOADING:
             case DISMANTLING_ROUTE_IDS.CONTAINER_LOADING:
                 if (normalizeDismantlingRole(role) === 'assistant') {
-                    return <GlobalLoadingScreen {...closurePropsAsPilot} />;
+                    // GlobalLoadingScreen uses isAssistant internally for the action button —
+                    // do NOT override role to pilot here or the button disappears.
+                    return <GlobalLoadingScreen {...closureProps} />;
                 }
                 return <MomentoDeCargarScreen {...closureProps} />;
             case DISMANTLING_ROUTE_IDS.RETURN_ROUTE:
