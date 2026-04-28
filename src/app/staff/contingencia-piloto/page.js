@@ -485,7 +485,55 @@ export default function ContingenciaPilotoPage() {
 
         // Glasses done → Kickoff bridge (music for aux, ready for teacher)
         if (glassesDone) {
-            // In contingency: Aux does music (pilot's task)
+            const musicDone = seatMeta.pilot_music_ambience_done === true;
+
+            // ── CONTINGENCY BARRIER BYPASS ──
+            // In normal ops, PilotMusicAmbienceScreen waits for:
+            //   teacher_operation_ready + aux_operation_ready + aux_operation_stand_photo_url
+            // In contingency there's no pilot, so those flags NEVER get set → deadlock.
+            // Fix: once music is done, auto-set all barrier flags and advance to OPERATION.
+            if (musicDone) {
+                setTimeout(async () => {
+                    try {
+                        const supabase = createClient();
+                        const now = new Date().toISOString();
+                        const { data } = await supabase.from('staff_journeys')
+                            .select('meta').eq('id', journeyId).single();
+                        const currentMeta = parseMeta(data?.meta);
+                        const nextMeta = {
+                            ...currentMeta,
+                            teacher_operation_ready: true,
+                            teacher_operation_ready_at: now,
+                            teacher_operation_ready_by: userId,
+                            aux_operation_ready: true,
+                            aux_operation_ready_at: now,
+                            aux_operation_ready_by: userId,
+                            aux_operation_stand_photo_url: currentMeta.aux_operation_stand_photo_url || 'contingency_no_pilot_skip',
+                            operation_start_bridge_at: currentMeta.operation_start_bridge_at || now,
+                            operation_start_bridge_by: currentMeta.operation_start_bridge_by || userId,
+                            operation_started_at: now,
+                        };
+                        await supabase.from('staff_journeys').update({
+                            mission_state: 'OPERATION',
+                            meta: nextMeta,
+                            updated_at: now,
+                        }).eq('id', journeyId);
+                    } catch (e) {
+                        console.warn('[ContingenciaPiloto] auto-advance to OPERATION error:', e);
+                    }
+                    setMissionState('OPERATION');
+                }, 0);
+                return (
+                    <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                        <div className="text-center space-y-4">
+                            <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
+                            <p className="text-slate-500 font-medium">Iniciando operación...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Music not done yet — aux does music (pilot's task)
             if (role === 'assistant') {
                 return (
                     <PilotMusicAmbienceScreen
@@ -494,7 +542,7 @@ export default function ContingenciaPilotoPage() {
                     />
                 );
             }
-            // Teacher/others wait for operation
+            // Teacher/others wait for aux to finish music
             return (
                 <PilotOperationalWaitScreen
                     {...commonProps}
