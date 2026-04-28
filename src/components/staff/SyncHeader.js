@@ -889,6 +889,8 @@ export default function SyncHeader({
                         journeyId={journeyId}
                         schoolId={missionInfo?.school_id || missionInfo?.id}
                         role={role}
+                        userId={userId}
+                        profile={{ full_name: firstName, role }}
                         onDemoStart={onDemoStart}
                         onCloseMission={onCloseMission}
                     />

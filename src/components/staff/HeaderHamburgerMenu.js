@@ -5,15 +5,21 @@ import { Menu, X, LogOut, Clock, Plane, Repeat, TrendingUp, MapPin, UserX } from
 import StartDemoFab from './StartDemoFab';
 import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null, userId = null, profile = null }) {
     const [isOpen, setIsOpen] = useState(false);
     const [changeMissionProgress, setChangeMissionProgress] = useState(false);
     const [directOpProgress, setDirectOpProgress] = useState(false);
+    const [noPilotProgress, setNoPilotProgress] = useState(false);
     const changeMissionTimerRef = useRef(null);
     const directOpTimerRef = useRef(null);
+    const noPilotTimerRef = useRef(null);
     const router = useRouter();
+    const pathname = usePathname();
+    const isOnContingenciaPiloto = pathname?.includes('contingencia-piloto');
+    // Show "Sin Piloto" only when there's an active journey AND we're NOT already in contingencia-piloto
+    const showNoPilotOption = !!journeyId && !isOnContingenciaPiloto;
     const normalizedRole = role ? String(role).toLowerCase() : null;
     const canSeeHistory = !normalizedRole || ['pilot', 'teacher', 'assistant', 'auxiliar', 'operativo', 'admin'].includes(normalizedRole);
     const canGoDirectToOperation = ['pilot', 'teacher', 'assistant', 'auxiliar'].includes(normalizedRole || '');
@@ -71,6 +77,85 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
 
         // Navigate to the isolated contingency route (this client + others via Supabase listener)
         window.location.href = '/staff/contingencia';
+    };
+
+    const handleNoPilotContingency = async () => {
+        try {
+            const supabase = createClient();
+            const now = new Date().toISOString();
+            const actorName = profile?.full_name?.split(' ')[0] || 'Operativo';
+
+            if (journeyId && userId) {
+                const { data: currentData } = await supabase
+                    .from('staff_journeys')
+                    .select('meta')
+                    .eq('id', journeyId)
+                    .single();
+                const currentMeta = currentData?.meta || {};
+                const nextMeta = {
+                    ...currentMeta,
+                    contingency_no_pilot: true,
+                    contingency_no_pilot_activated_at: now,
+                    contingency_no_pilot_activated_by: userId,
+                    contingency_no_pilot_activated_by_name: actorName,
+                };
+                await supabase.from('staff_journeys').update({
+                    meta: nextMeta,
+                    updated_at: now,
+                }).eq('id', journeyId);
+                await supabase.from('staff_events').insert({
+                    journey_id: journeyId,
+                    type: 'CONTINGENCY_NO_PILOT',
+                    actor_user_id: userId,
+                    payload: { by_name: actorName },
+                });
+            } else {
+                const resolvedSchoolId = schoolId
+                    || localStorage.getItem('flyhigh_selected_mission_id')
+                    || (() => { try { return JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}')?.id; } catch { return null; } })();
+
+                if (resolvedSchoolId) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+                    const { data: existingJourney } = await supabase
+                        .from('staff_journeys')
+                        .select('id, meta')
+                        .eq('date', today)
+                        .eq('school_id', resolvedSchoolId)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (existingJourney) {
+                        const existingMeta = existingJourney.meta || {};
+                        await supabase.from('staff_journeys').update({
+                            meta: { ...existingMeta, contingency_no_pilot: true, contingency_no_pilot_activated_at: now, contingency_no_pilot_activated_by: user?.id, contingency_no_pilot_activated_by_name: actorName },
+                            updated_at: now,
+                        }).eq('id', existingJourney.id);
+                    } else {
+                        await supabase.from('staff_journeys').insert({
+                            date: today,
+                            school_id: resolvedSchoolId,
+                            status: 'active',
+                            mission_state: 'prep',
+                            meta: {
+                                contingency_no_pilot: true,
+                                contingency_no_pilot_activated_at: now,
+                                contingency_no_pilot_activated_by: user?.id,
+                                contingency_no_pilot_activated_by_name: actorName,
+                            },
+                            created_at: now,
+                            updated_at: now,
+                        });
+                    }
+                }
+            }
+            console.log('🚨 No-Pilot Contingency fired. Redirecting...');
+        } catch (err) {
+            console.error('Failed to activate no-pilot contingency:', err);
+        }
+        window.location.href = '/staff/contingencia-piloto';
     };
 
     const handleLogout = async () => {
@@ -218,12 +303,58 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                             </button>
                         )}
 
+                        {/* Sin Piloto — smart conditional: only when journey active & not already in contingencia */}
+                        {showNoPilotOption && (
+                            <button
+                                onMouseDown={() => {
+                                    setNoPilotProgress(true);
+                                    noPilotTimerRef.current = setTimeout(() => {
+                                        setIsOpen(false);
+                                        setNoPilotProgress(false);
+                                        handleNoPilotContingency();
+                                    }, 3000);
+                                }}
+                                onMouseUp={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                onMouseLeave={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                onTouchStart={() => {
+                                    setNoPilotProgress(true);
+                                    noPilotTimerRef.current = setTimeout(() => {
+                                        setIsOpen(false);
+                                        setNoPilotProgress(false);
+                                        handleNoPilotContingency();
+                                    }, 3000);
+                                }}
+                                onTouchEnd={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                className="relative w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-orange-50 transition-colors rounded-lg text-orange-600 group overflow-hidden select-none"
+                            >
+                                {noPilotProgress && (
+                                    <div
+                                        className="absolute inset-0 bg-orange-100/70 origin-left"
+                                        style={{ animation: 'noPilotFill 3s linear forwards' }}
+                                    />
+                                )}
+                                <div className="relative p-2 bg-orange-50 rounded-lg transition-colors group-hover:bg-orange-100">
+                                    <UserX size={18} className={noPilotProgress ? 'animate-pulse' : ''} />
+                                </div>
+                                <div className="relative">
+                                    <p className="text-sm font-bold">Sin Piloto</p>
+                                    <p className="text-[10px] text-orange-500 font-semibold tracking-tight">
+                                        {noPilotProgress ? 'Mantén 3s para activar...' : 'Operar sin piloto'}
+                                    </p>
+                                </div>
+                            </button>
+                        )}
+
                         <style jsx>{`
                             @keyframes changeMissionFill {
                                 from { transform: scaleX(0); }
                                 to { transform: scaleX(1); }
                             }
                             @keyframes emergencyFill {
+                                from { transform: scaleX(0); }
+                                to { transform: scaleX(1); }
+                            }
+                            @keyframes noPilotFill {
                                 from { transform: scaleX(0); }
                                 to { transform: scaleX(1); }
                             }
