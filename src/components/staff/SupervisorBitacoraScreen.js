@@ -33,7 +33,6 @@ export default function SupervisorBitacoraScreen({
     
     // Data States
     const [nombreClave, setNombreClave] = useState('');
-    const [capitan, setCapitan] = useState('');
     const [destinos, setDestinos] = useState('');
     const [flightPlan, setFlightPlan] = useState(null);
     
@@ -104,7 +103,6 @@ export default function SupervisorBitacoraScreen({
     const handleStartMasterFlow = useCallback(async () => {
         // Reset old data
         setNombreClave('');
-        setCapitan('');
         setDestinos('');
         setFlightPlan(null);
         setSaved(false);
@@ -130,7 +128,6 @@ export default function SupervisorBitacoraScreen({
         const bitacoraEntry = {
             flightNumber,
             nombreClave: nombreClave.trim(),
-            capitan: capitan.trim() || null,
             destinos: destinos.trim() || null,
             timestamp: new Date().toISOString()
         };
@@ -667,22 +664,22 @@ export default function SupervisorBitacoraScreen({
 
                             {/* Step 1: Trigger */}
                             <div style={{
-                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
-                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12,
-                                display: 'flex', gap: 16, alignItems: 'center'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 24, padding: '24px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16,
+                                display: 'flex', gap: 20, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    width: 56, height: 56, borderRadius: 16, flexShrink: 0,
                                     background: 'rgba(59, 130, 246, 0.2)',
                                     border: '1px solid rgba(59, 130, 246, 0.5)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     color: '#60A5FA'
                                 }}>
-                                    <Radio size={24} />
+                                    <Radio size={32} />
                                 </div>
                                 <div>
-                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Cuando escuchen:</p>
-                                    <p style={{ fontSize: 18, fontWeight: 900, color: '#60A5FA', margin: '2px 0 0' }}>
+                                    <p style={{ fontSize: 15, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Cuando escuchen:</p>
+                                    <p style={{ fontSize: 22, fontWeight: 900, color: '#60A5FA', margin: '4px 0 0' }}>
                                         "¡SUBE, SUBE, SUBE!"
                                     </p>
                                 </div>
@@ -690,119 +687,50 @@ export default function SupervisorBitacoraScreen({
 
                             {/* Step 2: Action */}
                             <div style={{
-                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
-                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12,
-                                display: 'flex', gap: 16, alignItems: 'center'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 24, padding: '24px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16,
+                                display: 'flex', gap: 20, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    width: 56, height: 56, borderRadius: 16, flexShrink: 0,
                                     background: 'rgba(245, 158, 11, 0.2)',
                                     border: '1px solid rgba(245, 158, 11, 0.5)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     color: '#FBBF24',
                                     animation: 'pulseGlow 2s infinite'
                                 }}>
-                                    <Zap size={24} fill="#FBBF24" />
+                                    <Zap size={32} fill="#FBBF24" />
                                 </div>
                                 <div>
-                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Tienen que gritar:</p>
-                                    <p style={{ fontSize: 22, fontWeight: 900, color: '#FBBF24', margin: '2px 0 0', textShadow: '0 0 10px rgba(245,158,11,0.4)' }}>
-                                        "¡¡¡SUBE!!!"
+                                    <p style={{ fontSize: 15, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Tienen que gritar:</p>
+                                    <p style={{ fontSize: 26, fontWeight: 900, color: '#FBBF24', margin: '4px 0 0', textShadow: '0 0 12px rgba(245,158,11,0.5)' }}>
+                                        "¡HASTA LAS NUBES!"
                                     </p>
                                 </div>
                             </div>
 
                             {/* Step 3: Consequence */}
                             <div style={{
-                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
-                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 24,
-                                display: 'flex', gap: 16, alignItems: 'center'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 24, padding: '24px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 32,
+                                display: 'flex', gap: 20, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    width: 56, height: 56, borderRadius: 16, flexShrink: 0,
                                     background: 'rgba(239, 68, 68, 0.1)',
                                     border: '1px solid rgba(239, 68, 68, 0.4)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     color: '#F87171'
                                 }}>
-                                    <AlertTriangle size={24} />
+                                    <AlertTriangle size={32} />
                                 </div>
                                 <div>
-                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Si no gritan duro...</p>
-                                    <p style={{ fontSize: 16, fontWeight: 800, color: '#F87171', margin: '2px 0 0' }}>
+                                    <p style={{ fontSize: 15, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Si no gritan duro...</p>
+                                    <p style={{ fontSize: 20, fontWeight: 800, color: '#F87171', margin: '4px 0 0' }}>
                                         ¡El dron se apaga!
                                     </p>
                                 </div>
                             </div>
-
-                            {/* Visual: Neon Equalizer */}
-                            <div style={{
-                                background: '#0F172A',
-                                borderRadius: 24, padding: '24px', marginBottom: 16,
-                                textAlign: 'center', position: 'relative',
-                                border: '1px solid rgba(255,255,255,0.05)',
-                                boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
-                                    <BatteryCharging size={16} color="#94A3B8" />
-                                    <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94A3B8', margin: 0 }}>
-                                        Nivel de Energía
-                                    </p>
-                                </div>
-                                <div style={{
-                                    display: 'flex', gap: 6, height: 40, alignItems: 'flex-end',
-                                    justifyContent: 'center', marginBottom: 12
-                                }}>
-                                    {[
-                                        { h: 15, color: '#EF4444' },
-                                        { h: 25, color: '#EF4444' },
-                                        { h: 35, color: '#F59E0B' },
-                                        { h: 50, color: '#F59E0B' },
-                                        { h: 70, color: '#10B981' },
-                                        { h: 85, color: '#10B981' },
-                                        { h: 100, color: '#34D399' },
-                                    ].map((bar, i) => (
-                                        <div key={i} style={{
-                                            width: 24, height: `${bar.h}%`, borderRadius: 4,
-                                            background: bar.color,
-                                            animation: `barBounce 1.2s ease-in-out ${i * 0.1}s infinite alternate`,
-                                            boxShadow: `0 0 12px ${bar.color}88`
-                                        }} />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── CAPITÁN (OPCIONAL) ── */}
-                        <div style={{ padding: '0 16px 16px' }}>
-                            <label style={{ display: 'block' }}>
-                                <span style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                    <User size={16} /> (Opcional) Designar Capitán
-                                </span>
-                                <input
-                                    type="text"
-                                    value={capitan}
-                                    onChange={(e) => setCapitan(e.target.value)}
-                                    placeholder="Nombre del niño/niña..."
-                                    maxLength={50}
-                                    style={{
-                                        width: '100%', padding: '16px 20px', borderRadius: 16,
-                                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.5)', 
-                                        color: 'white', fontSize: 16, fontWeight: 600,
-                                        outline: 'none', transition: 'all 0.3s'
-                                    }}
-                                    onFocus={(e) => {
-                                        e.target.style.borderColor = '#4F46E5';
-                                        e.target.style.background = 'rgba(30, 41, 59, 0.8)';
-                                        e.target.style.boxShadow = '0 0 0 4px rgba(79, 70, 229, 0.2)';
-                                    }}
-                                    onBlur={(e) => {
-                                        e.target.style.borderColor = 'rgba(255,255,255,0.1)';
-                                        e.target.style.background = 'rgba(30, 41, 59, 0.5)';
-                                        e.target.style.boxShadow = 'none';
-                                    }}
-                                />
-                            </label>
                         </div>
 
                         {/* ── CTA ── */}
