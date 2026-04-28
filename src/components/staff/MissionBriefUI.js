@@ -15,7 +15,10 @@ import {
     Plane,
     GraduationCap,
     HandHeart,
-    User
+    User,
+    UserX,
+    AlertTriangle,
+    ChevronDown
 } from 'lucide-react';
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import ResetProcessButton from '@/components/staff/ResetProcessButton';
@@ -156,6 +159,71 @@ export default function MissionBriefUI({
         }
     };
 
+    // ── Contingencia Sin Piloto ──
+    const handleNoPilotContingency = async () => {
+        try {
+            const supabase = createClient();
+            const now = new Date().toISOString();
+            const actorName = profile?.full_name?.split(' ')[0] || 'Operativo';
+            const resolvedSchoolId = school?.id;
+
+            if (journeyId && userId) {
+                // Journey exists — flag it
+                const { data: currentData } = await supabase
+                    .from('staff_journeys')
+                    .select('meta')
+                    .eq('id', journeyId)
+                    .single();
+                const currentMeta = currentData?.meta || {};
+                await supabase.from('staff_journeys').update({
+                    meta: { ...currentMeta, contingency_no_pilot: true, contingency_no_pilot_activated_at: now, contingency_no_pilot_activated_by: userId, contingency_no_pilot_activated_by_name: actorName },
+                    updated_at: now,
+                }).eq('id', journeyId);
+                await supabase.from('staff_events').insert({
+                    journey_id: journeyId,
+                    type: 'CONTINGENCY_NO_PILOT',
+                    actor_user_id: userId,
+                    payload: { by_name: actorName },
+                });
+            } else if (resolvedSchoolId) {
+                // No journey yet — find or create
+                const { data: { user } } = await supabase.auth.getUser();
+                const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+                const { data: existingJourney } = await supabase
+                    .from('staff_journeys')
+                    .select('id, meta')
+                    .eq('date', today)
+                    .eq('school_id', resolvedSchoolId)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existingJourney) {
+                    const existingMeta = existingJourney.meta || {};
+                    await supabase.from('staff_journeys').update({
+                        meta: { ...existingMeta, contingency_no_pilot: true, contingency_no_pilot_activated_at: now, contingency_no_pilot_activated_by: user?.id, contingency_no_pilot_activated_by_name: actorName },
+                        updated_at: now,
+                    }).eq('id', existingJourney.id);
+                } else {
+                    await supabase.from('staff_journeys').insert({
+                        date: today,
+                        school_id: resolvedSchoolId,
+                        school_name: school?.school_name || 'Escuela',
+                        status: 'active',
+                        mission_state: 'prep',
+                        meta: { contingency_no_pilot: true, contingency_no_pilot_activated_at: now, contingency_no_pilot_activated_by: user?.id, contingency_no_pilot_activated_by_name: actorName },
+                        created_at: now,
+                        updated_at: now,
+                    });
+                }
+            }
+            console.log('🚨 No-Pilot Contingency activated from Check-In screen');
+        } catch (err) {
+            console.error('Failed to activate no-pilot contingency:', err);
+        }
+        window.location.href = '/staff/contingencia-piloto';
+    };
+
     // Fecha actual (UI Only)
     const todayDate = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
     const capitalizedDate = todayDate.charAt(0).toUpperCase() + todayDate.slice(1);
@@ -164,6 +232,9 @@ export default function MissionBriefUI({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [directOpProgress, setDirectOpProgress] = useState(false);
     const directOpTimerRef = useRef(null);
+    const [showContingencyPanel, setShowContingencyPanel] = useState(false);
+    const [noPilotProgress, setNoPilotProgress] = useState(false);
+    const noPilotTimerRef = useRef(null);
     // Determinar estado del botón
     const canCheckIn = (isWithinRange && locationStatus === 'success') || locationStatus === 'error' || locationStatus === 'denied'; // Permitir si hay error (fallback) o si está en rango
     const isOfflineOrError = locationStatus === 'error' || locationStatus === 'denied';
@@ -396,6 +467,103 @@ export default function MissionBriefUI({
                             </div>
                         ))}
                     </div>
+                </div>
+
+                {/* ── Contingency: ¿Un miembro no se presentó? ── */}
+                <div className="pt-1">
+                    <button
+                        onClick={() => setShowContingencyPanel(!showContingencyPanel)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-300 ${
+                            showContingencyPanel
+                                ? 'bg-orange-50 border-orange-200 shadow-sm'
+                                : 'bg-white border-slate-100 hover:border-orange-200 hover:bg-orange-50/50'
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-xl transition-colors ${
+                                showContingencyPanel ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'
+                            }`}>
+                                <AlertTriangle size={18} />
+                            </div>
+                            <div className="text-left">
+                                <p className={`text-sm font-bold transition-colors ${
+                                    showContingencyPanel ? 'text-orange-700' : 'text-slate-600'
+                                }`}>¿Un miembro no se presentó?</p>
+                                <p className="text-[10px] text-slate-400 font-medium">Activar modo contingencia</p>
+                            </div>
+                        </div>
+                        <ChevronDown
+                            size={16}
+                            className={`text-slate-400 transition-transform duration-300 ${
+                                showContingencyPanel ? 'rotate-180 text-orange-500' : ''
+                            }`}
+                        />
+                    </button>
+
+                    {/* Expandable Contingency Options */}
+                    {showContingencyPanel && (
+                        <div className="mt-2 bg-gradient-to-b from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-start gap-2 text-orange-700">
+                                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                                <p className="text-xs font-medium leading-relaxed">
+                                    Si un miembro del equipo no llegará, puedes continuar la misión redistribuyendo sus tareas.
+                                </p>
+                            </div>
+
+                            {/* Sin Piloto — Long press 3s */}
+                            <button
+                                onMouseDown={() => {
+                                    setNoPilotProgress(true);
+                                    noPilotTimerRef.current = setTimeout(() => {
+                                        setNoPilotProgress(false);
+                                        handleNoPilotContingency();
+                                    }, 3000);
+                                }}
+                                onMouseUp={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                onMouseLeave={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                onTouchStart={() => {
+                                    setNoPilotProgress(true);
+                                    noPilotTimerRef.current = setTimeout(() => {
+                                        setNoPilotProgress(false);
+                                        handleNoPilotContingency();
+                                    }, 3000);
+                                }}
+                                onTouchEnd={() => { clearTimeout(noPilotTimerRef.current); setNoPilotProgress(false); }}
+                                className="relative w-full flex items-center gap-3 px-4 py-4 bg-white rounded-xl border border-orange-200 hover:border-orange-300 transition-all overflow-hidden select-none group active:scale-[0.98] shadow-sm"
+                            >
+                                {/* Progress bar fill */}
+                                {noPilotProgress && (
+                                    <div
+                                        className="absolute inset-0 bg-orange-100/80 origin-left"
+                                        style={{ animation: 'contingencyFill 3s linear forwards' }}
+                                    />
+                                )}
+                                <div className="relative p-2.5 bg-orange-100 rounded-xl text-orange-600 group-hover:bg-orange-200 transition-colors">
+                                    <UserX size={20} className={noPilotProgress ? 'animate-pulse' : ''} />
+                                </div>
+                                <div className="relative flex-1 text-left">
+                                    <p className="text-sm font-bold text-orange-700">Continuar sin Piloto</p>
+                                    <p className="text-[10px] text-orange-500 font-semibold">
+                                        {noPilotProgress ? '⏳ Mantén presionado 3s...' : 'Mantén presionado para activar'}
+                                    </p>
+                                </div>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                    noPilotProgress
+                                        ? 'bg-orange-500 text-white scale-110'
+                                        : 'bg-orange-100 text-orange-400'
+                                }`}>
+                                    <Plane size={14} className={noPilotProgress ? 'animate-bounce' : ''} />
+                                </div>
+                            </button>
+
+                            <style jsx>{`
+                                @keyframes contingencyFill {
+                                    from { transform: scaleX(0); }
+                                    to { transform: scaleX(1); }
+                                }
+                            `}</style>
+                        </div>
+                    )}
                 </div>
 
                 {/* --- FALLBACK COMPONENT INJECTION --- */}
