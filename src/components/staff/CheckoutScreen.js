@@ -41,7 +41,7 @@ function normalizeRole(role) {
 
 function firstName(fullName, fallback = 'Operativo') {
     const normalized = String(fullName || '').trim();
-    if (!normalized) return fallback;
+    if (!normalized || normalized.toLowerCase() === 'por confirmar' || normalized.toLowerCase() === 'por asignar' || normalized.toLowerCase() === 'por') return fallback;
     const [head] = normalized.split(/\s+/);
     return head || fallback;
 }
@@ -318,6 +318,9 @@ export default function CheckoutScreen({
     const roleTag = useMemo(() => ROLE_LABELS[profile?.role] || 'Operativo', [profile?.role]);
 
     const missionMeta = useMemo(() => parseMeta(missionInfo?.meta), [missionInfo?.meta]);
+    const isContingency = missionMeta?.contingency_no_pilot === true;
+    const activeTeamRoles = useMemo(() => isContingency ? ['teacher', 'assistant'] : TEAM_ROLES, [isContingency]);
+
     const initialTeamStatus = useMemo(() => toTeamStatus(getTeamStatusFromMeta(missionMeta)), [missionMeta]);
     const missionId = useMemo(() => resolveMissionId(missionInfo, missionMeta), [missionInfo, missionMeta]);
 
@@ -335,23 +338,26 @@ export default function CheckoutScreen({
         return mapping;
     }, [missionInfo?.pilot_id, missionInfo?.teacher_id, missionInfo?.aux_id, missionInfo?.assistant_id, missionMeta?.pilot_id, missionMeta?.teacher_id, missionMeta?.aux_id, missionMeta?.assistant_id]);
 
-    const teamMembers = useMemo(() => ([
-        {
-            role: 'pilot',
-            label: 'Piloto',
-            name: firstName(missionInfo?.pilot_name || missionMeta?.pilot_name, 'Piloto')
-        },
-        {
-            role: 'teacher',
-            label: 'Docente',
-            name: firstName(missionInfo?.teacher_name || missionMeta?.teacher_name, 'Docente')
-        },
-        {
-            role: 'assistant',
-            label: 'Auxiliar',
-            name: firstName(missionInfo?.aux_name || missionInfo?.assistant_name || missionMeta?.aux_name || missionMeta?.assistant_name, 'Auxiliar')
-        }
-    ]), [missionInfo?.pilot_name, missionInfo?.teacher_name, missionInfo?.aux_name, missionInfo?.assistant_name, missionMeta?.pilot_name, missionMeta?.teacher_name, missionMeta?.aux_name, missionMeta?.assistant_name]);
+    const teamMembers = useMemo(() => {
+        const members = [
+            {
+                role: 'pilot',
+                label: 'Piloto',
+                name: firstName(missionInfo?.pilot_name || missionMeta?.pilot_name, 'Piloto')
+            },
+            {
+                role: 'teacher',
+                label: 'Docente',
+                name: firstName(missionInfo?.teacher_name || missionMeta?.teacher_name, 'Docente')
+            },
+            {
+                role: 'assistant',
+                label: 'Auxiliar',
+                name: firstName(missionInfo?.aux_name || missionInfo?.assistant_name || missionMeta?.aux_name || missionMeta?.assistant_name, 'Auxiliar')
+            }
+        ];
+        return isContingency ? members.filter(m => m.role !== 'pilot') : members;
+    }, [missionInfo?.pilot_name, missionInfo?.teacher_name, missionInfo?.aux_name, missionInfo?.assistant_name, missionMeta?.pilot_name, missionMeta?.teacher_name, missionMeta?.aux_name, missionMeta?.assistant_name, isContingency]);
 
     const nextMissionDate = useMemo(() => {
         const rawDate =
@@ -389,7 +395,7 @@ export default function CheckoutScreen({
     const [isSyncingCheckout, setIsSyncingCheckout] = useState(false);
 
     const isWithinRange = distance !== null && distance <= STAFF_CONFIG.GEOFENCE_RADIUS_METERS;
-    const hasCurrentUserCheckedOut = TEAM_ROLES.includes(normalizedRole) && teamCheckoutStatus[normalizedRole] === true;
+    const hasCurrentUserCheckedOut = activeTeamRoles.includes(normalizedRole) && teamCheckoutStatus[normalizedRole] === true;
 
     useEffect(() => {
         setTeamCheckoutStatus((prev) => ({
@@ -559,7 +565,7 @@ export default function CheckoutScreen({
     const handleFinalizeCheckout = async () => {
         if (!journeyId || isSubmitting || hasCurrentUserCheckedOut) return;
 
-        if (!TEAM_ROLES.includes(normalizedRole)) {
+        if (!activeTeamRoles.includes(normalizedRole)) {
             setFeedback('No fue posible validar tu rol operativo.');
             return;
         }
@@ -669,7 +675,7 @@ export default function CheckoutScreen({
             }
             nextStatus[normalizedRole] = true;
 
-            const allTeamCheckedOut = TEAM_ROLES.every((role) => nextStatus[role] === true);
+            const allTeamCheckedOut = activeTeamRoles.every((role) => nextStatus[role] === true);
 
             const { data: journeyData, error: readJourneyError } = await supabase
                 .from('staff_journeys')
@@ -806,7 +812,7 @@ export default function CheckoutScreen({
     // ── TEMP: Force checkout bypass for remote testing ──
     const handleForceCheckout = async () => {
         if (!journeyId || isSubmitting || hasCurrentUserCheckedOut) return;
-        if (!TEAM_ROLES.includes(normalizedRole)) {
+        if (!activeTeamRoles.includes(normalizedRole)) {
             setFeedback('No fue posible validar tu rol operativo.');
             return;
         }
@@ -855,7 +861,7 @@ export default function CheckoutScreen({
                 if (role) nextStatus[role] = true;
             }
             nextStatus[normalizedRole] = true;
-            const allTeamCheckedOut = TEAM_ROLES.every((role) => nextStatus[role] === true);
+            const allTeamCheckedOut = activeTeamRoles.every((role) => nextStatus[role] === true);
 
             const { data: journeyData, error: readErr } = await supabase.from('staff_journeys')
                 .select('meta').eq('id', journeyId).single();
@@ -959,7 +965,9 @@ export default function CheckoutScreen({
                 <section className="rounded-3xl border border-blue-100 bg-blue-50 p-5 shadow-[0_24px_56px_-34px_rgba(30,64,175,0.32)]">
                     <h2 className="m-0 text-[29px] font-black leading-tight tracking-tight text-slate-900">¡Misión Cumplida!</h2>
                     <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">
-                        Gracias a tu esfuerzo de hoy, le cumpliste el sueño de volar a {isLoadingStudents ? '...' : studentsCount} niños.
+                        {isContingency
+                            ? `¡Gran trabajo en equipo! Sacaron la misión adelante sin piloto y le cumplieron el sueño de volar a ${isLoadingStudents ? '...' : studentsCount} niños.`
+                            : `Gracias a tu esfuerzo de hoy, le cumpliste el sueño de volar a ${isLoadingStudents ? '...' : studentsCount} niños.`}
                     </p>
                 </section>
 
