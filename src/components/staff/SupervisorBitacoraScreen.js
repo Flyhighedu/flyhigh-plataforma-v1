@@ -18,7 +18,7 @@ import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import useAudioRecorder from '@/hooks/useAudioRecorder';
 import IdentityScanner from '@/components/staff/IdentityScanner';
 import SquadronCalculator from '@/components/staff/SquadronCalculator';
-import { Rocket, Send, User, ChevronRight, CheckCircle2, Mic, Zap, BatteryCharging, AlertTriangle, Radio } from 'lucide-react';
+import { Rocket, Send, ChevronRight, CheckCircle2, Mic, Zap, AlertTriangle, Radio } from 'lucide-react';
 
 export default function SupervisorBitacoraScreen({
     journeyId,
@@ -165,7 +165,6 @@ export default function SupervisorBitacoraScreen({
             setTimeout(() => {
                 setMasterStep('idle');
                 setNombreClave('');
-                setCapitan('');
                 setDestinos('');
                 setFlightPlan(null);
                 setSaved(false);
@@ -178,7 +177,7 @@ export default function SupervisorBitacoraScreen({
         } finally {
             setIsSaving(false);
         }
-    }, [nombreClave, capitan, destinos, journeyId, bitacoraHistory, isSaving, micRecording, stopRecording]);
+    }, [nombreClave, destinos, journeyId, bitacoraHistory, isSaving, micRecording, stopRecording]);
 
     // Upload telemetry audio to server
     const uploadTelemetry = useCallback(async (blob) => {
@@ -260,7 +259,6 @@ export default function SupervisorBitacoraScreen({
         setCalcOpen(false);
         setNavExpanded(false);
         setNombreClave('');
-        setCapitan('');
         setDestinos('');
         setFlightPlan(null);
         setSaved(false);
