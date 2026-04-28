@@ -565,12 +565,29 @@ export default function ContingenciaPilotoPage() {
     }
 
     if (missionState === 'waiting_dropzone' || missionState === 'waiting_unload_assignment') {
+        // ── CONTINGENCY: No pilot to coordinate → auto-advance to unload ──
+        // In normal ops, this wait exists for role coordination.
+        // In contingency, there's no pilot, so we skip straight to unload.
+        // Using setTimeout to avoid calling setState during render.
+        setTimeout(async () => {
+            try {
+                const supabase = createClient();
+                await supabase.from('staff_journeys').update({
+                    mission_state: 'unload',
+                    updated_at: new Date().toISOString(),
+                }).eq('id', journeyId);
+            } catch (e) {
+                console.warn('[ContingenciaPiloto] auto-advance DB update error:', e);
+            }
+            setMissionState('unload');
+        }, 0);
         return (
-            <EnRutaScreen
-                {...commonProps}
-                role={role}
-                onStateChange={(newState) => setMissionState(newState)}
-            />
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
+                    <p className="text-slate-500 font-medium">Avanzando a descarga...</p>
+                </div>
+            </div>
         );
     }
 
