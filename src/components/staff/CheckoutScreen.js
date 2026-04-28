@@ -811,7 +811,7 @@ export default function CheckoutScreen({
 
     // ── TEMP: Force checkout bypass for remote testing ──
     const handleForceCheckout = async () => {
-        if (!journeyId || isSubmitting || hasCurrentUserCheckedOut) return;
+        if (!journeyId || isSubmitting) return;
         if (!activeTeamRoles.includes(normalizedRole)) {
             setFeedback('No fue posible validar tu rol operativo.');
             return;
@@ -856,12 +856,11 @@ export default function CheckoutScreen({
                 .select('user_id, payload').eq('journey_id', journeyId).eq('event_type', 'checkout').limit(500);
 
             const nextStatus = { ...EMPTY_TEAM_STATUS, ...toTeamStatus(getTeamStatusFromMeta(parseMeta(missionInfo?.meta))) };
-            for (const row of teamEvents || []) {
-                const role = resolveEventRole(row, teamUserRoleMap);
-                if (role) nextStatus[role] = true;
-            }
-            nextStatus[normalizedRole] = true;
-            const allTeamCheckedOut = activeTeamRoles.every((role) => nextStatus[role] === true);
+            // Force checkout ALL active roles to complete the mission
+            activeTeamRoles.forEach(role => {
+                nextStatus[role] = true;
+            });
+            const allTeamCheckedOut = true;
 
             const { data: journeyData, error: readErr } = await supabase.from('staff_journeys')
                 .select('meta').eq('id', journeyId).single();
@@ -919,10 +918,13 @@ export default function CheckoutScreen({
                 }
                 clearJourneyLocalOperationalData(journeyId);
                 clearLocalProgress(journeyId);
-                if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('flyhigh_staff_mission');
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    window.localStorage.removeItem('flyhigh_staff_mission');
+                    window.localStorage.removeItem('flyhigh_selected_mission_id');
+                }
             }
             if (typeof onCheckoutComplete === 'function') onCheckoutComplete({ allTeamCheckedOut, nextStatus, finalizedAt: now });
-            router.replace('/staff/history');
+            router.replace('/staff/dashboard');
         } catch (error) {
             const details = getErrorMessage(error);
             console.error('Force checkout error:', { error, details });
@@ -1159,10 +1161,10 @@ export default function CheckoutScreen({
                     <button
                         type="button"
                         onClick={handleForceCheckout}
-                        disabled={isSubmitting || hasCurrentUserCheckedOut}
+                        disabled={isSubmitting}
                         className="mt-6 w-full text-center text-xs text-gray-400 underline"
                     >
-                        Modo Prueba: Forzar Check-out
+                        Modo Prueba: Forzar Check-out de Todo el Equipo
                     </button>
                 </div>
             </div>
