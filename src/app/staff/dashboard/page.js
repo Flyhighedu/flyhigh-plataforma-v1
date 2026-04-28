@@ -911,6 +911,13 @@ export default function StaffDashboard() {
                     return;
                 }
 
+                // [CONTINGENCY NO-PILOT REDIRECT] Same pattern as above
+                if (meta?.contingency_no_pilot === true) {
+                    console.log('🚨 No-pilot contingency active on init! Redirecting to /staff/contingencia-piloto...');
+                    window.location.href = '/staff/contingencia-piloto';
+                    return;
+                }
+
                 setMissionState(state);
                 setTodaySchool(prev => ({
                     ...prev,
@@ -1265,6 +1272,10 @@ export default function StaffDashboard() {
                     console.log('🚨 [POLL] Contingency detected! Redirecting to /staff/contingencia...');
                     window.location.href = '/staff/contingencia';
                 }
+                if (meta?.contingency_no_pilot === true) {
+                    console.log('🚨 [POLL] No-pilot contingency detected! Redirecting...');
+                    window.location.href = '/staff/contingencia-piloto';
+                }
             } catch (err) {
                 // Silently ignore polling errors
             }
@@ -1314,6 +1325,11 @@ export default function StaffDashboard() {
                         if (incomingMeta?.contingency_direct_operation === true) {
                             console.log('🚨 Contingency detected from DB! Redirecting to /staff/contingencia...');
                             window.location.href = '/staff/contingencia';
+                            return;
+                        }
+                        if (incomingMeta?.contingency_no_pilot === true) {
+                            console.log('🚨 No-pilot contingency detected! Redirecting to /staff/contingencia-piloto...');
+                            window.location.href = '/staff/contingencia-piloto';
                             return;
                         }
 

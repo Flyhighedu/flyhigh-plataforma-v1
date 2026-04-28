@@ -43,6 +43,7 @@ export default function SupervisorBitacoraScreen({
     const [bitacoraHistory, setBitacoraHistory] = useState([]);
     const [scannerOpen, setScannerOpen] = useState(false);
     const [calcOpen, setCalcOpen] = useState(false);
+    const [navExpanded, setNavExpanded] = useState(false);
     
     // Timer & Recording States
     const [timerSeconds, setTimerSeconds] = useState(PREFLIGHT_TIMER_SECONDS);
@@ -204,6 +205,72 @@ export default function SupervisorBitacoraScreen({
         }
     }, [journeyId, bitacoraHistory.length, userId, recDuration]);
 
+    // ── WIZARD STEP DEFINITIONS ──
+    const WIZARD_STEPS = ['idle', 'intro_scanner', 'scanner', 'intro_calculator', 'calculator', 'briefing_final'];
+    const WIZARD_LABELS = {
+        'idle': 'Inicio',
+        'intro_scanner': 'Intro Escáner',
+        'scanner': '🎤 Batalla de Gritos',
+        'intro_calculator': 'Intro Plan',
+        'calculator': '🗺️ Calculadora',
+        'briefing_final': '📣 Briefing'
+    };
+    const currentStepIndex = WIZARD_STEPS.indexOf(masterStep);
+
+    // ── Navigate to a specific step ──
+    const goToStep = useCallback((step) => {
+        // First: close all overlays
+        setScannerOpen(false);
+        setCalcOpen(false);
+        setMasterStep(step);
+        
+        // Then: open the correct overlay after a tick so React processes the close
+        if (step === 'scanner') {
+            setTimeout(() => setScannerOpen(true), 50);
+        } else if (step === 'calculator') {
+            setTimeout(() => setCalcOpen(true), 50);
+        }
+        
+        // If going into wizard from idle, start timer & mic
+        if (step !== 'idle' && !timerRunning) {
+            setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
+            setTimerRunning(true);
+            if (micSupported && !micRecording) {
+                try { startRecording(); } catch { /* non-blocking */ }
+            }
+        }
+    }, [timerRunning, micSupported, micRecording, startRecording]);
+
+    const goNext = useCallback(() => {
+        const nextIdx = Math.min(currentStepIndex + 1, WIZARD_STEPS.length - 1);
+        goToStep(WIZARD_STEPS[nextIdx]);
+    }, [currentStepIndex, goToStep]);
+
+    const goPrev = useCallback(() => {
+        const prevIdx = Math.max(currentStepIndex - 1, 0);
+        goToStep(WIZARD_STEPS[prevIdx]);
+    }, [currentStepIndex, goToStep]);
+
+    // ── ABORT & RESTART: Salida rápida del wizard ──
+    const resetWizard = useCallback(() => {
+        setTimerRunning(false);
+        clearInterval(timerRef.current);
+        setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
+        if (micRecording) {
+            try { stopRecording(); } catch { /* non-blocking */ }
+        }
+        setScannerOpen(false);
+        setCalcOpen(false);
+        setNavExpanded(false);
+        setNombreClave('');
+        setCapitan('');
+        setDestinos('');
+        setFlightPlan(null);
+        setSaved(false);
+        setUploadedUrl(null);
+        setMasterStep('idle');
+    }, [micRecording, stopRecording]);
+
     const formatTimer = (s) => {
         const m = Math.floor(s / 60);
         const sec = s % 60;
@@ -211,6 +278,10 @@ export default function SupervisorBitacoraScreen({
     };
     const timerProgress = ((PREFLIGHT_TIMER_SECONDS - timerSeconds) / PREFLIGHT_TIMER_SECONDS) * 100;
     const showTimerSection = masterStep !== 'idle';
+
+    const activeFlightNumber = missionState?.active_flight_number || 1;
+    const equipoEnVuelo = bitacoraHistory.find(b => Number(b.flightNumber) === Number(activeFlightNumber));
+    const equipoEnVueloName = equipoEnVuelo ? equipoEnVuelo.nombreClave : 'el equipo anterior';
 
     return (
         <div className="min-h-screen bg-slate-50 pb-4 flex flex-col">
@@ -236,61 +307,133 @@ export default function SupervisorBitacoraScreen({
             </ContingencyBypassMenu>
 
             <div className="px-4 py-4 flex-1 flex flex-col max-w-lg mx-auto w-full">
+                {/* ── COLLAPSIBLE FLOATING NAV FAB (above ALL overlays) ── */}
+                {masterStep !== 'idle' && (
+                    <div style={{
+                        position: 'fixed', bottom: 20, right: 16,
+                        zIndex: 100000,
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+                        animation: 'fadeIn 0.2s ease-out'
+                    }}>
+                        {/* Expanded panel */}
+                        {navExpanded && (
+                            <div style={{
+                                background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(16px)',
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                borderRadius: 20, padding: '12px',
+                                boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+                                display: 'flex', flexDirection: 'column', gap: 8,
+                                minWidth: 200,
+                                animation: 'navSlideUp 0.2s ease-out'
+                            }}>
+                                {/* Step label */}
+                                <div style={{ textAlign: 'center', padding: '2px 0 6px' }}>
+                                    <p style={{ fontSize: 9, fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '0.12em', margin: 0 }}>
+                                        Paso {currentStepIndex} de {WIZARD_STEPS.length - 1}
+                                    </p>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#E2E8F0', margin: '2px 0 0' }}>
+                                        {WIZARD_LABELS[masterStep]}
+                                    </p>
+                                </div>
+
+                                {/* Navigation arrows row */}
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <button
+                                        onClick={() => { goPrev(); }}
+                                        disabled={currentStepIndex <= 1}
+                                        style={{
+                                            flex: 1, height: 44, borderRadius: 12,
+                                            border: 'none', background: currentStepIndex <= 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.12)',
+                                            color: currentStepIndex <= 1 ? '#475569' : '#fff',
+                                            fontSize: 16, fontWeight: 900,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            cursor: currentStepIndex <= 1 ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >← Atrás</button>
+                                    <button
+                                        onClick={() => { goNext(); }}
+                                        disabled={currentStepIndex >= WIZARD_STEPS.length - 1}
+                                        style={{
+                                            flex: 1, height: 44, borderRadius: 12,
+                                            border: 'none', background: currentStepIndex >= WIZARD_STEPS.length - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(99,102,241,0.3)',
+                                            color: currentStepIndex >= WIZARD_STEPS.length - 1 ? '#475569' : '#A5B4FC',
+                                            fontSize: 16, fontWeight: 900,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            cursor: currentStepIndex >= WIZARD_STEPS.length - 1 ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.15s'
+                                        }}
+                                    >Sig →</button>
+                                </div>
+
+                                {/* Exit button */}
+                                <button
+                                    onClick={resetWizard}
+                                    style={{
+                                        width: '100%', height: 40, borderRadius: 12,
+                                        border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239, 68, 68, 0.12)',
+                                        color: '#FCA5A5', fontSize: 12, fontWeight: 800,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                        cursor: 'pointer', transition: 'all 0.15s',
+                                        textTransform: 'uppercase', letterSpacing: '0.05em'
+                                    }}
+                                >✕ Salir al Inicio</button>
+                            </div>
+                        )}
+
+                        {/* FAB toggle button (always visible) */}
+                        <button
+                            onClick={() => setNavExpanded(prev => !prev)}
+                            style={{
+                                width: 52, height: 52, borderRadius: 16,
+                                border: '2px solid rgba(255,255,255,0.2)',
+                                background: navExpanded 
+                                    ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' 
+                                    : 'linear-gradient(135deg, #1E293B, #0F172A)',
+                                color: 'white',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+                                cursor: 'pointer',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                                transition: 'all 0.2s',
+                                position: 'relative'
+                            }}
+                        >
+                            <span style={{ fontSize: 14, fontWeight: 900, lineHeight: 1 }}>
+                                {navExpanded ? '▼' : `${currentStepIndex}`}
+                            </span>
+                            {!navExpanded && (
+                                <span style={{ fontSize: 7, fontWeight: 800, color: '#94A3B8', lineHeight: 1 }}>
+                                    /{WIZARD_STEPS.length - 1}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                )}
                 {/* Timer Section (Solo visible durante el wizard) */}
                 {showTimerSection && (
                     <section style={{
-                        background: 'linear-gradient(135deg, #FEF3C7, #FFFBEB)',
-                        border: `2px solid #FCD34D`,
-                        borderRadius: 20, padding: '16px 18px',
+                        position: 'absolute', top: 16, right: 16, zIndex: 50,
+                        background: timerSeconds === 0 ? '#DCFCE7' : timerSeconds <= 30 ? '#FEE2E2' : '#FEF3C7',
+                        border: `2px solid ${timerSeconds === 0 ? '#22C55E' : timerSeconds <= 30 ? '#EF4444' : '#FCD34D'}`,
+                        borderRadius: 100, padding: '8px 16px',
                         transition: 'all 0.3s ease',
-                        animation: 'fadeIn 0.3s ease-out'
+                        animation: 'fadeIn 0.3s ease-out',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 18 }}>⏱️</span>
-                                <div>
-                                    <p style={{ fontSize: 12, fontWeight: 800, color: '#92400E', margin: 0 }}>Timer Pre-Vuelo</p>
-                                    <p style={{ fontSize: 10, color: '#A16207', margin: 0 }}>Grabación de Telemetría Activa</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Recording indicator */}
-                        {micRecording && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', animation: 'recPulse 1.2s infinite' }} />
-                                <span style={{ fontSize: 10, fontWeight: 800, color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                    Grabando audio · {Math.floor(recDuration / 60)}:{(recDuration % 60).toString().padStart(2, '0')}
-                                </span>
+                        <span style={{ fontSize: 16 }}>{timerSeconds === 0 ? '🏁' : '⏱️'}</span>
+                        <span style={{
+                            fontSize: 16, fontWeight: 900,
+                            color: timerSeconds === 0 ? '#16A34A' : timerSeconds <= 30 ? '#DC2626' : '#92400E',
+                            fontVariantNumeric: 'tabular-nums'
+                        }}>
+                            {formatTimer(timerSeconds)}
+                        </span>
+                        {(micRecording || isUploading || uploadedUrl) && (
+                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: 4, paddingLeft: 8, borderLeft: '1px solid rgba(0,0,0,0.1)' }}>
+                                {isUploading ? <span style={{fontSize: 14}}>📤</span> : uploadedUrl ? <span style={{fontSize: 14}}>✅</span> : <span style={{width: 8, height: 8, borderRadius: '50%', background: '#EF4444', animation: 'recPulse 1.2s infinite'}}></span>}
                             </div>
                         )}
-                        {isUploading && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                                <span style={{ fontSize: 10, fontWeight: 800, color: '#2563EB' }}>📤 Subiendo audio...</span>
-                            </div>
-                        )}
-                        {uploadedUrl && !isUploading && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                                <span style={{ fontSize: 10, fontWeight: 800, color: '#16A34A' }}>✅ Audio guardado</span>
-                            </div>
-                        )}
-
-                        <div style={{ textAlign: 'center', marginBottom: 8 }}>
-                            <span style={{
-                                fontSize: timerSeconds === 0 ? 28 : 40, fontWeight: 900,
-                                color: timerSeconds === 0 ? '#16A34A' : timerSeconds <= 30 ? '#DC2626' : '#92400E',
-                                fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s ease'
-                            }}>
-                                {timerSeconds === 0 ? '¡Tiempo Agotado! ⚠️' : formatTimer(timerSeconds)}
-                            </span>
-                        </div>
-                        <div style={{ height: 6, borderRadius: 3, background: 'rgba(146,64,14,0.15)', overflow: 'hidden' }}>
-                            <div style={{
-                                height: '100%', borderRadius: 3, width: `${timerProgress}%`,
-                                background: timerSeconds === 0 ? '#22C55E' : timerSeconds <= 30 ? '#EF4444' : '#F59E0B',
-                                transition: 'width 1s linear, background 0.5s ease'
-                            }} />
-                        </div>
                     </section>
                 )}
 
@@ -363,67 +506,73 @@ export default function SupervisorBitacoraScreen({
 
                 {/* INTRO: ESCÁNER DE IDENTIDAD */}
                 {masterStep === 'intro_scanner' && (
-                    <div style={{ animation: 'fadeIn 0.3s ease-out', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontSize: 48, marginBottom: 8 }}>📡</div>
-                        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', marginBottom: 8 }}>
-                            Fase 1: Escáner de Identidad
-                        </h2>
-                        <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.4, marginBottom: 16, padding: '0 8px' }}>
-                            A continuación, usarás el Radar para que los niños elijan su nombre de escuadrón.<br/><br/>
-                            <strong>Instrucciones:</strong> Diles las dos opciones disponibles y haz que griten tan fuerte como puedan. El radar medirá la energía de sus gritos para decidir el ganador.
-                        </p>
+                    <div style={{ animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 16px' }}>
+                            {/* Icon Wrapper */}
+                            <div style={{
+                                width: 80, height: 80, borderRadius: 24,
+                                background: 'linear-gradient(135deg, #F0F9FF, #E0F2FE)',
+                                border: '2px solid #BAE6FD',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 40, marginBottom: 24,
+                                boxShadow: '0 12px 24px rgba(2, 132, 199, 0.1)'
+                            }}>
+                                📡
+                            </div>
+                            
+                            {/* Title */}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#EFF6FF', padding: '6px 14px', borderRadius: 100, marginBottom: 16 }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                                    Fase Operativa 1
+                                </span>
+                            </div>
+                            <h2 style={{ fontSize: 28, fontWeight: 900, color: '#0F172A', margin: '0 0 16px', lineHeight: 1.1 }}>
+                                Escáner de<br/>Identidad
+                            </h2>
+                            
+                            {/* Text / Briefing */}
+                            <div style={{
+                                background: '#F8FAFC', borderRadius: 20, padding: 20,
+                                border: '1px solid #E2E8F0', width: '100%',
+                                textAlign: 'left', marginBottom: 24
+                            }}>
+                                <p style={{ fontSize: 15, color: '#334155', lineHeight: 1.5, margin: '0 0 16px' }}>
+                                    Es hora de darle un nombre al grupo. Para hacerlo, usaremos la <strong style={{color:'#0F172A'}}>Batalla de Gritos</strong>.
+                                </p>
+                                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                                        <span style={{ fontSize: 12, color: '#2563EB', fontWeight: 800 }}>i</span>
+                                    </div>
+                                    <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.5, margin: 0 }}>
+                                        Diles las dos opciones en pantalla y pídeles que griten tan fuerte como puedan. La app medirá su energía automáticamente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                         
-                        <div style={{ marginTop: 'auto', marginBottom: 16 }}>
+                        {/* CTA Bottom */}
+                        <div style={{ marginTop: 'auto', padding: '0 16px 24px' }}>
                             <button
                                 onClick={() => {
                                     setMasterStep('scanner');
                                     setScannerOpen(true);
                                 }}
                                 style={{
-                                    width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-                                    background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)', color: 'white',
+                                    width: '100%', padding: '18px', borderRadius: 20, border: 'none',
+                                    background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', color: 'white',
                                     fontSize: 16, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                                    cursor: 'pointer', boxShadow: '0 10px 25px rgba(59,130,246,0.3)'
+                                    cursor: 'pointer', boxShadow: '0 12px 24px rgba(37, 99, 235, 0.25)',
+                                    transition: 'all 0.2s ease'
                                 }}
                             >
-                                Comenzar Escáner <ChevronRight />
+                                Iniciar Dinámica <ChevronRight size={20} />
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* INTRO: CALCULADORA DE ESCUADRONES */}
-                {masterStep === 'intro_calculator' && (
-                    <div style={{ animation: 'fadeIn 0.3s ease-out', textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontSize: 48, marginBottom: 8 }}>🗺️</div>
-                        <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', marginBottom: 8 }}>
-                            Fase 2: Plan de Vuelo
-                        </h2>
-                        <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.4, marginBottom: 16, padding: '0 8px' }}>
-                            El grupo ya tiene identidad. Ahora definiremos a dónde volarán.<br/><br/>
-                            <strong>Instrucciones:</strong> Selecciona la ruta del día y divide a los niños en los 5 micro-escuadrones usando el sistema de asignación.
-                        </p>
-                        
-                        <div style={{ marginTop: 'auto', marginBottom: 16 }}>
-                            <button
-                                onClick={() => {
-                                    setMasterStep('calculator');
-                                    setCalcOpen(true);
-                                }}
-                                style={{
-                                    width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-                                    background: 'linear-gradient(135deg, #10B981, #047857)', color: 'white',
-                                    fontSize: 16, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                                    cursor: 'pointer', boxShadow: '0 10px 25px rgba(16,185,129,0.3)'
-                                }}
-                            >
-                                Crear Plan de Vuelo <ChevronRight />
-                            </button>
-                        </div>
-                    </div>
-                )}
+
 
                 {/* BRIEFING FINAL (OUTRO) */}
                 {masterStep === 'briefing_final' && (
@@ -444,107 +593,51 @@ export default function SupervisorBitacoraScreen({
                             <p style={{ fontSize: 16, fontWeight: 800, color: '#1E293B', fontStyle: 'italic', margin: 0, lineHeight: 1.4 }}>
                                 "¡Muy bien, <span style={{ color: '#7C3AED' }}>Escuadrón {nombreClave}</span>!<br/>
                                 <br/>
-                                Sus lugares ya están asignados en el radar. Ahora esperen a que el Piloto los llame por su nombre para el despegue."
+                                Sus lugares ya están asignados. Vamos a tener que esperar a que el <strong style={{ color: '#2563EB' }}>Escuadrón {equipoEnVueloName}</strong> termine su vuelo y baje.<br/>
+                                <br/>
+                                Después de eso, el piloto los llamará por su nombre de equipo para que pasen al área de despegue."
                             </p>
+                        </div>
+
+                        <div style={{ padding: '0 8px 16px' }}>
+                            <label style={{ display: 'block', textAlign: 'left' }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <User size={14} /> (Opcional) Capitán Seleccionado
+                                </span>
+                                <input
+                                    type="text"
+                                    value={capitan}
+                                    onChange={(e) => setCapitan(e.target.value)}
+                                    placeholder="Nombre del niño/niña..."
+                                    maxLength={50}
+                                    style={{
+                                        width: '100%', marginTop: 8, padding: '14px 16px', borderRadius: 12,
+                                        border: '2px solid #E2E8F0', background: 'white', fontSize: 16, fontWeight: 600,
+                                        outline: 'none', transition: 'border-color 0.2s'
+                                    }}
+                                    onFocus={(e) => e.target.style.borderColor = '#7C3AED'}
+                                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                                />
+                            </label>
                         </div>
 
                         <div style={{ marginTop: 'auto', marginBottom: 16 }}>
                             <button
-                                onClick={() => setMasterStep('review')}
+                                onClick={handleSaveBitacora}
+                                disabled={isSaving || saved}
                                 style={{
-                                    width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-                                    background: 'linear-gradient(135deg, #10B981, #047857)', color: 'white',
+                                    width: '100%', padding: '20px', borderRadius: 20, border: 'none',
+                                    background: saved ? '#10B981' : 'linear-gradient(135deg, #0F172A, #1E293B)', color: 'white',
                                     fontSize: 16, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                                    cursor: 'pointer', boxShadow: '0 10px 25px rgba(16,185,129,0.3)'
+                                    cursor: isSaving || saved ? 'not-allowed' : 'pointer',
+                                    boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.3)' : '0 15px 30px rgba(15,23,42,0.4)',
+                                    transition: 'all 0.3s'
                                 }}
                             >
-                                Confirmar y Continuar <ChevronRight />
+                                {isSaving ? 'Guardando...' : saved ? '✅ ENVIADO AL PILOTO' : <><Send size={24} /> GUARDAR Y ENVIAR AL PILOTO</>}
                             </button>
                         </div>
-                    </div>
-                )}
-
-                {/* REVIEW STATE: RESUMEN Y AUTORIZACIÓN FINAL */}
-                {masterStep === 'review' && (
-                    <div style={{ animation: 'fadeIn 0.3s ease-out', marginTop: 24 }}>
-                        <div style={{ marginBottom: 24, textAlign: 'center' }}>
-                            <div style={{ width: 64, height: 64, background: '#D1FAE5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                                <CheckCircle2 size={32} color="#059669" />
-                            </div>
-                            <h2 style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', margin: '0 0 8px' }}>
-                                ¡Sistemas Listos!
-                            </h2>
-                            <p style={{ fontSize: 14, color: '#64748B', margin: 0 }}>
-                                Revisa los datos y autoriza el envío al Piloto.
-                            </p>
-                        </div>
-
-                        <div style={{ background: 'white', borderRadius: 24, border: '2px solid #E2E8F0', overflow: 'hidden', marginBottom: 24, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)' }}>
-                            {/* Identidad */}
-                            <div style={{ padding: '20px', borderBottom: '2px solid #E2E8F0', background: '#F8FAFC' }}>
-                                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nombre Clave del Grupo</span>
-                                <h3 style={{ fontSize: 22, fontWeight: 900, color: '#7C3AED', margin: '4px 0 0' }}>"{nombreClave}"</h3>
-                            </div>
-
-                            {/* Plan de Vuelo */}
-                            {flightPlan && (
-                                <div style={{ padding: '20px', borderBottom: '2px solid #E2E8F0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                        <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Plan de Vuelo</span>
-                                        <span style={{ fontSize: 11, fontWeight: 800, background: '#EDE9FE', color: '#7C3AED', padding: '4px 10px', borderRadius: 100 }}>{flightPlan.routeName}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                        {flightPlan.groups.map((count, idx) => count > 0 && (
-                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#F8FAFC', padding: '12px 16px', borderRadius: 12 }}>
-                                                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', width: 45 }}>ESC {idx+1}</span>
-                                                <span style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', flex: 1 }}>{flightPlan.assignments[idx]}</span>
-                                                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>{count} pax</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Opcional: Capitán */}
-                            <div style={{ padding: '20px' }}>
-                                <label style={{ display: 'block' }}>
-                                    <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <User size={14} /> (Opcional) Capitán Seleccionado
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={capitan}
-                                        onChange={(e) => setCapitan(e.target.value)}
-                                        placeholder="Nombre del niño/niña..."
-                                        maxLength={50}
-                                        style={{
-                                            width: '100%', marginTop: 8, padding: '14px 16px', borderRadius: 12,
-                                            border: '2px solid #E2E8F0', background: 'white', fontSize: 16, fontWeight: 600,
-                                            outline: 'none', transition: 'border-color 0.2s'
-                                        }}
-                                        onFocus={(e) => e.target.style.borderColor = '#7C3AED'}
-                                        onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
-                                    />
-                                </label>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleSaveBitacora}
-                            disabled={isSaving || saved}
-                            style={{
-                                width: '100%', padding: '20px', borderRadius: 20, border: 'none',
-                                background: saved ? '#10B981' : 'linear-gradient(135deg, #1E293B, #0F172A)', color: 'white',
-                                fontSize: 18, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                                cursor: isSaving || saved ? 'not-allowed' : 'pointer',
-                                boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.3)' : '0 10px 25px rgba(15,23,42,0.2)',
-                                transition: 'all 0.3s'
-                            }}
-                        >
-                            {isSaving ? 'Guardando...' : saved ? '✅ ENVIADO AL PILOTO' : <><Send size={24} /> GUARDAR Y ENVIAR AL PILOTO</>}
-                        </button>
                     </div>
                 )}
             </div>
@@ -559,33 +652,28 @@ export default function SupervisorBitacoraScreen({
                 onResult={(name) => { 
                     setNombreClave(name); 
                     setScannerOpen(false); 
-                    // Automatically trigger Phase 2 Intro
-                    setMasterStep('intro_calculator');
+                    // Bypass Phase 2 Intro, jump straight into the Calculator dynamic
+                    setMasterStep('calculator');
+                    setCalcOpen(true);
                 }}
                 onClose={() => {
-                    // Si el usuario cancela, volvemos a idle manualmente
-                    setScannerOpen(false);
-                    setMasterStep('idle');
-                    resetTimer();
+                    resetWizard();
                 }}
             />
 
             {/* Fase 2: Squadron Calculator Overlay */}
             <SquadronCalculator
                 isOpen={calcOpen}
+                squadronName={nombreClave}
                 timerSeconds={timerSeconds}
                 onClose={() => {
-                    // Si cierra a la mitad, no matamos el timer pero volvemos a idle
-                    setCalcOpen(false);
-                    setMasterStep('idle');
-                    resetTimer();
+                    resetWizard();
                 }}
                 onComplete={(plan) => {
                     setFlightPlan(plan);
                     const places = Object.values(plan.assignments).filter(Boolean);
                     setDestinos(`Ruta ${plan.routeName}: ${places.join(', ')}`);
                     setCalcOpen(false);
-                    // Automatically trigger Phase 3 Intro (Briefing Final)
                     setMasterStep('briefing_final');
                 }}
             />
@@ -598,6 +686,10 @@ export default function SupervisorBitacoraScreen({
                 @keyframes fadeIn {
                     from { opacity: 0; transform: translateY(10px); }
                     to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes navSlideUp {
+                    from { opacity: 0; transform: translateY(12px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
                 }
             `}</style>
         </div>
