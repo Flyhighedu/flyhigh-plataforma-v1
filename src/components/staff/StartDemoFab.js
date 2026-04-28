@@ -67,13 +67,13 @@ export default function StartDemoFab({ onDemoStarted, minimal = false, schoolId 
                 if (onDemoStarted) onDemoStarted();
                 setLoading(false);
             } else {
-                // EXIT DEMO: clean everything and force reload for instant lobby return
+                // EXIT DEMO: clean everything and redirect to lobby
                 localStorage.removeItem('flyhigh_selected_mission_id');
                 localStorage.removeItem('flyhigh_staff_mission');
                 localStorage.removeItem('flyhigh_active_journey_id');
                 localStorage.removeItem('flyhigh_test_mode');
-                window.location.reload();
-                return; // Don't continue — page is reloading
+                window.location.href = '/staff/dashboard';
+                return; // Don't continue — page is navigating
             }
 
         } catch (error) {

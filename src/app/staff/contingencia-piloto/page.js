@@ -319,7 +319,8 @@ export default function ContingenciaPilotoPage() {
                         localStorage.removeItem('flyhigh_staff_mission');
                         localStorage.removeItem('flyhigh_selected_mission_id');
                         localStorage.removeItem('flyhigh_active_journey_id');
-                        window.location.href = '/staff/dashboard?tab=history';
+                        localStorage.removeItem('flyhigh_test_mode');
+                        window.location.href = '/staff/dashboard';
                         return;
                     }
 

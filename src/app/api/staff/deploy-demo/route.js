@@ -88,8 +88,24 @@ export async function DELETE(request) {
 
         const demoJourneyId = demoJourney?.id;
 
-        // 2. Clean up all related data (if journey existed)
+        // 2. Signal ALL connected clients to exit by closing the journey first.
+        //    The realtime UPDATE listener on contingencia-piloto/page.js detects
+        //    status='closed' and redirects everyone to the dashboard lobby.
         if (demoJourneyId) {
+            await supabaseAdmin
+                .from('staff_journeys')
+                .update({
+                    status: 'closed',
+                    mission_state: 'completed',
+                    meta: { demo_exit: true, demo_exit_at: new Date().toISOString() },
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', demoJourneyId);
+
+            // Give realtime 2s to propagate the close event to all clients
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // 3. Now clean up all related data
             await Promise.allSettled([
                 supabaseAdmin.from('staff_prep_events').delete().eq('journey_id', demoJourneyId),
                 supabaseAdmin.from('staff_prep_photos').delete().eq('journey_id', demoJourneyId),
@@ -98,7 +114,7 @@ export async function DELETE(request) {
                 supabaseAdmin.from('bitacora_vuelos').delete().eq('journey_id', demoJourneyId),
             ]);
 
-            // 3. Delete the journey itself
+            // 4. Delete the journey itself
             await supabaseAdmin
                 .from('staff_journeys')
                 .delete()
