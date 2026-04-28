@@ -18,7 +18,7 @@ import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import useAudioRecorder from '@/hooks/useAudioRecorder';
 import IdentityScanner from '@/components/staff/IdentityScanner';
 import SquadronCalculator from '@/components/staff/SquadronCalculator';
-import { Rocket, Send, User, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Rocket, Send, User, ChevronRight, CheckCircle2, Mic, Zap, BatteryCharging, AlertTriangle, Radio } from 'lucide-react';
 
 export default function SupervisorBitacoraScreen({
     journeyId,
@@ -576,201 +576,208 @@ export default function SupervisorBitacoraScreen({
 
                 {/* BRIEFING FINAL — MISIÓN ESPECIAL: ¡SUBE, SUBE! */}
                 {masterStep === 'briefing_final' && (
-                    <div style={{ animation: 'fadeIn 0.4s ease-out', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+                    <div style={{ animation: 'fadeIn 0.4s ease-out', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', backgroundColor: '#020617' }}>
                         
-                        {/* ── HERO HEADER ── */}
+                        {/* ── ARCADE HERO HEADER ── */}
                         <div style={{
-                            background: 'linear-gradient(160deg, #0F172A 0%, #1E3A5F 50%, #7C3AED 100%)',
-                            borderRadius: '0 0 32px 32px',
-                            padding: '28px 20px 32px',
+                            background: 'radial-gradient(circle at top, #312E81 0%, #020617 80%)',
+                            borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+                            padding: '40px 20px 32px',
                             textAlign: 'center',
                             position: 'relative',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 40px rgba(79, 70, 229, 0.15)'
                         }}>
-                            {/* Glow orbs */}
-                            <div style={{ position: 'absolute', top: -30, right: -30, width: 100, height: 100, background: 'radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
-                            <div style={{ position: 'absolute', bottom: -20, left: -20, width: 80, height: 80, background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }} />
+                            {/* Grid overlay for cyberpunk feel */}
+                            <div style={{
+                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                backgroundImage: 'linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px)',
+                                backgroundSize: '20px 20px',
+                                opacity: 0.3,
+                                pointerEvents: 'none'
+                            }} />
 
-                            <div style={{ fontSize: 52, marginBottom: 4, animation: 'heroFloat 3s ease-in-out infinite', filter: 'drop-shadow(0 0 20px rgba(124,58,237,0.6))' }}>🚀</div>
-                            <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: '#A78BFA', marginBottom: 4 }}>Misión Especial</p>
-                            <h2 style={{ fontSize: 26, fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-0.02em', textShadow: '0 2px 12px rgba(124,58,237,0.5)' }}>
-                                ¡SUBE, SUBE! 🔊
+                            <div style={{ 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 80, height: 80, 
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #4F46E5, #EC4899)',
+                                marginBottom: 16, 
+                                animation: 'heroFloat 3s ease-in-out infinite',
+                                boxShadow: '0 0 30px rgba(236, 72, 153, 0.6)',
+                                border: '3px solid rgba(255,255,255,0.2)'
+                            }}>
+                                <Zap size={40} color="white" fill="white" style={{ animation: 'pulseGlow 2s infinite' }} />
+                            </div>
+
+                            <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.3em', textTransform: 'uppercase', color: '#F472B6', marginBottom: 8 }}>
+                                Misión de Emergencia
+                            </p>
+                            <h2 style={{ fontSize: 32, fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-0.02em', textShadow: '0 4px 20px rgba(236, 72, 153, 0.8)' }}>
+                                ¡ENERGÍA SÓNICA!
                             </h2>
-                            <p style={{ fontSize: 12, color: '#94A3B8', fontWeight: 600, marginTop: 8, lineHeight: 1.4 }}>
-                                Explica esta dinámica al <strong style={{ color: '#E0E7FF' }}>Escuadrón {nombreClave}</strong>
-                            </p>
-                        </div>
-
-                        {/* ── SCRIPT CARD: What to tell the kids ── */}
-                        <div style={{ padding: '20px 16px 0' }}>
-                            <div style={{
-                                background: 'linear-gradient(135deg, #EFF6FF, #F5F3FF)',
-                                border: '2px solid #C7D2FE',
-                                borderRadius: 20,
-                                padding: '20px 18px',
-                                position: 'relative'
-                            }}>
-                                <span style={{
-                                    position: 'absolute', top: -11, left: 20,
-                                    background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', color: 'white',
-                                    fontSize: 9, fontWeight: 900, padding: '5px 12px', borderRadius: 100,
-                                    textTransform: 'uppercase', letterSpacing: '0.15em',
-                                    boxShadow: '0 4px 12px rgba(124,58,237,0.3)'
-                                }}>📖 Lee en voz alta</span>
-
-                                <p style={{ fontSize: 16, fontWeight: 700, color: '#1E293B', lineHeight: 1.55, margin: '4px 0 0' }}>
-                                    "¡<span style={{ color: '#7C3AED', fontWeight: 900 }}>Escuadrón {nombreClave}</span>, tenemos una misión especial!
-                                </p>
-                                <p style={{ fontSize: 16, fontWeight: 700, color: '#334155', lineHeight: 1.55, margin: '12px 0 0' }}>
-                                    Nuestro piloto necesita de <strong style={{ color: '#0F172A' }}>USTEDES</strong> para que el dron pueda seguir volando. ✈️
-                                </p>
-                                <p style={{ fontSize: 16, fontWeight: 700, color: '#334155', lineHeight: 1.55, margin: '12px 0 0' }}>
-                                    A veces, el dron se empezará a detener y necesitará su energía para seguir..."
+                            <div style={{ marginTop: 12, display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: 100, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <p style={{ fontSize: 13, color: '#E2E8F0', fontWeight: 700, margin: 0 }}>
+                                    Explica esto al <strong style={{ color: '#60A5FA' }}>Escuadrón {nombreClave}</strong>
                                 </p>
                             </div>
                         </div>
 
-                        {/* ── STEP-BY-STEP INSTRUCTIONS ── */}
-                        <div style={{ padding: '16px 16px 0' }}>
-                            <p style={{ fontSize: 11, fontWeight: 900, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 12, paddingLeft: 4 }}>
-                                ¿Cómo funciona?
+                        {/* ── THE TELEPROMPTER (READ ALOUD) ── */}
+                        <div style={{ padding: '24px 16px 0', position: 'relative', zIndex: 10 }}>
+                            <div style={{
+                                background: 'linear-gradient(180deg, #1E293B, #0F172A)',
+                                border: '2px solid #3B82F6',
+                                borderRadius: 24,
+                                padding: '24px',
+                                position: 'relative',
+                                boxShadow: '0 10px 30px rgba(59, 130, 246, 0.2)'
+                            }}>
+                                <div style={{
+                                    position: 'absolute', top: -16, left: '50%', transform: 'translateX(-50%)',
+                                    background: 'linear-gradient(90deg, #2563EB, #3B82F6)', color: 'white',
+                                    fontSize: 11, fontWeight: 900, padding: '8px 16px', borderRadius: 100,
+                                    textTransform: 'uppercase', letterSpacing: '0.2em',
+                                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    <Mic size={14} /> LÉELES ESTO
+                                </div>
+
+                                <p style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, margin: '8px 0 0', textAlign: 'center' }}>
+                                    "¡<span style={{ color: '#60A5FA', fontWeight: 900, textShadow: '0 0 10px rgba(96,165,250,0.5)' }}>Escuadrón {nombreClave}</span>!
+                                </p>
+                                <p style={{ fontSize: 18, fontWeight: 700, color: '#CBD5E1', lineHeight: 1.6, margin: '12px 0 0', textAlign: 'center' }}>
+                                    El dron necesita de <strong style={{ color: '#F472B6', textShadow: '0 0 10px rgba(244,114,182,0.5)' }}>SU VOZ</strong> para volar.
+                                </p>
+                                <p style={{ fontSize: 18, fontWeight: 700, color: '#CBD5E1', lineHeight: 1.6, margin: '12px 0 0', textAlign: 'center' }}>
+                                    ¡Si no lo ayudan, se va a caer!"
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* ── GAME MECHANICS (TUTORIAL STEPS) ── */}
+                        <div style={{ padding: '32px 16px 0' }}>
+                            <p style={{ fontSize: 12, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: 16, textAlign: 'center' }}>
+                                Las Reglas del Juego
                             </p>
 
-                            {/* Step 1 */}
+                            {/* Step 1: Trigger */}
                             <div style={{
-                                background: 'white', borderRadius: 16, padding: '16px',
-                                border: '1.5px solid #E2E8F0', marginBottom: 10,
-                                display: 'flex', gap: 14, alignItems: 'flex-start',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12,
+                                display: 'flex', gap: 16, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                                    background: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    background: 'rgba(59, 130, 246, 0.2)',
+                                    border: '1px solid rgba(59, 130, 246, 0.5)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: 'white', fontWeight: 900, fontSize: 18,
-                                    boxShadow: '0 4px 12px rgba(59,130,246,0.3)'
-                                }}>1</div>
+                                    color: '#60A5FA'
+                                }}>
+                                    <Radio size={24} />
+                                </div>
                                 <div>
-                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>El piloto dice por la bocina:</p>
-                                    <p style={{
-                                        fontSize: 20, fontWeight: 900, color: '#7C3AED', margin: '6px 0 0',
-                                        textShadow: '0 1px 4px rgba(124,58,237,0.15)'
-                                    }}>
-                                        "¡SUBE, SUBE, SUBE!" 📢
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Cuando escuchen:</p>
+                                    <p style={{ fontSize: 18, fontWeight: 900, color: '#60A5FA', margin: '2px 0 0' }}>
+                                        "¡SUBE, SUBE, SUBE!"
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Step 2 */}
+                            {/* Step 2: Action */}
                             <div style={{
-                                background: 'white', borderRadius: 16, padding: '16px',
-                                border: '1.5px solid #E2E8F0', marginBottom: 10,
-                                display: 'flex', gap: 14, alignItems: 'flex-start',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12,
+                                display: 'flex', gap: 16, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    background: 'rgba(245, 158, 11, 0.2)',
+                                    border: '1px solid rgba(245, 158, 11, 0.5)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: 'white', fontWeight: 900, fontSize: 18,
-                                    boxShadow: '0 4px 12px rgba(245,158,11,0.3)'
-                                }}>2</div>
+                                    color: '#FBBF24',
+                                    animation: 'pulseGlow 2s infinite'
+                                }}>
+                                    <Zap size={24} fill="#FBBF24" />
+                                </div>
                                 <div>
-                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Los niños gritan lo más fuerte:</p>
-                                    <p style={{
-                                        fontSize: 20, fontWeight: 900, color: '#F59E0B', margin: '6px 0 0',
-                                        animation: 'pulseGlow 2s ease-in-out infinite'
-                                    }}>
-                                        "¡¡¡SUBE!!!" 🗣️🔥
-                                    </p>
-                                    <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '4px 0 0' }}>
-                                        Entre más fuerte griten, más alto vuela el dron
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Tienen que gritar:</p>
+                                    <p style={{ fontSize: 22, fontWeight: 900, color: '#FBBF24', margin: '2px 0 0', textShadow: '0 0 10px rgba(245,158,11,0.4)' }}>
+                                        "¡¡¡SUBE!!!"
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Step 3 */}
+                            {/* Step 3: Consequence */}
                             <div style={{
-                                background: 'white', borderRadius: 16, padding: '16px',
-                                border: '1.5px solid #E2E8F0', marginBottom: 10,
-                                display: 'flex', gap: 14, alignItems: 'flex-start',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                                background: 'rgba(30, 41, 59, 0.5)', borderRadius: 20, padding: '16px',
+                                border: '1px solid rgba(255,255,255,0.05)', marginBottom: 24,
+                                display: 'flex', gap: 16, alignItems: 'center'
                             }}>
                                 <div style={{
-                                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                                    background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                                    width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.4)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: 'white', fontWeight: 900, fontSize: 18,
-                                    boxShadow: '0 4px 12px rgba(239,68,68,0.3)'
-                                }}>!</div>
+                                    color: '#F87171'
+                                }}>
+                                    <AlertTriangle size={24} />
+                                </div>
                                 <div>
-                                    <p style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Si no gritan suficiente...</p>
-                                    <p style={{ fontSize: 14, fontWeight: 700, color: '#EF4444', margin: '4px 0 0' }}>
-                                        ¡El dron ya no podrá avanzar! 😱
-                                    </p>
-                                    <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '4px 0 0' }}>
-                                        Necesita toda la energía del escuadrón
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Si no gritan duro...</p>
+                                    <p style={{ fontSize: 16, fontWeight: 800, color: '#F87171', margin: '2px 0 0' }}>
+                                        ¡El dron se apaga!
                                     </p>
                                 </div>
                             </div>
 
-                            {/* Visual: Energy meter */}
+                            {/* Visual: Neon Equalizer */}
                             <div style={{
-                                background: 'linear-gradient(135deg, #0F172A, #1E293B)',
-                                borderRadius: 20, padding: '18px 16px', marginBottom: 10,
-                                textAlign: 'center', position: 'relative', overflow: 'hidden'
+                                background: '#0F172A',
+                                borderRadius: 24, padding: '24px', marginBottom: 16,
+                                textAlign: 'center', position: 'relative',
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)'
                             }}>
-                                <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center bottom, rgba(124,58,237,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
-                                <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94A3B8', margin: '0 0 10px', position: 'relative' }}>
-                                    Nivel de Energía del Dron
-                                </p>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+                                    <BatteryCharging size={16} color="#94A3B8" />
+                                    <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#94A3B8', margin: 0 }}>
+                                        Nivel de Energía
+                                    </p>
+                                </div>
                                 <div style={{
-                                    display: 'flex', gap: 4, height: 32, alignItems: 'flex-end',
-                                    justifyContent: 'center', marginBottom: 8, position: 'relative'
+                                    display: 'flex', gap: 6, height: 40, alignItems: 'flex-end',
+                                    justifyContent: 'center', marginBottom: 12
                                 }}>
                                     {[
-                                        { h: 12, color: '#EF4444' },
-                                        { h: 16, color: '#EF4444' },
-                                        { h: 20, color: '#F59E0B' },
-                                        { h: 24, color: '#F59E0B' },
-                                        { h: 28, color: '#22C55E' },
-                                        { h: 32, color: '#22C55E' },
-                                        { h: 32, color: '#10B981' },
+                                        { h: 15, color: '#EF4444' },
+                                        { h: 25, color: '#EF4444' },
+                                        { h: 35, color: '#F59E0B' },
+                                        { h: 50, color: '#F59E0B' },
+                                        { h: 70, color: '#10B981' },
+                                        { h: 85, color: '#10B981' },
+                                        { h: 100, color: '#34D399' },
                                     ].map((bar, i) => (
                                         <div key={i} style={{
-                                            width: 22, height: bar.h, borderRadius: 6,
+                                            width: 24, height: `${bar.h}%`, borderRadius: 4,
                                             background: bar.color,
-                                            animation: `barBounce 1.5s ease-in-out ${i * 0.15}s infinite`,
-                                            boxShadow: `0 0 8px ${bar.color}55`
+                                            animation: `barBounce 1.2s ease-in-out ${i * 0.1}s infinite alternate`,
+                                            boxShadow: `0 0 12px ${bar.color}88`
                                         }} />
                                     ))}
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', padding: '0 4px' }}>
-                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#EF4444' }}>🔇 Bajo</span>
-                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B' }}>🔉 Medio</span>
-                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#22C55E' }}>🔊 ¡MÁXIMO!</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── NOTA PARA EL DOCENTE ── */}
-                        <div style={{ padding: '0 16px 12px' }}>
-                            <div style={{
-                                background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 14,
-                                padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'flex-start'
-                            }}>
-                                <span style={{ fontSize: 20, flexShrink: 0 }}>💡</span>
-                                <p style={{ fontSize: 12, fontWeight: 600, color: '#92400E', margin: 0, lineHeight: 1.45 }}>
-                                    <strong>Tip:</strong> El piloto activará esta dinámica varias veces durante el vuelo. Motiva a los niños a gritar cada vez más fuerte. ¡Es un momento clave de engagement!
-                                </p>
                             </div>
                         </div>
 
                         {/* ── CAPITÁN (OPCIONAL) ── */}
                         <div style={{ padding: '0 16px 16px' }}>
                             <label style={{ display: 'block' }}>
-                                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <User size={14} /> (Opcional) Capitán Seleccionado
+                                <span style={{ fontSize: 12, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                    <User size={16} /> (Opcional) Designar Capitán
                                 </span>
                                 <input
                                     type="text"
@@ -779,32 +786,42 @@ export default function SupervisorBitacoraScreen({
                                     placeholder="Nombre del niño/niña..."
                                     maxLength={50}
                                     style={{
-                                        width: '100%', marginTop: 8, padding: '14px 16px', borderRadius: 12,
-                                        border: '2px solid #E2E8F0', background: 'white', fontSize: 16, fontWeight: 600,
-                                        outline: 'none', transition: 'border-color 0.2s'
+                                        width: '100%', padding: '16px 20px', borderRadius: 16,
+                                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(30, 41, 59, 0.5)', 
+                                        color: 'white', fontSize: 16, fontWeight: 600,
+                                        outline: 'none', transition: 'all 0.3s'
                                     }}
-                                    onFocus={(e) => e.target.style.borderColor = '#7C3AED'}
-                                    onBlur={(e) => e.target.style.borderColor = '#E2E8F0'}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = '#4F46E5';
+                                        e.target.style.background = 'rgba(30, 41, 59, 0.8)';
+                                        e.target.style.boxShadow = '0 0 0 4px rgba(79, 70, 229, 0.2)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = 'rgba(255,255,255,0.1)';
+                                        e.target.style.background = 'rgba(30, 41, 59, 0.5)';
+                                        e.target.style.boxShadow = 'none';
+                                    }}
                                 />
                             </label>
                         </div>
 
                         {/* ── CTA ── */}
-                        <div style={{ marginTop: 'auto', padding: '0 16px 24px' }}>
+                        <div style={{ marginTop: 'auto', padding: '0 16px 24px', position: 'relative', zIndex: 20 }}>
                             <button
                                 onClick={handleSaveBitacora}
                                 disabled={isSaving || saved}
                                 style={{
                                     width: '100%', padding: '20px', borderRadius: 20, border: 'none',
-                                    background: saved ? '#10B981' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+                                    background: saved ? '#10B981' : 'linear-gradient(90deg, #4F46E5, #EC4899)',
                                     color: 'white', fontSize: 16, fontWeight: 900, textTransform: 'uppercase',
-                                    letterSpacing: '0.05em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                                    letterSpacing: '0.1em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
                                     cursor: isSaving || saved ? 'not-allowed' : 'pointer',
-                                    boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.3)' : '0 15px 30px rgba(124,58,237,0.4)',
-                                    transition: 'all 0.3s'
+                                    boxShadow: saved ? '0 10px 25px rgba(16,185,129,0.4)' : '0 10px 30px rgba(236, 72, 153, 0.4)',
+                                    transition: 'all 0.3s transform 0.1s',
+                                    transform: isSaving ? 'scale(0.98)' : 'scale(1)'
                                 }}
                             >
-                                {isSaving ? 'Guardando...' : saved ? '✅ ¡ESCUADRÓN LISTO!' : <><Send size={22} /> ESCUADRÓN LISTO</>}
+                                {isSaving ? 'Guardando...' : saved ? '✅ ¡Misión Iniciada!' : <><Send size={22} /> INICIAR MISIÓN</>}
                             </button>
                         </div>
                     </div>
