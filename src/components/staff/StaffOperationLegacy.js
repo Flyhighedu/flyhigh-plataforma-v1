@@ -498,6 +498,20 @@ export default function StaffOperationLegacy({
         localStorage.setItem(ACTIVE_FLIGHT_KEY, JSON.stringify(nextActive));
     }, [currentMission?.id, currentMission?.meta, initialMission?.id, initialMission?.meta, journeyId, preview]);
 
+    // ── Keep currentMission.meta in sync with realtime updates from initialMission ──
+    // This ensures components like BitacoraPilotBanner receive live data
+    // from the teacher's bitacora entries without a full re-initialization.
+    useEffect(() => {
+        if (!initialMission?.meta || startFromMissionSelector) return;
+        setCurrentMission(prev => {
+            if (!prev) return prev;
+            const prevMetaStr = JSON.stringify(prev.meta || {});
+            const nextMetaStr = JSON.stringify(initialMission.meta || {});
+            if (prevMetaStr === nextMetaStr) return prev;
+            return { ...prev, meta: initialMission.meta };
+        });
+    }, [initialMission?.meta, startFromMissionSelector]);
+
     const handleSelectMission = (mission) => {
         setCurrentMission(mission);
         if (!preview) localStorage.setItem('flyhigh_staff_mission', JSON.stringify(mission));
@@ -859,6 +873,9 @@ export default function StaffOperationLegacy({
     const missionMeta = parseMetaLike(currentMission?.meta || initialMission?.meta);
     const missionStateKey = String(missionState || '').trim();
     const isOperationPhaseActive = OPERATION_PHASE_STATES.has(missionStateKey);
+
+    // ── Contingency: assistant acts as pilot → needs the Bitácora banner ──
+    const isContingencyNoPilot = missionMeta?.contingency_no_pilot === true;
 
     const missionFlights = sortFlightsByEndDesc(
         dedupeFlightLogs(
@@ -1457,7 +1474,8 @@ export default function StaffOperationLegacy({
 
             <div className="px-4 py-6 space-y-8 max-w-lg mx-auto">
                 {/* ── Escuadrón: Bitácora Banner for Pilot (read-only) ── */}
-                {currentRole === 'pilot' && (
+                {/* In contingency mode, the assistant flies the drone and needs the squadron info */}
+                {(currentRole === 'pilot' || (isContingencyNoPilot && (currentRole === 'assistant' || currentRole === 'auxiliar'))) && (
                     <BitacoraPilotBanner 
                         missionInfo={currentMission} 
                         activeFlight={activeFlight}
