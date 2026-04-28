@@ -102,6 +102,47 @@ function resolveContingencyDismantlingRoute(role, meta) {
         return resolveDismantlingRoute(normalizedRole, meta);
     }
 
+    // ── APOYO_BODEGA interception ──
+    // The normal router sends both teacher and assistant to APOYO_BODEGA (kind='screen')
+    // when pilot tasks (inventory/charging) are pending. In contingency, no pilot exists,
+    // so we must redirect these tasks to the correct substitute.
+    if (normalRoute.screen === DISMANTLING_ROUTE_IDS.APOYO_BODEGA) {
+        const safeMeta = parseMeta(meta);
+
+        if (normalizedRole === 'teacher') {
+            // Teacher absorbs pilot's inventory + charging tasks
+            if (!isDone(safeMeta, 'pilot_return_inventory_done', 'closure_return_inventory_done')) {
+                return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.RETURN_INVENTORY, routeKey: 'teacher:contingency_return_inventory' };
+            }
+            if (!isDone(safeMeta, 'pilot_electronics_charged', 'closure_electronics_charging_done')) {
+                return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.ELECTRONICS_CHARGING, routeKey: 'teacher:contingency_electronics_charging' };
+            }
+            // Teacher's pilot tasks are done — re-route to next normal step
+            return resolveDismantlingRoute(normalizedRole, meta);
+        }
+
+        if (normalizedRole === 'assistant') {
+            // Assistant may still have own tasks to do (e.g., AuxRecordingCharging)
+            if (!isDone(safeMeta, 'aux_recording_charging_done', 'closure_recording_charging_done')) {
+                return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.AUX_RECORDING_CHARGING, routeKey: 'assistant:aux_recording_charging' };
+            }
+            // All assistant tasks done — check if teacher finished pilot tasks
+            const pilotTasksDone =
+                isDone(safeMeta, 'pilot_return_inventory_done', 'closure_return_inventory_done') &&
+                isDone(safeMeta, 'pilot_electronics_charged', 'closure_electronics_charging_done');
+            if (pilotTasksDone) {
+                return { kind: 'screen', screen: DISMANTLING_ROUTE_IDS.CHECKOUT, routeKey: 'assistant:checkout' };
+            }
+            // Wait for teacher to finish pilot tasks
+            return {
+                kind: 'wait',
+                routeKey: 'assistant:wait_teacher_pilot_tasks',
+                waitChip: 'En espera de docente',
+                waitMessage: 'Esperando a que el docente complete inventario y estación de carga...'
+            };
+        }
+    }
+
     // For assistant: inject drone storage FIRST if not done
     if (normalizedRole === 'assistant') {
         const safeMeta = parseMeta(meta);
