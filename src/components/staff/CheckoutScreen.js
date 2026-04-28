@@ -955,7 +955,7 @@ export default function CheckoutScreen({
                 actionsSlot={(
                     <HeaderHamburgerMenu
                         journeyId={journeyId}
-                        schoolId={missionInfo?.id || missionInfo?.mission_id || missionId}
+                        schoolId={missionInfo?.school_id || missionInfo?.id || missionInfo?.mission_id || missionId}
                         role={profile?.role}
                         onDemoStart={onRefresh}
                     />

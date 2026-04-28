@@ -887,7 +887,7 @@ export default function SyncHeader({
                 actionsSlot={(
                     <HeaderHamburgerMenu
                         journeyId={journeyId}
-                        schoolId={missionInfo?.id}
+                        schoolId={missionInfo?.school_id || missionInfo?.id}
                         role={role}
                         onDemoStart={onDemoStart}
                         onCloseMission={onCloseMission}
