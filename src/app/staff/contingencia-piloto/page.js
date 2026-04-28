@@ -20,6 +20,7 @@ import { resolveDismantlingRoute, DISMANTLING_ROUTE_IDS, normalizeDismantlingRol
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
 import SupervisorBitacoraScreen from '@/components/staff/SupervisorBitacoraScreen';
 import PrepChecklist from '@/components/staff/PrepChecklist';
+import PilotPrepChecklist from '@/components/staff/PilotPrepChecklist';
 import EnRutaScreen from '@/components/staff/EnRutaScreen';
 import PilotPrepareFlightScreen from '@/components/staff/PilotPrepareFlightScreen';
 import PilotMusicAmbienceScreen from '@/components/staff/PilotMusicAmbienceScreen';
@@ -693,36 +694,259 @@ export default function ContingenciaPilotoPage() {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // PREP PHASE — Each role does their checklist
-    // In contingency: Teacher also does pilot's kit checklist
+    // PREP PHASE — Each role does their own checklist independently
+    // In contingency: Teacher also does pilot's equipment checklist
+    //
+    // FLOW:
+    //   Teacher: Own checklist → Pilot equipment checklist → Wait for Aux
+    //   Aux:     Own checklist → Wait for Teacher
+    //   Both done → Auto-advance to IN_ROUTE
+    //
+    // Meta flags used:
+    //   contingency_teacher_prep_done — Teacher finished own + pilot checklist
+    //   contingency_aux_prep_done    — Aux finished own checklist
     // ═══════════════════════════════════════════════════════════════
     if (!missionState || [
         'prep', 'PILOT_PREP', 'MISSION_BRIEF',
         'CHECKIN_DONE', 'PREP_DONE', 'AUX_PREP_DONE',
         'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK',
-        'PILOT_READY_FOR_LOAD', 'AUX_CONTAINERS_DONE', 'ROUTE_READY'
+        'PILOT_READY_FOR_LOAD', 'AUX_CONTAINERS_DONE', 'ROUTE_READY',
+        'CONTINGENCY_PREP_WAITING'
     ].includes(missionState)) {
+
+        const teacherDone = meta?.contingency_teacher_prep_done === true;
+        const auxDone = meta?.contingency_aux_prep_done === true;
+
+        // ── Helper: check if both roles are done and auto-advance ──
+        const checkAndAdvanceToRoute = async (updatedMeta) => {
+            const tDone = updatedMeta?.contingency_teacher_prep_done === true;
+            const aDone = updatedMeta?.contingency_aux_prep_done === true;
+            if (tDone && aDone) {
+                try {
+                    const supabase = createClient();
+                    const now = new Date().toISOString();
+                    await supabase.from('staff_journeys').update({
+                        mission_state: 'IN_ROUTE',
+                        meta: { ...updatedMeta, contingency_prep_completed_at: now },
+                        updated_at: now,
+                    }).eq('id', journeyId);
+                    setMissionState('IN_ROUTE');
+                } catch (e) {
+                    console.warn('[ContingenciaPiloto] auto-advance to IN_ROUTE error:', e);
+                }
+            }
+        };
+
+        // ── TEACHER FLOW ──
+        if (role === 'teacher') {
+            // Step 1: Teacher hasn't finished their own prep + pilot checklist
+            if (!teacherDone) {
+                // Sub-step: Check if teacher already did their OWN prep (meta flag)
+                const teacherOwnDone = meta?.contingency_teacher_own_prep_done === true;
+
+                if (!teacherOwnDone) {
+                    // Show teacher's own checklist first
+                    return (
+                        <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+                            <PrepChecklist
+                                role="teacher"
+                                journeyId={journeyId}
+                                userId={userId}
+                                onComplete={async () => {
+                                    // Mark teacher's own prep as done, but DON'T advance to IN_ROUTE
+                                    if (journeyId) {
+                                        try {
+                                            const supabase = createClient();
+                                            const now = new Date().toISOString();
+                                            const { data: currentJourney } = await supabase
+                                                .from('staff_journeys')
+                                                .select('meta')
+                                                .eq('id', journeyId)
+                                                .single();
+                                            const currentMeta = parseMeta(currentJourney?.meta);
+                                            const nextMeta = {
+                                                ...currentMeta,
+                                                contingency_teacher_own_prep_done: true,
+                                                contingency_teacher_own_prep_done_at: now,
+                                            };
+                                            await supabase.from('staff_journeys').update({
+                                                meta: nextMeta,
+                                                updated_at: now,
+                                            }).eq('id', journeyId);
+                                            // Force refresh to re-render with updated meta
+                                            await refreshMission();
+                                        } catch (e) {
+                                            console.warn('[ContingenciaPiloto] teacher own prep error:', e);
+                                        }
+                                    }
+                                }}
+                                missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
+                                preview={false}
+                                onRefresh={refreshMission}
+                            />
+                        </div>
+                    );
+                }
+
+                // Teacher's own prep is done → now do pilot's equipment checklist
+                return (
+                    <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+                        <PilotPrepChecklist
+                            journeyId={journeyId}
+                            userId={userId}
+                            onComplete={async () => {
+                                // Mark teacher + pilot prep fully done
+                                if (journeyId) {
+                                    try {
+                                        const supabase = createClient();
+                                        const now = new Date().toISOString();
+                                        const { data: currentJourney } = await supabase
+                                            .from('staff_journeys')
+                                            .select('meta')
+                                            .eq('id', journeyId)
+                                            .single();
+                                        const currentMeta = parseMeta(currentJourney?.meta);
+                                        const nextMeta = {
+                                            ...currentMeta,
+                                            contingency_teacher_prep_done: true,
+                                            contingency_teacher_prep_done_at: now,
+                                            contingency_pilot_checklist_done_by: 'teacher',
+                                        };
+                                        await supabase.from('staff_journeys').update({
+                                            mission_state: 'CONTINGENCY_PREP_WAITING',
+                                            meta: nextMeta,
+                                            updated_at: now,
+                                        }).eq('id', journeyId);
+
+                                        // Check if aux is also done → auto-advance
+                                        await checkAndAdvanceToRoute(nextMeta);
+                                        await refreshMission();
+                                    } catch (e) {
+                                        console.warn('[ContingenciaPiloto] teacher+pilot prep error:', e);
+                                    }
+                                }
+                            }}
+                            preview={false}
+                            missionInfo={{
+                                ...missionInfo,
+                                profile: { ...profile, role: 'pilot' },
+                                mission_state: missionState
+                            }}
+                            onRefresh={refreshMission}
+                        />
+                    </div>
+                );
+            }
+
+            // Step 2: Teacher is done, waiting for aux
+            if (!auxDone) {
+                return (
+                    <PilotOperationalWaitScreen
+                        {...commonProps}
+                        chipOverride="Preparación completada"
+                        waitTitle="¡Excelente trabajo! 🎉"
+                        waitMessage="Has completado tu preparación y la verificación de equipo. Esperando a que el auxiliar termine su checklist del vehículo..."
+                        waitSubMessage="Esto sucederá automáticamente cuando el auxiliar confirme."
+                        waitPhase="load"
+                    />
+                );
+            }
+
+            // Both done but state hasn't updated yet — trigger advance
+            checkAndAdvanceToRoute(meta);
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                    <div className="text-center space-y-4">
+                        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
+                        <p className="text-slate-500 font-medium">Iniciando ruta...</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── ASSISTANT FLOW ──
+        if (role === 'assistant') {
+            // Step 1: Aux hasn't finished their own prep
+            if (!auxDone) {
+                return (
+                    <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+                        <PrepChecklist
+                            role="assistant"
+                            journeyId={journeyId}
+                            userId={userId}
+                            onComplete={async () => {
+                                // Mark aux prep done, but DON'T advance to IN_ROUTE
+                                if (journeyId) {
+                                    try {
+                                        const supabase = createClient();
+                                        const now = new Date().toISOString();
+                                        const { data: currentJourney } = await supabase
+                                            .from('staff_journeys')
+                                            .select('meta')
+                                            .eq('id', journeyId)
+                                            .single();
+                                        const currentMeta = parseMeta(currentJourney?.meta);
+                                        const nextMeta = {
+                                            ...currentMeta,
+                                            contingency_aux_prep_done: true,
+                                            contingency_aux_prep_done_at: now,
+                                        };
+                                        await supabase.from('staff_journeys').update({
+                                            mission_state: 'CONTINGENCY_PREP_WAITING',
+                                            meta: nextMeta,
+                                            updated_at: now,
+                                        }).eq('id', journeyId);
+
+                                        // Check if teacher is also done → auto-advance
+                                        await checkAndAdvanceToRoute(nextMeta);
+                                        await refreshMission();
+                                    } catch (e) {
+                                        console.warn('[ContingenciaPiloto] aux prep error:', e);
+                                    }
+                                }
+                            }}
+                            missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
+                            preview={false}
+                            onRefresh={refreshMission}
+                        />
+                    </div>
+                );
+            }
+
+            // Step 2: Aux is done, waiting for teacher
+            if (!teacherDone) {
+                return (
+                    <PilotOperationalWaitScreen
+                        {...commonProps}
+                        chipOverride="Vehículo listo"
+                        waitTitle="¡Vehículo preparado! 🚗"
+                        waitMessage="Tu checklist del vehículo está completo. Esperando a que la docente termine la verificación de equipo..."
+                        waitSubMessage="Esto sucederá automáticamente cuando la docente confirme."
+                        waitPhase="load"
+                    />
+                );
+            }
+
+            // Both done but state hasn't updated yet — trigger advance
+            checkAndAdvanceToRoute(meta);
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                    <div className="text-center space-y-4">
+                        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
+                        <p className="text-slate-500 font-medium">Iniciando ruta...</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // Fallback for any other role (shouldn't happen in contingency)
         return (
             <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
                 <PrepChecklist
                     role={role}
                     journeyId={journeyId}
                     userId={userId}
-                    onComplete={async () => {
-                        // After prep, advance to en_route
-                        if (journeyId) {
-                            try {
-                                const supabase = createClient();
-                                await supabase.from('staff_journeys').update({
-                                    mission_state: 'IN_ROUTE',
-                                    updated_at: new Date().toISOString(),
-                                }).eq('id', journeyId);
-                                setMissionState('IN_ROUTE');
-                            } catch (e) {
-                                console.warn('[ContingenciaPiloto] prep complete error:', e);
-                            }
-                        }
-                    }}
+                    onComplete={refreshMission}
                     missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
                     preview={false}
                     onRefresh={refreshMission}
@@ -747,20 +971,7 @@ export default function ContingenciaPilotoPage() {
                 role={role}
                 journeyId={journeyId}
                 userId={userId}
-                onComplete={async () => {
-                    if (journeyId) {
-                        try {
-                            const supabase = createClient();
-                            await supabase.from('staff_journeys').update({
-                                mission_state: 'IN_ROUTE',
-                                updated_at: new Date().toISOString(),
-                            }).eq('id', journeyId);
-                            setMissionState('IN_ROUTE');
-                        } catch (e) {
-                            console.warn('[ContingenciaPiloto] prep complete error:', e);
-                        }
-                    }
-                }}
+                onComplete={refreshMission}
                 missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
                 preview={false}
                 onRefresh={refreshMission}
