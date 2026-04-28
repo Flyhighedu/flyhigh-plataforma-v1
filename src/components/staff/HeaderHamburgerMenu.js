@@ -76,11 +76,13 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
     };
 
     const handleNoPilotContingency = async () => {
-        if (journeyId && userId) {
-            try {
-                const supabase = createClient();
-                const now = new Date().toISOString();
-                const actorName = profile?.full_name?.split(' ')[0] || 'Operativo';
+        try {
+            const supabase = createClient();
+            const now = new Date().toISOString();
+            const actorName = profile?.full_name?.split(' ')[0] || 'Operativo';
+
+            if (journeyId && userId) {
+                // Journey exists — just flag it
                 const { data: currentData } = await supabase
                     .from('staff_journeys')
                     .select('meta')
@@ -104,10 +106,55 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                     actor_user_id: userId,
                     payload: { by_name: actorName },
                 });
-                console.log('🚨 No-Pilot Contingency fired. Redirecting...');
-            } catch (err) {
-                console.error('Failed to activate no-pilot contingency:', err);
+            } else {
+                // No journey yet — create one with contingency flag
+                const resolvedSchoolId = schoolId
+                    || localStorage.getItem('flyhigh_selected_mission_id')
+                    || (() => { try { return JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}')?.id; } catch { return null; } })();
+
+                if (resolvedSchoolId) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+                    // Check if a journey already exists for today
+                    const { data: existingJourney } = await supabase
+                        .from('staff_journeys')
+                        .select('id, meta')
+                        .eq('date', today)
+                        .eq('school_id', resolvedSchoolId)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (existingJourney) {
+                        // Journey exists but wasn't linked yet — flag it
+                        const existingMeta = existingJourney.meta || {};
+                        await supabase.from('staff_journeys').update({
+                            meta: { ...existingMeta, contingency_no_pilot: true, contingency_no_pilot_activated_at: now, contingency_no_pilot_activated_by: user?.id, contingency_no_pilot_activated_by_name: actorName },
+                            updated_at: now,
+                        }).eq('id', existingJourney.id);
+                    } else {
+                        // No journey at all — create a brand new one
+                        await supabase.from('staff_journeys').insert({
+                            date: today,
+                            school_id: resolvedSchoolId,
+                            status: 'active',
+                            mission_state: 'prep',
+                            meta: {
+                                contingency_no_pilot: true,
+                                contingency_no_pilot_activated_at: now,
+                                contingency_no_pilot_activated_by: user?.id,
+                                contingency_no_pilot_activated_by_name: actorName,
+                            },
+                            created_at: now,
+                            updated_at: now,
+                        });
+                    }
+                }
             }
+            console.log('🚨 No-Pilot Contingency fired. Redirecting...');
+        } catch (err) {
+            console.error('Failed to activate no-pilot contingency:', err);
         }
         window.location.href = '/staff/contingencia-piloto';
     };
@@ -257,8 +304,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                             </button>
                         )}
 
-                        {/* Sin Piloto — 3s long press */}
-                        {canGoDirectToOperation && (
+                        {/* Sin Piloto — 3s long press — always visible */}
                             <button
                                 onMouseDown={() => {
                                     setNoPilotProgress(true);
@@ -297,7 +343,6 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                     </p>
                                 </div>
                             </button>
-                        )}
 
                         <style jsx>{`
                             @keyframes changeMissionFill {

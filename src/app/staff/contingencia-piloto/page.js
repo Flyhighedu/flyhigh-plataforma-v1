@@ -179,36 +179,66 @@ export default function ContingenciaPilotoPage() {
 
                 const savedMission = safeParseJson(localStorage.getItem('flyhigh_staff_mission'));
                 const savedMissionId = localStorage.getItem('flyhigh_selected_mission_id');
-                if (!savedMission && !savedMissionId) {
-                    setError('No hay misión activa. Regresa al dashboard primero.');
-                    setLoading(false);
-                    return;
-                }
-
                 const schoolId = savedMission?.id || savedMissionId;
                 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
 
-                const { data: journey } = await supabase
-                    .from('staff_journeys')
-                    .select('*')
-                    .eq('date', today)
-                    .eq('school_id', schoolId)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                let journey = null;
+
+                // Strategy 1: Find journey by school for today
+                if (schoolId) {
+                    const { data } = await supabase
+                        .from('staff_journeys')
+                        .select('*')
+                        .eq('date', today)
+                        .eq('school_id', schoolId)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                    journey = data;
+                }
+
+                // Strategy 2: No school or no journey found — find ANY journey with contingency flag for today
+                if (!journey) {
+                    const { data } = await supabase
+                        .from('staff_journeys')
+                        .select('*')
+                        .eq('date', today)
+                        .order('created_at', { ascending: false })
+                        .limit(10);
+
+                    if (data && data.length > 0) {
+                        // Find the one with contingency_no_pilot flag
+                        journey = data.find(j => {
+                            const m = parseMeta(j.meta);
+                            return m?.contingency_no_pilot === true;
+                        });
+                        // If none found with flag, just take the latest one
+                        if (!journey) journey = data[0];
+                    }
+                }
 
                 if (!journey) {
-                    setError('No se encontró una jornada activa para hoy.');
+                    setError('No se encontró una jornada activa para hoy. Regresa al dashboard y selecciona una misión primero.');
                     setLoading(false);
                     return;
                 }
 
-                // Verify contingency mode is active
-                const meta = parseMeta(journey.meta);
+                // If contingency flag isn't set yet (race condition), set it now
+                let meta = parseMeta(journey.meta);
                 if (!isNoPilotContingency(meta)) {
-                    setError('Esta jornada no está en modo contingencia sin piloto.');
-                    setLoading(false);
-                    return;
+                    const now = new Date().toISOString();
+                    const nextMeta = {
+                        ...meta,
+                        contingency_no_pilot: true,
+                        contingency_no_pilot_activated_at: now,
+                        contingency_no_pilot_activated_by: user.id,
+                        contingency_no_pilot_activated_by_name: profileData.full_name?.split(' ')[0] || 'Operativo',
+                    };
+                    await supabase.from('staff_journeys').update({
+                        meta: nextMeta,
+                        updated_at: now,
+                    }).eq('id', journey.id);
+                    meta = nextMeta;
                 }
 
                 setJourneyId(journey.id);
