@@ -578,7 +578,12 @@ export default function ContingenciaPilotoPage() {
     // PREP PHASE — Each role does their checklist
     // In contingency: Teacher also does pilot's kit checklist
     // ═══════════════════════════════════════════════════════════════
-    if (!missionState || ['prep', 'PILOT_READY_FOR_LOAD', 'AUX_CONTAINERS_DONE', 'ROUTE_READY'].includes(missionState)) {
+    if (!missionState || [
+        'prep', 'PILOT_PREP', 'MISSION_BRIEF',
+        'CHECKIN_DONE', 'PREP_DONE', 'AUX_PREP_DONE',
+        'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK',
+        'PILOT_READY_FOR_LOAD', 'AUX_CONTAINERS_DONE', 'ROUTE_READY'
+    ].includes(missionState)) {
         return (
             <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
                 <PrepChecklist
@@ -609,20 +614,39 @@ export default function ContingenciaPilotoPage() {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // FALLBACK — Unknown state, show operation panel
+    // CLOSURE / REPORT PHASE — Redirect to checkout
+    // ═══════════════════════════════════════════════════════════════
+    if (['SHUTDOWN', 'POST_MISSION_REPORT', 'CLOSURE'].includes(missionState)) {
+        return <CheckoutScreen {...closureProps} />;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FALLBACK — Unknown state: auto-resolve to prep instead of error
     // ═══════════════════════════════════════════════════════════════
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-50 px-4">
-            <div className="max-w-sm text-center space-y-4">
-                <AlertCircle className="w-12 h-12 text-amber-400 mx-auto" />
-                <p className="text-slate-700 font-medium">Estado no reconocido: {missionState}</p>
-                <button onClick={refreshMission} className="text-sm text-blue-500 underline">
-                    Reintentar sincronización
-                </button>
-                <button onClick={() => router.push('/staff/dashboard')} className="text-sm text-slate-400 underline block mx-auto mt-2">
-                    Volver al dashboard
-                </button>
-            </div>
+        <div className="min-h-screen" style={{ backgroundColor: '#F8F9FB' }}>
+            <PrepChecklist
+                role={role}
+                journeyId={journeyId}
+                userId={userId}
+                onComplete={async () => {
+                    if (journeyId) {
+                        try {
+                            const supabase = createClient();
+                            await supabase.from('staff_journeys').update({
+                                mission_state: 'IN_ROUTE',
+                                updated_at: new Date().toISOString(),
+                            }).eq('id', journeyId);
+                            setMissionState('IN_ROUTE');
+                        } catch (e) {
+                            console.warn('[ContingenciaPiloto] prep complete error:', e);
+                        }
+                    }
+                }}
+                missionInfo={{ ...missionInfo, profile, mission_state: missionState }}
+                preview={false}
+                onRefresh={refreshMission}
+            />
         </div>
     );
 }
