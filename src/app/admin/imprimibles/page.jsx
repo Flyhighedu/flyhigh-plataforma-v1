@@ -2,11 +2,12 @@
 import React, { useState, useRef, useCallback } from "react";
 import {
   Printer, Download, Pencil, X, RotateCcw, ChevronDown, ChevronUp,
-  FileText, Smartphone, Image as ImageIcon, Package, Settings2, Palette, Newspaper, Loader2
+  FileText, Smartphone, Image as ImageIcon, Package, Settings2, Palette, Newspaper, Loader2, Award
 } from "lucide-react";
 import FlyerNinos, { FLYER_NINOS_DEFAULTS } from "@/components/flyers/FlyerNinos";
 import FlyerPadres, { FLYER_PADRES_DEFAULTS } from "@/components/flyers/FlyerPadres";
 import CircularDigital, { CIRCULAR_DIGITAL_DEFAULTS } from "@/components/flyers/CircularDigital";
+import CertificadoEscuela, { CERTIFICADO_DEFAULTS } from "@/components/flyers/CertificadoEscuela";
 import { formatFlyerDate, formatMoney, captureAsPDF, captureAsPNG, downloadAll } from "@/utils/flyerUtils";
 
 // ── FLYER CATALOG ──
@@ -38,6 +39,15 @@ const FLYER_CATALOG = [
     color: "#10b981",
     defaults: CIRCULAR_DIGITAL_DEFAULTS,
   },
+  {
+    id: "certificado",
+    label: "Certificado",
+    subtitle: "Escuela · Color · Carta",
+    icon: <Award size={22} className="text-violet-500" strokeWidth={2.5} />,
+    format: "PDF",
+    color: "#8b5cf6",
+    defaults: CERTIFICADO_DEFAULTS,
+  },
 ];
 
 // ── Field label mapping for drawer form ──
@@ -62,16 +72,23 @@ const FIELD_LABELS = {
   corazonTitulo: "Título Sección Corazón",
   narrativaPricing: "Narrativa de Pricing",
   transparenciaCopy: "Texto de Transparencia",
+  // Certificate
+  cuerpoTexto: "Texto del Cuerpo",
+  firmaNombre: "Nombre del Firmante",
+  firmaCargo: "Cargo del Firmante",
 };
 
 export default function ImprimiblesPage() {
   // ── Per-Flyer Configs ──
   const today = new Date().toISOString().slice(0, 10);
   const defaultConfig = { escuela: "ESCUELA EJEMPLO", fechaISO: today, cuota: 50, tarifa: 100, isDirty: false };
+  const currentMonthYear = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' });
+  const certDefaultConfig = { escuela: "Nombre de la Escuela", fechaTexto: currentMonthYear.replace(/^./, c => c.toUpperCase()), isDirty: false };
   const [configs, setConfigs] = useState({
     ninos: { ...defaultConfig },
     padres: { ...defaultConfig },
     digital: { ...defaultConfig },
+    certificado: { ...certDefaultConfig },
   });
 
   const handleConfigChange = useCallback((id, field, value) => {
@@ -104,6 +121,7 @@ export default function ImprimiblesPage() {
     ninos: {},
     padres: {},
     digital: {},
+    certificado: {},
   });
 
   // ── UI State ──
@@ -115,7 +133,8 @@ export default function ImprimiblesPage() {
   const ninosRef = useRef(null);
   const padresRef = useRef(null);
   const digitalRef = useRef(null);
-  const refMap = { ninos: ninosRef, padres: padresRef, digital: digitalRef };
+  const certificadoRef = useRef(null);
+  const refMap = { ninos: ninosRef, padres: padresRef, digital: digitalRef, certificado: certificadoRef };
 
   // ── Handlers ──
   const handleUpdateText = useCallback((flyerId, field, value) => {
@@ -132,8 +151,10 @@ export default function ImprimiblesPage() {
   const handleResetAll = useCallback(() => {
     const today = new Date().toISOString().slice(0, 10);
     const defaultConfig = { escuela: "ESCUELA EJEMPLO", fechaISO: today, cuota: 50, tarifa: 100, isDirty: false };
-    setConfigs({ ninos: { ...defaultConfig }, padres: { ...defaultConfig }, digital: { ...defaultConfig } });
-    setTextOverrides({ ninos: {}, padres: {}, digital: {} });
+    const currentMonthYear = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' });
+    const certDefaultConfig = { escuela: "Nombre de la Escuela", fechaTexto: currentMonthYear.replace(/^./, c => c.toUpperCase()), isDirty: false };
+    setConfigs({ ninos: { ...defaultConfig }, padres: { ...defaultConfig }, digital: { ...defaultConfig }, certificado: { ...certDefaultConfig } });
+    setTextOverrides({ ninos: {}, padres: {}, digital: {}, certificado: {} });
   }, []);
 
   const handleDownload = useCallback(async (type) => {
@@ -144,6 +165,9 @@ export default function ImprimiblesPage() {
       } else if (type === "digital") {
         const safeName = configs.digital.escuela.replace(/\s+/g, "_");
         await captureAsPNG(digitalRef.current, `Circular digital - ${safeName}.png`);
+      } else if (type === "certificado") {
+        const safeName = configs.certificado.escuela.replace(/\s+/g, "_");
+        await captureAsPDF(certificadoRef.current, `Certificado - ${safeName}.pdf`);
       } else {
         const ref = refMap[type];
         const safeName = configs[type].escuela.replace(/\s+/g, "_");
@@ -162,7 +186,17 @@ export default function ImprimiblesPage() {
   const overrideCount = (id) => Object.keys(textOverrides[id] || {}).length;
 
   // ── Component mapping ──
+  const getCertificadoProps = () => {
+    const c = configs.certificado;
+    return { escuela: c.escuela, fecha: c.fechaTexto };
+  };
+
   const FlyerComponent = ({ id, forCapture = false }) => {
+    if (id === "certificado") {
+      const props = { ...getCertificadoProps(), texts: textOverrides.certificado };
+      const ref = forCapture ? certificadoRef : undefined;
+      return <CertificadoEscuela ref={ref} {...props} />;
+    }
     const props = { ...getFlyerProps(id), texts: textOverrides[id] };
     const ref = forCapture ? refMap[id] : undefined;
     switch (id) {
@@ -182,7 +216,7 @@ export default function ImprimiblesPage() {
         {/* Google Fonts */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Open+Sans:wght@400;600;700&family=Poppins:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,600&display=swap" rel="stylesheet" crossOrigin="anonymous" />
 
         {/* ── HEADER ACTIONS ── */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
@@ -213,10 +247,8 @@ export default function ImprimiblesPage() {
           </div>
         </div>
 
-      {/* ── VARIABLES PANEL REMOVED (Per User Request) ── */}
-
       {/* ── PREVIEW CARDS GRID ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 items-start">
         {FLYER_CATALOG.map(flyer => {
           const isDownloading = downloading[flyer.id];
           const edits = overrideCount(flyer.id);
@@ -276,39 +308,56 @@ export default function ImprimiblesPage() {
                     <input 
                       type="text" 
                       value={configs[flyer.id].escuela}
-                      onChange={e => handleConfigChange(flyer.id, 'escuela', e.target.value.toUpperCase())}
+                      onChange={e => handleConfigChange(flyer.id, 'escuela', flyer.id === 'certificado' ? e.target.value : e.target.value.toUpperCase())}
                       className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Fecha del Evento</label>
-                    <input 
-                      type="date" 
-                      value={configs[flyer.id].fechaISO}
-                      onChange={e => handleConfigChange(flyer.id, 'fechaISO', e.target.value)}
-                      className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  {flyer.id === 'certificado' ? (
+                    /* Certificate: free-text date field */
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Cuota $</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Fecha (texto libre)</label>
                       <input 
-                        type="number" 
-                        value={configs[flyer.id].cuota}
-                        onChange={e => handleConfigChange(flyer.id, 'cuota', Number(e.target.value))}
-                        className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
+                        type="text" 
+                        value={configs.certificado.fechaTexto}
+                        onChange={e => handleConfigChange('certificado', 'fechaTexto', e.target.value)}
+                        placeholder="Abril de 2026"
+                        className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Tarifa Base $</label>
-                      <input 
-                        type="number" 
-                        value={configs[flyer.id].tarifa}
-                        onChange={e => handleConfigChange(flyer.id, 'tarifa', Number(e.target.value))}
-                        className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
-                      />
-                    </div>
-                  </div>
+                  ) : (
+                    /* Flyers: ISO date + monetary fields */
+                    <>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Fecha del Evento</label>
+                        <input 
+                          type="date" 
+                          value={configs[flyer.id].fechaISO}
+                          onChange={e => handleConfigChange(flyer.id, 'fechaISO', e.target.value)}
+                          className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Cuota $</label>
+                          <input 
+                            type="number" 
+                            value={configs[flyer.id].cuota}
+                            onChange={e => handleConfigChange(flyer.id, 'cuota', Number(e.target.value))}
+                            className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Tarifa Base $</label>
+                          <input 
+                            type="number" 
+                            value={configs[flyer.id].tarifa}
+                            onChange={e => handleConfigChange(flyer.id, 'tarifa', Number(e.target.value))}
+                            className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-2 border-t border-slate-100/80 mt-auto">
@@ -505,6 +554,7 @@ export default function ImprimiblesPage() {
         <FlyerNinos ref={ninosRef} {...getFlyerProps("ninos")} texts={textOverrides.ninos} />
         <FlyerPadres ref={padresRef} {...getFlyerProps("padres")} texts={textOverrides.padres} />
         <CircularDigital ref={digitalRef} {...getFlyerProps("digital")} texts={textOverrides.digital} />
+        <CertificadoEscuela ref={certificadoRef} {...getCertificadoProps()} texts={textOverrides.certificado} />
       </div>
 
       {/* Spinner keyframe */}
