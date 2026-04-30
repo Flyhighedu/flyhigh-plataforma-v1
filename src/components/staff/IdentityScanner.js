@@ -18,163 +18,16 @@ const TEAM_B_COLOR = '#FF3366';
 const NEON_GREEN = '#00FF88';
 const PARTICLE_COUNT = 18;
 
-function useAudioAnalyser() {
-    const ctxRef = useRef(null);
-    const analyserRef = useRef(null);
-    const streamRef = useRef(null);
-    const rafRef = useRef(null);
-    const levelRef = useRef(0);
-    const [level, setLevel] = useState(0);
-    const [active, setActive] = useState(false);
-    const [micError, setMicError] = useState(null);
-
-    const start = useCallback(async () => {
-        // Clean up any previous session first
-        try {
-            cancelAnimationFrame(rafRef.current);
-            streamRef.current?.getTracks().forEach(t => t.stop());
-            if (ctxRef.current && ctxRef.current.state !== 'closed') {
-                await ctxRef.current.close().catch(() => {});
-            }
-        } catch {}
-        streamRef.current = null; ctxRef.current = null; analyserRef.current = null;
-        setMicError(null);
-
-        try {
-            // Check for secure context first
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                throw new Error("El navegador bloqueó el micrófono porque la conexión no es segura (HTTPS). Si estás probando en red local, usa un túnel HTTPS.");
-            }
-
-            // Step 1: Get microphone stream — try without filters first, fallback to basic
-            let stream;
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: { 
-                        autoGainControl: { ideal: false }, 
-                        echoCancellation: { ideal: false }, 
-                        noiseSuppression: { ideal: false },
-                        channelCount: 1,
-                        sampleRate: { ideal: 44100 }
-                    } 
-                });
-            } catch (constraintErr) {
-                console.warn('IdentityScanner: Constraint mic failed, trying basic audio:', constraintErr);
-                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            }
-            streamRef.current = stream;
-            console.log('IdentityScanner: Mic stream obtained, tracks:', stream.getAudioTracks().length);
-
-            // Step 2: Create AudioContext — MUST happen during user gesture on iOS
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            const ctx = new AudioCtx();
-            ctxRef.current = ctx;
-            console.log('IdentityScanner: AudioContext state:', ctx.state);
-
-            // Step 3: Force resume — critical for iOS Safari
-            if (ctx.state === 'suspended') {
-                await ctx.resume();
-                console.log('IdentityScanner: AudioContext resumed, state:', ctx.state);
-            }
-
-            // Step 4: Connect nodes
-            const src = ctx.createMediaStreamSource(stream);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4;
-            src.connect(analyser);
-            analyserRef.current = analyser;
-            setActive(true);
-
-            // Step 5: Start analysis loop with DUAL strategy
-            // iOS Safari sometimes returns all-zero for getByteFrequencyData
-            // but getByteTimeDomainData (waveform) always works
-            const freqBuf = new Uint8Array(analyser.frequencyBinCount);
-            const timeBuf = new Uint8Array(analyser.frequencyBinCount);
-            let zeroFrames = 0;
-            let useTimeDomain = false;
-
-            const tick = () => {
-                if (!analyserRef.current) return;
-
-                let rms = 0;
-
-                if (!useTimeDomain) {
-                    // Try frequency data first (more accurate for volume)
-                    analyser.getByteFrequencyData(freqBuf);
-                    let sum = 0;
-                    for (let i = 0; i < freqBuf.length; i++) sum += freqBuf[i] * freqBuf[i];
-                    rms = Math.sqrt(sum / freqBuf.length);
-
-                    // If we get 30+ consecutive zero frames, iOS isn't giving us freq data
-                    if (rms < 0.1) {
-                        zeroFrames++;
-                        if (zeroFrames > 30) {
-                            useTimeDomain = true;
-                            console.warn('IdentityScanner: Frequency data empty, switching to waveform mode');
-                        }
-                    } else {
-                        zeroFrames = 0;
-                    }
-                }
-
-                if (useTimeDomain) {
-                    // Fallback: compute RMS from time-domain waveform (128 = silence center)
-                    analyser.getByteTimeDomainData(timeBuf);
-                    let sum = 0;
-                    for (let i = 0; i < timeBuf.length; i++) {
-                        const v = (timeBuf[i] - 128) / 128;
-                        sum += v * v;
-                    }
-                    rms = Math.sqrt(sum / timeBuf.length) * 255; // scale to match freq range
-                }
-                
-                // Linear scale: RMS of 80+ = 100%
-                const normalized = Math.min(100, Math.max(0, Math.round((rms / 80) * 100)));
-                levelRef.current = normalized;
-                setLevel(normalized);
-                rafRef.current = requestAnimationFrame(tick);
-            };
-            rafRef.current = requestAnimationFrame(tick);
-            console.log('IdentityScanner: Audio analysis loop started');
-        } catch (e) {
-            console.error('IdentityScanner: Mic access failed:', e);
-            setMicError(e.message || 'No se pudo acceder al micrófono');
-        }
-    }, []);
-
-    const stop = useCallback(() => {
-        cancelAnimationFrame(rafRef.current);
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        if (ctxRef.current && ctxRef.current.state !== 'closed') {
-            ctxRef.current.close().catch(() => {});
-        }
-        streamRef.current = null; ctxRef.current = null; analyserRef.current = null;
-        setActive(false); setLevel(0); levelRef.current = 0;
-    }, []);
-
-    useEffect(() => () => { cancelAnimationFrame(rafRef.current); stop(); }, [stop]);
-
-    return { level, levelRef, active, start, stop, micError };
-}
-
 export default function IdentityScanner({ isOpen, onResult, onClose, usedNames = [], timerSeconds }) {
     const [phase, setPhase] = useState('prompt_intro');
 
     const [nameA, setNameA] = useState('');
     const [nameB, setNameB] = useState('');
-    const [peakA, setPeakA] = useState(0);
-    const [peakB, setPeakB] = useState(0);
-    const [capturing, setCapturing] = useState(null);
+    const [scoreA, setScoreA] = useState(0);
+    const [scoreB, setScoreB] = useState(0);
     const [winner, setWinner] = useState('');
     const [showVictory, setShowVictory] = useState(false);
     const [showName, setShowName] = useState(false);
-    const [countdown, setCountdown] = useState(null);
-    const timerRef = useRef(null);
-    const capturingRef = useRef(null);
-    const peakARef = useRef(0);
-    const peakBRef = useRef(0);
-    const { level, levelRef, active: micActive, start: startMic, stop: stopMic, micError } = useAudioAnalyser();
     const [isPortrait, setIsPortrait] = useState(true);
 
     useEffect(() => {
@@ -183,24 +36,6 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
         window.addEventListener('resize', check);
         return () => window.removeEventListener('resize', check);
     }, []);
-
-    // Track peaks in RAF
-    useEffect(() => {
-        if (!micActive) return;
-        let raf;
-        const track = () => {
-            const cur = levelRef.current;
-            if (capturingRef.current === 'A' && cur > peakARef.current) {
-                peakARef.current = cur; setPeakA(cur);
-            }
-            if (capturingRef.current === 'B' && cur > peakBRef.current) {
-                peakBRef.current = cur; setPeakB(cur);
-            }
-            raf = requestAnimationFrame(track);
-        };
-        raf = requestAnimationFrame(track);
-        return () => cancelAnimationFrame(raf);
-    }, [micActive, levelRef]);
 
     const pickRandomNames = useCallback(() => {
         const availableNames = SQUADRON_NAMES.filter(n => !usedNames.includes(n));
@@ -211,71 +46,37 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
     }, [usedNames]);
 
     const reset = useCallback(() => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setCountdown(null);
         setPhase('prompt_intro'); 
-
         pickRandomNames();
-        setPeakA(0); setPeakB(0); peakARef.current = 0; peakBRef.current = 0;
-        setCapturing(null); capturingRef.current = null;
+        setScoreA(0); setScoreB(0);
         setWinner(''); setShowVictory(false); setShowName(false);
-        stopMic();
-    }, [stopMic, pickRandomNames]);
+    }, [pickRandomNames]);
 
     useEffect(() => { if (!isOpen) reset(); }, [isOpen, reset]);
 
-    const startBattle = useCallback(async () => {
+    const startBattle = useCallback(() => {
         if (!nameA || !nameB || nameA === nameB) return;
-        setPeakA(0); setPeakB(0); peakARef.current = 0; peakBRef.current = 0;
-        await startMic();
-        setPhase('prompt_A');
+        setScoreA(0); setScoreB(0);
+        setPhase('battle');
         try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
-    }, [nameA, nameB, startMic]);
+    }, [nameA, nameB]);
 
     const declareWinner = useCallback(() => {
         let w;
-        const diff = Math.abs(peakARef.current - peakBRef.current);
-        
-        if (diff < 3) {
+        if (scoreA === scoreB) {
             w = Math.random() < 0.5 ? nameA : nameB;
         } else {
-            w = peakARef.current >= peakBRef.current ? nameA : nameB;
+            w = scoreA > scoreB ? nameA : nameB;
         }
         
-        setWinner(w); stopMic(); setPhase('victory');
+        setWinner(w); setPhase('victory');
         setTimeout(() => setShowVictory(true), 50);
         setTimeout(() => {
             setShowName(true);
             try { navigator.vibrate?.([100, 50, 200]); } catch {}
         }, 300);
         
-    }, [nameA, nameB, stopMic]);
-
-    const startCapture = useCallback((team) => {
-        setPhase('battle');
-        if (timerRef.current) clearInterval(timerRef.current);
-        setCapturing(team); 
-        capturingRef.current = team;
-        setCountdown(8);
-        timerRef.current = setInterval(() => {
-            setCountdown(prev => {
-                if (prev <= 1) {
-                    clearInterval(timerRef.current);
-                    setCapturing(null);
-                    capturingRef.current = null;
-                    
-                    if (team === 'A') {
-                        setPhase('prompt_B');
-                        try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
-                    } else if (team === 'B') {
-                        declareWinner();
-                    }
-                    return null;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-    }, [declareWinner]);
+    }, [nameA, nameB, scoreA, scoreB]);
 
     const confirmWinner = useCallback(() => {
         if (winner) {
@@ -286,11 +87,6 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
 
     if (!isOpen) return null;
 
-    const liveA = capturing === 'A' ? level : 0;
-    const liveB = capturing === 'B' ? level : 0;
-    const barA = Math.max(peakA, liveA);
-    const barB = Math.max(peakB, liveB);
-    const bothCaptured = peakA > 0 && peakB > 0 && !capturing;
     const winColor = winner === nameA ? TEAM_A_COLOR : TEAM_B_COLOR;
 
     return (
@@ -347,14 +143,14 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                             borderRadius:16,padding:'16px 20px',margin:'8px 0',
                             display:'flex',alignItems:'center',justifyContent:'center',gap:12
                         }}>
-                            <span style={{fontSize:20}}>🛑</span>
+                            <span style={{fontSize:20}}>✋</span>
                             <span style={{fontSize:13,color:'#94A3B8',fontWeight:800,textTransform:'uppercase',letterSpacing:'0.1em'}}>
-                                Pausa: Deja que los niños griten
+                                Pausa: Deja que los niños decidan
                             </span>
                         </div>
 
                         <p style={{fontSize:22,color:'white',fontWeight:800,lineHeight:1.4,margin:0}}>
-                            "Bueno chicos, ¡vamos a elegirlo con un grito!"
+                            "Bueno chicos, ¡vamos a elegirlo levantando la mano!"
                         </p>
                     </div>
 
@@ -368,7 +164,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                             transition:'all 0.3s',
                             animation:'pulseBtn 1.5s infinite'
                         }}>
-                            INICIAR BATALLA
+                            INICIAR VOTACIÓN
                         </button>
                         
                         <button onClick={pickRandomNames} style={{
@@ -387,66 +183,18 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                 </div>
             )}
 
-                    {timerSeconds !== undefined && (
-                        <div style={{
-                            position:'absolute',top:20,right:20,
-                            background:'rgba(255,255,255,0.1)',borderRadius:100,
-                            padding:'6px 14px',display:'flex',alignItems:'center',gap:8,
-                            color:'white',fontWeight:800,fontSize:14
-                        }}>
-                            ⏱️ {Math.floor(timerSeconds/60)}:{(timerSeconds%60).toString().padStart(2,'0')}
-                        </div>
-                    )}
-
-            {/* ═══ PROMPT A ═══ */}
-            {phase === 'prompt_A' && (
-                <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,gap:32,textAlign:'center'}}>
-                    <div style={{width:80,height:80,borderRadius:'50%',background:`${TEAM_A_COLOR}22`,display:'flex',alignItems:'center',justifyContent:'center',border:`2px solid ${TEAM_A_COLOR}`}}>
-                        <span style={{fontSize:40}}>📢</span>
-                    </div>
-                    <div>
-                        <p style={{fontSize:12,color:TEAM_A_COLOR,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:16}}>Instrucción para Supervisor</p>
-                        <p style={{fontSize:24,color:'white',fontWeight:800,lineHeight:1.4}}>
-                            "Niños, los que quieran llamarse <span style={{color:TEAM_A_COLOR,textShadow:`0 0 15px ${TEAM_A_COLOR}88`}}>{nameA}</span>, ¡necesito que griten tan fuerte como puedan a la cuenta de 3!"
-                        </p>
-                    </div>
-                    <button onClick={() => startCapture('A')} style={{
-                        marginTop:24,padding:'20px 48px',borderRadius:20,border:'none',
-                        background:TEAM_A_COLOR,color:'#0A0A0F',fontSize:20,fontWeight:900,
-                        textTransform:'uppercase',cursor:'pointer',boxShadow:`0 0 40px ${TEAM_A_COLOR}66`,
-                        animation:'pulseBtn 1.5s infinite'
-                    }}>
-                        ¡A GRITAR!
-                    </button>
+            {timerSeconds !== undefined && (
+                <div style={{
+                    position:'absolute',top:20,right:20,zIndex: 10000,
+                    background:'rgba(255,255,255,0.1)',borderRadius:100,
+                    padding:'6px 14px',display:'flex',alignItems:'center',gap:8,
+                    color:'white',fontWeight:800,fontSize:14
+                }}>
+                    ⏱️ {Math.floor(timerSeconds/60)}:{(timerSeconds%60).toString().padStart(2,'0')}
                 </div>
             )}
 
-            {/* ═══ PROMPT B ═══ */}
-            {phase === 'prompt_B' && (
-                <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,gap:32,textAlign:'center'}}>
-                    <div style={{width:80,height:80,borderRadius:'50%',background:`${TEAM_B_COLOR}22`,display:'flex',alignItems:'center',justifyContent:'center',border:`2px solid ${TEAM_B_COLOR}`}}>
-                        <span style={{fontSize:40}}>📢</span>
-                    </div>
-                    <div>
-                        <p style={{fontSize:12,color:TEAM_B_COLOR,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:16}}>Instrucción para Supervisor</p>
-                        <p style={{fontSize:24,color:'white',fontWeight:800,lineHeight:1.4}}>
-                            "¡Muy bien! Ahora, los que quieran ser <span style={{color:TEAM_B_COLOR,textShadow:`0 0 15px ${TEAM_B_COLOR}88`}}>{nameB}</span>... ¡Es su turno! ¡Griten con toda su fuerza!"
-                        </p>
-                    </div>
-                    <button onClick={() => startCapture('B')} style={{
-                        marginTop:24,padding:'20px 48px',borderRadius:20,border:'none',
-                        background:TEAM_B_COLOR,color:'white',fontSize:20,fontWeight:900,
-                        textTransform:'uppercase',cursor:'pointer',boxShadow:`0 0 40px ${TEAM_B_COLOR}66`,
-                        animation:'pulseBtn 1.5s infinite'
-                    }}>
-                        ¡A GRITAR!
-                    </button>
-                </div>
-            )}
-
-
-
-            {/* ═══ BATTLE ═══ */}
+            {/* ═══ BATTLE (VOTING) ═══ */}
             {phase === 'battle' && (
                 <div style={{
                     position:'absolute',
@@ -459,144 +207,88 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                     transformOrigin:'center center',
                     background:'#0A0A0F'
                 }}>
-                    {/* HUD BATTLE INFO */}
-                    {timerSeconds !== undefined && (
-                        <div style={{
-                            position:'absolute',top:20,left:'50%',transform:'translateX(-50%)',
-                            background:'rgba(255,255,255,0.1)',borderRadius:100,zIndex:100,
-                            padding:'6px 14px',display:'flex',alignItems:'center',gap:8,
-                            color:'white',fontWeight:800,fontSize:14
-                        }}>
-                            ⏱️ {Math.floor(timerSeconds/60)}:{(timerSeconds%60).toString().padStart(2,'0')}
-                        </div>
-                    )}
 
-                    {/* Mic status indicator */}
-                    {micError && (
-                        <div style={{
-                            position:'absolute',bottom:20,left:'50%',transform:'translateX(-50%)',
-                            background:'rgba(255,50,50,0.9)',borderRadius:12,zIndex:100,
-                            padding:'8px 16px',color:'white',fontWeight:700,fontSize:12,
-                            maxWidth:'80%',textAlign:'center'
+                    {/* HUD BATTLE INFO */}
+                    <div style={{
+                        position:'absolute',bottom:20,left:'50%',transform:'translateX(-50%)',
+                        zIndex:100, display:'flex', flexDirection:'column', alignItems:'center', gap: 12
+                    }}>
+                        <button onClick={declareWinner} style={{
+                            padding:'16px 40px',borderRadius:100,border:'none',
+                            background:NEON_GREEN,color:'#0A0A0F',fontSize:16,fontWeight:900,
+                            textTransform:'uppercase',letterSpacing:'0.1em',cursor:'pointer',
+                            boxShadow:`0 0 20px ${NEON_GREEN}66`,
+                            animation:'pulseBtn 2s infinite'
                         }}>
-                            🎤 Error: {micError}
-                        </div>
-                    )}
-                    {!micError && capturing && (
-                        <div style={{
-                            position:'absolute',bottom:20,left:'50%',transform:'translateX(-50%)',
-                            background:'rgba(0,255,136,0.15)',borderRadius:100,zIndex:100,
-                            padding:'6px 14px',display:'flex',alignItems:'center',gap:8,
-                            color:NEON_GREEN,fontWeight:800,fontSize:12
-                        }}>
-                            <div style={{width:8,height:8,borderRadius:'50%',background:NEON_GREEN,animation:'corePulse 1s infinite'}}/>
-                            🎤 Nivel: {level}
-                        </div>
-                    )}                    {/* Team A */}
-                    {(!capturing || capturing === 'A') && (
-                        <div style={{
-                            flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                            justifyContent:'space-between',padding: capturing ? '32px 16px' : '24px 12px',
-                            background:`linear-gradient(180deg, ${TEAM_A_COLOR}11 0%, ${TEAM_A_COLOR}05 100%)`,
-                            borderRight: capturing ? 'none' : '1px solid #1E293B'
-                        }}>
-                            <p style={{fontSize: capturing ? 48 : 13,fontWeight:900,color:TEAM_A_COLOR,textAlign:'center',
-                                textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3}}>
-                                {nameA}
-                            </p>
-                            {/* Energy bar */}
-                            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                                justifyContent:'flex-end',width:'100%',maxWidth: capturing ? 160 : 80,margin:'12px 0'}}>
-                                <p style={{fontSize: capturing ? 64 : 28,fontWeight:900,color:TEAM_A_COLOR,marginBottom:8,
-                                    textShadow:`0 0 15px ${TEAM_A_COLOR}88`}}>{peakA}</p>
-                                <div style={{width:'100%',height: capturing ? '80%' : '60%',borderRadius:12,
-                                    background:'#0F172A',border:`2px solid ${TEAM_A_COLOR}33`,
-                                    position:'relative',overflow:'hidden'}}>
-                                    <div style={{
-                                        position:'absolute',bottom:0,left:0,right:0,
-                                        height:`${barA}%`,borderRadius:10,
-                                        background:`linear-gradient(0deg, ${TEAM_A_COLOR}, ${TEAM_A_COLOR}88)`,
-                                        boxShadow:`0 0 20px ${TEAM_A_COLOR}66, inset 0 0 15px ${TEAM_A_COLOR}44`,
-                                        transition: capturing==='A' ? 'height 0.05s linear' : 'height 0.3s ease-out'
-                                    }}/>
-                                </div>
-                            </div>
+                            Declarar Ganador
+                        </button>
+                    </div>
+
+                    {/* Team A */}
+                    <div style={{
+                        flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+                        justifyContent:'center',padding:'32px 16px',
+                        background:`linear-gradient(180deg, ${TEAM_A_COLOR}11 0%, ${TEAM_A_COLOR}05 100%)`,
+                        borderRight: '1px solid #1E293B', position: 'relative'
+                    }}>
+                        <p style={{fontSize: 24,fontWeight:900,color:TEAM_A_COLOR,textAlign:'center',
+                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3, marginBottom: 40}}>
+                            {nameA}
+                        </p>
+                        
+                        <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
+                            <button onClick={() => setScoreA(s => Math.max(0, s - 1))} style={{
+                                width: 64, height: 64, borderRadius: '50%', border: 'none',
+                                background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 32,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>-</button>
                             
-                            {!capturing ? (
-                                <button
-                                    onClick={() => startCapture('A')}
-                                    style={{
-                                        width:'100%',maxWidth:140,padding:'16px 0',borderRadius:16,
-                                        border:`2px solid ${TEAM_A_COLOR}`,
-                                        background:'transparent',
-                                        color:TEAM_A_COLOR,
-                                        fontSize:11,fontWeight:900,textTransform:'uppercase',
-                                        letterSpacing:'0.1em',cursor:'pointer',
-                                        transition:'all 0.15s',userSelect:'none',WebkitUserSelect:'none'
-                                    }}
-                                >Capturar</button>
-                            ) : (
-                                <div style={{
-                                    fontSize: 80, fontWeight: 900, color: '#fff',
-                                    textShadow:`0 0 20px ${TEAM_A_COLOR}, 0 0 40px ${TEAM_A_COLOR}`,
-                                    animation: 'pulseBtn 1s ease-in-out infinite'
-                                }}>{countdown}</div>
-                            )}
+                            <p style={{
+                                fontSize: 80,fontWeight:900,color:TEAM_A_COLOR,
+                                textShadow:`0 0 20px ${TEAM_A_COLOR}88`, minWidth: 100, textAlign: 'center'
+                            }}>{scoreA}</p>
+                            
+                            <button onClick={() => setScoreA(s => s + 1)} style={{
+                                width: 64, height: 64, borderRadius: '50%', border: 'none',
+                                background: TEAM_A_COLOR, color: '#000', fontSize: 32,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: `0 0 20px ${TEAM_A_COLOR}66`
+                            }}>+</button>
                         </div>
-                    )}
+                    </div>
 
                     {/* Team B */}
-                    {(!capturing || capturing === 'B') && (
-                        <div style={{
-                            flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                            justifyContent:'space-between',padding: capturing ? '32px 16px' : '24px 12px',
-                            background:`linear-gradient(180deg, ${TEAM_B_COLOR}11 0%, ${TEAM_B_COLOR}05 100%)`
-                        }}>
-                            <p style={{fontSize: capturing ? 48 : 13,fontWeight:900,color:TEAM_B_COLOR,textAlign:'center',
-                                textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3}}>
-                                {nameB}
-                            </p>
-                            <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                                justifyContent:'flex-end',width:'100%',maxWidth: capturing ? 160 : 80,margin:'12px 0'}}>
-                                <p style={{fontSize: capturing ? 64 : 28,fontWeight:900,color:TEAM_B_COLOR,marginBottom:8,
-                                    textShadow:`0 0 15px ${TEAM_B_COLOR}88`}}>{peakB}</p>
-                                <div style={{width:'100%',height: capturing ? '80%' : '60%',borderRadius:12,
-                                    background:'#0F172A',border:`2px solid ${TEAM_B_COLOR}33`,
-                                    position:'relative',overflow:'hidden'}}>
-                                    <div style={{
-                                        position:'absolute',bottom:0,left:0,right:0,
-                                        height:`${barB}%`,borderRadius:10,
-                                        background:`linear-gradient(0deg, ${TEAM_B_COLOR}, ${TEAM_B_COLOR}88)`,
-                                        boxShadow:`0 0 20px ${TEAM_B_COLOR}66, inset 0 0 15px ${TEAM_B_COLOR}44`,
-                                        transition: capturing==='B' ? 'height 0.05s linear' : 'height 0.3s ease-out'
-                                    }}/>
-                                </div>
-                            </div>
+                    <div style={{
+                        flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+                        justifyContent:'center',padding:'32px 16px',
+                        background:`linear-gradient(180deg, ${TEAM_B_COLOR}11 0%, ${TEAM_B_COLOR}05 100%)`,
+                        position: 'relative'
+                    }}>
+                        <p style={{fontSize: 24,fontWeight:900,color:TEAM_B_COLOR,textAlign:'center',
+                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3, marginBottom: 40}}>
+                            {nameB}
+                        </p>
+                        
+                        <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
+                            <button onClick={() => setScoreB(s => Math.max(0, s - 1))} style={{
+                                width: 64, height: 64, borderRadius: '50%', border: 'none',
+                                background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 32,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>-</button>
                             
-                            {!capturing ? (
-                                <button
-                                    onClick={() => startCapture('B')}
-                                    style={{
-                                        width:'100%',maxWidth:140,padding:'16px 0',borderRadius:16,
-                                        border:`2px solid ${TEAM_B_COLOR}`,
-                                        background:'transparent',
-                                        color:TEAM_B_COLOR,
-                                        fontSize:11,fontWeight:900,textTransform:'uppercase',
-                                        letterSpacing:'0.1em',cursor:'pointer',
-                                        transition:'all 0.15s',userSelect:'none',WebkitUserSelect:'none'
-                                    }}
-                                >Capturar</button>
-                            ) : (
-                                <div style={{
-                                    fontSize: 80, fontWeight: 900, color: '#fff',
-                                    textShadow:`0 0 20px ${TEAM_B_COLOR}, 0 0 40px ${TEAM_B_COLOR}`,
-                                    animation: 'pulseBtn 1s ease-in-out infinite'
-                                }}>{countdown}</div>
-                            )}
+                            <p style={{
+                                fontSize: 80,fontWeight:900,color:TEAM_B_COLOR,
+                                textShadow:`0 0 20px ${TEAM_B_COLOR}88`, minWidth: 100, textAlign: 'center'
+                            }}>{scoreB}</p>
+                            
+                            <button onClick={() => setScoreB(s => s + 1)} style={{
+                                width: 64, height: 64, borderRadius: '50%', border: 'none',
+                                background: TEAM_B_COLOR, color: '#fff', fontSize: 32,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: `0 0 20px ${TEAM_B_COLOR}66`
+                            }}>+</button>
                         </div>
-                    )}
-
-                    {/* No need for the bothCaptured declare winner overlay anymore, it is handled by prompt_eval */}
+                    </div>
                 </div>
             )}
 
@@ -655,9 +347,9 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                                 fontSize:14,color:'#94A3B8',marginTop:16,fontWeight:700,
                                 animation:'fadeInUp 0.8s ease-out'
                             }}>
-                                Energía: <span style={{color:TEAM_A_COLOR,fontWeight:900}}>{peakA}</span>
+                                Votos: <span style={{color:TEAM_A_COLOR,fontWeight:900}}>{scoreA}</span>
                                 {' vs '}
-                                <span style={{color:TEAM_B_COLOR,fontWeight:900}}>{peakB}</span>
+                                <span style={{color:TEAM_B_COLOR,fontWeight:900}}>{scoreB}</span>
                             </p>
 
                             <button onClick={confirmWinner} style={{

@@ -11,10 +11,36 @@ function getAdminSupabase() {
 }
 
 // GET — fetch all schools from catalogo_escuelas
-export async function GET() {
+// Supports ?nivel=PREESCOLAR|PRIMARIA filter (graceful fallback if column doesn't exist yet)
+export async function GET(request) {
     try {
         const supabase = getAdminSupabase();
+        const { searchParams } = new URL(request.url);
+        const nivel = searchParams.get('nivel');
 
+        // Try with nivel_educativo filter first
+        if (nivel) {
+            const { data, error } = await supabase
+                .from('catalogo_escuelas')
+                .select('*')
+                .eq('nivel_educativo', nivel)
+                .order('nombre_escuela', { ascending: true });
+
+            // If the column doesn't exist yet, fall back to unfiltered query
+            if (error && error.message?.includes('nivel_educativo')) {
+                console.warn('[API] nivel_educativo column not found, falling back to unfiltered query');
+                const { data: allData, error: allErr } = await supabase
+                    .from('catalogo_escuelas')
+                    .select('*')
+                    .order('nombre_escuela', { ascending: true });
+                if (allErr) throw allErr;
+                return NextResponse.json({ data: allData || [], _fallback: true });
+            }
+            if (error) throw error;
+            return NextResponse.json({ data: data || [] });
+        }
+
+        // No filter — return all
         const { data, error } = await supabase
             .from('catalogo_escuelas')
             .select('*')
@@ -43,7 +69,7 @@ export async function PATCH(request) {
             );
         }
 
-        const editableFields = ['nombre_escuela', 'tipo', 'ninos', 'codigo_postal', 'turno', 'visitada', 'estado_pipeline'];
+        const editableFields = ['nombre_escuela', 'tipo', 'ninos', 'codigo_postal', 'turno', 'visitada', 'estado_pipeline', 'nivel_educativo'];
         if (!editableFields.includes(field)) {
             return NextResponse.json(
                 { error: `Field "${field}" is not editable on catalogo_escuelas` },
@@ -83,7 +109,7 @@ export async function PATCH(request) {
 // POST — create a new school in catalogo_escuelas
 export async function POST(request) {
     try {
-        const { cct, nombre_escuela, tipo, ninos, codigo_postal, turno } = await request.json();
+        const { cct, nombre_escuela, tipo, ninos, codigo_postal, turno, nivel_educativo } = await request.json();
 
         if (!cct?.trim() || !nombre_escuela?.trim()) {
             return NextResponse.json(
@@ -103,6 +129,7 @@ export async function POST(request) {
                 ninos: ninos ? parseInt(ninos) : null,
                 codigo_postal: codigo_postal || null,
                 turno: turno || null,
+                nivel_educativo: nivel_educativo || 'PRIMARIA',
             })
             .select()
             .single();

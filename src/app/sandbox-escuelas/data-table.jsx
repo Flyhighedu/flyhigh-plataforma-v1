@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment, useCallback } from "react";
+import { useState, Fragment, useCallback, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -43,12 +43,38 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
   const [sorting, setSorting] = useState([]);
   const [columnSizing, setColumnSizing] = useState({});
 
+  // Guard: prevent TanStack from silently resetting column filters
+  const columnFiltersRef = useRef(columnFilters);
+  const userClearedRef = useRef(false);
+
+  const handleColumnFiltersChange = useCallback((updaterOrValue) => {
+    setColumnFilters((prev) => {
+      const next = typeof updaterOrValue === "function" ? updaterOrValue(prev) : updaterOrValue;
+      // Block silent resets: if we had filters and TanStack tries to clear them,
+      // only allow it if the user explicitly cleared them
+      if (Array.isArray(next) && next.length === 0 && prev.length > 0 && !userClearedRef.current) {
+        return prev; // keep existing filters
+      }
+      userClearedRef.current = false;
+      columnFiltersRef.current = next;
+      return next;
+    });
+  }, []);
+
+  // Expose a safe clear function for the UI clear button
+  const clearAllFilters = useCallback(() => {
+    userClearedRef.current = true;
+    setColumnFilters([]);
+    setGlobalFilter("");
+    columnFiltersRef.current = [];
+  }, []);
+
   const table = useReactTable({
     data,
     columns,
     state: { globalFilter, columnFilters, sorting, columnSizing },
     onGlobalFilterChange: setGlobalFilter,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange: handleColumnFiltersChange,
     onSortingChange: setSorting,
     onColumnSizingChange: setColumnSizing,
     columnResizeMode: "onChange",
@@ -56,6 +82,11 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: "includesString",
+    autoResetAll: false,
+    autoResetColumnFilters: false,
+    autoResetGlobalFilter: false,
+    autoResetSorting: false,
+    enableMultiSort: false,
     getRowId: (row) => row.cct,
     meta: {
       updateData: onUpdateRow,
@@ -250,12 +281,123 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
     }
   }, [table]);
 
+  // Build unique-value sets for dropdown filter columns (from raw unfiltered data)
+  const dropdownOptions = {
+    tipo: [...new Set(data.map(r => r.tipo).filter(Boolean))].sort(),
+    turno: [...new Set(data.map(r => r.turno).filter(Boolean))].sort(),
+    estado_pipeline: [...new Set(data.map(r => r.estado_pipeline).filter(Boolean))].sort(),
+  };
+
+  const PIPELINE_LABEL_MAP = {
+    sin_contacto: 'Sin contacto',
+    llamada_sin_respuesta: 'Llamada s/r',
+    contactada: 'En conversación',
+    cita_ventas: 'Pres. Agendada',
+    agendada: 'Agendada',
+    en_preparacion: 'En preparación',
+    en_ruta: 'En ruta',
+    operando: 'Operando',
+    visitada: 'Completada ✓',
+    perdida: 'Perdida ✗',
+  };
+
+  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
+
+  // Render per-column filter input
+  const renderColumnFilter = (col) => {
+    if (!col.getCanFilter()) return null;
+
+    // Categorical dropdown for tipo, turno, estado_pipeline
+    if (dropdownOptions[col.id]) {
+      const val = col.getFilterValue() ?? "";
+      const isActive = !!val;
+      return (
+        <select
+          value={val}
+          onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+          className={`w-full h-6 text-xs border rounded px-1 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer transition-colors ${
+            isActive ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold" : "bg-white"
+          }`}
+        >
+          <option value="">Filtrar…</option>
+          {dropdownOptions[col.id].map(opt => (
+            <option key={opt} value={opt}>
+              {col.id === "estado_pipeline" ? (PIPELINE_LABEL_MAP[opt] || opt) : opt}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    // Visitada checkbox-style dropdown
+    if (col.id === "visitada") {
+      return (
+        <select
+          value={(col.getFilterValue() ?? "")}
+          onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+          className={`w-full h-6 text-xs border rounded px-1 outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer transition-colors ${
+            col.getFilterValue() ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold" : "bg-white"
+          }`}
+        >
+          <option value="">Todas</option>
+          <option value="si">✅ Visitadas</option>
+          <option value="no">⭕ Pendientes</option>
+        </select>
+      );
+    }
+
+    // Numeric min filter for niños
+    if (col.id === "ninos") {
+      const val = col.getFilterValue() ?? "";
+      const isActive = !!val;
+      return (
+        <input
+          type="number"
+          value={val}
+          onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+          placeholder="Mín…"
+          min={0}
+          className={`w-full h-6 text-xs border rounded px-1 outline-none focus:ring-1 focus:ring-blue-400 transition-colors ${
+            isActive ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold" : "bg-white"
+          }`}
+        />
+      );
+    }
+
+    // Default text filter for everything else (cct, nombre, codigo_postal)
+    const val = col.getFilterValue() ?? "";
+    const isActive = !!val;
+    return (
+      <input
+        value={val}
+        onChange={(e) => col.setFilterValue(e.target.value || undefined)}
+        placeholder="Filtrar…"
+        className={`w-full h-6 text-xs border rounded px-1 outline-none focus:ring-1 focus:ring-blue-400 transition-colors ${
+          isActive ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold" : "bg-white"
+        }`}
+      />
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Input placeholder="Buscar por escuela, CCT, C.P.…" value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="max-w-sm h-9" />
         <span className="text-sm text-muted-foreground">{table.getFilteredRowModel().rows.length} escuelas</span>
+
+        {/* Active filters badge + clear button */}
+        {activeFilterCount > 0 && (
+          <button
+            onClick={clearAllFilters}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
+            title="Limpiar todos los filtros"
+          >
+            <span>{activeFilterCount} filtro{activeFilterCount > 1 ? 's' : ''} activo{activeFilterCount > 1 ? 's' : ''}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        )}
+
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
@@ -294,27 +436,11 @@ export function DataTable({ columns, data, onUpdateRow, onDeleteRow, onCreateRow
                   ))}
                 </TableRow>
               ))}
+              {/* Per-column filter row */}
               <TableRow className="bg-slate-50/80">
                 {table.getAllLeafColumns().map((col) => (
                   <TableHead key={col.id} className="py-1 px-1 bg-slate-50/80" style={{ width: col.getSize() }}>
-                    {col.id === "visitada" ? (
-                      <select
-                        value={(col.getFilterValue() ?? "")}
-                        onChange={(e) => col.setFilterValue(e.target.value || undefined)}
-                        className="w-full h-6 text-xs border rounded px-1 bg-white outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
-                      >
-                        <option value="">Todas</option>
-                        <option value="si">✅ Visitadas</option>
-                        <option value="no">⭕ Pendientes</option>
-                      </select>
-                    ) : col.getCanFilter() ? (
-                      <input
-                        value={(col.getFilterValue() ?? "")}
-                        onChange={(e) => col.setFilterValue(e.target.value || undefined)}
-                        placeholder="Filtrar…"
-                        className="w-full h-6 text-xs border rounded px-1 bg-white outline-none focus:ring-1 focus:ring-blue-400"
-                      />
-                    ) : null}
+                    {renderColumnFilter(col)}
                   </TableHead>
                 ))}
               </TableRow>

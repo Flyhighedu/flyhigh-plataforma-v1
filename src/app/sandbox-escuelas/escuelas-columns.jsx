@@ -66,6 +66,7 @@ function TipoSelectCell({ getValue, row, column, table }) {
   const colors = {
     "PRIVADO": "bg-violet-100 text-violet-800",
     "FEDERAL TRANSFERIDO": "bg-blue-100 text-blue-800",
+    "ESTATAL": "bg-teal-100 text-teal-800",
   };
 
   return (
@@ -74,6 +75,7 @@ function TipoSelectCell({ getValue, row, column, table }) {
       <option value="">—</option>
       <option value="PRIVADO">Privado</option>
       <option value="FEDERAL TRANSFERIDO">Federal Transferido</option>
+      <option value="ESTATAL">Estatal</option>
     </select>
   );
 }
@@ -235,6 +237,7 @@ export const escuelasColumns = [
     cell: (props) => <TipoSelectCell {...props} />,
     size: 160,
     enableGlobalFilter: true,
+    filterFn: 'equalsString',
   },
   {
     accessorKey: "ninos",
@@ -242,6 +245,12 @@ export const escuelasColumns = [
     cell: (props) => <EditableCell {...props} />,
     size: 90,
     enableGlobalFilter: false,
+    filterFn: (row, columnId, filterValue) => {
+      const val = Number(row.getValue(columnId)) || 0;
+      const min = Number(filterValue);
+      if (isNaN(min)) return true;
+      return val >= min;
+    },
     footer: ({ table }) => {
       const sum = table.getFilteredRowModel().rows.reduce((s, r) => s + (Number(r.getValue("ninos")) || 0), 0);
       return <span className="font-bold text-sm">{formatNumber(sum)}</span>;
@@ -260,6 +269,7 @@ export const escuelasColumns = [
     cell: (props) => <TurnoSelectCell {...props} />,
     size: 130,
     enableGlobalFilter: false,
+    filterFn: 'equalsString',
   },
   {
     accessorKey: "estado_pipeline",
@@ -268,6 +278,7 @@ export const escuelasColumns = [
     size: 280,
     enableGlobalFilter: false,
     enableSorting: true,
+    filterFn: 'equalsString',
     sortingFn: (rowA, rowB) => {
       const order = { sin_contacto: 0, llamada_sin_respuesta: 1, contactada: 2, cita_ventas: 3, agendada: 4, en_preparacion: 5, en_ruta: 6, operando: 7, visitada: 8, perdida: -1 };
       return (order[rowA.original.estado_pipeline] ?? 0) - (order[rowB.original.estado_pipeline] ?? 0);

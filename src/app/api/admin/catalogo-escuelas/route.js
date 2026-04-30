@@ -16,7 +16,7 @@ export async function GET() {
 
         const { data, error } = await supabase
             .from('catalogo_escuelas')
-            .select('cct, nombre_escuela, turno, tipo, ninos, codigo_postal')
+            .select('*')
             .order('nombre_escuela', { ascending: true });
 
         if (error) throw error;

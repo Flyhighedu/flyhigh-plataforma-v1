@@ -76,6 +76,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
           <option value="">—</option>
           <option value="PRIVADO">Privado</option>
           <option value="FEDERAL TRANSFERIDO">Federal Transferido</option>
+          <option value="ESTATAL">Estatal</option>
         </select>
       </TableCell>
       {/* Niños */}
