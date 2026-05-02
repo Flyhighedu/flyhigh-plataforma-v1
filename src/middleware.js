@@ -14,7 +14,7 @@ export async function middleware(request) {
     // This block is COMPLETELY INDEPENDENT from /staff auth.
     if (request.nextUrl.pathname.startsWith('/sandbox-')) {
         const adminCookie = request.cookies.get('flyhigh_admin_auth')?.value;
-        const isValid = verifyAdminToken(adminCookie);
+        const isValid = await verifyAdminToken(adminCookie);
 
         if (!isValid) {
             // No valid admin cookie → redirect to admin login

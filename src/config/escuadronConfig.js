@@ -144,11 +144,13 @@ export const META_KEYS = {
     BITACORA_CURRENT: 'escuadron_bitacora_current',      // Current flight group's bitacora
     BITACORA_HISTORY: 'escuadron_bitacora_history',      // Array of past bitacoras
     DEBRIEF_DONE: 'escuadron_debrief_done',
-    DEBRIEF_DATA: 'escuadron_debrief_data'
+    DEBRIEF_DATA: 'escuadron_debrief_data',
+    POI_ROUTE_ACTIVE: 'escuadron_poi_route_active'       // POIs selected by pilot for today's route
 };
 
 // ── Local Storage Keys ──
 export const LOCAL_KEYS = {
     EMOTION_SCORES: 'flyhigh_escuadron_emotion_scores',  // Array of per-flight scores
-    BRIEFING_DONE: 'flyhigh_escuadron_briefing_done'     // Boolean
+    BRIEFING_DONE: 'flyhigh_escuadron_briefing_done',    // Boolean
+    POI_CACHE: 'flyhigh_poi_cache'                       // Cached POIs for offline fallback
 };

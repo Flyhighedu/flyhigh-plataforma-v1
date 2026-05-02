@@ -76,7 +76,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
             textTransform: "uppercase", letterSpacing: "0.3em", fontSize: "0.65rem",
             fontWeight: 700, marginBottom: "8px", color: "#374151", ...titleFont,
           }}>
-            ESCUELA: <span>{escuela}</span>
+            ESCUELA: <span data-variable="escuela">{escuela}</span>
           </p>
           <h1 style={{
             fontSize: "3.5rem", fontWeight: 900, textTransform: "uppercase",
@@ -119,7 +119,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                 display: "block", fontWeight: 800, fontSize: "0.45rem",
                 letterSpacing: "0.1em", color: "#6b7280", marginBottom: "2px", ...titleFont,
               }}>{t.ticketFechaLabel}</span>
-              <span style={{ fontWeight: 700, fontSize: "0.7rem", display: "block", color: "#000000" }}>
+              <span data-variable="fecha" style={{ fontWeight: 700, fontSize: "0.7rem", display: "block", color: "#000000" }}>
                 {fecha}
               </span>
               <div style={{ height: "1px", backgroundColor: "#d1d5db", width: "100%", opacity: 0.7, marginTop: "4px" }} />
@@ -134,7 +134,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
               <span style={{
                 fontWeight: 700, fontSize: "0.65rem", display: "block",
                 color: "#000000", lineHeight: 1.2, textTransform: "uppercase",
-              }}>ESCUELA: {escuela}</span>
+              }}>ESCUELA: <span data-variable="escuela">{escuela}</span></span>
               <div style={{ height: "1px", backgroundColor: "#d1d5db", width: "100%", opacity: 0.7, marginTop: "4px" }} />
             </div>
 
@@ -158,7 +158,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                 }}>{t.paseLabel}</span>
                 <div style={{ display: "flex", alignItems: "baseline", lineHeight: 1 }}>
                   <span style={{ color: "#374151", fontWeight: 700, fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Solo</span>
-                  <span style={{ fontWeight: 900, fontSize: "2.1rem", color: "#000000", letterSpacing: "-0.02em", lineHeight: 0.8 }}>{monto}</span>
+                  <span data-variable="cuota" style={{ fontWeight: 900, fontSize: "2.1rem", color: "#000000", letterSpacing: "-0.02em", lineHeight: 0.8 }}>{monto}</span>
                 </div>
               </div>
 
@@ -175,7 +175,7 @@ const FlyerPadres = React.forwardRef(function FlyerPadres({ escuela, fecha, mont
                       <td style={{ verticalAlign: "top", padding: 0 }}>
                         <p style={{ fontSize: "0.52rem", lineHeight: 1.3, textAlign: "left", color: "#1f2937", margin: 0 }}>
                           Gracias a <strong>nuestros patrocinadores</strong>, la aportación es de solo{" "}
-                          <strong style={{ color: "#000000" }}>{monto}</strong>. Ellos cubren los otros{" "}
+                          <strong data-variable="cuota" style={{ color: "#000000" }}>{monto}</strong>. Ellos cubren los otros{" "}
                           <strong style={{ color: "#000000" }}>{subsidio}</strong> de cada niño.
                         </p>
                       </td>

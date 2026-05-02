@@ -10,7 +10,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
     nombre_escuela: "",
     colonia: "",
     estatus: "pendiente",
-    fecha_programada: new Date().toISOString().split('T')[0],
+    fecha_programada: new Date().toISOString().split("T")[0],
     tarifa_base: 80,
     turno: "",
     cuota_alumno: 50,
@@ -46,8 +46,8 @@ export function GhostRow({ columnCount, onCreateRow }) {
       return;
     }
     const match = catalog.find((c) => c.nombre_escuela === val);
-    
-    let turnoNormalize = f => f;
+
+    let turnoNormalize = (f) => f;
     if (match && match.turno) {
       const lower = String(match.turno).toLowerCase();
       if (lower.includes("matutino")) turnoNormalize = () => "Matutino";
@@ -62,7 +62,8 @@ export function GhostRow({ columnCount, onCreateRow }) {
     }));
   };
 
-  const canSave = form.nombre_escuela.trim() && form.fecha_programada && form.turno;
+  const canSave =
+    form.nombre_escuela.trim() && form.fecha_programada && form.turno;
   const handleSave = async () => {
     if (!canSave || isSaving) return;
     setIsSaving(true);
@@ -71,15 +72,20 @@ export function GhostRow({ columnCount, onCreateRow }) {
       setForm(emptyForm);
       setIsManualName(false);
       setTimeout(() => firstRef.current?.focus(), 50);
-    } catch {} finally {
+    } catch {
+    } finally {
       setIsSaving(false);
     }
   };
   const kd = (e) => {
-    if (e.key === "Enter" && canSave) { e.preventDefault(); handleSave(); }
+    if (e.key === "Enter" && canSave) {
+      e.preventDefault();
+      handleSave();
+    }
   };
 
-  const cls = "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500 w-full";
+  const cls =
+    "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500 w-full";
 
   return (
     <TableRow className="bg-emerald-50/30 border-t-2 border-dashed border-emerald-300 hover:bg-emerald-50/50">
@@ -96,10 +102,12 @@ export function GhostRow({ columnCount, onCreateRow }) {
       </TableCell>
       {/* Fecha Programada */}
       <TableCell className="p-1">
-         <Input
+        <Input
           type="date"
           value={form.fecha_programada}
-          onChange={(e) => setForm((f) => ({ ...f, fecha_programada: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, fecha_programada: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
@@ -107,37 +115,56 @@ export function GhostRow({ columnCount, onCreateRow }) {
       {/* Nombre */}
       <TableCell className="p-1 min-w-[200px]">
         {!isManualName ? (
-           <select
-             value={form.nombre_escuela}
-             onChange={handleSelectChange}
-             onKeyDown={kd}
-             className={`${cls} text-[11px] font-semibold px-2 uppercase outline-none select-none border rounded-md min-w-[200px] bg-white`}
-           >
-             <option value="">Seleccione Escuela...</option>
-             <option value="MANUAL_ENTRY" className="font-bold bg-amber-100 text-amber-900 border-b border-amber-200">➕ Ingresar escuela (fuera de catálogo)</option>
-             {catalog.map((c) => (
-               <option key={c.cct} value={c.nombre_escuela}>{c.nombre_escuela}</option>
-             ))}
-           </select>
+          <select
+            value={form.nombre_escuela}
+            onChange={handleSelectChange}
+            onKeyDown={kd}
+            className={`${cls} text-[11px] font-semibold px-2 uppercase outline-none select-none border rounded-md min-w-[200px] bg-white`}
+          >
+            <option value="">Seleccione Escuela...</option>
+            <option
+              value="MANUAL_ENTRY"
+              className="font-bold bg-amber-100 text-amber-900 border-b border-amber-200"
+            >
+              ➕ Ingresar escuela (fuera de catálogo)
+            </option>
+            {catalog.map((c) => (
+              <option key={c.cct} value={c.nombre_escuela}>
+                {c.nombre_escuela}
+              </option>
+            ))}
+          </select>
         ) : (
-           <div className="flex items-center gap-1 w-full bg-amber-50 rounded-sm border border-amber-300 pr-1 min-w-[200px]">
-             <Input
-               ref={firstRef}
-               autoFocus
-               type="text"
-               placeholder="Ingresar escuela..."
-               value={form.nombre_escuela}
-               onChange={(e) => setForm(f => ({ ...f, nombre_escuela: e.target.value }))}
-               onKeyDown={kd}
-               className={`h-7 w-full text-xs font-semibold px-2 outline-none border-none shadow-none focus-visible:ring-0 bg-transparent uppercase`}
-             />
-             <button 
-               onClick={() => { setIsManualName(false); setForm(f => ({ ...f, nombre_escuela: "", cct: "", turno: "" })); }} 
-               title="Volver al Catálogo" 
-               className="text-amber-600 hover:text-amber-800 p-0.5 flex-shrink-0" 
-               tabIndex={-1}
-             >✕</button>
-           </div>
+          <div className="flex items-center gap-1 w-full bg-amber-50 rounded-sm border border-amber-300 pr-1 min-w-[200px]">
+            <Input
+              ref={firstRef}
+              autoFocus
+              type="text"
+              placeholder="Ingresar escuela..."
+              value={form.nombre_escuela}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, nombre_escuela: e.target.value }))
+              }
+              onKeyDown={kd}
+              className={`h-7 w-full text-xs font-semibold px-2 outline-none border-none shadow-none focus-visible:ring-0 bg-transparent uppercase`}
+            />
+            <button
+              onClick={() => {
+                setIsManualName(false);
+                setForm((f) => ({
+                  ...f,
+                  nombre_escuela: "",
+                  cct: "",
+                  turno: "",
+                }));
+              }}
+              title="Volver al Catálogo"
+              className="text-amber-600 hover:text-amber-800 p-0.5 flex-shrink-0"
+              tabIndex={-1}
+            >
+              ✕
+            </button>
+          </div>
         )}
       </TableCell>
       {/* Turno */}
@@ -145,9 +172,11 @@ export function GhostRow({ columnCount, onCreateRow }) {
         <select
           value={form.turno || ""}
           onChange={(e) => setForm((f) => ({ ...f, turno: e.target.value }))}
-          className={`h-8 text-[11px] font-semibold rounded-md border px-1 outline-none text-slate-600 ${!form.turno ? 'bg-rose-50 border-rose-300 ring-rose-500' : 'bg-white border-emerald-200'} focus:ring-emerald-500 w-full cursor-pointer uppercase`}
+          className={`h-8 text-[11px] font-semibold rounded-md border px-1 outline-none text-slate-600 ${!form.turno ? "bg-rose-50 border-rose-300 ring-rose-500" : "bg-white border-emerald-200"} focus:ring-emerald-500 w-full cursor-pointer uppercase`}
         >
-          <option value="" disabled>SELECCIONE...</option>
+          <option value="" disabled>
+            SELECCIONE...
+          </option>
           <option value="Matutino">Matutino</option>
           <option value="Vespertino">Vespertino</option>
         </select>
@@ -176,117 +205,142 @@ export function GhostRow({ columnCount, onCreateRow }) {
       </TableCell>
       {/* Tarifa Fija */}
       <TableCell className="p-1">
-         <Input
+        <Input
           type="number"
           placeholder="80"
           value={form.tarifa_base}
-          onChange={(e) => setForm((f) => ({ ...f, tarifa_base: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, tarifa_base: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
       </TableCell>
-      
+
       {/* Spacers for the rest of the columns (Cuota Alm, Subsidio, Director, Tel Director, Delegado, Tel, Zona, Sector, Origen) = 9 columns */}
       {/* Cuota Alm */}
       <TableCell className="p-1 min-w-[70px]">
-         <Input
+        <Input
           type="number"
           placeholder="50"
           value={form.cuota_alumno}
-          onChange={(e) => setForm((f) => ({ ...f, cuota_alumno: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, cuota_alumno: e.target.value }))
+          }
           onKeyDown={kd}
           className={`${cls} text-center`}
         />
       </TableCell>
       {/* Subsidio */}
       <TableCell className="p-1 min-w-[80px]">
-         <Input
+        <Input
           type="number"
           placeholder="0"
           value={form.subsidio_patrocinador}
-          onChange={(e) => setForm((f) => ({ ...f, subsidio_patrocinador: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, subsidio_patrocinador: e.target.value }))
+          }
           onKeyDown={kd}
           className={`${cls} text-center`}
         />
       </TableCell>
       {/* Director */}
       <TableCell className="p-1 min-w-[120px]">
-         <Input
+        <Input
           type="text"
           placeholder="Director..."
           value={form.nombre_director}
-          onChange={(e) => setForm((f) => ({ ...f, nombre_director: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, nombre_director: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
       </TableCell>
       {/* # Niños */}
       <TableCell className="p-1 min-w-[70px]">
-         <Input
-           type="number"
-           placeholder="0"
-           value={form.numero_ninos}
-           onChange={(e) => setForm((f) => ({ ...f, numero_ninos: e.target.value }))}
-           onKeyDown={kd}
-           className={`${cls} text-center`}
-         />
+        <Input
+          type="number"
+          placeholder="0"
+          value={form.numero_ninos}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, numero_ninos: e.target.value }))
+          }
+          onKeyDown={kd}
+          className={`${cls} text-center`}
+        />
       </TableCell>
       {/* Tel Director */}
       <TableCell className="p-1 min-w-[100px]">
-         <Input
+        <Input
           type="text"
           placeholder="Tel..."
           value={form.telefono_director}
-          onChange={(e) => setForm((f) => ({ ...f, telefono_director: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, telefono_director: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
       </TableCell>
       {/* Delegado */}
       <TableCell className="p-1 min-w-[120px]">
-         <Input
+        <Input
           type="text"
           placeholder="Delegado..."
           value={form.nombre_maestro_delegado}
-          onChange={(e) => setForm((f) => ({ ...f, nombre_maestro_delegado: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, nombre_maestro_delegado: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
       </TableCell>
       {/* Tel Delegado */}
       <TableCell className="p-1 min-w-[100px]">
-         <Input
+        <Input
           type="text"
           placeholder="Tel..."
           value={form.telefono_maestro_delegado}
-          onChange={(e) => setForm((f) => ({ ...f, telefono_maestro_delegado: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({
+              ...f,
+              telefono_maestro_delegado: e.target.value,
+            }))
+          }
           onKeyDown={kd}
           className={cls}
         />
       </TableCell>
       {/* Zona */}
       <TableCell className="p-1 min-w-[60px]">
-         <Input
+        <Input
           type="text"
           placeholder="Zona"
           value={form.numero_zona}
-          onChange={(e) => setForm((f) => ({ ...f, numero_zona: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, numero_zona: e.target.value }))
+          }
           onKeyDown={kd}
           className={`${cls} text-center`}
         />
       </TableCell>
       {/* Sector */}
       <TableCell className="p-1 min-w-[60px]">
-         <Input
+        <Input
           type="text"
           placeholder="Sector"
           value={form.numero_sector}
-          onChange={(e) => setForm((f) => ({ ...f, numero_sector: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, numero_sector: e.target.value }))
+          }
           onKeyDown={kd}
           className={`${cls} text-center`}
         />
       </TableCell>
-      <TableCell className="p-1"><span className="text-xs text-slate-400 italic">manual</span></TableCell> {/* Origen */}
+      <TableCell className="p-1">
+        <span className="text-xs text-slate-400 italic">manual</span>
+      </TableCell>
 
       {/* Acción: Insertar */}
       <TableCell className="p-1">

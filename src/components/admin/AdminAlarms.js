@@ -38,7 +38,7 @@ export default function AdminAlarms() {
         fetchAlarms();
         const intv = setInterval(fetchAlarms, 30000);
         return () => clearInterval(intv);
-    }, [alarms, dismissedIDs]);
+    }, []);
 
     const activeAlarms = alarms.filter(a => !dismissedIDs.includes(a.id));
 

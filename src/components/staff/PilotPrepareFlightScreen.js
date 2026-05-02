@@ -93,6 +93,7 @@ function checksAreEqual(a, b) {
 function getPilotPrepTiming(meta = {}) {
     const spotAtMs = Date.parse(meta?.pilot_spot_set_at || '');
     const prepAtMs = Date.parse(meta?.pilot_prep_complete_at || '');
+    const poisAtMs = Date.parse(meta?.pilot_pois_selected_at || '');
     const controllerAtMs = Date.parse(meta?.pilot_controller_connected_at || '');
     const audioAtMs = Date.parse(meta?.pilot_audio_configured_at || '');
     const spotConfirmed = Number.isFinite(spotAtMs);
@@ -101,8 +102,26 @@ function getPilotPrepTiming(meta = {}) {
         Number.isFinite(prepAtMs) &&
         prepAtMs >= spotAtMs;
 
-    const controllerConnectedForCurrentSpot =
+    // Backward-compatibility: If the pilot already connected the controller
+    // (pre-POI feature missions), treat POI selection as implicitly done.
+    // This prevents breaking in-progress missions that never had the POI step.
+    const controllerAlreadyDone =
         checklistDoneForCurrentSpot &&
+        meta?.pilot_controller_connected === true &&
+        (!Number.isFinite(controllerAtMs) || controllerAtMs >= prepAtMs);
+
+    const poisSelectedForCurrentSpot =
+        checklistDoneForCurrentSpot &&
+        (
+            // Explicit POI selection (new flow)
+            (meta?.pilot_pois_selected === true &&
+             (!Number.isFinite(poisAtMs) || poisAtMs >= prepAtMs)) ||
+            // Implicit: pre-POI mission where pilot already connected controller
+            controllerAlreadyDone
+        );
+
+    const controllerConnectedForCurrentSpot =
+        poisSelectedForCurrentSpot &&
         meta?.pilot_controller_connected === true &&
         (!Number.isFinite(controllerAtMs) || controllerAtMs >= prepAtMs);
 
@@ -114,6 +133,7 @@ function getPilotPrepTiming(meta = {}) {
     return {
         spotConfirmed,
         checklistDoneForCurrentSpot,
+        poisSelectedForCurrentSpot,
         controllerConnectedForCurrentSpot,
         audioConfiguredForCurrentSpot
     };
@@ -136,13 +156,15 @@ export default function PilotPrepareFlightScreen({
         const {
             spotConfirmed,
             checklistDoneForCurrentSpot,
+            poisSelectedForCurrentSpot,
             controllerConnectedForCurrentSpot,
             audioConfiguredForCurrentSpot
         } = getPilotPrepTiming(m);
 
         if (audioConfiguredForCurrentSpot) return 'done';
-        if (checklistDoneForCurrentSpot && !controllerConnectedForCurrentSpot) return 'connect';
+        if (poisSelectedForCurrentSpot && !controllerConnectedForCurrentSpot) return 'connect';
         if (controllerConnectedForCurrentSpot && !audioConfiguredForCurrentSpot) return 'audio';
+        if (checklistDoneForCurrentSpot && !poisSelectedForCurrentSpot) return 'select_pois';
         if (spotConfirmed) return 'prepare';
         return 'identify';
     });
@@ -162,6 +184,15 @@ export default function PilotPrepareFlightScreen({
     const [audioChecks, setAudioChecks] = useState(initAudioChecks);
     const [isSavingAudioCheck, setIsSavingAudioCheck] = useState(false);
     const audioChecksCompleted = audioChecks.filter(Boolean).length;
+
+    // ── POI Selection State ──
+    const [availablePois, setAvailablePois] = useState([]);
+    const [selectedPoiIds, setSelectedPoiIds] = useState(() => {
+        const saved = initialMetaRef.current?.pilot_route_pois;
+        return Array.isArray(saved) ? saved.map(p => p.id) : [];
+    });
+    const [poisLoading, setPoisLoading] = useState(false);
+    const [poisSaving, setPoisSaving] = useState(false);
 
     const toggleCheck = async (idx) => {
         const next = [...prepChecks];
@@ -216,13 +247,15 @@ export default function PilotPrepareFlightScreen({
         const {
             spotConfirmed,
             checklistDoneForCurrentSpot,
+            poisSelectedForCurrentSpot,
             controllerConnectedForCurrentSpot,
             audioConfiguredForCurrentSpot
         } = getPilotPrepTiming(meta);
 
         let expectedPhase = 'identify';
         if (spotConfirmed) expectedPhase = 'prepare';
-        if (checklistDoneForCurrentSpot && !controllerConnectedForCurrentSpot) expectedPhase = 'connect';
+        if (checklistDoneForCurrentSpot && !poisSelectedForCurrentSpot) expectedPhase = 'select_pois';
+        if (poisSelectedForCurrentSpot && !controllerConnectedForCurrentSpot) expectedPhase = 'connect';
         if (controllerConnectedForCurrentSpot && !audioConfiguredForCurrentSpot) expectedPhase = 'audio';
         if (audioConfiguredForCurrentSpot) expectedPhase = 'done';
 
@@ -344,6 +377,9 @@ export default function PilotPrepareFlightScreen({
                 pilot_audio_checks: resetAudioChecks,
                 pilot_audio_configured: false,
                 pilot_audio_configured_at: null,
+                pilot_pois_selected: false,
+                pilot_pois_selected_at: null,
+                pilot_route_pois: null,
                 pilot_ready: false,
                 pilot_ready_at: null,
                 pilot_ready_source: null
@@ -372,7 +408,7 @@ export default function PilotPrepareFlightScreen({
         }
     };
 
-    // Transition to connect phase (after checklist 3/3)
+    // Transition to POI selection phase (after checklist 3/3)
     const handleChecklistDone = async () => {
         if (isUploading) return;
         setIsUploading(true);
@@ -385,13 +421,77 @@ export default function PilotPrepareFlightScreen({
                 meta: { ...curMeta, pilot_prep_complete_at: now },
                 updated_at: now
             }).eq('id', journeyId);
-            setPilotPhase('connect');
+            setPilotPhase('select_pois');
             onRefresh && onRefresh();
         } catch (e) {
-            console.error('Error transitioning to connect phase:', e);
+            console.error('Error transitioning to POI selection:', e);
             alert('Error al avanzar. Intenta de nuevo.');
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    // Load available POIs from pilot_pois table when entering select_pois phase
+    useEffect(() => {
+        if (pilotPhase !== 'select_pois' || !userId) return;
+        let cancelled = false;
+        setPoisLoading(true);
+        const loadPois = async () => {
+            try {
+                const supabase = createClient();
+                const { data, error } = await supabase
+                    .from('pilot_pois')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                if (!cancelled && !error) {
+                    setAvailablePois(data || []);
+                }
+            } catch (err) {
+                console.warn('POI load error:', err);
+            } finally {
+                if (!cancelled) setPoisLoading(false);
+            }
+        };
+        loadPois();
+        return () => { cancelled = true; };
+    }, [pilotPhase, userId]);
+
+    // Toggle POI selection
+    const togglePoiSelection = (poiId) => {
+        setSelectedPoiIds(prev =>
+            prev.includes(poiId)
+                ? prev.filter(id => id !== poiId)
+                : [...prev, poiId]
+        );
+    };
+
+    // Confirm POI selection → advance to connect
+    const handlePoisConfirmed = async () => {
+        if (poisSaving) return;
+        setPoisSaving(true);
+        try {
+            const supabase = createClient();
+            const now = new Date().toISOString();
+            const { data: cur } = await supabase.from('staff_journeys').select('meta').eq('id', journeyId).single();
+            const curMeta = parseMeta(cur?.meta);
+            const selectedPois = availablePois.filter(p => selectedPoiIds.includes(p.id)).map(p => ({ id: p.id, name: p.name, category: p.category }));
+            await supabase.from('staff_journeys').update({
+                meta: {
+                    ...curMeta,
+                    pilot_pois_selected: true,
+                    pilot_pois_selected_at: now,
+                    pilot_route_pois: selectedPois
+                },
+                updated_at: now
+            }).eq('id', journeyId);
+            setPilotPhase('connect');
+            onRefresh && onRefresh();
+        } catch (e) {
+            console.error('Error saving POI selection:', e);
+            alert('Error al guardar POIs. Intenta de nuevo.');
+        } finally {
+            setPoisSaving(false);
         }
     };
 
@@ -515,8 +615,8 @@ export default function PilotPrepareFlightScreen({
     return (
         <div style={{
             fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-            background: (pilotPhase === 'identify' || pilotPhase === 'prepare' || pilotPhase === 'connect' || pilotPhase === 'audio') ? '#F3F4F6' : 'linear-gradient(180deg, #1EA1FF 0%, #007AFF 100%)',
-            color: (pilotPhase === 'identify' || pilotPhase === 'prepare' || pilotPhase === 'connect' || pilotPhase === 'audio') ? '#1F2937' : 'white',
+            background: (pilotPhase === 'identify' || pilotPhase === 'prepare' || pilotPhase === 'select_pois' || pilotPhase === 'connect' || pilotPhase === 'audio') ? '#F3F4F6' : 'linear-gradient(180deg, #1EA1FF 0%, #007AFF 100%)',
+            color: (pilotPhase === 'identify' || pilotPhase === 'prepare' || pilotPhase === 'select_pois' || pilotPhase === 'connect' || pilotPhase === 'audio') ? '#1F2937' : 'white',
             minHeight: '100vh',
             display: 'flex', flexDirection: 'column',
             WebkitFontSmoothing: 'antialiased',
@@ -863,6 +963,138 @@ export default function PilotPrepareFlightScreen({
                         </div>
                     </div>
                 ) : null}
+
+                {/* ═══ PHASE 2.5: SELECT POIs ═══ */}
+                {pilotPhase === 'select_pois' && (
+                    <div style={{
+                        flex: 1, display: 'flex', flexDirection: 'column',
+                        gap: 16, paddingBottom: 100
+                    }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                                width: 56, height: 56, borderRadius: 16,
+                                background: '#EFF6FF', border: '1px solid #DBEAFE',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 12px', fontSize: 28
+                            }}>📍</div>
+                            <h2 style={{
+                                fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em',
+                                lineHeight: 1.2, marginBottom: 4, color: '#1F2937'
+                            }}>Puntos de Interés</h2>
+                            <p style={{
+                                fontSize: 14, color: '#6B7280', lineHeight: 1.5, fontWeight: 400, margin: 0
+                            }}>Selecciona los que mostrarás en tu ruta hoy</p>
+                        </div>
+
+                        {/* POI List */}
+                        {poisLoading ? (
+                            <div style={{ textAlign: 'center', padding: 32 }}>
+                                <Loader2 size={24} color="#2563EB" style={{ animation: 'spin 1s linear infinite' }} />
+                                <p style={{ fontSize: 13, color: '#6B7280', marginTop: 8, fontWeight: 500 }}>Cargando puntos...</p>
+                            </div>
+                        ) : availablePois.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center', padding: '32px 16px',
+                                background: 'white', borderRadius: 16,
+                                border: '1px solid #E5E7EB'
+                            }}>
+                                <p style={{ fontSize: 40, marginBottom: 8 }}>📍</p>
+                                <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', margin: '0 0 4px' }}>
+                                    No hay puntos de interés registrados
+                                </p>
+                                <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
+                                    Puedes crearlos desde el menú ⋮ → Puntos de Interés
+                                </p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <p style={{
+                                    fontSize: 11, fontWeight: 700, color: '#6B7280',
+                                    textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 4px'
+                                }}>
+                                    {selectedPoiIds.length} de {availablePois.length} seleccionados
+                                </p>
+                                {availablePois.map(poi => {
+                                    const isSelected = selectedPoiIds.includes(poi.id);
+                                    return (
+                                        <button
+                                            key={poi.id}
+                                            onClick={() => togglePoiSelection(poi.id)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 14,
+                                                backgroundColor: isSelected ? '#EFF6FF' : 'white',
+                                                border: isSelected ? '1.5px solid #93C5FD' : '1px solid #E5E7EB',
+                                                borderRadius: 16, padding: '16px',
+                                                cursor: 'pointer', textAlign: 'left',
+                                                transition: 'all 0.2s ease', width: '100%',
+                                                WebkitTapHighlightColor: 'transparent',
+                                                boxShadow: isSelected
+                                                    ? '0 2px 8px rgba(37,99,235,0.08)'
+                                                    : '0 1px 3px rgba(0,0,0,0.04)'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: 28, height: 28, borderRadius: 8,
+                                                border: isSelected ? '2px solid #2563EB' : '2px solid #D1D5DB',
+                                                background: isSelected ? '#2563EB' : 'white',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                transition: 'all 0.2s', flexShrink: 0
+                                            }}>
+                                                {isSelected && (
+                                                    <CheckCircle2 size={16} color="white" />
+                                                )}
+                                            </div>
+                                            <span style={{ fontSize: 22, flexShrink: 0 }}>{({'school':'🏫','parking':'🅿️','hazard':'⚠️','landmark':'📍','refuel':'⛽','general':'📌'})[poi.category] || '📌'}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{
+                                                    fontSize: 14, fontWeight: 600,
+                                                    color: isSelected ? '#1E40AF' : '#374151',
+                                                    margin: 0, overflow: 'hidden',
+                                                    textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                }}>{poi.name}</p>
+                                                {poi.description && (
+                                                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: '2px 0 0', fontWeight: 500 }}>
+                                                        {poi.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Fixed CTA */}
+                        <div style={{
+                            position: 'fixed', bottom: 0, left: 0, right: 0,
+                            padding: '16px 24px', paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                            background: 'linear-gradient(to top, #F3F4F6 80%, transparent)',
+                            zIndex: 10
+                        }}>
+                            <button
+                                onClick={handlePoisConfirmed}
+                                disabled={poisSaving}
+                                style={{
+                                    width: '100%', padding: '15px',
+                                    backgroundColor: '#2563EB', color: 'white',
+                                    borderRadius: 16, border: 'none',
+                                    fontSize: 15, fontWeight: 700,
+                                    boxShadow: '0 10px 25px -8px rgba(37,99,235,0.4)',
+                                    cursor: poisSaving ? 'wait' : 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                    opacity: poisSaving ? 0.7 : 1
+                                }}
+                            >
+                                {poisSaving ? 'Guardando...' : (
+                                    selectedPoiIds.length === 0
+                                        ? 'Continuar sin puntos de interés'
+                                        : `Confirmar ${selectedPoiIds.length} punto${selectedPoiIds.length === 1 ? '' : 's'} ✓`
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* ═══ PHASE 3: CONNECT CONTROLLER ═══ */}
                 {pilotPhase === 'connect' && (

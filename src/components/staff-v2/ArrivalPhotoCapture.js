@@ -92,6 +92,9 @@ export default function ArrivalPhotoCapture({ journeyId, userId, onComplete }) {
             delete nextMeta.pilot_audio_checks;
             delete nextMeta.pilot_audio_configured;
             delete nextMeta.pilot_audio_configured_at;
+            delete nextMeta.pilot_pois_selected;
+            delete nextMeta.pilot_pois_selected_at;
+            delete nextMeta.pilot_route_pois;
             delete nextMeta.global_seat_deployment_done;
             delete nextMeta.global_seat_deployment_done_at;
             delete nextMeta.global_seat_deployment_done_by;

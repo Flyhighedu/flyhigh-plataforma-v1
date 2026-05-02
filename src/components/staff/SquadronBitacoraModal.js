@@ -294,14 +294,9 @@ export function BitacoraPilotBanner({ missionInfo, activeFlight, nextFlightNumbe
                         "{activeSquad.nombreClave}"
                     </p>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                        {activeSquad.capitan && (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: activeFlight ? '#D1FAE5' : '#6D28D9' }}>
-                                🎖️ Capitán: {activeSquad.capitan}
-                            </span>
-                        )}
-                        {activeSquad.destinos && (
-                            <span style={{ fontSize: 12, fontWeight: 700, color: activeFlight ? '#D1FAE5' : '#6D28D9' }}>
-                                🗺️ {activeSquad.destinos}
+                        {activeSquad.destinoPersonalizado && (
+                            <span style={{ fontSize: 13, fontWeight: 800, color: activeFlight ? '#FDE68A' : '#7C3AED' }}>
+                                📍 Destino especial: {activeSquad.destinoPersonalizado}
                             </span>
                         )}
                     </div>

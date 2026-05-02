@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { processBackgroundRemoval } from '@/lib/bgRemover';
 import FlyerDownloadModal from '@/components/flyers/FlyerDownloadModal';
+import CronogramaReportModal from '@/components/admin/CronogramaReportModal';
 
 import SandboxEscuelasPage from '@/app/sandbox-escuelas/page';
 import SandboxVuelosPage from '@/app/sandbox-vuelos/page';
@@ -27,10 +28,10 @@ import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
 import SandboxCRMPage from '@/app/sandbox-crm/page';
 import CRMEscuelasPage from '@/app/admin/crm/page';
 import ImprimiblesPage from '@/app/admin/imprimibles/page';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
-const DashboardPage = dynamic(() => import('../dashboard/page'), {
+const DashboardPage = dynamic(() => import('@/app/dashboard/page'), {
     ssr: false,
     loading: () => (
         <div className="flex items-center justify-center h-[400px] bg-slate-100">
@@ -46,24 +47,31 @@ export default function AdminPage() {
     // TODOS LOS HOOKS DEBEN IR AL INICIO
     // ============================================
     const router = useRouter();
+    const pathname = usePathname();
 
-    // --- ESTADO DE AUTENTICACIÓN ---
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [password, setPassword] = useState('');
-    const [loginError, setLoginError] = useState('');
-    const [loginLoading, setLoginLoading] = useState(false);
-    const [isMounted, setIsMounted] = useState(false); // Fix hydration mismatch
+    const [isMounted, setIsMounted] = useState(false);
 
     // --- ESTADO DE TABS ---
-    const [activeTab, setActiveTab] = useState('bd'); // Starts on database tab now
+    const pathParts = pathname.split('/').filter(Boolean);
+    const activeTab = 'cronograma';
+    const isAuthenticated = true; // Authenticated by layout
+    const setIsAuthenticated = () => {};
+
+    const setActiveTab = (tab) => {
+        router.push(`/admin/${tab}`);
+    };
+
     // New state for embedded dashboard preview
     const [showDashboardPreview, setShowDashboardPreview] = useState(false);
     // --- ESTADO PARA LA SECCIÓN "BASES DE DATOS" ---
     const [dbView, setDbView] = useState('menu'); // 'menu' | 'catalogo' | 'vuelos'
     const [isExitingDB, setIsExitingDB] = useState(false);
 
-    // --- ESTADO PARA DESCARGA DE FLYERS ---
+    // --- ESTADO PARA DESCARGA DE FLYERS Y REPORTES ---
     const [showFlyerModal, setShowFlyerModal] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [showReportNotification, setShowReportNotification] = useState(false);
+    const [reportNotificationDays, setReportNotificationDays] = useState(7);
     const [flyerSchoolData, setFlyerSchoolData] = useState(null);
 
     // --- SINCRONIZADOR PIXEL-PERFECT DEL MASCOT AL SCROLL ---
@@ -337,6 +345,27 @@ export default function AdminPage() {
         }
     }, [activeTab, isAuthenticated]);
 
+    // Verificar notificación de reporte al montar o cambiar tab
+    useEffect(() => {
+        if (!isMounted || activeTab !== 'cronograma') return;
+        const checkReportNotification = () => {
+            const savedAutoDay = localStorage.getItem('flyhigh_report_auto_day');
+            const savedDays = localStorage.getItem('flyhigh_report_days_forward') || '7';
+            const lastGenerated = localStorage.getItem('flyhigh_report_last_generated');
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+            const currentDayNum = new Date().getDay().toString(); // 0-6
+
+            if (savedAutoDay && savedAutoDay === currentDayNum && lastGenerated !== todayStr) {
+                setShowReportNotification(true);
+                setReportNotificationDays(parseInt(savedDays));
+            } else {
+                setShowReportNotification(false);
+            }
+        };
+        checkReportNotification();
+    }, [isMounted, activeTab]);
+
 
 
     // Cargar patrocinadores y cronograma al montar
@@ -347,6 +376,43 @@ export default function AdminPage() {
         fetchCatalogoEscuelas();
         fetchAvailableDates();
     }, [isAuthenticated]);
+
+    // --- EFECTOS PARA PERSISTENCIA (Borrador) ---
+    useEffect(() => {
+        if (!isMounted) return;
+        try {
+            const savedData = localStorage.getItem('flyhigh_draft_school_form');
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                if (parsed.form) setNextSchoolForm(parsed.form);
+                if (parsed.editingId) setEditingSchoolId(parsed.editingId);
+            }
+        } catch (e) {
+            console.warn('Error reading draft from localStorage:', e);
+        }
+    }, [isMounted]);
+
+    useEffect(() => {
+        if (!isMounted) return;
+        const hasData = Object.values(nextSchoolForm).some(v => v !== '');
+        if (hasData || editingSchoolId) {
+            localStorage.setItem('flyhigh_draft_school_form', JSON.stringify({
+                form: nextSchoolForm,
+                editingId: editingSchoolId
+            }));
+        } else {
+            localStorage.removeItem('flyhigh_draft_school_form');
+        }
+    }, [nextSchoolForm, editingSchoolId, isMounted]);
+
+    // Restaurar selección en catálogo si la escuela del borrador tiene CCT
+    useEffect(() => {
+        if (catalogoEscuelas.length > 0 && nextSchoolForm.cct && !selectedCatalogoSchool) {
+            const catalogMatch = catalogoEscuelas.find(s => s.cct === nextSchoolForm.cct);
+            if (catalogMatch) setSelectedCatalogoSchool(catalogMatch);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [catalogoEscuelas, nextSchoolForm.cct]);
 
     // Fetch catálogo oficial de escuelas
     const fetchCatalogoEscuelas = async () => {
@@ -610,6 +676,7 @@ export default function AdminPage() {
 
             setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '', nombre_director: '', telefono_director: '', numero_ninos: '', cuota_alumno: '' });
             setSelectedCatalogoSchool(null);
+            localStorage.removeItem('flyhigh_draft_school_form');
         } catch (err) {
             console.error('Error saving next school:', err);
             alert('Error al guardar escuela: ' + (err.message || err));
@@ -699,6 +766,7 @@ export default function AdminPage() {
         setNextSchoolForm({ nombre_escuela: '', colonia: '', fecha_programada: '', cct: '', turno: '', nombre_director: '', telefono_director: '', numero_ninos: '', cuota_alumno: '' });
         setSelectedCatalogoSchool(null);
         setEditingSchoolId(null);
+        localStorage.removeItem('flyhigh_draft_school_form');
     };
 
     const handleCompleteNextSchool = async (id, currentStatus) => {
@@ -907,74 +975,9 @@ export default function AdminPage() {
     // --- HYDRATION GUARD ---
     if (!isMounted) {
         return (
-            <div className="min-h-screen neu-bg-screen flex items-center justify-center p-4">
+            <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--neu-bg)' }}>
                 <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
             </div>
-        );
-    }
-
-    // --- PANTALLA DE LOGIN ---
-    if (!isAuthenticated) {
-        return (
-            <main className="min-h-screen neu-bg-screen flex items-center justify-center p-4">
-                {globalStyles}
-                <div className="w-full max-w-md">
-                    <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl shadow-lg shadow-blue-500/30 mb-6">
-                            <ShieldCheck className="w-10 h-10 text-white" />
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 neu-text">
-                            Acceso <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">Restringido</span>
-                        </h1>
-                        <p className="neu-text-sub text-sm">Panel de Administración · Fly High Edu</p>
-                    </div>
-
-                    <div className="neu-card p-10 max-w-md w-full relative z-10 text-center">
-                        <form onSubmit={handleLogin} className="space-y-6">
-                            <div>
-                                <label className="flex items-center gap-2 text-xs font-bold neu-text-sub uppercase tracking-wider mb-3">
-                                    <KeyRound size={14} /> Contraseña de Administrador
-                                </label>
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 neu-text-sub" />
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                        placeholder="Ingresa la contraseña"
-                                        className="w-full neu-input-inset pl-12 pr-4 py-4 focus:ring-2 focus:ring-blue-500 transition-all font-mono tracking-widest"
-                                        autoFocus
-                                    />
-                                </div>
-                            </div>
-
-                            {loginError && (
-                                <div className="flex items-center gap-2 p-3 rounded-xl text-sm bg-red-500/20 text-red-300 border border-red-500/30">
-                                    <AlertCircle size={16} />
-                                    {loginError}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={loginLoading || !password}
-                                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {loginLoading ? (
-                                    <><Loader2 size={18} className="animate-spin" /> Verificando...</>
-                                ) : (
-                                    <><Lock size={18} /> Ingresar al Panel</>
-                                )}
-                            </button>
-                        </form>
-                    </div>
-
-                    <p className="text-center text-slate-600 text-xs mt-6">
-                        Acceso exclusivo para administradores autorizados.
-                    </p>
-                </div>
-            </main>
         );
     }
 
@@ -1080,17 +1083,6 @@ export default function AdminPage() {
     // --- PANEL DE ADMINISTRACIÓN ---
     return (
         <>
-        <AdminLayout
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            isAuthenticated={isAuthenticated}
-            onLogout={async () => {
-                await fetch('/api/admin-auth', { method: 'DELETE' });
-                setIsAuthenticated(false);
-                setPassword('');
-            }}
-        >
-            {globalStyles}
             {/* CONTENIDO DE TABS */}
             
             {/* TAB: BASES DE DATOS (IMPORTACIÓN DE SANDBOXES) */}
@@ -1776,6 +1768,40 @@ export default function AdminPage() {
                 activeTab === 'cronograma' && (
                     <div className="max-w-5xl mx-auto space-y-8 animate-premium-in">
 
+                        {/* Notificación de Reporte */}
+                        {showReportNotification && (
+                            <div className="bg-indigo-600 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-indigo-600/20 animate-premium-in relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+                                <div className="flex items-center gap-3 relative z-10">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                                        <FileText className="text-white" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-sm md:text-base">¡Tu reporte semanal está listo para generarse!</h3>
+                                        <p className="text-indigo-100 text-xs">Descarga el itinerario operativo de los próximos {reportNotificationDays} días.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 relative z-10 w-full sm:w-auto">
+                                    <button 
+                                        onClick={() => {
+                                            setShowReportModal(true);
+                                            setShowReportNotification(false);
+                                        }}
+                                        className="flex-1 sm:flex-none bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all active:scale-95 whitespace-nowrap"
+                                    >
+                                        Ver Reporte
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowReportNotification(false)}
+                                        className="p-2 text-indigo-200 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                                        title="Ocultar"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* === PANEL: DISPONIBILIDAD BOT WHATSAPP === */}
                         <section className="neu-card p-6 md:p-8 border-2 border-emerald-500/20">
                             <div className="flex items-center justify-between mb-6">
@@ -2164,9 +2190,14 @@ export default function AdminPage() {
                                             <p className="text-blue-100/80 text-xs font-medium mt-0.5">Misiones pendientes por completar</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => fetchNextSchools()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md transition-all duration-300 hover:rotate-180 active:scale-95">
-                                        <RefreshCw size={18} />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setShowReportModal(true)} className="px-4 py-2 bg-white hover:bg-slate-50 text-blue-600 rounded-xl shadow-lg shadow-black/10 transition-all duration-300 active:scale-95 text-sm font-bold flex items-center gap-2" title="Generar Reporte Semanal">
+                                            <FileText size={18} className="text-blue-600" /> Reporte
+                                        </button>
+                                        <button onClick={() => fetchNextSchools()} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl backdrop-blur-md transition-all duration-300 hover:rotate-180 active:scale-95">
+                                            <RefreshCw size={18} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {fetchingNextSchools ? (
@@ -2303,6 +2334,14 @@ export default function AdminPage() {
                     </div>
                 )
             }
+
+            {showReportModal && (
+                <CronogramaReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    schools={nextSchools}
+                />
+            )}
 
             {/* FOOTER */}
 
@@ -2765,7 +2804,6 @@ export default function AdminPage() {
                     <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
                 </footer>
             )}
-        </AdminLayout>
 
         {/* Flyer Download Modal */}
         {showFlyerModal && flyerSchoolData && (

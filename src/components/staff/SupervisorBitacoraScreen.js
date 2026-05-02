@@ -34,7 +34,8 @@ export default function SupervisorBitacoraScreen({
     // Data States
     const [nombreClave, setNombreClave] = useState('');
     const [destinos, setDestinos] = useState('');
-    const [flightPlan, setFlightPlan] = useState(null);
+    const [destinoPersonalizado, setDestinoPersonalizado] = useState('');
+    const [ruta, setRuta] = useState(null);
     
     // UI & Modal States
     const [isSaving, setIsSaving] = useState(false);
@@ -100,22 +101,27 @@ export default function SupervisorBitacoraScreen({
     }, [timerRunning]);
 
     // MASTER FLOW: Start
-    const handleStartMasterFlow = useCallback(async () => {
+    const handleStartMasterFlow = useCallback(() => {
         // Reset old data
         setNombreClave('');
         setDestinos('');
-        setFlightPlan(null);
+        setDestinoPersonalizado('');
+        setRuta(null);
         setSaved(false);
         setUploadedUrl(null);
 
-        // Start Timer & Audio
+        // Go to tanda prep first (timer & mic start AFTER this step)
+        setMasterStep('prep_tanda');
+    }, []);
+
+    // Called when teacher confirms tanda is ready
+    const handleTandaReady = useCallback(async () => {
+        // NOW start Timer & Audio
         setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
         setTimerRunning(true);
         if (micSupported && !micRecording) {
             try { await startRecording(); } catch (err) { console.warn('⚠️ Mic auto-start failed:', err); }
         }
-
-        // Advance to Phase 1 Intro
         setMasterStep('intro_scanner');
     }, [micSupported, micRecording, startRecording]);
 
@@ -129,6 +135,8 @@ export default function SupervisorBitacoraScreen({
             flightNumber,
             nombreClave: nombreClave.trim(),
             destinos: destinos.trim() || null,
+            destinoPersonalizado: destinoPersonalizado.trim() || null,
+            ruta: ruta || null,
             timestamp: new Date().toISOString()
         };
 
@@ -166,7 +174,8 @@ export default function SupervisorBitacoraScreen({
                 setMasterStep('idle');
                 setNombreClave('');
                 setDestinos('');
-                setFlightPlan(null);
+                setDestinoPersonalizado('');
+                setRuta(null);
                 setSaved(false);
                 setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
             }, 1500);
@@ -177,7 +186,7 @@ export default function SupervisorBitacoraScreen({
         } finally {
             setIsSaving(false);
         }
-    }, [nombreClave, destinos, journeyId, bitacoraHistory, isSaving, micRecording, stopRecording]);
+    }, [nombreClave, destinos, destinoPersonalizado, ruta, journeyId, bitacoraHistory, isSaving, micRecording, stopRecording]);
 
     // Upload telemetry audio to server
     const uploadTelemetry = useCallback(async (blob) => {
@@ -202,13 +211,13 @@ export default function SupervisorBitacoraScreen({
     }, [journeyId, bitacoraHistory.length, userId, recDuration]);
 
     // ── WIZARD STEP DEFINITIONS ──
-    const WIZARD_STEPS = ['idle', 'intro_scanner', 'scanner', 'intro_calculator', 'calculator', 'briefing_final'];
+    const WIZARD_STEPS = ['idle', 'prep_tanda', 'intro_scanner', 'scanner', 'calculator', 'briefing_final'];
     const WIZARD_LABELS = {
         'idle': 'Inicio',
-        'intro_scanner': 'Intro Escáner',
-        'scanner': '🎤 Batalla de Gritos',
-        'intro_calculator': 'Intro Plan',
-        'calculator': '🗺️ Calculadora',
+        'prep_tanda': '👥 Prepara Tanda',
+        'intro_scanner': 'Intro Dinámica',
+        'scanner': '✋ Votación de Nombre',
+        'calculator': '🗺️ Destinos + Lugar Especial',
         'briefing_final': '📣 Briefing'
     };
     const currentStepIndex = WIZARD_STEPS.indexOf(masterStep);
@@ -260,7 +269,8 @@ export default function SupervisorBitacoraScreen({
         setNavExpanded(false);
         setNombreClave('');
         setDestinos('');
-        setFlightPlan(null);
+        setDestinoPersonalizado('');
+        setRuta(null);
         setSaved(false);
         setUploadedUrl(null);
         setMasterStep('idle');
@@ -485,8 +495,13 @@ export default function SupervisorBitacoraScreen({
                                                 <p style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     "{entry.nombreClave}"
                                                 </p>
+                                                {entry.destinoPersonalizado && (
+                                                    <p style={{ fontSize: 13, color: '#7C3AED', fontWeight: 700, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        📍 {entry.destinoPersonalizado}
+                                                    </p>
+                                                )}
                                                 {entry.destinos && (
-                                                    <p style={{ fontSize: 12, color: '#64748B', fontWeight: 600, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <p style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                         🗺️ {entry.destinos}
                                                     </p>
                                                 )}
@@ -496,6 +511,84 @@ export default function SupervisorBitacoraScreen({
                                 </div>
                             </section>
                         )}
+                    </div>
+                )}
+
+                {/* PREP TANDA: Separar a los niños */}
+                {masterStep === 'prep_tanda' && (
+                    <div style={{ animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 24px' }}>
+                            {/* Big emoji icon */}
+                            <div style={{
+                                width: 88, height: 88, borderRadius: 28,
+                                background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+                                border: '2px solid #FBBF24',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 44, marginBottom: 28,
+                                boxShadow: '0 16px 32px rgba(251, 191, 36, 0.15)'
+                            }}>
+                                👥
+                            </div>
+
+                            {/* Badge */}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FFFBEB', padding: '6px 14px', borderRadius: 100, marginBottom: 16 }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                                    Antes de iniciar
+                                </span>
+                            </div>
+
+                            <h2 style={{ fontSize: 28, fontWeight: 900, color: '#0F172A', margin: '0 0 12px', lineHeight: 1.15 }}>
+                                Separa a tu<br/>próxima tanda
+                            </h2>
+
+                            <p style={{ fontSize: 15, color: '#64748B', margin: '0 0 28px', lineHeight: 1.5, maxWidth: 320 }}>
+                                Solo los niños que vayan a volar ahora deben tomar la dinámica.
+                            </p>
+
+                            {/* Visual hint cards */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 340 }}>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 14,
+                                    background: '#F8FAFC', borderRadius: 16, padding: '14px 16px',
+                                    border: '1px solid #E2E8F0'
+                                }}>
+                                    <span style={{ fontSize: 22 }}>🥽</span>
+                                    <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', margin: 0, lineHeight: 1.4, textAlign: 'left' }}>
+                                        Cuenta las gafas disponibles y separa a ese número de niños
+                                    </p>
+                                </div>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 14,
+                                    background: '#F8FAFC', borderRadius: 16, padding: '14px 16px',
+                                    border: '1px solid #E2E8F0'
+                                }}>
+                                    <span style={{ fontSize: 22 }}>✋</span>
+                                    <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', margin: 0, lineHeight: 1.4, textAlign: 'left' }}>
+                                        Los demás esperan su turno aparte
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* CTA Bottom */}
+                        <div style={{ marginTop: 'auto', padding: '0 16px 24px' }}>
+                            <button
+                                onClick={handleTandaReady}
+                                style={{
+                                    width: '100%', padding: '20px', borderRadius: 20, border: 'none',
+                                    background: 'linear-gradient(135deg, #F59E0B, #D97706)', color: 'white',
+                                    fontSize: 17, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                    cursor: 'pointer', boxShadow: '0 14px 28px rgba(245, 158, 11, 0.3)',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                ¡Tanda lista para emocionar! 🚀
+                            </button>
+                            <p style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#94A3B8', marginTop: 10 }}>
+                                El timer y la grabación iniciarán al continuar
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -532,14 +625,14 @@ export default function SupervisorBitacoraScreen({
                                 textAlign: 'left', marginBottom: 24
                             }}>
                                 <p style={{ fontSize: 15, color: '#334155', lineHeight: 1.5, margin: '0 0 16px' }}>
-                                    Es hora de darle un nombre al grupo. Para hacerlo, usaremos la <strong style={{color:'#0F172A'}}>Batalla de Gritos</strong>.
+                                    Es hora de darle un nombre al grupo. Para hacerlo, usaremos la <strong style={{color:'#0F172A'}}>Votación a Mano Alzada</strong>.
                                 </p>
                                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                                     <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                                         <span style={{ fontSize: 12, color: '#2563EB', fontWeight: 800 }}>i</span>
                                     </div>
                                     <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.5, margin: 0 }}>
-                                        Diles las dos opciones en pantalla y pídeles que griten tan fuerte como puedan. La app medirá su energía automáticamente.
+                                        Diles las dos opciones en pantalla y pídeles que levanten la mano para votar. Luego mantén presionado el nombre ganador durante 1 segundo.
                                     </p>
                                 </div>
                             </div>
@@ -615,7 +708,7 @@ export default function SupervisorBitacoraScreen({
                             </h2>
                             <div style={{ marginTop: 12, display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: 100, border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <p style={{ fontSize: 13, color: '#E2E8F0', fontWeight: 700, margin: 0 }}>
-                                    Explica esto al <strong style={{ color: '#60A5FA' }}>Escuadrón {nombreClave}</strong>
+                                    Explica esto al <strong style={{ color: '#60A5FA' }}>Escuadrón {nombreClave}</strong>{destinoPersonalizado ? ` · 📍 ${destinoPersonalizado}` : ''}
                                 </p>
                             </div>
                         </div>
@@ -782,9 +875,9 @@ export default function SupervisorBitacoraScreen({
                     resetWizard();
                 }}
                 onComplete={(plan) => {
-                    setFlightPlan(plan);
-                    const places = Object.values(plan.assignments).filter(Boolean);
-                    setDestinos(`Ruta ${plan.routeName}: ${places.join(', ')}`);
+                    setDestinos(plan.destinos || '');
+                    setDestinoPersonalizado(plan.destinoPersonalizado || '');
+                    setRuta(plan.routeId || null);
                     setCalcOpen(false);
                     setMasterStep('briefing_final');
                 }}

@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Loader2, Plus, List, Map, Star, Trash2, Edit3, Navigation } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, List, Map, Star, Trash2, Edit3, Navigation, Landmark } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIFormModal, { CATEGORIES } from './POIFormModal';
@@ -27,6 +27,12 @@ export default function TacticalMapScreen({ userId, profile }) {
     const [editingPoi, setEditingPoi] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
+
+    // Overpass API states
+    const [mapBounds, setMapBounds] = useState(null);
+    const [suggestedPois, setSuggestedPois] = useState([]);
+    const [isSearchingCulturalPois, setIsSearchingCulturalPois] = useState(false);
+    const [groqQuota, setGroqQuota] = useState(null);
 
     // Load POIs
     useEffect(() => {
@@ -63,6 +69,171 @@ export default function TacticalMapScreen({ userId, profile }) {
         setClickedLatLng(null);
         setShowForm(true);
     }, []);
+
+    const handleSuggestedPoiClick = useCallback((poi) => {
+        // Pass it without an id, so POIFormModal treats it as a new creation
+        setEditingPoi({
+            name: poi.name,
+            description: poi.description,
+            category: 'landmark',
+            latitude: poi.latitude,
+            longitude: poi.longitude
+        });
+        setClickedLatLng(null);
+        setShowForm(true);
+    }, []);
+
+    const handleSearchCulturalPois = async () => {
+        // Toggle: Si ya hay puntos, los borramos (apagar radar)
+        if (suggestedPois.length > 0) {
+            setSuggestedPois([]);
+            return;
+        }
+
+        if (!mapBounds) {
+            alert('Mueve un poco el mapa primero para detectar la zona.');
+            return;
+        }
+
+        setIsSearchingCulturalPois(true);
+        try {
+            const sw = mapBounds._southWest;
+            const ne = mapBounds._northEast;
+            const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+
+            const query = `
+                [out:json][timeout:20];
+                (
+                  node["historic"](${bbox});
+                  way["historic"](${bbox});
+                  node["tourism"~"museum|artwork|attraction|theme_park|zoo"](${bbox});
+                  way["tourism"~"museum|artwork|attraction|theme_park|zoo"](${bbox});
+                  node["amenity"="place_of_worship"](${bbox});
+                  way["amenity"="place_of_worship"](${bbox});
+                  node["aeroway"="aerodrome"](${bbox});
+                  way["aeroway"="aerodrome"](${bbox});
+                  node["waterway"="dam"](${bbox});
+                  way["waterway"="dam"](${bbox});
+                  node["natural"~"peak|volcano"](${bbox});
+                );
+                out center;
+            `;
+
+            const res = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            });
+
+            if (!res.ok) throw new Error('Failed to fetch from Overpass');
+            const data = await res.json();
+
+            let newPois = data.elements.map(el => {
+                const lat = el.type === 'node' ? el.lat : el.center?.lat;
+                const lon = el.type === 'node' ? el.lon : el.center?.lon;
+                const name = el.tags?.name;
+                const historicType = el.tags?.historic;
+                const tourismType = el.tags?.tourism;
+                const amenityType = el.tags?.amenity;
+                const naturalType = el.tags?.natural;
+                const aeroType = el.tags?.aeroway;
+                const waterType = el.tags?.waterway;
+
+                const wikiTag = el.tags?.wikipedia;
+                const wikidataTag = el.tags?.wikidata;
+
+                if (!lat || !lon || !name) return null;
+
+                let desc = 'Punto de interés geográfico o cultural.';
+                if (historicType === 'monument') desc = 'Monumento Histórico.';
+                else if (historicType === 'archaeological_site') desc = 'Sitio Arqueológico.';
+                else if (tourismType === 'museum') desc = 'Museo.';
+                else if (tourismType === 'artwork') desc = 'Obra de arte pública.';
+                else if (tourismType === 'theme_park') desc = 'Parque de Atracciones.';
+                else if (tourismType === 'zoo') desc = 'Zoológico.';
+                else if (amenityType === 'place_of_worship') desc = 'Templo / Lugar de culto.';
+                else if (naturalType === 'peak' || naturalType === 'volcano') desc = `Elevación Natural (${el.tags?.ele ? el.tags.ele + 'm' : 'Cerro/Montaña'}).`;
+                else if (aeroType === 'aerodrome') desc = 'Aeropuerto / Pista de aterrizaje.';
+                else if (waterType === 'dam') desc = 'Presa / Infraestructura hidráulica.';
+
+                return {
+                    id: el.id,
+                    name: name,
+                    description: desc,
+                    latitude: lat,
+                    longitude: lon,
+                    wikiTag: wikiTag,
+                    wikidataTag: wikidataTag
+                };
+            }).filter(Boolean);
+
+            if (newPois.length === 0) {
+                alert('No se encontraron sitios culturales o geográficos en esta área. Intenta alejarte un poco.');
+                return;
+            }
+
+            // Obtener contexto geográfico general (Ciudad, Estado) para mejorar las búsquedas
+            let geoContext = '';
+            try {
+                const centerLat = (mapBounds._southWest.lat + mapBounds._northEast.lat) / 2;
+                const centerLng = (mapBounds._southWest.lng + mapBounds._northEast.lng) / 2;
+                const nomRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${centerLat}&lon=${centerLng}&format=json`);
+                if (nomRes.ok) {
+                    const nomData = await nomRes.json();
+                    if (nomData.address) {
+                        const city = nomData.address.city || nomData.address.town || nomData.address.village || nomData.address.county || '';
+                        const state = nomData.address.state || '';
+                        geoContext = `${city} ${state}`.trim();
+                    }
+                }
+            } catch (e) {
+                console.warn('Nominatim reverse geocode failed');
+            }
+
+            // Enriquecer con IA (Groq) + caché Supabase
+            try {
+                const infoRes = await fetch('/api/poi-batch-info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pois: newPois.map(p => ({
+                            name: p.name,
+                            lat: p.latitude,
+                            lon: p.longitude,
+                            type: p.description // el tipo básico de OSM (ej: "Monumento Histórico.")
+                        })),
+                        context: geoContext
+                    })
+                });
+                
+                if (infoRes.ok) {
+                    const data = await infoRes.json();
+                    const infoMap = data.results || data; // Backward compat
+                    if (data.quota) setGroqQuota(data.quota);
+                    
+                    console.log('[POI Info] Keys returned:', Object.keys(infoMap));
+                    
+                    newPois = newPois.map(poi => {
+                        const aiInfo = infoMap[poi.name];
+                        if (aiInfo && typeof aiInfo === 'string' && aiInfo.length > 10) {
+                            poi.description = aiInfo;
+                        } else {
+                            console.warn(`[POI Info] No match for "${poi.name}". aiInfo =`, aiInfo);
+                        }
+                        return poi;
+                    });
+                }
+            } catch (e) {
+                console.warn('POI info enrichment failed', e);
+            }
+
+            setSuggestedPois(newPois);
+        } catch (err) {
+            console.error('Overpass error:', err);
+            alert('Error al buscar sitios culturales. Por favor, intenta de nuevo.');
+        } finally {
+            setIsSearchingCulturalPois(false);
+        }
+    };
 
     const handleSave = useCallback(async (poiData) => {
         if (!userId || isSaving) return;
@@ -175,10 +346,59 @@ export default function TacticalMapScreen({ userId, profile }) {
                 <div style={{ flex: 1, position: 'relative' }}>
                     <MapWithNoSSR
                         pois={pois}
+                        suggestedPois={suggestedPois}
                         userLocation={userLocation}
                         onMapClick={handleMapClick}
                         onMarkerClick={handleEditPoi}
+                        onBoundsChange={setMapBounds}
+                        onSuggestedPoiClick={handleSuggestedPoiClick}
                     />
+                    
+                    {/* Cultural POI Search Toggle */}
+                    <button
+                        onClick={handleSearchCulturalPois}
+                        disabled={isSearchingCulturalPois}
+                        style={{
+                            position: 'absolute', bottom: 96, right: 16, zIndex: 2000,
+                            width: 56, height: 56, borderRadius: 18,
+                            background: suggestedPois.length > 0 ? '#F59E0B' : '#1E293B',
+                            border: '1px solid #334155', 
+                            color: suggestedPois.length > 0 ? '#1E293B' : '#F59E0B',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: suggestedPois.length > 0 ? '0 8px 24px -4px rgba(245,158,11,0.5)' : '0 8px 24px -4px rgba(0,0,0,0.5)',
+                            cursor: isSearchingCulturalPois ? 'wait' : 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                        title="Buscar sitios culturales e históricos"
+                    >
+                        {isSearchingCulturalPois ? <Loader2 size={24} className="animate-spin" /> : <Landmark size={24} strokeWidth={2.5} />}
+                    </button>
+
+                    {/* Groq AI Quota Badge */}
+                    {groqQuota && (
+                        <div style={{
+                            position: 'absolute', bottom: 80, left: 16, zIndex: 9999,
+                            background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(8px)',
+                            borderRadius: 12, padding: '8px 12px',
+                            border: '1px solid #334155',
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            fontSize: 11, fontWeight: 600, color: '#94A3B8',
+                            pointerEvents: 'none'
+                        }}>
+                            <div style={{
+                                width: 8, height: 8, borderRadius: '50%',
+                                background: groqQuota.remainingRequests > 10000 ? '#22C55E' :
+                                           groqQuota.remainingRequests > 5000 ? '#F59E0B' : '#EF4444',
+                                boxShadow: `0 0 6px ${groqQuota.remainingRequests > 10000 ? '#22C55E' :
+                                           groqQuota.remainingRequests > 5000 ? '#F59E0B' : '#EF4444'}`
+                            }} />
+                            <span style={{ color: '#E2E8F0' }}>
+                                🤖 {groqQuota.remainingRequests.toLocaleString()}/{groqQuota.limitRequests.toLocaleString()}
+                            </span>
+                            <span style={{ color: '#64748B', fontSize: 10 }}>req/día</span>
+                        </div>
+                    )}
+
                     {/* FAB */}
                     <button
                         onClick={() => {
@@ -189,7 +409,7 @@ export default function TacticalMapScreen({ userId, profile }) {
                             }
                         }}
                         style={{
-                            position: 'absolute', bottom: 24, right: 16, zIndex: 40,
+                            position: 'absolute', bottom: 24, right: 16, zIndex: 2000,
                             width: 56, height: 56, borderRadius: 18,
                             background: 'linear-gradient(135deg, #06B6D4, #0891B2)',
                             border: 'none', color: 'white',

@@ -13,12 +13,13 @@ export function GhostRow({ columnCount, onCreateRow }) {
     phone: "",
     email: "",
   };
-  
+
   const [form, setForm] = useState(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
   const firstRef = useRef(null);
 
-  const canSave = form.id.trim().length > 10 && form.full_name.trim().length > 2;
+  const canSave =
+    form.id.trim().length > 10 && form.full_name.trim().length > 2;
 
   const handleSave = async () => {
     if (!canSave || isSaving) return;
@@ -27,16 +28,21 @@ export function GhostRow({ columnCount, onCreateRow }) {
       await onCreateRow(form);
       setForm(emptyForm);
       setTimeout(() => firstRef.current?.focus(), 50);
-    } catch {} finally {
+    } catch {
+    } finally {
       setIsSaving(false);
     }
   };
 
   const kd = (e) => {
-    if (e.key === "Enter" && canSave) { e.preventDefault(); handleSave(); }
+    if (e.key === "Enter" && canSave) {
+      e.preventDefault();
+      handleSave();
+    }
   };
 
-  const cls = "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500 rounded-md font-medium text-slate-700 placeholder:text-slate-400";
+  const cls =
+    "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500 rounded-md font-medium text-slate-700 placeholder:text-slate-400";
 
   // Column order in hr-columns.jsx:
   // 1: UUID Copy Button -> Here it will be an Input for the new UUID
@@ -46,10 +52,9 @@ export function GhostRow({ columnCount, onCreateRow }) {
   // 5: Telefono
   // 6: Email
   // 7: Acciones
-  
+
   return (
     <TableRow className="bg-emerald-50/30 border-t-2 border-dashed border-emerald-300 hover:bg-emerald-50/50 transition-colors">
-      
       {/* 1: UUID (Input) */}
       <TableCell className="p-2">
         <Input
@@ -70,7 +75,9 @@ export function GhostRow({ columnCount, onCreateRow }) {
           type="text"
           placeholder="Ej. Juan Pérez"
           value={form.full_name}
-          onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, full_name: e.target.value }))
+          }
           onKeyDown={kd}
           className={`${cls} w-full`}
         />
@@ -96,8 +103,10 @@ export function GhostRow({ columnCount, onCreateRow }) {
       <TableCell className="p-2 text-center">
         <select
           value={form.is_active.toString()}
-          onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
-          className={`h-8 text-[11px] font-bold uppercase rounded-md border px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${form.is_active ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-200 text-slate-600 border-slate-300'}`}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, is_active: e.target.value === "true" }))
+          }
+          className={`h-8 text-[11px] font-bold uppercase rounded-md border px-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${form.is_active ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-slate-200 text-slate-600 border-slate-300"}`}
         >
           <option value="true">Activo</option>
           <option value="false">Inactivo</option>
@@ -135,10 +144,13 @@ export function GhostRow({ columnCount, onCreateRow }) {
           disabled={!canSave || isSaving}
           className="inline-flex w-full items-center justify-center h-8 px-3 rounded-lg text-xs font-black text-white bg-emerald-500 hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm shadow-emerald-500/30 hover:shadow-emerald-500/50"
         >
-          {isSaving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : "INJECT"}
+          {isSaving ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            "INJECT"
+          )}
         </button>
       </TableCell>
-
     </TableRow>
   );
 }

@@ -26,22 +26,29 @@ export function GhostRow({ columnCount, onCreateRow }) {
       setForm(emptyForm);
       // Re-focus first field for rapid data entry
       setTimeout(() => firstRef.current?.focus(), 50);
-    } catch {} finally {
+    } catch {
+    } finally {
       setIsSaving(false);
     }
   };
   const kd = (e) => {
-    if (e.key === "Enter" && canSave) { e.preventDefault(); handleSave(); }
+    if (e.key === "Enter" && canSave) {
+      e.preventDefault();
+      handleSave();
+    }
   };
 
-  const cls = "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500";
+  const cls =
+    "h-8 text-sm bg-emerald-50/50 border-emerald-200 focus:ring-emerald-500";
 
   // Column order must match escuelas-columns.jsx exactly:
   // # | CCT | Nombre | Tipo | Niños | C.P. | Turno | ✈️ Visitada | Acción
   return (
     <TableRow className="bg-emerald-50/30 border-t-2 border-dashed border-emerald-300 hover:bg-emerald-50/50">
       {/* # */}
-      <TableCell><span className="text-emerald-500 text-lg font-bold">＋</span></TableCell>
+      <TableCell>
+        <span className="text-emerald-500 text-lg font-bold">＋</span>
+      </TableCell>
       {/* CCT */}
       <TableCell>
         <Input
@@ -60,7 +67,9 @@ export function GhostRow({ columnCount, onCreateRow }) {
           type="text"
           placeholder="Nombre de la escuela…"
           value={form.nombre_escuela}
-          onChange={(e) => setForm((f) => ({ ...f, nombre_escuela: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, nombre_escuela: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
@@ -97,7 +106,9 @@ export function GhostRow({ columnCount, onCreateRow }) {
           type="text"
           placeholder="60000"
           value={form.codigo_postal}
-          onChange={(e) => setForm((f) => ({ ...f, codigo_postal: e.target.value }))}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, codigo_postal: e.target.value }))
+          }
           onKeyDown={kd}
           className={cls}
         />
@@ -128,7 +139,11 @@ export function GhostRow({ columnCount, onCreateRow }) {
           disabled={!canSave || isSaving}
           className="inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          {isSaving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : "Crear"}
+          {isSaving ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            "Crear"
+          )}
         </button>
       </TableCell>
     </TableRow>

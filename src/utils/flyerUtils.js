@@ -157,7 +157,7 @@ async function inlineExternalImages(element) {
  * 4. Captures with html-to-image
  * 5. Restores element position
  */
-async function captureAsDataURL(element, scale = 3) {
+export async function captureAsDataURL(element, scale = 3) {
   if (!element) {
     throw new Error('Element ref is null — el componente no se ha montado todavía.');
   }
@@ -201,6 +201,36 @@ async function captureAsDataURL(element, scale = 3) {
     if (parent) {
       parent.style.cssText = originalStyle;
     }
+  }
+}
+
+export async function captureAsJPEGDataURL(element, scale = 3, quality = 1.0) {
+  if (!element) throw new Error('Element ref is null');
+  const htmlToImage = await import('html-to-image');
+  await waitForFonts();
+  await inlineExternalImages(element);
+
+  const parent = element.parentElement;
+  const originalStyle = parent?.style?.cssText || '';
+  if (parent) {
+    parent.style.cssText = [
+      'position: fixed', 'left: 0', 'top: 0', 'z-index: -1',
+      'opacity: 1', 'pointer-events: none', 'overflow: visible',
+    ].join('; ') + ';';
+  }
+
+  await new Promise(r => setTimeout(r, 300));
+
+  try {
+    const dataUrl = await htmlToImage.toJpeg(element, {
+      pixelRatio: scale,
+      quality: quality,
+      backgroundColor: '#ffffff',
+      skipFonts: false,
+    });
+    return dataUrl;
+  } finally {
+    if (parent) parent.style.cssText = originalStyle;
   }
 }
 

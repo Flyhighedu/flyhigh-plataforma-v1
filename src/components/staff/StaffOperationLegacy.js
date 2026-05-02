@@ -1466,6 +1466,12 @@ export default function StaffOperationLegacy({
                                 >
                                     <Clock size={18} /> Historial de Misiones
                                 </button>
+                                <button
+                                    onClick={() => { setShowMenu(false); router.push('/staff/poi'); }}
+                                    className="w-full text-left px-4 py-3 hover:bg-blue-50 rounded-lg flex items-center gap-3 text-blue-600 text-sm font-medium border-t border-slate-100"
+                                >
+                                    <span style={{ fontSize: 16 }}>📍</span> Puntos de Interés
+                                </button>
                             </div>
                         </div>
                     )}

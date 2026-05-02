@@ -11,8 +11,8 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
+const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 const CAT_COLORS = {
     school: '#3B82F6', parking: '#8B5CF6', hazard: '#EF4444',
@@ -22,6 +22,29 @@ const CAT_EMOJI = {
     school: '🏫', parking: '🅿️', hazard: '⚠️',
     landmark: '📍', refuel: '⛽', general: '📌'
 };
+
+const suggestedIcon = L.divIcon({
+    className: '',
+    html: `<div style="
+        width:40px;height:40px;border-radius:20px;
+        background:radial-gradient(circle, #FDE047 0%, #F59E0B 100%);
+        border:2px solid #FEF08A;
+        display:flex;align-items:center;justify-content:center;
+        font-size:20px;box-shadow:0 0 16px rgba(245,158,11,0.8), 0 0 32px rgba(245,158,11,0.4);
+        cursor:pointer;
+        animation: pulse 2s infinite;
+    ">🌟</div>
+    <style>
+      @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+      }
+    </style>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -22]
+});
 
 function makeIcon(category) {
     const color = CAT_COLORS[category] || CAT_COLORS.general;
@@ -52,10 +75,11 @@ const userIcon = L.divIcon({
     iconAnchor: [9, 9]
 });
 
-export default function TacticalMapLeaflet({ pois = [], userLocation, onMapClick, onMarkerClick }) {
+export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], userLocation, onMapClick, onMarkerClick, onBoundsChange, onSuggestedPoiClick }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef([]);
+    const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
 
     // Initialize map once
@@ -68,7 +92,7 @@ export default function TacticalMapLeaflet({ pois = [], userLocation, onMapClick
             attributionControl: false
         });
 
-        L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+        L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 19, subdomains: 'abc' }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
 
@@ -76,7 +100,13 @@ export default function TacticalMapLeaflet({ pois = [], userLocation, onMapClick
             onMapClick?.(e.latlng.lat, e.latlng.lng);
         });
 
+        map.on('moveend', () => {
+            onBoundsChange?.(map.getBounds());
+        });
+
         mapRef.current = map;
+        // initial bounds
+        setTimeout(() => onBoundsChange?.(map.getBounds()), 100);
 
         return () => {
             map.remove();
@@ -128,6 +158,45 @@ export default function TacticalMapLeaflet({ pois = [], userLocation, onMapClick
             markersRef.current.push(marker);
         });
     }, [pois, onMarkerClick]);
+
+    // Sync Suggested POI markers
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        suggestedMarkersRef.current.forEach(m => map.removeLayer(m));
+        suggestedMarkersRef.current = [];
+
+        suggestedPois.forEach(poi => {
+            const marker = L.marker([poi.latitude, poi.longitude], {
+                icon: suggestedIcon,
+                zIndexOffset: 1000 // Ensure they are above other POIs
+            }).addTo(map);
+
+            marker.bindPopup(`
+                <div style="font-family:system-ui;min-width:160px;text-align:center;">
+                    <p style="font-size:14px;font-weight:800;color:#F59E0B;margin:0 0 4px;">${poi.name}</p>
+                    <p style="font-size:12px;color:#64748B;margin:0 0 8px;">${poi.description || 'Punto de interés sugerido'}</p>
+                    <button id="btn-add-${poi.id}" style="
+                        width:100%;padding:6px;background:#0F172A;color:white;
+                        border:none;border-radius:8px;font-weight:bold;cursor:pointer;
+                    ">Añadir a mi lista</button>
+                </div>
+            `, { className: 'poi-popup suggested-popup', closeButton: true });
+
+            marker.on('popupopen', () => {
+                const btn = document.getElementById(`btn-add-${poi.id}`);
+                if (btn) {
+                    btn.onclick = () => {
+                        map.closePopup();
+                        onSuggestedPoiClick?.(poi);
+                    };
+                }
+            });
+
+            suggestedMarkersRef.current.push(marker);
+        });
+    }, [suggestedPois, onSuggestedPoiClick]);
 
     return (
         <>

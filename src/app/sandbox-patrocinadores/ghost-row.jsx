@@ -15,27 +15,34 @@ export function GhostRow({ columnCount, onCreateRow }) {
   const [isSaving, setIsSaving] = useState(false);
   const firstRef = useRef(null);
 
-  const canSave = form.nombre.trim() && form.email.trim() && form.password.trim();
+  const canSave =
+    form.nombre.trim() && form.email.trim() && form.password.trim();
   const handleSave = async () => {
     if (!canSave || isSaving) return;
     setIsSaving(true);
     try {
       await onCreateRow({
         ...form,
-        aportacion_total: form.aportacion_total === "" ? 0 : Number(form.aportacion_total),
+        aportacion_total:
+          form.aportacion_total === "" ? 0 : Number(form.aportacion_total),
       });
       setForm(emptyForm);
       setTimeout(() => firstRef.current?.focus(), 50);
-    } catch {} finally {
+    } catch {
+    } finally {
       setIsSaving(false);
     }
   };
-  
+
   const kd = (e) => {
-    if (e.key === "Enter" && canSave) { e.preventDefault(); handleSave(); }
+    if (e.key === "Enter" && canSave) {
+      e.preventDefault();
+      handleSave();
+    }
   };
 
-  const cls = "h-8 text-sm bg-fuchsia-50/50 border-fuchsia-200 focus:ring-fuchsia-500 w-full";
+  const cls =
+    "h-8 text-sm bg-fuchsia-50/50 border-fuchsia-200 focus:ring-fuchsia-500 w-full";
 
   return (
     <TableRow className="bg-fuchsia-50/30 border-t-2 border-dashed border-fuchsia-300 hover:bg-fuchsia-50/50">
@@ -43,7 +50,7 @@ export function GhostRow({ columnCount, onCreateRow }) {
       <TableCell className="p-1 text-center">
         <span className="text-xs text-slate-400 italic">Automática</span>
       </TableCell>
-      
+
       {/* Razón Social / Nombre */}
       <TableCell className="p-1">
         <Input
@@ -89,13 +96,15 @@ export function GhostRow({ columnCount, onCreateRow }) {
             type="number"
             placeholder="0"
             value={form.aportacion_total}
-            onChange={(e) => setForm((f) => ({ ...f, aportacion_total: e.target.value }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, aportacion_total: e.target.value }))
+            }
             onKeyDown={kd}
             className={cls}
           />
         </div>
       </TableCell>
-      
+
       {/* Acción: Insertar */}
       <TableCell className="p-1">
         <button

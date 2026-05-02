@@ -158,6 +158,7 @@ const CertificadoEscuela = React.forwardRef(function CertificadoEscuela(
             A la institución educativa:
           </p>
           <h2
+            data-variable="escuela"
             style={{
               fontFamily: "'Playfair Display', serif",
               fontSize: "2rem",
@@ -209,7 +210,7 @@ const CertificadoEscuela = React.forwardRef(function CertificadoEscuela(
               margin: "0 0 25px 0",
             }}
           >
-            Uruapan, Michoacán. {fecha}.
+            Uruapan, Michoacán. <span data-variable="fecha">{fecha}</span>.
           </p>
 
           {/* Signature */}

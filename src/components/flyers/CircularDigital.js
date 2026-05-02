@@ -113,11 +113,11 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
         {/* Welcome */}
         <div style={{ padding: "0 8px", textAlign: "center" }}>
           <p style={{ fontWeight: 900, color: "#0c4a6e", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.15em", margin: "0 0 6px" }}>
-            A los padres de familia de la escuela {escuela}:
+            A los padres de familia de la escuela <span data-variable="escuela">{escuela}</span>:
           </p>
           <div style={{ fontSize: "10px", color: "#1f2937", lineHeight: 1.5, textAlign: "center", maxWidth: "90%", margin: "0 auto" }}>
             Volar es uno de los sueños más grandes que compartimos cuando fuimos niños. Hoy nos enorgullece que la escuela{" "}
-            <strong style={{ color: "#0c4a6e", fontWeight: 700 }}>{escuela}</strong>{" "}
+            <strong data-variable="escuela" style={{ color: "#0c4a6e", fontWeight: 700 }}>{escuela}</strong>{" "}
             sea sede de la campaña <strong style={{ color: "#0c4a6e", fontWeight: 800 }}>Fly High EDU</strong> para que sus hijos lo hagan realidad:{" "}
             <span style={{ color: "#0284c7", fontWeight: 900, textTransform: "uppercase", letterSpacing: "-0.03em" }}>descubrir su ciudad desde las alturas.</span>
           </div>
@@ -193,7 +193,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
                 <span style={{ fontSize: "6px", color: "#0c4a6e", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "2px" }}>Tu Aportación</span>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: "2px", width: "100%" }}>
                   <span style={{ fontSize: "8px", fontWeight: 900, color: "#0284c7", textTransform: "uppercase" }}>Solo</span>
-                  <span style={{ fontSize: "20px", fontWeight: 900, color: "#0c4a6e", lineHeight: 1 }}>{monto}</span>
+                  <span data-variable="cuota" style={{ fontSize: "20px", fontWeight: 900, color: "#0c4a6e", lineHeight: 1 }}>{monto}</span>
                 </div>
               </div>
               <span style={{
@@ -210,7 +210,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
               </p>
               <p style={{ fontSize: "8px", color: "#1f2937", lineHeight: 1.3, textAlign: "justify", margin: 0 }}>
                 Así como otros padres aportaron para tu hijo, hoy tus{" "}
-                <strong style={{ color: "#0284c7", fontWeight: 700, fontSize: "9px" }}>{monto} pesos</strong>{" "}
+                <strong data-variable="cuota" style={{ color: "#0284c7", fontWeight: 700, fontSize: "9px" }}>{monto} pesos</strong>{" "}
                 regresan el favor para que niños de otras escuelas también puedan volar.
               </p>
             </div>
@@ -222,7 +222,7 @@ const CircularDigital = React.forwardRef(function CircularDigital({ escuela, fec
               <div style={{ width: "40%", display: "flex", flexDirection: "column", justifyContent: "center", borderRight: "1px solid #e5e7eb", paddingRight: "8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <CalendarIcon />
-                  <span style={{ fontSize: "8px", fontWeight: 700, color: "#1f2937" }}>{fecha}</span>
+                  <span data-variable="fecha" style={{ fontSize: "8px", fontWeight: 700, color: "#1f2937" }}>{fecha}</span>
                 </div>
               </div>
               <div style={{ width: "60%", display: "flex", alignItems: "flex-start", gap: "6px", paddingLeft: "4px" }}>
