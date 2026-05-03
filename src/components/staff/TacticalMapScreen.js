@@ -358,24 +358,157 @@ export default function TacticalMapScreen({ userId, profile }) {
             `${i + 1}. "${p.name}" — Coords: ${p.latitude}, ${p.longitude} — Tipo: ${p.description}`
         ).join('\n');
 
-        const megaPrompt = `Eres un investigador enciclopédico con acceso a Google Search. Necesito que investigues puntos de interés de ${lastGeoContext || 'Uruapan, Michoacán'} con DATOS DUROS Y VERIFICABLES.
+        const megaPrompt = `Eres un investigador enciclopédico y narrador con acceso a Google Search. Necesito que investigues ${suggestedPois.length} puntos de interés de ${lastGeoContext || 'Uruapan, Michoacán'}. Quiero artículos que cuenten la HISTORIA del lugar de forma envolvente, pero que incluyan DATOS DUROS verificables tejidos en la narrativa.
 
 REGLAS OBLIGATORIAS DE CALIDAD:
 1. USA GOOGLE SEARCH para cada punto. No respondas de memoria.
-2. Cada artículo DEBE incluir AL MENOS 3 de estos tipos de datos numéricos:
-   - Año exacto de fundación, construcción o decreto
-   - Altitud en metros sobre el nivel del mar
-   - Extensión en hectáreas o kilómetros cuadrados
-   - Población, visitantes por año, o aforo
-   - Mediciones físicas: longitud, profundidad, caudal, temperatura
-   - Distancia a otro punto de referencia conocido
-   - Fecha histórica específica (día/mes/año)
-3. PROHIBIDO usar frases vagas como "en la época de", "hace muchos años", "una gran extensión". Reemplázalas SIEMPRE con el dato exacto.
+2. Cada artículo debe contar una HISTORIA RICA que incluya:
+   - Contexto histórico: quién lo fundó, por qué, qué pasaba en esa época
+   - Significado cultural: qué representa para la comunidad, tradiciones vinculadas
+   - Anécdotas o leyendas locales si las hay
+   - Conexión con personajes históricos (nombre completo y cargo)
+   - Estado actual: cómo se usa hoy, quién lo visita
+   Y ADEMÁS, AL MENOS 4 datos numéricos verificables tejidos DENTRO de la narrativa (no como lista), del siguiente catálogo:
+
+PARA RÍOS, ARROYOS, CASCADAS:
+- Longitud total del río en km
+- Caudal promedio en litros por segundo
+- Altitud del nacimiento en msnm
+- Temperatura del agua en °C
+- Cuenca hidrológica a la que pertenece
+- Altura de la caída de agua (cascadas)
+
+PARA CERROS, MONTAÑAS, VOLCANES:
+- Altitud exacta en metros sobre el nivel del mar
+- Prominencia topográfica
+- Última erupción (volcanes) con fecha
+- Distancia a la ciudad más cercana
+- Tipo de roca o suelo predominante
+
+PARA PARQUES, RESERVAS NATURALES, BOSQUES:
+- Extensión en hectáreas o km²
+- Año de decreto o fundación
+- Número de especies de flora y/o fauna registradas
+- Visitantes por año
+- Especies endémicas destacadas
+- Tipo de ecosistema (bosque templado, selva, etc.)
+
+PARA IGLESIAS, TEMPLOS, CAPILLAS:
+- Año exacto de construcción o consagración
+- Estilo arquitectónico (barroco, neoclásico, etc.)
+- Altura de la torre o cúpula en metros
+- Fecha de la fiesta patronal (día/mes)
+- Siglo de origen
+
+PARA MUSEOS, CENTROS CULTURALES, TEATROS:
+- Año de fundación
+- Número de piezas o exposiciones permanentes
+- Visitantes anuales
+- Superficie del inmueble en m²
+- Colecciones o piezas destacadas
+
+PARA PRESAS, LAGOS, LAGUNAS, CUERPOS DE AGUA:
+- Capacidad de almacenamiento en millones de m³
+- Superficie del espejo de agua en hectáreas
+- Profundidad máxima y promedio
+- Año de construcción (presas)
+- Volumen anual captado
+
+PARA MONUMENTOS, PLAZAS, SITIOS HISTÓRICOS:
+- Fecha del evento histórico conmemorado (día/mes/año)
+- Año de construcción o inauguración del monumento
+- Dimensiones (altura, ancho)
+- Personaje histórico vinculado con nombre completo y cargo
+- Decreto o acta oficial que lo protege
+
+PARA UNIVERSIDADES, ESCUELAS, BIBLIOTECAS:
+- Año de fundación
+- Matrícula o número de estudiantes
+- Número de carreras o programas
+- Egresados notables con nombre
+
+PARA FÁBRICAS, PLANTAS, INFRAESTRUCTURA INDUSTRIAL:
+- Año de inicio de operaciones
+- Capacidad de producción con unidades
+- Número de empleados
+- Tipo de industria
+
+PARA ESTACIONES DE TREN, AEROPUERTOS, PUENTES:
+- Año de inauguración
+- Longitud de pista o puente en metros
+- Pasajeros anuales o tráfico diario
+- Ruta o línea que atendía
+
+PARA MERCADOS, PLAZAS COMERCIALES:
+- Año de fundación
+- Número de locatarios o puestos
+- Producto estrella o especialidad regional
+
+PARA ESTADIOS, UNIDADES DEPORTIVAS:
+- Aforo o capacidad
+- Año de inauguración
+- Equipos o eventos que alberga
+
+PARA MIRADORES, PUNTOS PANORÁMICOS:
+- Altitud del punto
+- Distancia de visibilidad en km
+- Qué se puede observar desde ahí
+
+PARA EDIFICIOS NOTABLES, ARQUITECTURA CIVIL, PALACIOS DE GOBIERNO:
+- Año de construcción o inauguración
+- Estilo arquitectónico (art déco, colonial, neoclásico, modernista, etc.)
+- Arquitecto o constructor (nombre completo)
+- Superficie construida en m²
+- Número de pisos o niveles
+- Material de construcción (cantera, adobe, concreto, etc.)
+- Uso original vs. uso actual si cambió
+
+PARA PANTEONES, CEMENTERIOS:
+- Año de fundación
+- Superficie en hectáreas
+- Personajes históricos sepultados (nombre y cargo)
+- Estilo de las capillas o monumentos funerarios
+- Si tiene declaratoria de patrimonio
+
+PARA GLORIETAS, ROTONDAS, FUENTES:
+- Año de construcción
+- Diámetro o dimensiones en metros
+- Escultura o monumento central (autor, altura)
+- Evento o personaje que conmemora
+
+PARA MURALES, ESCULTURAS, ARTE PÚBLICO:
+- Artista (nombre completo)
+- Año de creación
+- Dimensiones (alto x ancho en metros)
+- Técnica o material (óleo, mosaico, bronce, cantera)
+- Tema o historia que representa
+
+PARA HOSPITALES, CLÍNICAS:
+- Año de fundación
+- Número de camas o capacidad
+- Especialidades médicas
+- Población que atiende
+
+PARA HACIENDAS, CASONAS HISTÓRICAS:
+- Siglo o año de construcción
+- Familia original propietaria
+- Extensión original del terreno en hectáreas
+- Actividad productiva histórica (café, caña, ganadería)
+- Estado de conservación actual
+
+PARA ACUEDUCTOS, FUENTES, INFRAESTRUCTURA HIDRÁULICA HISTÓRICA:
+- Año o siglo de construcción
+- Longitud en metros o km
+- Capacidad de conducción en litros por segundo
+- Material (cantera, ladrillo, piedra)
+- Si sigue en funcionamiento
+
+3. PROHIBIDO usar frases vagas como "en la época de", "hace muchos años", "una gran extensión", "es muy importante". Reemplázalas SIEMPRE con el dato exacto.
 4. Si NO encuentras un dato específico verificable, escríbelo como: "[dato no verificado]" en lugar de inventarlo.
-5. El "dato curioso" debe ser SORPRENDENTE y contener un número o comparación ("X veces más grande que...", "uno de los N en todo México").
-6. Escribe en español amigable para niños de primaria, pero sin sacrificar precisión.
-7. 5-7 oraciones por artículo. Entre 300 y 600 caracteres.
-8. NO uses markdown, asteriscos, ni formato especial. Solo texto plano.
+5. El "dato curioso" debe ser SORPRENDENTE y contener un número o comparación concreta ("X veces más grande que una cancha de fútbol", "uno de los N más antiguos de México", "produce X toneladas al año").
+6. El tono debe ser el de un narrador apasionado que cuenta la historia del lugar a niños de 9-12 años. Que sea ENVOLVENTE e INTERESANTE, que despierte curiosidad, pero sin sacrificar precisión. Los datos numéricos deben estar integrados naturalmente en la narrativa, no como una ficha técnica fría.
+7. 6-10 oraciones por artículo. Entre 500 y 1000 caracteres.
+8. NO uses markdown, asteriscos, negritas, ni formato especial. Solo texto plano limpio.
 
 FORMATO DE RESPUESTA (JSON estricto, sin explicaciones fuera del JSON):
 [

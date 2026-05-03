@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, ChevronDown, Loader2, Sparkles, Save, Trash2, RefreshCw, BookOpen, Search } from 'lucide-react';
+import { X, ChevronDown, Loader2, Sparkles, Save, Trash2, RefreshCw, BookOpen, Search, Zap } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════
 // POIDetailModal — Modal único para ver, crear y editar POIs.
@@ -61,7 +61,7 @@ export default function POIDetailModal({
     const [datoClave2, setDatoClave2] = useState('');
     const [pregunta, setPregunta] = useState('');
 
-    // Research state (Regla 0 — misma lógica)
+    // Research state
     const [researchArticle, setResearchArticle] = useState('');
     const [isResearching, setIsResearching] = useState(false);
     const [accordionOpen, setAccordionOpen] = useState(false);
@@ -74,7 +74,16 @@ export default function POIDetailModal({
     const [headerColor, setHeaderColor] = useState('#2563EB');
     const [regeneratingField, setRegeneratingField] = useState(null);
     const [loadingStep, setLoadingStep] = useState(null);
-    const [quotaCountdown, setQuotaCountdown] = useState(null);
+
+    // ═══ TRIDENTE ENGINE STATE ═══
+    const ENGINE_OPTIONS = [
+        { id: 'gemini', label: 'Gemini Flash', color: '#4285F4', icon: '🔵' },
+        { id: 'cohere', label: 'Cohere Command R+', color: '#D18EE2', icon: '🟣' },
+        { id: 'rag', label: 'Tavily + Groq', color: '#F59E0B', icon: '🟡' }
+    ];
+    const [activeEngine, setActiveEngine] = useState('gemini');
+    const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
+    const [engineToast, setEngineToast] = useState(null); // { message, fromEngine, toEngine }
 
     const nameRef = useRef(null);
     const scrollRef = useRef(null);
@@ -100,20 +109,20 @@ export default function POIDetailModal({
         setHasGeneratedFicha(!!(poi?.dato_clave_1 || poi?.dato_clave_2));
         setIsSaving(false);
         setLoadingStep(null);
-        setQuotaCountdown(null);
+        setEngineToast(null);
+        setEngineDropdownOpen(false);
 
         if (isNewPin) {
             setTimeout(() => nameRef.current?.focus(), 400);
         }
     }, [isOpen, poi, isNewPin]);
 
-    // ═══ REGLA 0: Deep Research — lógica INTACTA ═══
-    // Returns the article text so callers can use it without stale closure
+    // ═══ TRIDENTE: Deep Research con fallover automático ═══
     const handleDeepResearch = async () => {
         if (isResearching) return '';
         setIsResearching(true);
         setResearchTriggered(true);
-        setQuotaCountdown(null);
+        setEngineToast(null);
         let articleText = '';
         try {
             const res = await fetch('/api/poi-deep-research', {
@@ -124,21 +133,32 @@ export default function POIDetailModal({
                     type: poi?.description || '',
                     context: geoContext,
                     lat: poi?.latitude,
-                    lon: poi?.longitude
+                    lon: poi?.longitude,
+                    preferredEngine: activeEngine
                 })
             });
-            if (res.ok) {
-                const data = await res.json();
-                articleText = data.article || 'No se encontró información verificada.';
-            } else if (res.status === 429) {
-                // ═══ Quota exceeded — activate Active Wait state ═══
-                const data = await res.json();
-                const waitSeconds = data.retryAfter || 60;
-                setQuotaCountdown(waitSeconds);
-                setIsResearching(false);
-                return '';
+            const data = await res.json();
+
+            if (data.article && data.article.length > 30) {
+                articleText = data.article;
+
+                // Si el backend hizo fallover automático, notificar al usuario
+                if (data.engine && data.engine !== activeEngine && data.engine !== 'none') {
+                    const prevLabel = ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label || activeEngine;
+                    const newLabel = ENGINE_OPTIONS.find(e => e.id === data.engine)?.label || data.engine;
+                    setActiveEngine(data.engine);
+                    setEngineToast({
+                        message: `Motor cambiado automáticamente para asegurar tu respuesta`,
+                        detail: `${prevLabel} → ${newLabel}`
+                    });
+                    setTimeout(() => setEngineToast(null), 5000);
+                } else if (data.engine && data.engine !== 'none') {
+                    setActiveEngine(data.engine);
+                }
+            } else if (data.allFailed) {
+                articleText = data.article || 'No fue posible investigar este punto en este momento. Intenta más tarde.';
             } else {
-                articleText = 'Error al investigar. Intenta de nuevo.';
+                articleText = data.article || 'No se encontró información verificada.';
             }
         } catch (e) {
             console.error('Deep research error:', e);
@@ -149,26 +169,6 @@ export default function POIDetailModal({
         }
         return articleText;
     };
-
-    // ═══ Auto-retry countdown when quota is hit ═══
-    useEffect(() => {
-        if (quotaCountdown === null || quotaCountdown <= 0) return;
-        const timer = setInterval(() => {
-            setQuotaCountdown(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    // Auto-retry when countdown reaches 0
-                    setTimeout(() => {
-                        setQuotaCountdown(null);
-                        handleDeepResearch();
-                    }, 100);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [quotaCountdown > 0]);
 
     // Accordion toggle — trigger research on first open
     const toggleAccordion = () => {
@@ -222,7 +222,7 @@ export default function POIDetailModal({
             const res = await fetch('/api/poi-fill-ficha', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ article, poiName: title || poi?.name, regenerate: isRegenerating, fieldToRegenerate, currentValue })
+                body: JSON.stringify({ article, poiName: title || poi?.name, regenerate: isRegenerating, fieldToRegenerate, currentValue, preferredEngine: activeEngine })
             });
             if (res.ok) {
                 const data = await res.json();
@@ -343,6 +343,58 @@ export default function POIDetailModal({
                             {typeof poi?.latitude === 'number' ? poi.latitude.toFixed(5) : '—'}, {typeof poi?.longitude === 'number' ? poi.longitude.toFixed(5) : '—'}
                         </p>
                     </div>
+
+                    {/* ═══ ENGINE SELECTOR DROPDOWN ═══ */}
+                    <div style={{ position: 'relative', marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Zap size={12} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                        <button
+                            onClick={() => setEngineDropdownOpen(!engineDropdownOpen)}
+                            style={{
+                                background: 'rgba(255,255,255,0.12)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                borderRadius: 8, padding: '5px 12px',
+                                color: 'rgba(255,255,255,0.9)',
+                                fontSize: 11, fontWeight: 600,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <span>{ENGINE_OPTIONS.find(e => e.id === activeEngine)?.icon}</span>
+                            <span>{ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label}</span>
+                            <ChevronDown size={12} style={{
+                                transition: 'transform 0.2s',
+                                transform: engineDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'
+                            }} />
+                        </button>
+                        {engineDropdownOpen && (
+                            <div style={{
+                                position: 'absolute', top: '100%', left: 20, marginTop: 4, zIndex: 100,
+                                background: '#1E293B', border: '1px solid #334155',
+                                borderRadius: 10, padding: 4, minWidth: 200,
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+                                animation: 'poiFadeIn 0.15s ease-out'
+                            }}>
+                                {ENGINE_OPTIONS.map(eng => (
+                                    <button
+                                        key={eng.id}
+                                        onClick={() => { setActiveEngine(eng.id); setEngineDropdownOpen(false); }}
+                                        style={{
+                                            width: '100%', padding: '10px 12px',
+                                            background: activeEngine === eng.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                            border: 'none', borderRadius: 8,
+                                            color: '#F1F5F9', fontSize: 12, fontWeight: 600,
+                                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                                            transition: 'background 0.15s'
+                                        }}
+                                    >
+                                        <span style={{ fontSize: 14 }}>{eng.icon}</span>
+                                        <span>{eng.label}</span>
+                                        {activeEngine === eng.id && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#22C55E' }}>● Activo</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* ═══ SCROLLABLE BODY ═══ */}
@@ -398,41 +450,13 @@ export default function POIDetailModal({
                                     background: '#F8FAFC',
                                     paddingTop: 16
                                 }}>
-                                    {quotaCountdown !== null && quotaCountdown >= 0 ? (
-                                        /* ═══ Active Wait State — Quota cooldown ═══ */
-                                        <div style={{ textAlign: 'center', padding: '28px 12px' }}>
-                                            <div style={{
-                                                width: 48, height: 48, borderRadius: 12,
-                                                background: '#F1F5F9', margin: '0 auto 16px',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                            }}>
-                                                <Loader2 size={22} style={{ color: '#64748B', animation: 'spin 2.5s linear infinite' }} />
-                                            </div>
-                                            <p style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', margin: '0 0 6px', lineHeight: 1.4 }}>
-                                                El sistema está procesando un alto volumen de investigaciones en este momento.
-                                            </p>
-                                            <p style={{ fontSize: 13, color: '#64748B', margin: '0 0 16px', lineHeight: 1.5 }}>
-                                                Tomando un breve respiro para asegurar información precisa.
-                                            </p>
-                                            <div style={{
-                                                display: 'inline-flex', alignItems: 'center', gap: 8,
-                                                background: '#F8FAFC', border: '1px solid #E2E8F0',
-                                                borderRadius: 20, padding: '8px 16px'
-                                            }}>
-                                                <div style={{
-                                                    width: 8, height: 8, borderRadius: '50%',
-                                                    background: '#3B82F6', animation: 'pulse 1.5s ease-in-out infinite'
-                                                }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                                                    Reintentando automáticamente en {quotaCountdown}s
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ) : isResearching ? (
+                                    {isResearching ? (
                                         <div style={{ textAlign: 'center', padding: '24px 0' }}>
                                             <Loader2 size={24} style={{ color: '#0F172A', margin: '0 auto 12px', animation: 'spin 1s linear infinite' }} />
                                             <p style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', margin: 0 }}>Investigando...</p>
-                                            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Obteniendo información de fuentes públicas</p>
+                                            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+                                                {ENGINE_OPTIONS.find(e => e.id === activeEngine)?.icon} Usando {ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label}
+                                            </p>
                                         </div>
                                     ) : (
                                         <>
@@ -701,6 +725,26 @@ export default function POIDetailModal({
                     </button>
                 </div>
             </div>
+
+            {/* ═══ ENGINE TOAST — Notificación de cambio automático ═══ */}
+            {engineToast && (
+                <div style={{
+                    position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 60000, animation: 'poiFadeIn 0.3s ease-out',
+                    background: '#1E293B', color: '#F1F5F9',
+                    padding: '12px 20px', borderRadius: 14,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                    border: '1px solid #334155',
+                    maxWidth: '90vw', textAlign: 'center'
+                }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
+                        ⚡ {engineToast.message}
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>
+                        {engineToast.detail}
+                    </p>
+                </div>
+            )}
 
             <style>{`
                 @keyframes poiFadeIn { from { opacity: 0; } to { opacity: 1; } }
