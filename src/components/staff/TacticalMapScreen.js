@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star } from 'lucide-react';
+import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Copy, ClipboardCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIDetailModal from './POIDetailModal';
@@ -29,6 +29,7 @@ export default function TacticalMapScreen({ userId, profile }) {
     const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [groqQuota, setGroqQuota] = useState(null);
     const [lastGeoContext, setLastGeoContext] = useState('');
+    const [copiedPrompt, setCopiedPrompt] = useState(false);
 
     // ═══ UNIFIED MODAL STATE ═══
     const [modalPoi, setModalPoi] = useState(null);    // null = closed
@@ -349,6 +350,53 @@ export default function TacticalMapScreen({ userId, profile }) {
         }
     };
 
+    // ═══ COPY MEGA-PROMPT FOR GEMINI ULTRA ═══
+    const handleCopyForResearch = useCallback(async () => {
+        if (suggestedPois.length === 0) return;
+
+        const poiList = suggestedPois.map((p, i) =>
+            `${i + 1}. "${p.name}" — Coords: ${p.latitude}, ${p.longitude} — Tipo: ${p.description}`
+        ).join('\n');
+
+        const megaPrompt = `Eres un investigador enciclopédico especializado en México. Tu tarea es investigar los siguientes puntos de interés geográficos y culturales de la zona de ${lastGeoContext || 'Uruapan, Michoacán'}. USA GOOGLE SEARCH para verificar cada punto.
+
+REGLAS ESTRICTAS:
+1. USA BÚSQUEDA EN GOOGLE para verificar cada punto. No respondas de memoria.
+2. Si NO encuentras información real sobre un punto, escribe exactamente: "Sin información histórica verificada."
+3. NUNCA inventes datos, fechas ni personajes. Solo hechos confirmados por fuentes web.
+4. Cada artículo debe incluir: breve introducción, historia u origen, importancia regional, y un dato curioso si lo hay.
+5. 4-6 oraciones por artículo. Español claro y amigable para niños de primaria.
+6. NO uses markdown ni formato especial. Solo texto plano.
+
+FORMATO DE RESPUESTA (JSON estricto, sin explicaciones fuera del JSON):
+[
+  {
+    "name": "Nombre exacto del POI",
+    "coords": "lat, lng",
+    "article": "Artículo investigado aquí..."
+  }
+]
+
+LISTA DE ${suggestedPois.length} PUNTOS A INVESTIGAR:
+${poiList}`;
+
+        try {
+            await navigator.clipboard.writeText(megaPrompt);
+            setCopiedPrompt(true);
+            setTimeout(() => setCopiedPrompt(false), 3000);
+        } catch (e) {
+            // Fallback for older browsers
+            const ta = document.createElement('textarea');
+            ta.value = megaPrompt;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            setCopiedPrompt(true);
+            setTimeout(() => setCopiedPrompt(false), 3000);
+        }
+    }, [suggestedPois, lastGeoContext]);
+
     // ═══ SAVE (unified — includes ficha fields) ═══
     const handleSave = useCallback(async (poiData) => {
         if (!userId || isSaving) return;
@@ -527,6 +575,35 @@ export default function TacticalMapScreen({ userId, profile }) {
                     >
                         {isSearchingCulturalPois ? <Loader2 size={24} className="animate-spin" /> : <Landmark size={24} strokeWidth={2.5} />}
                     </button>
+
+                    {/* Copy for Gemini Research Button */}
+                    {suggestedPois.length > 0 && (
+                        <button
+                            onClick={handleCopyForResearch}
+                            style={{
+                                position: 'absolute', bottom: 88, right: 16, zIndex: 2000,
+                                height: 44, borderRadius: 14,
+                                padding: '0 16px',
+                                background: copiedPrompt ? '#22C55E' : '#7C3AED',
+                                border: 'none',
+                                color: 'white',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                boxShadow: copiedPrompt
+                                    ? '0 8px 24px -4px rgba(34,197,94,0.5)'
+                                    : '0 8px 24px -4px rgba(124,58,237,0.5)',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                fontSize: 12, fontWeight: 700,
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            {copiedPrompt ? (
+                                <><ClipboardCheck size={16} /> ¡Prompt copiado!</>
+                            ) : (
+                                <><Copy size={16} /> Copiar {suggestedPois.length} POIs</>
+                            )}
+                        </button>
+                    )}
 
                     {/* Groq AI Quota Badge */}
                     {groqQuota && (
