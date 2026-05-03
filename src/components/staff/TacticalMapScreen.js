@@ -2,10 +2,10 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Loader2, Plus, List, Map, Star, Trash2, Edit3, Navigation, Landmark } from 'lucide-react';
+import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import POIFormModal, { CATEGORIES } from './POIFormModal';
+import POIDetailModal from './POIDetailModal';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -14,17 +14,11 @@ const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false,
     </div>
 )});
 
-const CATEGORY_MAP = {};
-CATEGORIES.forEach(c => { CATEGORY_MAP[c.id] = c; });
-
 export default function TacticalMapScreen({ userId, profile }) {
     const router = useRouter();
     const [pois, setPois] = useState([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('map'); // 'map' | 'list'
-    const [showForm, setShowForm] = useState(false);
-    const [clickedLatLng, setClickedLatLng] = useState(null);
-    const [editingPoi, setEditingPoi] = useState(null);
     const [isSaving, setIsSaving] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
 
@@ -32,7 +26,13 @@ export default function TacticalMapScreen({ userId, profile }) {
     const [mapBounds, setMapBounds] = useState(null);
     const [suggestedPois, setSuggestedPois] = useState([]);
     const [isSearchingCulturalPois, setIsSearchingCulturalPois] = useState(false);
+    const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [groqQuota, setGroqQuota] = useState(null);
+    const [lastGeoContext, setLastGeoContext] = useState('');
+
+    // ═══ UNIFIED MODAL STATE ═══
+    const [modalPoi, setModalPoi] = useState(null);    // null = closed
+    const [isNewPin, setIsNewPin] = useState(false);
 
     // Load POIs
     useEffect(() => {
@@ -58,31 +58,103 @@ export default function TacticalMapScreen({ userId, profile }) {
         );
     }, []);
 
-    const handleMapClick = useCallback((lat, lng) => {
-        setClickedLatLng({ lat, lng });
-        setEditingPoi(null);
-        setShowForm(true);
+    // ═══ TRIGGER: Tap on saved POI marker ═══
+    const handleMarkerClick = useCallback((poi) => {
+        setModalPoi(poi);
+        setIsNewPin(false);
     }, []);
 
-    const handleEditPoi = useCallback((poi) => {
-        setEditingPoi(poi);
-        setClickedLatLng(null);
-        setShowForm(true);
-    }, []);
-
+    // ═══ TRIGGER: Tap on suggested POI marker ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
-        // Pass it without an id, so POIFormModal treats it as a new creation
-        setEditingPoi({
+        setModalPoi({
             name: poi.name,
             description: poi.description,
-            category: 'landmark',
             latitude: poi.latitude,
-            longitude: poi.longitude
+            longitude: poi.longitude,
+            category: 'landmark'
         });
-        setClickedLatLng(null);
-        setShowForm(true);
+        setIsNewPin(false);
     }, []);
 
+    // ═══ TRIGGER: Long-press on empty map ═══
+    const handleLongPress = useCallback(async (lat, lng) => {
+        setIsReverseGeocoding(true);
+        let placeName = '';
+        try {
+            const query = `
+                [out:json][timeout:10];
+                (
+                  node["name"](around:150, ${lat}, ${lng});
+                  way["name"](around:150, ${lat}, ${lng});
+                  relation["name"](around:150, ${lat}, ${lng});
+                );
+                out center;
+            `;
+            const res = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.elements && data.elements.length > 0) {
+                    // Calculate distance and priority
+                    let bestElement = null;
+                    let bestScore = Infinity; // Lower score is better
+
+                    data.elements.forEach(el => {
+                        const elLat = el.type === 'node' ? el.lat : el.center?.lat;
+                        const elLon = el.type === 'node' ? el.lon : el.center?.lon;
+                        if (!elLat || !elLon || !el.tags?.name) return;
+
+                        // Pythagorean distance approximation
+                        const dx = elLat - lat;
+                        const dy = elLon - lng;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        // Priority boost for interesting features
+                        let penalty = 1.0;
+                        const isMassiveArea = el.tags.landuse === 'cemetery' || el.tags.leisure === 'nature_reserve' || el.tags.natural === 'wood' || el.tags.amenity === 'university';
+                        const isTouristArea = el.tags.highway === 'roundabout' || el.tags.historic || el.tags.tourism || el.tags.leisure === 'park';
+
+                        if (isMassiveArea) {
+                            penalty = 0.1; // Super gravity for huge polygons
+                        } else if (isTouristArea) {
+                            penalty = 0.3; // High gravity for tourist/historic spots
+                        } else if (el.tags.highway && el.tags.highway !== 'pedestrian') {
+                            penalty = 2.0; // Normal roads are less interesting
+                        } else if (el.tags.shop || el.tags.office) {
+                            penalty = 3.0; // Shops are least interesting for POIs
+                        }
+
+                        const score = distance * penalty;
+
+                        if (score < bestScore) {
+                            bestScore = score;
+                            bestElement = el;
+                        }
+                    });
+
+                    if (bestElement) {
+                        placeName = bestElement.tags.name;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Overpass proximity search failed', e);
+        } finally {
+            setIsReverseGeocoding(false);
+            setModalPoi({
+                latitude: lat,
+                longitude: lng,
+                name: placeName,
+                description: ''
+            });
+            setIsNewPin(true);
+        }
+    }, []);
+
+    // ═══ Overpass Cultural POI Search (unchanged) ═══
     const handleSearchCulturalPois = async () => {
         // Toggle: Si ya hay puntos, los borramos (apagar radar)
         if (suggestedPois.length > 0) {
@@ -106,15 +178,24 @@ export default function TacticalMapScreen({ userId, profile }) {
                 (
                   node["historic"](${bbox});
                   way["historic"](${bbox});
-                  node["tourism"~"museum|artwork|attraction|theme_park|zoo"](${bbox});
-                  way["tourism"~"museum|artwork|attraction|theme_park|zoo"](${bbox});
-                  node["amenity"="place_of_worship"](${bbox});
-                  way["amenity"="place_of_worship"](${bbox});
+                  node["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
+                  way["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
+                  node["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
+                  way["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
                   node["aeroway"="aerodrome"](${bbox});
                   way["aeroway"="aerodrome"](${bbox});
-                  node["waterway"="dam"](${bbox});
-                  way["waterway"="dam"](${bbox});
-                  node["natural"~"peak|volcano"](${bbox});
+                  node["waterway"~"dam|river|waterfall"](${bbox});
+                  way["waterway"~"dam|river|waterfall"](${bbox});
+                  node["natural"~"peak|volcano|water|wood|forest"](${bbox});
+                  way["natural"~"peak|volcano|water|wood|forest"](${bbox});
+                  node["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
+                  way["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
+                  node["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill"](${bbox});
+                  way["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill"](${bbox});
+                  node["power"="plant"](${bbox});
+                  way["power"="plant"](${bbox});
+                  node["railway"="station"](${bbox});
+                  way["railway"="station"](${bbox});
                 );
                 out center;
             `;
@@ -137,23 +218,59 @@ export default function TacticalMapScreen({ userId, profile }) {
                 const naturalType = el.tags?.natural;
                 const aeroType = el.tags?.aeroway;
                 const waterType = el.tags?.waterway;
+                const leisureType = el.tags?.leisure;
+                const manMadeType = el.tags?.man_made;
+                const powerType = el.tags?.power;
+                const railwayType = el.tags?.railway;
 
                 const wikiTag = el.tags?.wikipedia;
                 const wikidataTag = el.tags?.wikidata;
 
                 if (!lat || !lon || !name) return null;
 
-                let desc = 'Punto de interés geográfico o cultural.';
-                if (historicType === 'monument') desc = 'Monumento Histórico.';
-                else if (historicType === 'archaeological_site') desc = 'Sitio Arqueológico.';
-                else if (tourismType === 'museum') desc = 'Museo.';
-                else if (tourismType === 'artwork') desc = 'Obra de arte pública.';
-                else if (tourismType === 'theme_park') desc = 'Parque de Atracciones.';
-                else if (tourismType === 'zoo') desc = 'Zoológico.';
-                else if (amenityType === 'place_of_worship') desc = 'Templo / Lugar de culto.';
-                else if (naturalType === 'peak' || naturalType === 'volcano') desc = `Elevación Natural (${el.tags?.ele ? el.tags.ele + 'm' : 'Cerro/Montaña'}).`;
+                let desc = 'Punto de interés geográfico, cultural o recreativo.';
+                if (historicType) desc = historicType === 'monument' ? 'Monumento Histórico.' : historicType === 'archaeological_site' ? 'Sitio Arqueológico.' : 'Lugar Histórico.';
+                else if (tourismType) {
+                    if (tourismType === 'museum') desc = 'Museo.';
+                    else if (tourismType === 'artwork') desc = 'Obra de arte pública.';
+                    else if (tourismType === 'theme_park') desc = 'Parque de Atracciones.';
+                    else if (tourismType === 'zoo') desc = 'Zoológico.';
+                    else if (tourismType === 'aquarium') desc = 'Acuario.';
+                    else if (tourismType === 'viewpoint') desc = 'Mirador.';
+                    else desc = 'Atracción turística.';
+                }
+                else if (amenityType) {
+                    if (amenityType === 'place_of_worship') desc = 'Templo / Lugar de culto.';
+                    else if (amenityType === 'university' || amenityType === 'college') desc = 'Institución Educativa Superior.';
+                    else if (amenityType === 'library') desc = 'Biblioteca.';
+                    else if (amenityType === 'theatre') desc = 'Teatro.';
+                    else desc = 'Edificio o Espacio Público.';
+                }
+                else if (naturalType) {
+                    if (naturalType === 'peak' || naturalType === 'volcano') desc = `Elevación Natural (${el.tags?.ele ? el.tags.ele + 'm' : 'Cerro/Montaña'}).`;
+                    else if (naturalType === 'water') desc = 'Cuerpo de Agua (Lago/Laguna).';
+                    else desc = 'Área Natural.';
+                }
+                else if (waterType) {
+                    if (waterType === 'dam') desc = 'Presa / Infraestructura hidráulica.';
+                    else if (waterType === 'river') desc = 'Río / Corriente de agua.';
+                    else if (waterType === 'waterfall') desc = 'Cascada / Salto de agua.';
+                    else desc = 'Cuerpo de Agua.';
+                }
+                else if (leisureType) {
+                    if (leisureType === 'park' || leisureType === 'nature_reserve') desc = 'Parque o Reserva Natural.';
+                    else if (leisureType === 'sports_centre' || leisureType === 'stadium') desc = 'Unidad Deportiva / Estadio.';
+                    else desc = 'Espacio Recreativo.';
+                }
+                else if (manMadeType) {
+                    if (manMadeType === 'wastewater_plant' || manMadeType === 'water_works') desc = 'Planta de Tratamiento / Infraestructura de Agua.';
+                    else if (manMadeType === 'observatory') desc = 'Observatorio.';
+                    else if (manMadeType === 'lighthouse') desc = 'Faro.';
+                    else desc = 'Infraestructura Civil.';
+                }
+                else if (powerType === 'plant') desc = 'Planta de Energía / Central Eléctrica.';
+                else if (railwayType === 'station') desc = 'Estación de Ferrocarril.';
                 else if (aeroType === 'aerodrome') desc = 'Aeropuerto / Pista de aterrizaje.';
-                else if (waterType === 'dam') desc = 'Presa / Infraestructura hidráulica.';
 
                 return {
                     id: el.id,
@@ -171,7 +288,7 @@ export default function TacticalMapScreen({ userId, profile }) {
                 return;
             }
 
-            // Obtener contexto geográfico general (Ciudad, Estado) para mejorar las búsquedas
+            // Obtener contexto geográfico general (Ciudad, Estado)
             let geoContext = '';
             try {
                 const centerLat = (mapBounds._southWest.lat + mapBounds._northEast.lat) / 2;
@@ -183,6 +300,7 @@ export default function TacticalMapScreen({ userId, profile }) {
                         const city = nomData.address.city || nomData.address.town || nomData.address.village || nomData.address.county || '';
                         const state = nomData.address.state || '';
                         geoContext = `${city} ${state}`.trim();
+                        setLastGeoContext(geoContext);
                     }
                 }
             } catch (e) {
@@ -199,7 +317,7 @@ export default function TacticalMapScreen({ userId, profile }) {
                             name: p.name,
                             lat: p.latitude,
                             lon: p.longitude,
-                            type: p.description // el tipo básico de OSM (ej: "Monumento Histórico.")
+                            type: p.description
                         })),
                         context: geoContext
                     })
@@ -207,17 +325,13 @@ export default function TacticalMapScreen({ userId, profile }) {
                 
                 if (infoRes.ok) {
                     const data = await infoRes.json();
-                    const infoMap = data.results || data; // Backward compat
+                    const infoMap = data.results || data;
                     if (data.quota) setGroqQuota(data.quota);
-                    
-                    console.log('[POI Info] Keys returned:', Object.keys(infoMap));
                     
                     newPois = newPois.map(poi => {
                         const aiInfo = infoMap[poi.name];
                         if (aiInfo && typeof aiInfo === 'string' && aiInfo.length > 10) {
                             poi.description = aiInfo;
-                        } else {
-                            console.warn(`[POI Info] No match for "${poi.name}". aiInfo =`, aiInfo);
                         }
                         return poi;
                     });
@@ -235,32 +349,60 @@ export default function TacticalMapScreen({ userId, profile }) {
         }
     };
 
+    // ═══ SAVE (unified — includes ficha fields) ═══
     const handleSave = useCallback(async (poiData) => {
         if (!userId || isSaving) return;
         setIsSaving(true);
         try {
             const supabase = createClient();
+            const fichaFields = {
+                research_article: poiData.research_article,
+                dato_clave_1: poiData.dato_clave_1,
+                dato_clave_2: poiData.dato_clave_2,
+                pregunta_interaccion: poiData.pregunta_interaccion
+            };
+            const baseFields = {
+                name: poiData.name,
+                description: poiData.description,
+                category: poiData.category,
+                is_favorite: poiData.is_favorite
+            };
+
             if (poiData.id) {
-                // Update
-                const { error } = await supabase.from('pilot_pois').update({
-                    name: poiData.name, description: poiData.description,
-                    category: poiData.category, is_favorite: poiData.is_favorite,
-                    updated_at: new Date().toISOString()
+                // Update existing
+                let { error } = await supabase.from('pilot_pois').update({
+                    ...baseFields, ...fichaFields, updated_at: new Date().toISOString()
                 }).eq('id', poiData.id).eq('user_id', userId);
+
+                // Fallback: retry without ficha fields if columns don't exist
+                if (error && error.message?.includes('column')) {
+                    console.warn('Ficha columns not found, saving without them');
+                    const res = await supabase.from('pilot_pois').update({
+                        ...baseFields, updated_at: new Date().toISOString()
+                    }).eq('id', poiData.id).eq('user_id', userId);
+                    error = res.error;
+                }
                 if (error) throw error;
                 setPois(prev => prev.map(p => p.id === poiData.id ? { ...p, ...poiData, updated_at: new Date().toISOString() } : p));
             } else {
-                // Insert
-                const { data, error } = await supabase.from('pilot_pois').insert({
-                    user_id: userId, name: poiData.name, description: poiData.description,
-                    latitude: poiData.latitude, longitude: poiData.longitude,
-                    category: poiData.category, is_favorite: poiData.is_favorite
+                // Insert new
+                let result = await supabase.from('pilot_pois').insert({
+                    user_id: userId, ...baseFields, ...fichaFields,
+                    latitude: poiData.latitude, longitude: poiData.longitude
                 }).select().single();
-                if (error) throw error;
-                setPois(prev => [data, ...prev]);
+
+                // Fallback
+                if (result.error && result.error.message?.includes('column')) {
+                    console.warn('Ficha columns not found, saving without them');
+                    result = await supabase.from('pilot_pois').insert({
+                        user_id: userId, ...baseFields,
+                        latitude: poiData.latitude, longitude: poiData.longitude
+                    }).select().single();
+                }
+                if (result.error) throw result.error;
+                setPois(prev => [result.data, ...prev]);
             }
-            setShowForm(false);
-            setEditingPoi(null);
+            setModalPoi(null);
         } catch (err) {
             console.error('POI save error:', err);
             alert('Error al guardar: ' + (err.message || 'Intenta de nuevo'));
@@ -275,8 +417,7 @@ export default function TacticalMapScreen({ userId, profile }) {
             const { error } = await supabase.from('pilot_pois').delete().eq('id', poiId).eq('user_id', userId);
             if (error) throw error;
             setPois(prev => prev.filter(p => p.id !== poiId));
-            setShowForm(false);
-            setEditingPoi(null);
+            setModalPoi(null);
         } catch (err) {
             console.error('POI delete error:', err);
             alert('Error al eliminar.');
@@ -348,18 +489,31 @@ export default function TacticalMapScreen({ userId, profile }) {
                         pois={pois}
                         suggestedPois={suggestedPois}
                         userLocation={userLocation}
-                        onMapClick={handleMapClick}
-                        onMarkerClick={handleEditPoi}
+                        onMarkerClick={handleMarkerClick}
                         onBoundsChange={setMapBounds}
                         onSuggestedPoiClick={handleSuggestedPoiClick}
+                        onLongPress={handleLongPress}
                     />
                     
+                    {/* Reverse Geocoding Loading Toast */}
+                    {isReverseGeocoding && (
+                        <div style={{
+                            position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+                            background: '#0F172A', color: '#F8FAFC', padding: '10px 20px', borderRadius: 20,
+                            display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                            border: '1px solid #334155', fontWeight: 600, fontSize: 13
+                        }}>
+                            <Loader2 size={16} className="animate-spin" style={{ color: '#06B6D4' }} />
+                            Identificando ubicación...
+                        </div>
+                    )}
+
                     {/* Cultural POI Search Toggle */}
                     <button
                         onClick={handleSearchCulturalPois}
                         disabled={isSearchingCulturalPois}
                         style={{
-                            position: 'absolute', bottom: 96, right: 16, zIndex: 2000,
+                            position: 'absolute', bottom: 24, right: 16, zIndex: 2000,
                             width: 56, height: 56, borderRadius: 18,
                             background: suggestedPois.length > 0 ? '#F59E0B' : '#1E293B',
                             border: '1px solid #334155', 
@@ -377,7 +531,7 @@ export default function TacticalMapScreen({ userId, profile }) {
                     {/* Groq AI Quota Badge */}
                     {groqQuota && (
                         <div style={{
-                            position: 'absolute', bottom: 80, left: 16, zIndex: 9999,
+                            position: 'absolute', bottom: 24, left: 16, zIndex: 9999,
                             background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(8px)',
                             borderRadius: 12, padding: '8px 12px',
                             border: '1px solid #334155',
@@ -398,29 +552,6 @@ export default function TacticalMapScreen({ userId, profile }) {
                             <span style={{ color: '#64748B', fontSize: 10 }}>req/día</span>
                         </div>
                     )}
-
-                    {/* FAB */}
-                    <button
-                        onClick={() => {
-                            if (userLocation) {
-                                handleMapClick(userLocation.lat, userLocation.lng);
-                            } else {
-                                alert('Esperando ubicación GPS...');
-                            }
-                        }}
-                        style={{
-                            position: 'absolute', bottom: 24, right: 16, zIndex: 2000,
-                            width: 56, height: 56, borderRadius: 18,
-                            background: 'linear-gradient(135deg, #06B6D4, #0891B2)',
-                            border: 'none', color: 'white',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 12px 28px -6px rgba(6,182,212,0.5)',
-                            cursor: 'pointer'
-                        }}
-                        title="Nuevo punto en mi ubicación"
-                    >
-                        <Plus size={28} strokeWidth={3} />
-                    </button>
                 </div>
             ) : (
                 /* List View */
@@ -429,67 +560,63 @@ export default function TacticalMapScreen({ userId, profile }) {
                         <div style={{ textAlign: 'center', paddingTop: 60 }}>
                             <Navigation size={48} style={{ color: '#334155', margin: '0 auto 16px' }} />
                             <p style={{ fontSize: 15, fontWeight: 800, color: '#64748B' }}>Sin puntos guardados</p>
-                            <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Toca el mapa para crear tu primer punto de interés.</p>
+                            <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>Mantén presionado el mapa para crear tu primer punto.</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {pois.map(poi => {
-                                const cat = CATEGORY_MAP[poi.category] || CATEGORY_MAP.general;
-                                return (
-                                    <button
-                                        key={poi.id}
-                                        onClick={() => handleEditPoi(poi)}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: 14,
-                                            padding: '14px 16px', borderRadius: 16,
-                                            background: '#1E293B', border: '1px solid #334155',
-                                            cursor: 'pointer', textAlign: 'left', width: '100%',
-                                            transition: 'border-color 0.2s'
-                                        }}
-                                    >
-                                        <div style={{
-                                            width: 42, height: 42, borderRadius: 14,
-                                            background: `${cat.color}20`, border: `2px solid ${cat.color}40`,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            fontSize: 20, flexShrink: 0
-                                        }}>
-                                            {cat.emoji}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <p style={{ fontSize: 14, fontWeight: 800, color: '#F1F5F9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {poi.name}
-                                                </p>
-                                                {poi.is_favorite && <Star size={12} fill="#F59E0B" style={{ color: '#F59E0B', flexShrink: 0 }} />}
-                                            </div>
-                                            <p style={{ fontSize: 11, color: '#64748B', margin: '2px 0 0', fontFamily: 'monospace' }}>
-                                                {poi.latitude.toFixed(4)}, {poi.longitude.toFixed(4)}
+                            {pois.map(poi => (
+                                <button
+                                    key={poi.id}
+                                    onClick={() => handleMarkerClick(poi)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 14,
+                                        padding: '14px 16px', borderRadius: 16,
+                                        background: '#1E293B', border: '1px solid #334155',
+                                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                                        transition: 'border-color 0.2s'
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 42, height: 42, borderRadius: 14,
+                                        background: '#10B98120', border: '2px solid #10B98140',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 20, flexShrink: 0
+                                    }}>
+                                        📍
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <p style={{ fontSize: 14, fontWeight: 800, color: '#F1F5F9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {poi.name}
                                             </p>
-                                            {poi.description && (
-                                                <p style={{ fontSize: 11, color: '#94A3B8', margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {poi.description}
-                                                </p>
-                                            )}
+                                            {poi.is_favorite && <Star size={12} fill="#F59E0B" style={{ color: '#F59E0B', flexShrink: 0 }} />}
                                         </div>
-                                        <Edit3 size={16} style={{ color: '#475569', flexShrink: 0 }} />
-                                    </button>
-                                );
-                            })}
+                                        <p style={{ fontSize: 11, color: '#64748B', margin: '2px 0 0', fontFamily: 'monospace' }}>
+                                            {poi.latitude.toFixed(4)}, {poi.longitude.toFixed(4)}
+                                        </p>
+                                        {poi.dato_clave_1 && (
+                                            <p style={{ fontSize: 11, color: '#F59E0B', margin: '4px 0 0' }}>
+                                                ⭐ Ficha completada
+                                            </p>
+                                        )}
+                                    </div>
+                                    <Edit3 size={16} style={{ color: '#475569', flexShrink: 0 }} />
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
             )}
 
-            {/* POI Form Modal */}
-            <POIFormModal
-                isOpen={showForm}
-                onClose={() => { setShowForm(false); setEditingPoi(null); }}
+            {/* ═══ UNIFIED POI MODAL ═══ */}
+            <POIDetailModal
+                isOpen={!!modalPoi}
+                onClose={() => setModalPoi(null)}
                 onSave={handleSave}
                 onDelete={handleDelete}
-                latitude={clickedLatLng?.lat}
-                longitude={clickedLatLng?.lng}
-                editingPoi={editingPoi}
-                isSaving={isSaving}
+                poi={modalPoi}
+                isNewPin={isNewPin}
+                geoContext={lastGeoContext}
             />
 
             <style>{`

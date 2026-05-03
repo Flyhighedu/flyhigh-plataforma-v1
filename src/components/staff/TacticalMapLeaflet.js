@@ -1,13 +1,12 @@
 'use client';
 
 // =====================================================
-// TacticalMapLeaflet.js
-// Pure Leaflet map component. Loaded via dynamic import
-// (no SSR) from TacticalMapScreen.js.
-// Uses CartoDB Dark tiles (free, no API key).
+// TacticalMapLeaflet.js — v2 (Refactored)
+// Pure Leaflet map. Tap pin = modal. Long-press = new pin.
+// No popups. Clean interaction model.
 // =====================================================
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -23,64 +22,63 @@ const CAT_EMOJI = {
     landmark: '📍', refuel: '⛽', general: '📌'
 };
 
-const suggestedIcon = L.divIcon({
-    className: '',
-    html: `<div style="
-        width:40px;height:40px;border-radius:20px;
-        background:radial-gradient(circle, #FDE047 0%, #F59E0B 100%);
-        border:2px solid #FEF08A;
-        display:flex;align-items:center;justify-content:center;
-        font-size:20px;box-shadow:0 0 16px rgba(245,158,11,0.8), 0 0 32px rgba(245,158,11,0.4);
-        cursor:pointer;
-        animation: pulse 2s infinite;
-    ">🌟</div>
-    <style>
-      @keyframes pulse {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-      }
-    </style>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -22]
-});
+function makeSuggestedIcon(name) {
+    const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
+    return L.divIcon({
+        className: 'poi-marker-container',
+        html: `<div style="
+            width:32px;height:32px;border-radius:16px;
+            background:#F59E0B;
+            border:2px solid #FEF08A;
+            display:flex;align-items:center;justify-content:center;
+            font-size:16px;
+            cursor:pointer;
+        ">🌟</div>
+        ${shortName ? `<div class="poi-marker-label">${shortName}</div>` : ''}`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+    });
+}
 
-function makeIcon(category) {
+function makeIcon(category, name) {
     const color = CAT_COLORS[category] || CAT_COLORS.general;
     const emoji = CAT_EMOJI[category] || CAT_EMOJI.general;
+    const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
     return L.divIcon({
-        className: '',
+        className: 'poi-marker-container',
         html: `<div style="
-            width:36px;height:36px;border-radius:12px;
-            background:${color};border:3px solid white;
+            width:32px;height:32px;border-radius:8px;
+            background:${color};border:2px solid white;
             display:flex;align-items:center;justify-content:center;
-            font-size:16px;box-shadow:0 4px 12px rgba(0,0,0,0.4);
+            font-size:16px;
             cursor:pointer;
-        ">${emoji}</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        popupAnchor: [0, -20]
+        ">${emoji}</div>
+        ${shortName ? `<div class="poi-marker-label">${shortName}</div>` : ''}`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
     });
 }
 
 const userIcon = L.divIcon({
     className: '',
     html: `<div style="
-        width:18px;height:18px;border-radius:50%;
-        background:#06B6D4;border:3px solid white;
-        box-shadow:0 0 12px rgba(6,182,212,0.6), 0 0 24px rgba(6,182,212,0.3);
+        width:16px;height:16px;border-radius:50%;
+        background:#06B6D4;border:2px solid white;
     "></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9]
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
 });
 
-export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], userLocation, onMapClick, onMarkerClick, onBoundsChange, onSuggestedPoiClick }) {
+export default function TacticalMapLeaflet({
+    pois = [], suggestedPois = [], userLocation,
+    onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress
+}) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef([]);
     const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
+    const [showLabels, setShowLabels] = useState(false);
 
     // Initialize map once
     useEffect(() => {
@@ -96,16 +94,58 @@ export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], user
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
 
-        map.on('click', (e) => {
-            onMapClick?.(e.latlng.lat, e.latlng.lng);
-        });
+        // ═══ LONG-PRESS DETECTION ═══
+        let pressTimer = null;
+        let startPos = null;
+
+        const startPress = (e) => {
+            const latlng = e.latlng;
+            startPos = e.containerPoint ? { x: e.containerPoint.x, y: e.containerPoint.y } : null;
+            pressTimer = setTimeout(() => {
+                onLongPress?.(latlng.lat, latlng.lng);
+                pressTimer = null;
+            }, 600);
+        };
+
+        const cancelPress = (e) => {
+            if (pressTimer) {
+                // Cancel if finger moved more than 10px
+                if (e.containerPoint && startPos) {
+                    const dx = e.containerPoint.x - startPos.x;
+                    const dy = e.containerPoint.y - startPos.y;
+                    if (Math.sqrt(dx * dx + dy * dy) > 10) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                }
+            }
+        };
+
+        const endPress = () => {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        };
+
+        map.on('mousedown', startPress);
+        map.on('touchstart', startPress);
+        map.on('mousemove', cancelPress);
+        map.on('touchmove', (e) => { endPress(); }); // Always cancel on touch move (dragging)
+        map.on('mouseup', endPress);
+        map.on('touchend', endPress);
 
         map.on('moveend', () => {
             onBoundsChange?.(map.getBounds());
         });
 
+        // ═══ ZOOM-BASED RENDER VISIBILITY ═══
+        map.on('zoomend', () => {
+            const isZoomedIn = map.getZoom() >= 16;
+            setShowLabels(prev => {
+                if (prev !== isZoomedIn) return isZoomedIn;
+                return prev;
+            });
+        });
+
         mapRef.current = map;
-        // initial bounds
         setTimeout(() => onBoundsChange?.(map.getBounds()), 100);
 
         return () => {
@@ -128,28 +168,18 @@ export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], user
         }
     }, [userLocation]);
 
-    // Sync POI markers
+    // Sync saved POI markers — tap opens modal directly
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
 
-        // Remove old
         markersRef.current.forEach(m => map.removeLayer(m));
         markersRef.current = [];
 
-        // Add new
         pois.forEach(poi => {
             const marker = L.marker([poi.latitude, poi.longitude], {
-                icon: makeIcon(poi.category)
+                icon: makeIcon(poi.category, showLabels ? poi.name : null)
             }).addTo(map);
-
-            marker.bindPopup(`
-                <div style="font-family:system-ui;min-width:160px;">
-                    <p style="font-size:14px;font-weight:800;color:#0F172A;margin:0 0 4px;">${poi.name}</p>
-                    ${poi.description ? `<p style="font-size:11px;color:#64748B;margin:0 0 6px;">${poi.description}</p>` : ''}
-                    <p style="font-size:10px;color:#94A3B8;margin:0;font-family:monospace;">${poi.latitude.toFixed(5)}, ${poi.longitude.toFixed(5)}</p>
-                </div>
-            `, { className: 'poi-popup', closeButton: true });
 
             marker.on('click', () => {
                 onMarkerClick?.(poi);
@@ -157,9 +187,9 @@ export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], user
 
             markersRef.current.push(marker);
         });
-    }, [pois, onMarkerClick]);
+    }, [pois, onMarkerClick, showLabels]);
 
-    // Sync Suggested POI markers
+    // Sync Suggested POI markers — tap opens modal directly
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
@@ -169,50 +199,46 @@ export default function TacticalMapLeaflet({ pois = [], suggestedPois = [], user
 
         suggestedPois.forEach(poi => {
             const marker = L.marker([poi.latitude, poi.longitude], {
-                icon: suggestedIcon,
-                zIndexOffset: 1000 // Ensure they are above other POIs
+                icon: makeSuggestedIcon(showLabels ? poi.name : null),
+                zIndexOffset: 1000
             }).addTo(map);
 
-            marker.bindPopup(`
-                <div style="font-family:system-ui;min-width:160px;text-align:center;">
-                    <p style="font-size:14px;font-weight:800;color:#F59E0B;margin:0 0 4px;">${poi.name}</p>
-                    <p style="font-size:12px;color:#64748B;margin:0 0 8px;">${poi.description || 'Punto de interés sugerido'}</p>
-                    <button id="btn-add-${poi.id}" style="
-                        width:100%;padding:6px;background:#0F172A;color:white;
-                        border:none;border-radius:8px;font-weight:bold;cursor:pointer;
-                    ">Añadir a mi lista</button>
-                </div>
-            `, { className: 'poi-popup suggested-popup', closeButton: true });
-
-            marker.on('popupopen', () => {
-                const btn = document.getElementById(`btn-add-${poi.id}`);
-                if (btn) {
-                    btn.onclick = () => {
-                        map.closePopup();
-                        onSuggestedPoiClick?.(poi);
-                    };
-                }
+            marker.on('click', () => {
+                onSuggestedPoiClick?.(poi);
             });
 
             suggestedMarkersRef.current.push(marker);
         });
-    }, [suggestedPois, onSuggestedPoiClick]);
+    }, [suggestedPois, onSuggestedPoiClick, showLabels]);
 
     return (
         <>
             <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
             <style>{`
-                .poi-popup .leaflet-popup-content-wrapper {
-                    background: white; border-radius: 16px;
-                    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
-                    padding: 4px;
-                }
-                .poi-popup .leaflet-popup-tip { background: white; }
                 .leaflet-control-zoom a {
                     background: #1E293B !important; color: #CBD5E1 !important;
                     border-color: #334155 !important; font-weight: 800 !important;
                 }
                 .leaflet-control-zoom a:hover { background: #334155 !important; }
+                
+                .poi-marker-container {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    overflow: visible !important;
+                }
+                .poi-marker-label {
+                    margin-top: 4px;
+                    background: #0F172A;
+                    color: #F8FAFC;
+                    font-size: 10px;
+                    font-weight: 700;
+                    border: 1px solid #334155;
+                    border-radius: 4px;
+                    padding: 2px 4px;
+                    white-space: nowrap;
+                    pointer-events: none;
+                }
             `}</style>
         </>
     );

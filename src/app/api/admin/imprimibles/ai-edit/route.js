@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the Gemini API client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 export async function POST(req) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return NextResponse.json({ error: 'Falta la clave GEMINI_API_KEY en las variables de entorno (.env.local).' }, { status: 500 });
     }
 
@@ -26,6 +26,8 @@ export async function POST(req) {
       1. DEBES mantener todos los estilos en línea (inline styles) existentes. Si agregas nuevos elementos, usa estilos en línea consistentes con el diseño original.
       2. NUNCA uses clases CSS externas ni hojas de estilo, todo debe ser inline.
       3. Asegúrate de que el HTML sea válido y que todas las etiquetas estén cerradas.
+      4. Responde ÚNICAMENTE con JSON válido con las llaves "html" y "message". Sin markdown, sin explicaciones extra.
+      Formato exacto: {"html":"...","message":"..."}
 
       LOGOS DISPONIBLES:
       ¡ATENCIÓN! CUANDO EL USUARIO SOLICITE AGREGAR LOGOS, DEBES UTILIZAR EXACTAMENTE LAS SIGUIENTES ETIQUETAS HTML. ESTÁ TOTALMENTE PROHIBIDO INVENTAR RUTAS, USAR PLACEHOLDERS (EJ: src="logo.png") O NOMBRES GENÉRICOS (EJ: Aliado 1). DEBES COPIAR Y PEGAR ESTAS ETIQUETAS EXACTAS:
@@ -55,6 +57,15 @@ export async function POST(req) {
       ${html}
     `;
 
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash-lite',
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      }
+    });
+
     let response;
     let lastError;
     let retries = 3;
@@ -62,24 +73,10 @@ export async function POST(req) {
 
     for (let i = 0; i <= retries; i++) {
       try {
-        console.log(`Intentando generación con gemini-flash-latest (Intento ${i + 1}/${retries + 1})...`);
-        response = await ai.models.generateContent({
-          model: 'gemini-flash-latest',
-          contents: [
-            { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userMessage }] }
-          ],
-          config: {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                html: { type: "STRING", description: "El HTML modificado" },
-                message: { type: "STRING", description: "Mensaje amigable explicando los cambios realizados" }
-              },
-              required: ["html", "message"]
-            }
-          }
+        console.log(`Intentando generación con gemini-2.5-flash-lite (Intento ${i + 1}/${retries + 1})...`);
+        response = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+          systemInstruction: { role: 'system', parts: [{ text: systemPrompt }] }
         });
         
         // Si tiene éxito, salimos del bucle
@@ -100,7 +97,8 @@ export async function POST(req) {
       throw lastError || new Error("Fallaron todos los reintentos.");
     }
 
-    const resultData = JSON.parse(response.text);
+    const resultText = response.response.text().trim();
+    const resultData = JSON.parse(resultText);
     
     // Strip markdown code block wrappers if the AI included them
     let cleanHtml = resultData.html || '';
@@ -112,3 +110,5 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Hubo un error al procesar la solicitud con IA.' }, { status: 500 });
   }
 }
+
+
