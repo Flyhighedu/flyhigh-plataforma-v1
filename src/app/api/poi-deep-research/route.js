@@ -88,13 +88,12 @@ async function researchWithCohere(name, type, context, lat, lon) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: 'command-r-plus',
+            model: 'command-a-03-2025',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userMsg }
             ],
-            temperature: 0.3,
-            connectors: [{ id: 'web-search' }]
+            temperature: 0.3
         })
     });
 
@@ -187,7 +186,7 @@ const ENGINE_FNS = {
 
 const ENGINE_LABELS = {
     gemini: 'Gemini Flash',
-    cohere: 'Cohere Command R+',
+    cohere: 'Cohere Command A',
     rag: 'Tavily + Groq'
 };
 

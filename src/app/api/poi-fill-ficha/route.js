@@ -84,7 +84,7 @@ async function fichaWithCohere(article, poiName, systemPrompt, temperature) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            model: 'command-r-plus',
+            model: 'command-a-03-2025',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userMsg }
@@ -136,7 +136,7 @@ async function fichaWithGroq(article, poiName, systemPrompt, temperature) {
 
 // ───────── Orquestador ─────────
 const ENGINE_FNS = { gemini: fichaWithGemini, cohere: fichaWithCohere, groq: fichaWithGroq };
-const ENGINE_LABELS = { gemini: 'Gemini Flash', cohere: 'Cohere Command R+', groq: 'Groq Llama 3' };
+const ENGINE_LABELS = { gemini: 'Gemini Flash', cohere: 'Cohere Command A', groq: 'Groq Llama 3' };
 
 export async function POST(request) {
     try {

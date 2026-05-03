@@ -78,7 +78,7 @@ export default function POIDetailModal({
     // ═══ TRIDENTE ENGINE STATE ═══
     const ENGINE_OPTIONS = [
         { id: 'gemini', label: 'Gemini Flash', color: '#4285F4', icon: '🔵' },
-        { id: 'cohere', label: 'Cohere Command R+', color: '#D18EE2', icon: '🟣' },
+        { id: 'cohere', label: 'Cohere Command A', color: '#D18EE2', icon: '🟣' },
         { id: 'rag', label: 'Tavily + Groq', color: '#F59E0B', icon: '🟡' }
     ];
     const [activeEngine, setActiveEngine] = useState('gemini');
