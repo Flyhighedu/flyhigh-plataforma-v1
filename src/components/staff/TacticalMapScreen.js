@@ -358,22 +358,31 @@ export default function TacticalMapScreen({ userId, profile }) {
             `${i + 1}. "${p.name}" — Coords: ${p.latitude}, ${p.longitude} — Tipo: ${p.description}`
         ).join('\n');
 
-        const megaPrompt = `Eres un investigador enciclopédico especializado en México. Tu tarea es investigar los siguientes puntos de interés geográficos y culturales de la zona de ${lastGeoContext || 'Uruapan, Michoacán'}. USA GOOGLE SEARCH para verificar cada punto.
+        const megaPrompt = `Eres un investigador enciclopédico con acceso a Google Search. Necesito que investigues puntos de interés de ${lastGeoContext || 'Uruapan, Michoacán'} con DATOS DUROS Y VERIFICABLES.
 
-REGLAS ESTRICTAS:
-1. USA BÚSQUEDA EN GOOGLE para verificar cada punto. No respondas de memoria.
-2. Si NO encuentras información real sobre un punto, escribe exactamente: "Sin información histórica verificada."
-3. NUNCA inventes datos, fechas ni personajes. Solo hechos confirmados por fuentes web.
-4. Cada artículo debe incluir: breve introducción, historia u origen, importancia regional, y un dato curioso si lo hay.
-5. 4-6 oraciones por artículo. Español claro y amigable para niños de primaria.
-6. NO uses markdown ni formato especial. Solo texto plano.
+REGLAS OBLIGATORIAS DE CALIDAD:
+1. USA GOOGLE SEARCH para cada punto. No respondas de memoria.
+2. Cada artículo DEBE incluir AL MENOS 3 de estos tipos de datos numéricos:
+   - Año exacto de fundación, construcción o decreto
+   - Altitud en metros sobre el nivel del mar
+   - Extensión en hectáreas o kilómetros cuadrados
+   - Población, visitantes por año, o aforo
+   - Mediciones físicas: longitud, profundidad, caudal, temperatura
+   - Distancia a otro punto de referencia conocido
+   - Fecha histórica específica (día/mes/año)
+3. PROHIBIDO usar frases vagas como "en la época de", "hace muchos años", "una gran extensión". Reemplázalas SIEMPRE con el dato exacto.
+4. Si NO encuentras un dato específico verificable, escríbelo como: "[dato no verificado]" en lugar de inventarlo.
+5. El "dato curioso" debe ser SORPRENDENTE y contener un número o comparación ("X veces más grande que...", "uno de los N en todo México").
+6. Escribe en español amigable para niños de primaria, pero sin sacrificar precisión.
+7. 5-7 oraciones por artículo. Entre 300 y 600 caracteres.
+8. NO uses markdown, asteriscos, ni formato especial. Solo texto plano.
 
 FORMATO DE RESPUESTA (JSON estricto, sin explicaciones fuera del JSON):
 [
   {
     "name": "Nombre exacto del POI",
     "coords": "lat, lng",
-    "article": "Artículo investigado aquí..."
+    "article": "Artículo con datos duros aquí..."
   }
 ]
 
