@@ -160,21 +160,43 @@ async function researchWithRAG(name, type, context, lat, lon) {
 
     // Paso 1: Tavily busca información web real
     const searchQuery = `${name} ${context || 'México'} historia información`;
-    const tavilyRes = await fetch('https://api.tavily.com/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            api_key: TAVILY_API_KEY,
-            query: searchQuery,
-            search_depth: 'basic',
-            max_results: 5,
-            include_answer: true,
-            include_raw_content: false
-        })
+    const tavilyBody = JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query: searchQuery,
+        search_depth: 'basic',
+        max_results: 5,
+        include_answer: true,
+        include_raw_content: false
     });
 
+    let tavilyRes = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: tavilyBody,
+        cache: 'no-store'
+    });
+
+    // Mini-retry: si Tavily da 429, esperar 3s e intentar una vez más
+    if (tavilyRes.status === 429) {
+        const retryAfter = tavilyRes.headers.get('retry-after');
+        const waitMs = retryAfter ? Math.min(parseInt(retryAfter) * 1000, 5000) : 3000;
+        console.log(`  ⏳ Tavily rate limit (retry-after: ${retryAfter || 'not set'}) — esperando ${waitMs}ms...`);
+        await new Promise(r => setTimeout(r, waitMs));
+        tavilyRes = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: tavilyBody,
+            cache: 'no-store'
+        });
+        console.log(`  ⏳ Tavily retry result: ${tavilyRes.status}`);
+    }
+
     if (tavilyRes.status === 429) throw new Error('429');
-    if (!tavilyRes.ok) throw new Error(`TAVILY_${tavilyRes.status}`);
+    if (!tavilyRes.ok) {
+        const errBody = await tavilyRes.text().catch(() => '');
+        console.warn(`  ⚠️ Tavily error ${tavilyRes.status}: ${errBody.substring(0, 200)}`);
+        throw new Error(`TAVILY_${tavilyRes.status}`);
+    }
 
     // ═══ Incrementar odómetro DESPUÉS de búsqueda exitosa ═══
     await incrementTavilyUsage();
@@ -189,24 +211,37 @@ async function researchWithRAG(name, type, context, lat, lon) {
 
     // Paso 2: Groq redacta el artículo a partir de los datos web
     const { systemPrompt } = buildPrompt(name, type, context, lat, lon);
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${GROQ_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-                { role: 'system', content: systemPrompt + '\n\nIMPORTANTE: Basa tu artículo EXCLUSIVAMENTE en la siguiente información extraída de páginas web reales. No agregues datos de tu propia memoria.' },
-                { role: 'user', content: `Datos web verificados sobre "${name}" (${context || 'México'}):\n\n${webContext}\n\nRedacta el artículo educativo basándote SOLO en estos datos.` }
-            ],
-            temperature: 0.25,
-            max_tokens: 600
-        })
+    const groqBody = JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+            { role: 'system', content: systemPrompt + '\n\nIMPORTANTE: Basa tu artículo EXCLUSIVAMENTE en la siguiente información extraída de páginas web reales. No agregues datos de tu propia memoria.' },
+            { role: 'user', content: `Datos web verificados sobre "${name}" (${context || 'México'}):\n\n${webContext}\n\nRedacta el artículo educativo basándote SOLO en estos datos.` }
+        ],
+        temperature: 0.25,
+        max_tokens: 600
     });
 
-    if (groqRes.status === 429) throw new Error('429');
+    let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: groqBody,
+        cache: 'no-store'
+    });
+
+    // Mini-retry para Groq
+    if (groqRes.status === 429) {
+        console.log('  ⏳ Groq rate limit — esperando 2s para reintentar...');
+        await new Promise(r => setTimeout(r, 2000));
+        groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+            body: groqBody,
+            cache: 'no-store'
+        });
+        console.log(`  ⏳ Groq retry result: ${groqRes.status}`);
+    }
+
+    if (groqRes.status === 429) throw new Error('GROQ_429');
     if (!groqRes.ok) throw new Error(`GROQ_${groqRes.status}`);
 
     const groqData = await groqRes.json();
@@ -238,7 +273,8 @@ async function researchWithCohere(name, type, context, lat, lon) {
                 { role: 'user', content: userMsg }
             ],
             temperature: 0.3
-        })
+        }),
+        cache: 'no-store'
     });
 
     if (res.status === 429) throw new Error('429');
@@ -308,11 +344,16 @@ export async function POST(request) {
                     failedEngines: engineLog.length > 0 ? engineLog : undefined
                 });
             } catch (err) {
-                const reason = err.message.includes('429') ? 'cuota agotada'
-                             : err.message === 'NO_KEY' ? 'sin API key'
-                             : err.message === 'EMPTY_RESPONSE' ? 'sin información'
-                             : err.message === 'TAVILY_LIMIT_REACHED' ? 'límite mensual alcanzado'
-                             : 'error';
+                const msg = err.message;
+                const reason = msg === 'GROQ_429' ? 'Groq: cuota agotada'
+                             : msg === '429' ? 'cuota agotada'
+                             : msg === 'NO_KEY' ? 'sin API key'
+                             : msg === 'EMPTY_RESPONSE' ? 'sin información'
+                             : msg === 'TAVILY_LIMIT_REACHED' ? 'límite mensual alcanzado'
+                             : msg.startsWith('TAVILY_') ? `Tavily error: ${msg}`
+                             : msg.startsWith('GROQ_') ? `Groq error: ${msg}`
+                             : msg.startsWith('COHERE_') ? `Cohere error: ${msg}`
+                             : `error: ${msg.substring(0, 80)}`;
                 console.warn(`  ✗ [${ENGINE_LABELS[engineId]}] falló: ${reason}`);
                 engineLog.push({ engine: engineId, label: ENGINE_LABELS[engineId], reason });
                 lastError = err;
