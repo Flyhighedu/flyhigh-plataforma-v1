@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // ═══════════════════════════════════════════════════════════════
 // POI Fill Ficha — TRIDENTE para generar fichas didácticas
 // Motor 1: Gemini Flash-Lite
-// Motor 2: Cohere Command R+
-// Motor 3: Groq (Llama 3)
+// Motor 2: Groq (Llama 3) — Sin Tavily, solo procesa artículo
+// Motor 3: Cohere Command A
 // Fallover automático. No requiere búsqueda web (procesa artículo).
 // ═══════════════════════════════════════════════════════════════
 
@@ -13,7 +13,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const ENGINE_ORDER = ['gemini', 'cohere', 'groq'];
+const ENGINE_ORDER = ['gemini', 'groq', 'cohere'];
 
 const SYSTEM_PROMPT = `Eres un pedagogo experto en diseño de fichas educativas para niños de primaria y secundaria en México.
 Recibirás un artículo de investigación sobre un punto de interés geográfico o cultural.

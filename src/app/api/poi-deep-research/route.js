@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
 
 // ═══════════════════════════════════════════════════════════════
-// POI Deep Research — TRIDENTE DE INVESTIGACIÓN
-// Motor 1: Gemini Flash-Lite (Google Search Grounding)
-// Motor 2: Cohere Command R+ (conocimiento enciclopédico)
-// Motor 3: RAG → Tavily (búsqueda web) + Groq (redacción)
+// POI Deep Research — EL TRIDENTE 🔱
+// Motor 1: Gemini 2.5 Flash-Lite (Google Search Grounding)
+// Motor 2: RAG → Tavily (búsqueda web) + Groq (redacción)
+// Motor 3: Cohere Command A (conocimiento enciclopédico)
 // Fallover automático e invisible entre motores.
 // ═══════════════════════════════════════════════════════════════
 
@@ -14,7 +15,77 @@ const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const ENGINE_ORDER = ['gemini', 'cohere', 'rag'];
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Orden: Gemini → Tavily+Groq → Cohere
+const ENGINE_ORDER = ['gemini', 'rag', 'cohere'];
+
+const ENGINE_LABELS = {
+    gemini: 'Gemini Flash',
+    rag: 'Tavily + Groq',
+    cohere: 'Cohere Command A'
+};
+
+// ───────── Supabase client (service role para escritura) ─────────
+function getSupabase() {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null;
+    return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+}
+
+// ───────── Odómetro Tavily: leer/incrementar/reset mensual ─────────
+async function getTavilyUsage() {
+    const sb = getSupabase();
+    if (!sb) return { usage_count: 0, monthly_limit: 1000, month_key: '' };
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // "2026-05"
+
+    const { data, error } = await sb.from('tavily_usage').select('*').eq('id', 1).single();
+
+    if (error || !data) {
+        // Tabla no existe o fila no encontrada — devolver defaults
+        return { usage_count: 0, monthly_limit: 1000, month_key: currentMonth };
+    }
+
+    // Auto-reset si cambió el mes
+    if (data.month_key !== currentMonth) {
+        await sb.from('tavily_usage').update({
+            usage_count: 0,
+            month_key: currentMonth,
+            updated_at: new Date().toISOString()
+        }).eq('id', 1);
+        return { usage_count: 0, monthly_limit: data.monthly_limit || 1000, month_key: currentMonth };
+    }
+
+    return data;
+}
+
+async function incrementTavilyUsage() {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    
+    // Intentar actualizar
+    const { error } = await sb.from('tavily_usage').update({
+        usage_count: (await getTavilyUsageCount()) + 1,
+        last_used_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    }).eq('id', 1);
+
+    if (error) {
+        console.warn('⚠️ No se pudo actualizar odómetro Tavily:', error.message);
+    }
+}
+
+async function getTavilyUsageCount() {
+    const sb = getSupabase();
+    if (!sb) return 0;
+    const { data } = await sb.from('tavily_usage').select('usage_count, month_key').eq('id', 1).single();
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (!data || data.month_key !== currentMonth) return 0;
+    return data.usage_count || 0;
+}
 
 // ───────── Prompt universal (mismo para los 3 motores) ─────────
 function buildPrompt(name, type, context, lat, lon) {
@@ -49,7 +120,7 @@ ESTRUCTURA:
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MOTOR 1: Gemini Flash-Lite (con Google Search Grounding)
+// MOTOR 1: Gemini 2.5 Flash-Lite (con Google Search Grounding)
 // ═══════════════════════════════════════════════════════════════
 async function researchWithGemini(name, type, context, lat, lon) {
     if (!GEMINI_API_KEY) throw new Error('NO_KEY');
@@ -74,50 +145,18 @@ async function researchWithGemini(name, type, context, lat, lon) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MOTOR 2: Cohere Command R+ (conocimiento enciclopédico)
-// ═══════════════════════════════════════════════════════════════
-async function researchWithCohere(name, type, context, lat, lon) {
-    if (!COHERE_API_KEY) throw new Error('NO_KEY');
-
-    const { systemPrompt, userMsg } = buildPrompt(name, type, context, lat, lon);
-
-    const res = await fetch('https://api.cohere.com/v2/chat', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${COHERE_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'command-a-03-2025',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userMsg }
-            ],
-            temperature: 0.3
-        })
-    });
-
-    if (res.status === 429) throw new Error('429');
-    if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`COHERE_${res.status}: ${errText}`);
-    }
-
-    const data = await res.json();
-    let text = data.message?.content?.[0]?.text
-            || data.text
-            || '';
-    text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
-
-    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
-    return text;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MOTOR 3: RAG — Tavily (búsqueda web) + Groq (redacción)
+// MOTOR 2: RAG — Tavily (búsqueda web) + Groq (redacción)
+// Con odómetro: verifica límite antes de usar
 // ═══════════════════════════════════════════════════════════════
 async function researchWithRAG(name, type, context, lat, lon) {
     if (!TAVILY_API_KEY || !GROQ_API_KEY) throw new Error('NO_KEY');
+
+    // ═══ Verificar odómetro Tavily ═══
+    const usage = await getTavilyUsage();
+    if (usage.usage_count >= usage.monthly_limit) {
+        console.warn(`⚠️ Tavily al límite: ${usage.usage_count}/${usage.monthly_limit}`);
+        throw new Error('TAVILY_LIMIT_REACHED');
+    }
 
     // Paso 1: Tavily busca información web real
     const searchQuery = `${name} ${context || 'México'} historia información`;
@@ -136,6 +175,9 @@ async function researchWithRAG(name, type, context, lat, lon) {
 
     if (tavilyRes.status === 429) throw new Error('429');
     if (!tavilyRes.ok) throw new Error(`TAVILY_${tavilyRes.status}`);
+
+    // ═══ Incrementar odómetro DESPUÉS de búsqueda exitosa ═══
+    await incrementTavilyUsage();
 
     const tavilyData = await tavilyRes.json();
     const webContext = [
@@ -176,18 +218,52 @@ async function researchWithRAG(name, type, context, lat, lon) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MOTOR 3: Cohere Command A (conocimiento enciclopédico)
+// ═══════════════════════════════════════════════════════════════
+async function researchWithCohere(name, type, context, lat, lon) {
+    if (!COHERE_API_KEY) throw new Error('NO_KEY');
+
+    const { systemPrompt, userMsg } = buildPrompt(name, type, context, lat, lon);
+
+    const res = await fetch('https://api.cohere.com/v2/chat', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${COHERE_API_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: 'command-a-03-2025',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userMsg }
+            ],
+            temperature: 0.3
+        })
+    });
+
+    if (res.status === 429) throw new Error('429');
+    if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`COHERE_${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+    let text = data.message?.content?.[0]?.text
+            || data.text
+            || '';
+    text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
+
+    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
+    return text;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ORQUESTADOR — Intenta cada motor en orden, salta al siguiente
 // ═══════════════════════════════════════════════════════════════
 const ENGINE_FNS = {
     gemini: researchWithGemini,
-    cohere: researchWithCohere,
-    rag: researchWithRAG
-};
-
-const ENGINE_LABELS = {
-    gemini: 'Gemini Flash',
-    cohere: 'Cohere Command A',
-    rag: 'Tavily + Groq'
+    rag: researchWithRAG,
+    cohere: researchWithCohere
 };
 
 export async function POST(request) {
@@ -195,11 +271,15 @@ export async function POST(request) {
         const { name, type, context, lat, lon, preferredEngine } = await request.json();
         if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
 
-        // Build engine order: preferred first, then the rest
+        // Build engine order: preferred first, then the rest in default order
         let order = [...ENGINE_ORDER];
         if (preferredEngine && ENGINE_FNS[preferredEngine]) {
             order = [preferredEngine, ...ENGINE_ORDER.filter(e => e !== preferredEngine)];
         }
+
+        // Leer odómetro Tavily para incluirlo en la respuesta
+        let tavilyUsage = null;
+        try { tavilyUsage = await getTavilyUsage(); } catch (e) { /* ignore */ }
 
         let lastError = null;
         const engineLog = [];
@@ -212,16 +292,26 @@ export async function POST(request) {
                 const article = await fn(name, type, context, lat, lon);
                 console.log(`  ✓ [${ENGINE_LABELS[engineId]}] → ${article.length} chars`);
 
+                // Releer odómetro si se usó Tavily
+                if (engineId === 'rag') {
+                    try { tavilyUsage = await getTavilyUsage(); } catch (e) { /* ignore */ }
+                }
+
                 return NextResponse.json({
                     article,
                     engine: engineId,
                     engineLabel: ENGINE_LABELS[engineId],
+                    tavilyUsage: tavilyUsage ? {
+                        count: tavilyUsage.usage_count,
+                        limit: tavilyUsage.monthly_limit
+                    } : null,
                     failedEngines: engineLog.length > 0 ? engineLog : undefined
                 });
             } catch (err) {
                 const reason = err.message.includes('429') ? 'cuota agotada'
                              : err.message === 'NO_KEY' ? 'sin API key'
                              : err.message === 'EMPTY_RESPONSE' ? 'sin información'
+                             : err.message === 'TAVILY_LIMIT_REACHED' ? 'límite mensual alcanzado'
                              : 'error';
                 console.warn(`  ✗ [${ENGINE_LABELS[engineId]}] falló: ${reason}`);
                 engineLog.push({ engine: engineId, label: ENGINE_LABELS[engineId], reason });
@@ -235,6 +325,7 @@ export async function POST(request) {
             article: 'No fue posible investigar este punto en este momento. Todos los motores de investigación están temporalmente agotados. Por favor, intenta más tarde.',
             engine: 'none',
             engineLabel: 'Sin motor disponible',
+            tavilyUsage: tavilyUsage ? { count: tavilyUsage.usage_count, limit: tavilyUsage.monthly_limit } : null,
             failedEngines: engineLog,
             allFailed: true
         }, { status: 503 });

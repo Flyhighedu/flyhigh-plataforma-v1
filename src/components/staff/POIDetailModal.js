@@ -78,12 +78,13 @@ export default function POIDetailModal({
     // ═══ TRIDENTE ENGINE STATE ═══
     const ENGINE_OPTIONS = [
         { id: 'gemini', label: 'Gemini Flash', color: '#4285F4', icon: '🔵' },
-        { id: 'cohere', label: 'Cohere Command A', color: '#D18EE2', icon: '🟣' },
-        { id: 'rag', label: 'Tavily + Groq', color: '#F59E0B', icon: '🟡' }
+        { id: 'rag', label: 'Tavily + Groq', color: '#F59E0B', icon: '🟡' },
+        { id: 'cohere', label: 'Cohere Command A', color: '#D18EE2', icon: '🟣' }
     ];
     const [activeEngine, setActiveEngine] = useState('gemini');
     const [engineDropdownOpen, setEngineDropdownOpen] = useState(false);
-    const [engineToast, setEngineToast] = useState(null); // { message, fromEngine, toEngine }
+    const [engineToast, setEngineToast] = useState(null);
+    const [tavilyUsage, setTavilyUsage] = useState(null); // { count, limit }
 
     const nameRef = useRef(null);
     const scrollRef = useRef(null);
@@ -142,13 +143,16 @@ export default function POIDetailModal({
             if (data.article && data.article.length > 30) {
                 articleText = data.article;
 
+                // Actualizar odómetro Tavily si viene en la respuesta
+                if (data.tavilyUsage) setTavilyUsage(data.tavilyUsage);
+
                 // Si el backend hizo fallover automático, notificar al usuario
                 if (data.engine && data.engine !== activeEngine && data.engine !== 'none') {
                     const prevLabel = ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label || activeEngine;
                     const newLabel = ENGINE_OPTIONS.find(e => e.id === data.engine)?.label || data.engine;
                     setActiveEngine(data.engine);
                     setEngineToast({
-                        message: `Motor cambiado automáticamente para asegurar tu respuesta`,
+                        message: 'El sistema está saturado. Cambiando de motor automáticamente para asegurar tu información',
                         detail: `${prevLabel} → ${newLabel}`
                     });
                     setTimeout(() => setEngineToast(null), 5000);
@@ -360,7 +364,12 @@ export default function POIDetailModal({
                             }}
                         >
                             <span>{ENGINE_OPTIONS.find(e => e.id === activeEngine)?.icon}</span>
-                            <span>{ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label}</span>
+                            <span>
+                                {ENGINE_OPTIONS.find(e => e.id === activeEngine)?.label}
+                                {activeEngine === 'rag' && tavilyUsage && (
+                                    <span style={{ opacity: 0.7, fontSize: 10, marginLeft: 4 }}>({tavilyUsage.count}/{tavilyUsage.limit})</span>
+                                )}
+                            </span>
                             <ChevronDown size={12} style={{
                                 transition: 'transform 0.2s',
                                 transform: engineDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'
@@ -370,7 +379,7 @@ export default function POIDetailModal({
                             <div style={{
                                 position: 'absolute', top: '100%', left: 20, marginTop: 4, zIndex: 100,
                                 background: '#1E293B', border: '1px solid #334155',
-                                borderRadius: 10, padding: 4, minWidth: 200,
+                                borderRadius: 10, padding: 4, minWidth: 220,
                                 boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
                                 animation: 'poiFadeIn 0.15s ease-out'
                             }}>
@@ -388,7 +397,14 @@ export default function POIDetailModal({
                                         }}
                                     >
                                         <span style={{ fontSize: 14 }}>{eng.icon}</span>
-                                        <span>{eng.label}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <span>{eng.label}</span>
+                                            {eng.id === 'rag' && tavilyUsage && (
+                                                <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>
+                                                    {tavilyUsage.count}/{tavilyUsage.limit} búsquedas usadas
+                                                </span>
+                                            )}
+                                        </div>
                                         {activeEngine === eng.id && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#22C55E' }}>● Activo</span>}
                                     </button>
                                 ))}
