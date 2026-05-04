@@ -22,21 +22,26 @@ const CAT_EMOJI = {
     landmark: '📍', refuel: '⛽', general: '📌'
 };
 
-function makeSuggestedIcon(name) {
+function makeSuggestedIcon(name, category) {
+    const isCity = category === 'city';
     const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
+    
+    const citySvg = `<svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="64" height="64" rx="32" fill="url(#bg-gradient)"/><circle cx="32" cy="32" r="30" stroke="#BFDBFE" stroke-width="4"/><path d="M42 24a4 4 0 013.5-3.8 5 5 0 019 1.8 3 3 0 01-1.5 5.8 4 4 0 01-11-3.8z" fill="#F472B6" opacity="0.8"/><path d="M28 20a3 3 0 012.8-2.5 4 4 0 017 1.5 2 2 0 01-1.2 3.8 3 3 0 01-8.6-2.8z" fill="#FBCFE8" opacity="0.9"/><path d="M38 28h12v26H38z" fill="#1E3A8A"/><path d="M14 34h10v20H14z" fill="#2563EB"/><path d="M24 26h14v28H24z" fill="#3B82F6"/><rect x="28" y="30" width="2" height="2" fill="#FDE047"/><rect x="32" y="30" width="2" height="2" fill="#1E3A8A"/><rect x="28" y="36" width="2" height="2" fill="#FDE047"/><rect x="32" y="36" width="2" height="2" fill="#FDE047"/><rect x="28" y="42" width="2" height="2" fill="#1E3A8A"/><rect x="32" y="42" width="2" height="2" fill="#FDE047"/><rect x="28" y="48" width="2" height="2" fill="#FDE047"/><rect x="32" y="48" width="2" height="2" fill="#FDE047"/><rect x="16" y="38" width="2" height="2" fill="#FDE047"/><rect x="20" y="38" width="2" height="2" fill="#FDE047"/><rect x="16" y="44" width="2" height="2" fill="#FDE047"/><rect x="20" y="44" width="2" height="2" fill="#1E3A8A"/><rect x="42" y="32" width="4" height="2" fill="#FDE047"/><rect x="42" y="38" width="4" height="2" fill="#FDE047"/><defs><linearGradient id="bg-gradient" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#3B82F6"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs></svg>`;
+    
+    const starSvg = `<svg width="36" height="36" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="30" fill="url(#star-bg)" stroke="#FEF08A" stroke-width="4"/><path d="M32 14l5.5 16.5H55l-14 10.5 5.5 16.5L32 47l-14 10.5 5.5-16.5-14-10.5h17.5L32 14z" fill="url(#star-gold)" filter="url(#drop-shadow)"/><defs><linearGradient id="star-bg" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#F59E0B"/><stop offset="1" stop-color="#D97706"/></linearGradient><linearGradient id="star-gold" x1="14" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse"><stop stop-color="#FEF08A"/><stop offset="1" stop-color="#F59E0B"/></linearGradient><filter id="drop-shadow" x="10" y="10" width="44" height="44" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="4" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs></svg>`;
+
     return L.divIcon({
         className: 'poi-marker-container',
         html: `<div style="
-            width:32px;height:32px;border-radius:16px;
-            background:#F59E0B;
-            border:2px solid #FEF08A;
             display:flex;align-items:center;justify-content:center;
-            font-size:16px;
             cursor:pointer;
-        ">🌟</div>
-        ${shortName ? `<div class="poi-marker-label">${shortName}</div>` : ''}`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
+            z-index: ${isCity ? '2000' : '1000'};
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        ">${isCity ? citySvg : starSvg}</div>
+        ${shortName ? `<div class="poi-marker-label" style="${isCity ? 'font-size:12px; padding:4px 8px; background:#1E3A8A; border-color:#3B82F6;' : ''}">${shortName}</div>` : ''}`,
+        iconSize: [isCity ? 56 : 36, isCity ? 56 : 36],
+        iconAnchor: [isCity ? 28 : 18, isCity ? 28 : 18]
     });
 }
 
@@ -199,8 +204,8 @@ export default function TacticalMapLeaflet({
 
         suggestedPois.forEach(poi => {
             const marker = L.marker([poi.latitude, poi.longitude], {
-                icon: makeSuggestedIcon(showLabels ? poi.name : null),
-                zIndexOffset: 1000
+                icon: makeSuggestedIcon(showLabels ? poi.name : null, poi.category),
+                zIndexOffset: poi.category === 'city' ? 2000 : 1000
             }).addTo(map);
 
             marker.on('click', () => {

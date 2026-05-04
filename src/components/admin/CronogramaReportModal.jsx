@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Download, FileText, Image as ImageIcon, Calendar, Settings, ChevronRight, MapPin, CheckCircle, Clock, TreePine, Building2, Zap } from 'lucide-react';
+import { X, Download, FileText, Image as ImageIcon, Calendar, Settings, ChevronRight, MapPin, CheckCircle, Clock, TreePine, Building2, Zap, Users } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
 export default function CronogramaReportModal({ isOpen, onClose, schools }) {
@@ -278,6 +278,10 @@ export default function CronogramaReportModal({ isOpen, onClose, schools }) {
                                                                     <div className="flex items-center gap-1.5 text-xs text-slate-700 font-bold bg-slate-100/50 px-2.5 py-1.5 rounded-lg border border-slate-100">
                                                                         <Clock size={12} className={isMatutino ? "text-blue-500" : "text-amber-500"} />
                                                                         <span className="uppercase">{school.turno || 'Pendiente'}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5 text-xs text-slate-700 font-bold bg-slate-100/50 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                                                                        <Users size={12} className="text-emerald-500" />
+                                                                        <span>{school.numero_ninos ? `${school.numero_ninos} Niños` : 'Por definir'}</span>
                                                                     </div>
                                                                     <div className="flex items-start gap-1.5 text-[11px] text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 flex-1 min-w-[200px]">
                                                                         <MapPin size={12} className="shrink-0 text-rose-500 mt-0.5" />

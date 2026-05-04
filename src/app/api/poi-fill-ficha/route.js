@@ -18,24 +18,32 @@ const ENGINE_ORDER = ['groq', 'gemini', 'cohere'];
 
 const SYSTEM_PROMPT = `Eres un pedagogo experto en diseño de fichas educativas para niños de primaria y secundaria en México.
 Recibirás un artículo de investigación sobre un punto de interés geográfico o cultural.
-Tu trabajo es generar exactamente 3 campos para una ficha didáctica que será usada por un piloto de vuelos turísticos educativos para narrar a los niños durante un vuelo.
+Tu trabajo es generar exactamente 4 campos para una ficha didáctica que será usada por un piloto de vuelos turísticos educativos para narrar a los niños durante un vuelo.
 
 CAMPOS A GENERAR:
 1. "dato_clave_1": Un dato concreto y sorprendente (una fecha, un número, un hecho poco conocido) que asombre a un niño. Máximo 1 oración corta y directa (10-18 palabras).
 2. "dato_clave_2": Otro dato diferente, enfocado en por qué este lugar importa para su comunidad o para México. Máximo 1 oración corta y directa (10-18 palabras).
-3. "pregunta_interaccion": Una pregunta abierta y divertida que el piloto le pueda hacer a los niños durante el vuelo para generar conversación. Debe ser muy breve. Una sola pregunta.
+3. "pregunta_estudio_1": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_1. Ejemplo: "¿En qué año fue inaugurado este hospital?".
+4. "pregunta_estudio_2": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_2. Ejemplo: "¿Cuántas especialidades ofrece a la comunidad?".
+5. "pregunta_interaccion": Una pregunta abierta y reflexiva que el piloto le pueda hacer a los niños DURANTE el vuelo para generar conversación y pensamiento crítico. Debe ser diferente a las preguntas de estudio. Una sola pregunta.
 
 REGLAS:
 - Basa TODO en el artículo proporcionado. No inventes datos adicionales.
 - Escribe en español claro y amigable para niños.
 - IMPORTANTE: Sé muy conciso. Los datos deben poder leerse de un solo vistazo rápido.
 - Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones extra.
-- Formato exacto: {"dato_clave_1":"...","dato_clave_2":"...","pregunta_interaccion":"..."}`;
+- Formato exacto: {"dato_clave_1":"...","dato_clave_2":"...","pregunta_estudio_1":"...","pregunta_estudio_2":"...","pregunta_interaccion":"..."}`;
 
 function buildSystemPrompt(regenerate, fieldToRegenerate, currentValue) {
     let prompt = SYSTEM_PROMPT;
     if (regenerate) {
-        if (fieldToRegenerate) {
+        if (fieldToRegenerate === 'dato_clave_3') {
+            prompt += `\n\nIMPORTANTE (NUEVO DATO): El usuario quiere agregar un TERCER dato clave ("dato_clave_3") y su pregunta de estudio ("pregunta_estudio_3").`;
+            if (currentValue) {
+                prompt += `\nEstos datos ya existen y NO debes repetirlos: ${currentValue}\nPROHIBIDO REESCRIBIR EL MISMO HECHO. Busca un ángulo COMPLETAMENTE DIFERENTE dentro del artículo.`;
+            }
+            prompt += `\nDevuelve un JSON que contenga SOLO las llaves "dato_clave_3" y "pregunta_estudio_3".`;
+        } else if (fieldToRegenerate) {
             prompt += `\n\nIMPORTANTE (REGENERACIÓN INDIVIDUAL): El usuario quiere regenerar el campo "${fieldToRegenerate}".`;
             if (currentValue) {
                 prompt += `\nEl usuario RECHAZÓ este dato actual: "${currentValue}".\nPROHIBIDO REESCRIBIR EL MISMO HECHO. Debes buscar un ángulo, tema, evento o personaje COMPLETAMENTE DIFERENTE dentro del artículo.`;
@@ -155,7 +163,7 @@ export async function POST(request) {
     try {
         const { article, poiName, regenerate, fieldToRegenerate, currentValue, preferredEngine } = await request.json();
         if (!article || article.length < 20) {
-            return NextResponse.json({ dato_clave_1: '', dato_clave_2: '', pregunta_interaccion: '' });
+            return NextResponse.json({ dato_clave_1: '', dato_clave_2: '', pregunta_estudio_1: '', pregunta_estudio_2: '', pregunta_interaccion: '' });
         }
 
         const systemPrompt = buildSystemPrompt(regenerate, fieldToRegenerate, currentValue);
@@ -174,16 +182,25 @@ export async function POST(request) {
             try {
                 const parsed = await fn(article, poiName, systemPrompt, temperature);
 
-                if (fieldToRegenerate && parsed[fieldToRegenerate]) {
-                    return NextResponse.json({
-                        [fieldToRegenerate]: parsed[fieldToRegenerate],
-                        engine: engineId
-                    });
+                // STRICT: if regenerating a single field, ONLY return that field
+                if (fieldToRegenerate) {
+                    const value = parsed[fieldToRegenerate];
+                    if (value) {
+                        return NextResponse.json({
+                            [fieldToRegenerate]: value,
+                            engine: engineId
+                        });
+                    }
+                    // If the LLM didn't produce the requested field, try next engine
+                    console.warn(`  ⚠ ${ENGINE_LABELS[engineId]} no devolvió ${fieldToRegenerate}`);
+                    continue;
                 }
 
                 return NextResponse.json({
                     dato_clave_1: parsed.dato_clave_1 || '',
                     dato_clave_2: parsed.dato_clave_2 || '',
+                    pregunta_estudio_1: parsed.pregunta_estudio_1 || '',
+                    pregunta_estudio_2: parsed.pregunta_estudio_2 || '',
                     pregunta_interaccion: parsed.pregunta_interaccion || '',
                     engine: engineId
                 });
@@ -194,14 +211,14 @@ export async function POST(request) {
 
         // Todos fallaron
         return NextResponse.json({
-            dato_clave_1: '', dato_clave_2: '', pregunta_interaccion: '',
+            dato_clave_1: '', dato_clave_2: '', pregunta_estudio_1: '', pregunta_estudio_2: '', pregunta_interaccion: '',
             engine: 'none', allFailed: true
         }, { status: 503 });
 
     } catch (error) {
         console.error('Fill ficha fatal error:', error.message);
         return NextResponse.json({
-            dato_clave_1: '', dato_clave_2: '', pregunta_interaccion: ''
+            dato_clave_1: '', dato_clave_2: '', pregunta_estudio_1: '', pregunta_estudio_2: '', pregunta_interaccion: ''
         }, { status: 500 });
     }
 }

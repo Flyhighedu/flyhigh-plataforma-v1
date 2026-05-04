@@ -322,6 +322,11 @@ export default function AdminPage() {
     };
 
     // --- EFFECTS ---
+    useEffect(() => {
+        if (pathname === '/admin') {
+            router.replace('/admin/bd');
+        }
+    }, [pathname, router]);
     // Verificar si ya está autenticado (cookie)
     useEffect(() => {
         setIsMounted(true); // Hydration fix

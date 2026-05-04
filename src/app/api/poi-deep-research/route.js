@@ -89,32 +89,32 @@ async function getTavilyUsageCount() {
 
 // ───────── Prompt universal (mismo para los 3 motores) ─────────
 function buildPrompt(name, type, context, lat, lon) {
-    const systemPrompt = `Eres un investigador enciclopédico experto en México con capacidad de búsqueda web.
-Tu única tarea es investigar lugares y puntos de interés (POIs) para generar un artículo educativo verídico.
+    const systemPrompt = `Eres un investigador experto en geografía, infraestructura y turismo en México con capacidad de búsqueda web.
+Tu única tarea es investigar lugares y puntos de interés (POIs) específicos para generar una ficha operativa o un artículo educativo verídico.
 
-REGLAS ABSOLUTAS:
-1. Si dispones de búsqueda web, ÚSALA. Si no, basa tu respuesta en conocimiento verificable.
-2. Si no tienes información real sobre este lugar, di exactamente: "No se encontró información histórica verificada para este punto."
-3. NUNCA INVENTES DATOS. Si no estás 100% seguro, no lo pongas.
-4. Incluye AL MENOS 3 datos numéricos reales (años, altitudes, medidas, cifras de visitantes, etc.)
-5. El tono debe ser el de un narrador apasionado que cuenta la historia a niños de 9-12 años.
+REGLAS ABSOLUTAS (CERO ALUCINACIÓN):
+1. Foco Estricto: Se te pregunta por un lugar ESPECÍFICO ("${name}"). NUNCA respondas con la historia general de la ciudad o municipio ("${context}") si no tienes datos del lugar en sí.
+2. Lugares Modernos/Industriales: Si el lugar es una planta (ej. Pemex), fábrica, hospital, gasolinera, o negocio, descríbelo como tal. Explica su función operativa, importancia económica o logística para la zona. No inventes "historia antigua" si no la tiene.
+3. Si dispones de búsqueda web, ÚSALA. Si no, basa tu respuesta en conocimiento verificable.
+4. Si no tienes información real sobre este punto ESPECÍFICO, di exactamente: "No se encontró información verificada para esta instalación/punto específico."
+5. NUNCA INVENTES DATOS. Si no estás 100% seguro de un dato, omítelo.
+6. Incluye AL MENOS 2 datos reales (año de construcción, capacidad, metros, impacto económico, etc.) si es posible.
 
 ESTRUCTURA:
-- Introducción — Qué es y dónde está.
-- Historia — Fechas, origen, fundación real.
-- Importancia — Relevancia cultural/económica con datos.
-- Dato curioso — Un hecho sorprendente con un número o comparación.
+- Introducción — Qué es exactamente (planta, museo, parque) y dónde está.
+- Relevancia u Operación — Su función o impacto (histórico si es cultural; económico/logístico si es industrial).
+- Dato Clave — Un hecho concreto o cifra sobre el lugar.
 
-- 6-10 oraciones. Entre 500 y 1000 caracteres.
-- Español claro y amigable.
+- 7-10 oraciones. Entre 600 y 1100 caracteres.
+- Español claro y profesional (o amigable si es turismo).
 - Sin formato Markdown. Solo texto plano con punto y seguido.`;
 
-    let userMsg = `Investiga este punto de interés:\n`;
+    let userMsg = `Investiga este lugar específico:\n`;
     userMsg += `Nombre: "${name}"\n`;
-    userMsg += `Ciudad/Estado: ${context || 'México'}\n`;
+    userMsg += `Ciudad/Estado/Zona: ${context || 'México'}\n`;
     if (lat && lon) userMsg += `Coordenadas GPS: ${lat}, ${lon}\n`;
-    if (type) userMsg += `Categoría: ${type}\n`;
-    userMsg += `\nGenera el artículo educativo con datos reales.`;
+    if (type) userMsg += `Categoría referencial: ${type}\n`;
+    userMsg += `\nGenera la ficha descriptiva basándote SOLO en información de ese lugar específico.`;
 
     return { systemPrompt, userMsg };
 }
@@ -141,7 +141,7 @@ async function researchWithGemini(name, type, context, lat, lon) {
     text = text.replace(/^["']+|["']+$/g, '').replace(/\*\*/g, '').trim();
 
     if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
-    return text;
+    return { text, images: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -165,6 +165,7 @@ async function researchWithRAG(name, type, context, lat, lon) {
         query: searchQuery,
         search_depth: 'basic',
         max_results: 5,
+        include_images: true,
         include_answer: true,
         include_raw_content: false
     });
@@ -218,7 +219,7 @@ async function researchWithRAG(name, type, context, lat, lon) {
             { role: 'user', content: `Datos web verificados sobre "${name}" (${context || 'México'}):\n\n${webContext}\n\nRedacta el artículo educativo basándote SOLO en estos datos.` }
         ],
         temperature: 0.25,
-        max_tokens: 600
+        max_tokens: 800
     });
 
     let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -249,7 +250,16 @@ async function researchWithRAG(name, type, context, lat, lon) {
     text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
 
     if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
-    return text;
+    
+    // Map Tavily images to standard format
+    const images = (tavilyData.images || []).map(url => ({
+        url,
+        thumbUrl: url,
+        credit: 'Tavily',
+        source: 'tavily'
+    }));
+
+    return { text, images };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -290,7 +300,7 @@ async function researchWithCohere(name, type, context, lat, lon) {
     text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
 
     if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
-    return text;
+    return { text, images: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -325,8 +335,10 @@ export async function POST(request) {
             console.log(`🔬 [${ENGINE_LABELS[engineId]}] Investigando: "${name}"`);
 
             try {
-                const article = await fn(name, type, context, lat, lon);
-                console.log(`  ✓ [${ENGINE_LABELS[engineId]}] → ${article.length} chars`);
+                const result = await fn(name, type, context, lat, lon);
+                const articleText = typeof result === 'string' ? result : result.text;
+                const images = result.images || [];
+                console.log(`  ✓ [${ENGINE_LABELS[engineId]}] → ${articleText.length} chars`);
 
                 // Releer odómetro si se usó Tavily
                 if (engineId === 'rag') {
@@ -334,7 +346,8 @@ export async function POST(request) {
                 }
 
                 return NextResponse.json({
-                    article,
+                    article: articleText,
+                    images: images,
                     engine: engineId,
                     engineLabel: ENGINE_LABELS[engineId],
                     tavilyUsage: tavilyUsage ? {
