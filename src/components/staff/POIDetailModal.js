@@ -74,6 +74,7 @@ export default function POIDetailModal({
     const [headerColor, setHeaderColor] = useState('#2563EB');
     const [regeneratingField, setRegeneratingField] = useState(null);
     const [loadingStep, setLoadingStep] = useState(null);
+    const [animKey, setAnimKey] = useState(0);
 
     // ═══ TRIDENTE ENGINE STATE ═══
     const ENGINE_OPTIONS = [
@@ -234,6 +235,7 @@ export default function POIDetailModal({
                 if (data.dato_clave_2) setDatoClave2(data.dato_clave_2);
                 if (data.pregunta_interaccion) setPregunta(data.pregunta_interaccion);
                 setHasGeneratedFicha(true);
+                setAnimKey(prev => prev + 1);
             }
         } catch (e) {
             console.error('Fill ficha error:', e);
@@ -502,145 +504,139 @@ export default function POIDetailModal({
                     </div>
 
                     {/* ═══ FICHA DIDÁCTICA ═══ */}
-                    <div style={{ padding: '24px 20px 120px' }}>
+                    <div style={{ padding: '32px 24px 120px' }}>
                         <h3 style={{
-                            fontSize: 12, fontWeight: 700, color: '#64748B',
-                            textTransform: 'uppercase', letterSpacing: '0.1em',
-                            margin: '0 0 20px'
+                            fontSize: 11, fontWeight: 700, color: '#94A3B8',
+                            textTransform: 'uppercase', letterSpacing: '0.15em',
+                            margin: '0 0 24px'
                         }}>
                             Ficha Didáctica
                         </h3>
 
                         {/* Dato Clave 1 */}
-                        <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', display: 'block' }}>
-                                        Dato Clave 1
-                                    </span>
-                                    {hasGeneratedFicha && (
-                                        <button 
-                                            onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'dato_clave_1'); }}
-                                            disabled={regeneratingField !== null || isFillingFicha}
-                                            style={{ 
-                                                background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
-                                                color: regeneratingField === 'dato_clave_1' ? '#2563EB' : '#94A3B8',
-                                                transition: 'color 0.2s', display: 'flex', alignItems: 'center'
-                                            }}
-                                            title="Regenerar solo este dato"
-                                        >
-                                            <RefreshCw size={14} style={{ animation: regeneratingField === 'dato_clave_1' ? 'spin 1s linear infinite' : 'none' }} />
-                                        </button>
-                                    )}
-                                </div>
-                                <textarea
-                                    value={datoClave1}
-                                    onChange={(e) => setDatoClave1(e.target.value)}
-                                    onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                                    placeholder="Un dato concreto que sorprenda..."
-                                    rows={2}
-                                    disabled={regeneratingField === 'dato_clave_1'}
-                                    style={{
-                                        width: '100%', padding: '12px 16px', borderRadius: 8,
-                                        border: '1px solid #CBD5E1', background: '#FFFFFF',
-                                        fontSize: 15, color: '#0F172A', resize: 'none',
-                                        outline: 'none', boxSizing: 'border-box',
-                                        transition: 'all 0.2s ease', lineHeight: 1.5,
-                                        fontFamily: 'system-ui',
-                                        opacity: regeneratingField === 'dato_clave_1' ? 0.5 : 1
-                                    }}
-                                    onFocus={(e) => { e.target.style.borderColor = '#0F172A'; e.target.style.boxShadow = '0 0 0 1px #0F172A'; }}
-                                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; e.target.style.boxShadow = 'none'; }}
-                                />
-                            </label>
+                        <div key={`dc1-${animKey}`} className="premium-reveal-1" style={{ marginBottom: 32, position: 'relative' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                    Dato Clave 1
+                                </span>
+                                {hasGeneratedFicha && (
+                                    <button 
+                                        onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'dato_clave_1'); }}
+                                        disabled={regeneratingField !== null || isFillingFicha}
+                                        style={{ 
+                                            background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
+                                            color: regeneratingField === 'dato_clave_1' ? '#2563EB' : '#CBD5E1',
+                                            transition: 'color 0.2s', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title="Regenerar solo este dato"
+                                    >
+                                        <RefreshCw size={14} style={{ animation: regeneratingField === 'dato_clave_1' ? 'spin 1s linear infinite' : 'none' }} />
+                                    </button>
+                                )}
+                            </div>
+                            <textarea
+                                value={datoClave1}
+                                onChange={(e) => setDatoClave1(e.target.value)}
+                                onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                placeholder="Un dato concreto que sorprenda..."
+                                rows={1}
+                                disabled={regeneratingField === 'dato_clave_1'}
+                                style={{
+                                    width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
+                                    fontSize: 17, color: '#0F172A', fontWeight: 400,
+                                    resize: 'none', outline: 'none', boxSizing: 'border-box',
+                                    lineHeight: 1.5, fontFamily: 'system-ui',
+                                    borderBottom: '1px solid #E2E8F0',
+                                    opacity: regeneratingField === 'dato_clave_1' ? 0.4 : 1,
+                                    transition: 'border-color 0.2s'
+                                }}
+                                onFocus={(e) => { e.target.style.borderBottomColor = '#2563EB'; }}
+                                onBlur={(e) => { e.target.style.borderBottomColor = '#E2E8F0'; }}
+                            />
                         </div>
 
                         {/* Dato Clave 2 */}
-                        <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', display: 'block' }}>
-                                        Dato Clave 2
-                                    </span>
-                                    {hasGeneratedFicha && (
-                                        <button 
-                                            onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'dato_clave_2'); }}
-                                            disabled={regeneratingField !== null || isFillingFicha}
-                                            style={{ 
-                                                background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
-                                                color: regeneratingField === 'dato_clave_2' ? '#2563EB' : '#94A3B8',
-                                                transition: 'color 0.2s', display: 'flex', alignItems: 'center'
-                                            }}
-                                            title="Regenerar solo este dato"
-                                        >
-                                            <RefreshCw size={14} style={{ animation: regeneratingField === 'dato_clave_2' ? 'spin 1s linear infinite' : 'none' }} />
-                                        </button>
-                                    )}
-                                </div>
-                                <textarea
-                                    value={datoClave2}
-                                    onChange={(e) => setDatoClave2(e.target.value)}
-                                    onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                                    placeholder="Por qué este lugar importa..."
-                                    rows={2}
-                                    disabled={regeneratingField === 'dato_clave_2'}
-                                    style={{
-                                        width: '100%', padding: '12px 16px', borderRadius: 8,
-                                        border: '1px solid #CBD5E1', background: '#FFFFFF',
-                                        fontSize: 15, color: '#0F172A', resize: 'none',
-                                        outline: 'none', boxSizing: 'border-box',
-                                        transition: 'all 0.2s ease', lineHeight: 1.5,
-                                        fontFamily: 'system-ui',
-                                        opacity: regeneratingField === 'dato_clave_2' ? 0.5 : 1
-                                    }}
-                                    onFocus={(e) => { e.target.style.borderColor = '#0F172A'; e.target.style.boxShadow = '0 0 0 1px #0F172A'; }}
-                                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; e.target.style.boxShadow = 'none'; }}
-                                />
-                            </label>
+                        <div key={`dc2-${animKey}`} className="premium-reveal-2" style={{ marginBottom: 32, position: 'relative' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                    Dato Clave 2
+                                </span>
+                                {hasGeneratedFicha && (
+                                    <button 
+                                        onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'dato_clave_2'); }}
+                                        disabled={regeneratingField !== null || isFillingFicha}
+                                        style={{ 
+                                            background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
+                                            color: regeneratingField === 'dato_clave_2' ? '#2563EB' : '#CBD5E1',
+                                            transition: 'color 0.2s', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title="Regenerar solo este dato"
+                                    >
+                                        <RefreshCw size={14} style={{ animation: regeneratingField === 'dato_clave_2' ? 'spin 1s linear infinite' : 'none' }} />
+                                    </button>
+                                )}
+                            </div>
+                            <textarea
+                                value={datoClave2}
+                                onChange={(e) => setDatoClave2(e.target.value)}
+                                onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                placeholder="Por qué este lugar importa..."
+                                rows={1}
+                                disabled={regeneratingField === 'dato_clave_2'}
+                                style={{
+                                    width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
+                                    fontSize: 17, color: '#0F172A', fontWeight: 400,
+                                    resize: 'none', outline: 'none', boxSizing: 'border-box',
+                                    lineHeight: 1.5, fontFamily: 'system-ui',
+                                    borderBottom: '1px solid #E2E8F0',
+                                    opacity: regeneratingField === 'dato_clave_2' ? 0.4 : 1,
+                                    transition: 'border-color 0.2s'
+                                }}
+                                onFocus={(e) => { e.target.style.borderBottomColor = '#2563EB'; }}
+                                onBlur={(e) => { e.target.style.borderBottomColor = '#E2E8F0'; }}
+                            />
                         </div>
 
                         {/* Pregunta de Interacción */}
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: 'block' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', display: 'block' }}>
-                                        Pregunta de Interacción
-                                    </span>
-                                    {hasGeneratedFicha && (
-                                        <button 
-                                            onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'pregunta_interaccion'); }}
-                                            disabled={regeneratingField !== null || isFillingFicha}
-                                            style={{ 
-                                                background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
-                                                color: regeneratingField === 'pregunta_interaccion' ? '#2563EB' : '#94A3B8',
-                                                transition: 'color 0.2s', display: 'flex', alignItems: 'center'
-                                            }}
-                                            title="Regenerar solo esta pregunta"
-                                        >
-                                            <RefreshCw size={14} style={{ animation: regeneratingField === 'pregunta_interaccion' ? 'spin 1s linear infinite' : 'none' }} />
-                                        </button>
-                                    )}
-                                </div>
-                                <textarea
-                                    value={pregunta}
-                                    onChange={(e) => setPregunta(e.target.value)}
-                                    onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-                                    placeholder="Una pregunta para detonar curiosidad..."
-                                    rows={2}
-                                    disabled={regeneratingField === 'pregunta_interaccion'}
-                                    style={{
-                                        width: '100%', padding: '12px 16px', borderRadius: 8,
-                                        border: '1px solid #CBD5E1', background: '#FFFFFF',
-                                        fontSize: 15, color: '#0F172A', resize: 'none',
-                                        outline: 'none', boxSizing: 'border-box',
-                                        transition: 'all 0.2s ease', lineHeight: 1.5,
-                                        fontFamily: 'system-ui',
-                                        opacity: regeneratingField === 'pregunta_interaccion' ? 0.5 : 1
-                                    }}
-                                    onFocus={(e) => { e.target.style.borderColor = '#0F172A'; e.target.style.boxShadow = '0 0 0 1px #0F172A'; }}
-                                    onBlur={(e) => { e.target.style.borderColor = '#CBD5E1'; e.target.style.boxShadow = 'none'; }}
-                                />
-                            </label>
+                        <div key={`pi-${animKey}`} className="premium-reveal-3" style={{ marginBottom: 40, position: 'relative' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                    Pregunta de Interacción
+                                </span>
+                                {hasGeneratedFicha && (
+                                    <button 
+                                        onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'pregunta_interaccion'); }}
+                                        disabled={regeneratingField !== null || isFillingFicha}
+                                        style={{ 
+                                            background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
+                                            color: regeneratingField === 'pregunta_interaccion' ? '#2563EB' : '#CBD5E1',
+                                            transition: 'color 0.2s', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title="Regenerar solo esta pregunta"
+                                    >
+                                        <RefreshCw size={14} style={{ animation: regeneratingField === 'pregunta_interaccion' ? 'spin 1s linear infinite' : 'none' }} />
+                                    </button>
+                                )}
+                            </div>
+                            <textarea
+                                value={pregunta}
+                                onChange={(e) => setPregunta(e.target.value)}
+                                onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                placeholder="Una pregunta para detonar curiosidad..."
+                                rows={1}
+                                disabled={regeneratingField === 'pregunta_interaccion'}
+                                style={{
+                                    width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
+                                    fontSize: 17, color: '#0F172A', fontWeight: 400,
+                                    resize: 'none', outline: 'none', boxSizing: 'border-box',
+                                    lineHeight: 1.5, fontFamily: 'system-ui',
+                                    borderBottom: '1px solid #E2E8F0',
+                                    opacity: regeneratingField === 'pregunta_interaccion' ? 0.4 : 1,
+                                    transition: 'border-color 0.2s'
+                                }}
+                                onFocus={(e) => { e.target.style.borderBottomColor = '#2563EB'; }}
+                                onBlur={(e) => { e.target.style.borderBottomColor = '#E2E8F0'; }}
+                            />
                         </div>
 
                         {/* AI Fill Button */}
@@ -650,10 +646,10 @@ export default function POIDetailModal({
                                     onClick={(e) => { e.preventDefault(); handleFillFicha(true); }}
                                     disabled={isFillingFicha || regeneratingField !== null}
                                     style={{
-                                        flex: 1, padding: '14px', borderRadius: 8,
-                                        background: isFillingFicha ? '#F8FAFC' : '#FFFFFF',
-                                        border: '1px solid #CBD5E1',
-                                        color: isFillingFicha ? '#94A3B8' : '#0F172A', fontSize: 14, fontWeight: 600,
+                                        flex: 1, padding: '16px', borderRadius: 12,
+                                        background: isFillingFicha ? '#F8FAFC' : 'rgba(37, 99, 235, 0.04)',
+                                        border: isFillingFicha ? '1px solid #E2E8F0' : '1px dashed rgba(37, 99, 235, 0.3)',
+                                        color: isFillingFicha ? '#94A3B8' : '#2563EB', fontSize: 14, fontWeight: 600,
                                         cursor: (isFillingFicha || regeneratingField !== null) ? 'wait' : 'pointer',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                                         transition: 'all 0.2s ease',
@@ -675,14 +671,14 @@ export default function POIDetailModal({
                                     onClick={(e) => { e.preventDefault(); handleFillFicha(false); }}
                                     disabled={isFillingFicha || regeneratingField !== null}
                                     style={{
-                                        flex: 1, padding: '14px', borderRadius: 8,
+                                        flex: 1, padding: '16px', borderRadius: 12,
                                         background: (isFillingFicha || regeneratingField !== null) ? '#F1F5F9' : '#0F172A',
-                                        border: '1px solid',
-                                        borderColor: (isFillingFicha || regeneratingField !== null) ? '#E2E8F0' : '#0F172A',
+                                        border: 'none',
                                         color: (isFillingFicha || regeneratingField !== null) ? '#94A3B8' : '#FFFFFF', fontSize: 14, fontWeight: 600,
                                         cursor: (isFillingFicha || regeneratingField !== null) ? 'wait' : 'pointer',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                                         transition: 'all 0.2s ease',
+                                        boxShadow: (isFillingFicha || regeneratingField !== null) ? 'none' : '0 4px 12px rgba(15, 23, 42, 0.15)',
                                         opacity: regeneratingField !== null ? 0.5 : 1
                                     }}
                                 >
@@ -693,7 +689,7 @@ export default function POIDetailModal({
                                     ) : isFillingFicha ? (
                                         <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Generando...</>
                                     ) : (
-                                        <><Sparkles size={18} /> Generar Ficha</>
+                                        <><Sparkles size={18} /> Generar Ficha con IA</>
                                     )}
                                 </button>
                             )}
@@ -768,6 +764,14 @@ export default function POIDetailModal({
                 @keyframes poiAccordion { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 600px; } }
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+                
+                @keyframes premiumReveal {
+                    0% { opacity: 0; filter: blur(4px); transform: translateY(10px); }
+                    100% { opacity: 1; filter: blur(0); transform: translateY(0); }
+                }
+                .premium-reveal-1 { animation: premiumReveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+                .premium-reveal-2 { animation: premiumReveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: 0.1s; opacity: 0; }
+                .premium-reveal-3 { animation: premiumReveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: 0.2s; opacity: 0; }
             `}</style>
         </div>
     );
