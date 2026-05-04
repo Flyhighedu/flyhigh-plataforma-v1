@@ -1068,7 +1068,7 @@ export default function POIDetailModal({
                                 </div>
                             </div>
                         ) : (
-                            hasGeneratedFicha && (
+                            (hasGeneratedFicha && !isNewPin) && (
                                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
                                     <button 
                                         onClick={(e) => { e.preventDefault(); handleFillFicha(true, 'dato_clave_3'); }}
