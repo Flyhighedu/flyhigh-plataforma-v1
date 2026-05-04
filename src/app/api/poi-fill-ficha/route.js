@@ -3,17 +3,18 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ═══════════════════════════════════════════════════════════════
 // POI Fill Ficha — TRIDENTE para generar fichas didácticas
-// Motor 1: Gemini Flash-Lite
-// Motor 2: Groq (Llama 3) — Sin Tavily, solo procesa artículo
-// Motor 3: Cohere Command A
-// Fallover automático. No requiere búsqueda web (procesa artículo).
+// Motor 1: Groq (Llama 3) — PRIMARIO: 14,400 RPD, ultrarrápido
+// Motor 2: Gemini Flash-Lite — Respaldo
+// Motor 3: Cohere Command A — Respaldo final
+// No requiere búsqueda web (procesa artículo ya investigado).
+// Groq es primario para AHORRAR cuota de Gemini para investigación.
 // ═══════════════════════════════════════════════════════════════
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const ENGINE_ORDER = ['gemini', 'groq', 'cohere'];
+const ENGINE_ORDER = ['groq', 'gemini', 'cohere'];
 
 const SYSTEM_PROMPT = `Eres un pedagogo experto en diseño de fichas educativas para niños de primaria y secundaria en México.
 Recibirás un artículo de investigación sobre un punto de interés geográfico o cultural.
@@ -50,7 +51,7 @@ function buildSystemPrompt(regenerate, fieldToRegenerate, currentValue) {
     return prompt;
 }
 
-// ───────── Motor 1: Gemini ─────────
+// ───────── Motor 2 (Respaldo): Gemini ─────────
 async function fichaWithGemini(article, poiName, systemPrompt, temperature) {
     if (!GEMINI_API_KEY) throw new Error('NO_KEY');
 
@@ -71,7 +72,7 @@ async function fichaWithGemini(article, poiName, systemPrompt, temperature) {
     return JSON.parse(text);
 }
 
-// ───────── Motor 2: Cohere ─────────
+// ───────── Motor 3 (Respaldo final): Cohere ─────────
 async function fichaWithCohere(article, poiName, systemPrompt, temperature) {
     if (!COHERE_API_KEY) throw new Error('NO_KEY');
 
@@ -90,7 +91,8 @@ async function fichaWithCohere(article, poiName, systemPrompt, temperature) {
                 { role: 'user', content: userMsg }
             ],
             temperature
-        })
+        }),
+        cache: 'no-store'
     });
 
     if (res.status === 429) throw new Error('429');
@@ -102,30 +104,41 @@ async function fichaWithCohere(article, poiName, systemPrompt, temperature) {
     return JSON.parse(text);
 }
 
-// ───────── Motor 3: Groq ─────────
+// ───────── Motor 1 (PRIMARIO): Groq — 14,400 RPD ─────────
 async function fichaWithGroq(article, poiName, systemPrompt, temperature) {
     if (!GROQ_API_KEY) throw new Error('NO_KEY');
 
     const userMsg = `Punto de interés: "${poiName || 'Desconocido'}"\n\nArtículo de investigación:\n${article}\n\nGenera la ficha didáctica en JSON.`;
-
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${GROQ_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userMsg }
-            ],
-            temperature,
-            max_tokens: 300
-        })
+    const groqBody = JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMsg }
+        ],
+        temperature,
+        max_tokens: 300
     });
 
-    if (res.status === 429) throw new Error('429');
+    let res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: groqBody,
+        cache: 'no-store'
+    });
+
+    // Mini-retry si 429
+    if (res.status === 429) {
+        console.log('  ⏳ Groq rate limit — retry en 2s...');
+        await new Promise(r => setTimeout(r, 2000));
+        res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+            body: groqBody,
+            cache: 'no-store'
+        });
+    }
+
+    if (res.status === 429) throw new Error('GROQ_429');
     if (!res.ok) throw new Error(`GROQ_${res.status}`);
 
     const data = await res.json();
