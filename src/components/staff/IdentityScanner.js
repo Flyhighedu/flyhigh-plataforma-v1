@@ -23,12 +23,12 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
 
     const [nameA, setNameA] = useState('');
     const [nameB, setNameB] = useState('');
-    const [scoreA, setScoreA] = useState(0);
-    const [scoreB, setScoreB] = useState(0);
     const [winner, setWinner] = useState('');
     const [showVictory, setShowVictory] = useState(false);
     const [showName, setShowName] = useState(false);
     const [isPortrait, setIsPortrait] = useState(true);
+    const [pressingTeam, setPressingTeam] = useState(null);
+    const pressTimer = useRef(null);
 
     useEffect(() => {
         const check = () => setIsPortrait(window.innerHeight > window.innerWidth);
@@ -48,35 +48,50 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
     const reset = useCallback(() => {
         setPhase('prompt_intro'); 
         pickRandomNames();
-        setScoreA(0); setScoreB(0);
         setWinner(''); setShowVictory(false); setShowName(false);
+        setPressingTeam(null);
+        if (pressTimer.current) clearTimeout(pressTimer.current);
     }, [pickRandomNames]);
 
     useEffect(() => { if (!isOpen) reset(); }, [isOpen, reset]);
 
     const startBattle = useCallback(() => {
         if (!nameA || !nameB || nameA === nameB) return;
-        setScoreA(0); setScoreB(0);
         setPhase('battle');
         try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
     }, [nameA, nameB]);
 
-    const declareWinner = useCallback(() => {
-        let w;
-        if (scoreA === scoreB) {
-            w = Math.random() < 0.5 ? nameA : nameB;
-        } else {
-            w = scoreA > scoreB ? nameA : nameB;
-        }
-        
-        setWinner(w); setPhase('victory');
+    const handleSelectWinner = useCallback((teamName) => {
+        setWinner(teamName); 
+        setPhase('victory');
         setTimeout(() => setShowVictory(true), 50);
         setTimeout(() => {
             setShowName(true);
             try { navigator.vibrate?.([100, 50, 200]); } catch {}
         }, 300);
+    }, []);
+
+    const handlePressStart = useCallback((teamName) => {
+        setPressingTeam(teamName);
+        try { navigator.vibrate?.(50); } catch {}
         
-    }, [nameA, nameB, scoreA, scoreB]);
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+        
+        pressTimer.current = setTimeout(() => {
+            try { navigator.vibrate?.(200); } catch {}
+            handleSelectWinner(teamName);
+            setPressingTeam(null);
+            pressTimer.current = null;
+        }, 1000);
+    }, [handleSelectWinner]);
+
+    const handlePressEnd = useCallback(() => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+        setPressingTeam(null);
+    }, []);
 
     const confirmWinner = useCallback(() => {
         if (winner) {
@@ -92,7 +107,8 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
     return (
         <div style={{
             position:'fixed',inset:0,zIndex:9999,background:'#0A0A0F',
-            display:'flex',flexDirection:'column',overflow:'hidden'
+            display:'flex',flexDirection:'column',overflow:'hidden',
+            userSelect:'none'
         }}>
             {/* ═══ PROMPT INTRO ═══ */}
             {phase === 'prompt_intro' && (
@@ -194,7 +210,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                 </div>
             )}
 
-            {/* ═══ BATTLE (VOTING) ═══ */}
+            {/* ═══ BATTLE (VOTING BY LONG PRESS) ═══ */}
             {phase === 'battle' && (
                 <div style={{
                     position:'absolute',
@@ -207,87 +223,90 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                     transformOrigin:'center center',
                     background:'#0A0A0F'
                 }}>
-
-                    {/* HUD BATTLE INFO */}
-                    <div style={{
-                        position:'absolute',bottom:20,left:'50%',transform:'translateX(-50%)',
-                        zIndex:100, display:'flex', flexDirection:'column', alignItems:'center', gap: 12
-                    }}>
-                        <button onClick={declareWinner} style={{
-                            padding:'16px 40px',borderRadius:100,border:'none',
-                            background:NEON_GREEN,color:'#0A0A0F',fontSize:16,fontWeight:900,
-                            textTransform:'uppercase',letterSpacing:'0.1em',cursor:'pointer',
-                            boxShadow:`0 0 20px ${NEON_GREEN}66`,
-                            animation:'pulseBtn 2s infinite'
-                        }}>
-                            Declarar Ganador
-                        </button>
-                    </div>
-
                     {/* Team A */}
-                    <div style={{
-                        flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                        justifyContent:'center',padding:'32px 16px',
-                        background:`linear-gradient(180deg, ${TEAM_A_COLOR}11 0%, ${TEAM_A_COLOR}05 100%)`,
-                        borderRight: '1px solid #1E293B', position: 'relative'
-                    }}>
-                        <p style={{fontSize: 24,fontWeight:900,color:TEAM_A_COLOR,textAlign:'center',
-                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3, marginBottom: 40}}>
+                    <div 
+                        onMouseDown={() => handlePressStart(nameA)}
+                        onMouseUp={handlePressEnd}
+                        onMouseLeave={handlePressEnd}
+                        onTouchStart={(e) => { e.preventDefault(); handlePressStart(nameA); }}
+                        onTouchEnd={(e) => { e.preventDefault(); handlePressEnd(); }}
+                        onTouchCancel={handlePressEnd}
+                        style={{
+                            flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+                            justifyContent:'center',padding:'32px 16px',
+                            background:`linear-gradient(180deg, ${TEAM_A_COLOR}11 0%, ${TEAM_A_COLOR}05 100%)`,
+                            borderRight: '1px solid #1E293B', position: 'relative',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            transform: pressingTeam === nameA ? 'scale(0.98)' : 'scale(1)',
+                            opacity: pressingTeam && pressingTeam !== nameA ? 0.4 : 1
+                        }}
+                    >
+                        {pressingTeam === nameA && (
+                            <div style={{
+                                position: 'absolute', inset: 0, 
+                                background: `${TEAM_A_COLOR}22`, 
+                                animation: 'fillProgress 1s linear forwards',
+                                transformOrigin: 'bottom',
+                            }}/>
+                        )}
+                        <p style={{
+                            fontSize: 36,fontWeight:900,color:TEAM_A_COLOR,textAlign:'center',
+                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3,
+                            zIndex: 10, pointerEvents: 'none', textShadow:`0 0 20px ${TEAM_A_COLOR}66`
+                        }}>
                             {nameA}
                         </p>
-                        
-                        <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-                            <button onClick={() => setScoreA(s => Math.max(0, s - 1))} style={{
-                                width: 64, height: 64, borderRadius: '50%', border: 'none',
-                                background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 32,
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>-</button>
-                            
-                            <p style={{
-                                fontSize: 80,fontWeight:900,color:TEAM_A_COLOR,
-                                textShadow:`0 0 20px ${TEAM_A_COLOR}88`, minWidth: 100, textAlign: 'center'
-                            }}>{scoreA}</p>
-                            
-                            <button onClick={() => setScoreA(s => s + 1)} style={{
-                                width: 64, height: 64, borderRadius: '50%', border: 'none',
-                                background: TEAM_A_COLOR, color: '#000', fontSize: 32,
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: `0 0 20px ${TEAM_A_COLOR}66`
-                            }}>+</button>
-                        </div>
+                        <p style={{
+                            fontSize: 12, color: TEAM_A_COLOR, opacity: pressingTeam === nameA ? 1 : 0.6, marginTop: 24, zIndex: 10,
+                            textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 800,
+                            transition: 'opacity 0.3s'
+                        }}>
+                            {pressingTeam === nameA ? 'Manten presionado...' : 'Mantén presionado para elegir'}
+                        </p>
                     </div>
 
                     {/* Team B */}
-                    <div style={{
-                        flex:1,display:'flex',flexDirection:'column',alignItems:'center',
-                        justifyContent:'center',padding:'32px 16px',
-                        background:`linear-gradient(180deg, ${TEAM_B_COLOR}11 0%, ${TEAM_B_COLOR}05 100%)`,
-                        position: 'relative'
-                    }}>
-                        <p style={{fontSize: 24,fontWeight:900,color:TEAM_B_COLOR,textAlign:'center',
-                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3, marginBottom: 40}}>
+                    <div 
+                        onMouseDown={() => handlePressStart(nameB)}
+                        onMouseUp={handlePressEnd}
+                        onMouseLeave={handlePressEnd}
+                        onTouchStart={(e) => { e.preventDefault(); handlePressStart(nameB); }}
+                        onTouchEnd={(e) => { e.preventDefault(); handlePressEnd(); }}
+                        onTouchCancel={handlePressEnd}
+                        style={{
+                            flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+                            justifyContent:'center',padding:'32px 16px',
+                            background:`linear-gradient(180deg, ${TEAM_B_COLOR}11 0%, ${TEAM_B_COLOR}05 100%)`,
+                            position: 'relative',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            transform: pressingTeam === nameB ? 'scale(0.98)' : 'scale(1)',
+                            opacity: pressingTeam && pressingTeam !== nameB ? 0.4 : 1
+                        }}
+                    >
+                        {pressingTeam === nameB && (
+                            <div style={{
+                                position: 'absolute', inset: 0, 
+                                background: `${TEAM_B_COLOR}22`, 
+                                animation: 'fillProgress 1s linear forwards',
+                                transformOrigin: 'bottom',
+                            }}/>
+                        )}
+                        <p style={{
+                            fontSize: 36,fontWeight:900,color:TEAM_B_COLOR,textAlign:'center',
+                            textTransform:'uppercase',letterSpacing:'0.05em',lineHeight:1.3,
+                            zIndex: 10, pointerEvents: 'none', textShadow:`0 0 20px ${TEAM_B_COLOR}66`
+                        }}>
                             {nameB}
                         </p>
-                        
-                        <div style={{display: 'flex', alignItems: 'center', gap: 24}}>
-                            <button onClick={() => setScoreB(s => Math.max(0, s - 1))} style={{
-                                width: 64, height: 64, borderRadius: '50%', border: 'none',
-                                background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 32,
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>-</button>
-                            
-                            <p style={{
-                                fontSize: 80,fontWeight:900,color:TEAM_B_COLOR,
-                                textShadow:`0 0 20px ${TEAM_B_COLOR}88`, minWidth: 100, textAlign: 'center'
-                            }}>{scoreB}</p>
-                            
-                            <button onClick={() => setScoreB(s => s + 1)} style={{
-                                width: 64, height: 64, borderRadius: '50%', border: 'none',
-                                background: TEAM_B_COLOR, color: '#fff', fontSize: 32,
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                boxShadow: `0 0 20px ${TEAM_B_COLOR}66`
-                            }}>+</button>
-                        </div>
+                        <p style={{
+                            fontSize: 12, color: TEAM_B_COLOR, opacity: pressingTeam === nameB ? 1 : 0.6, marginTop: 24, zIndex: 10,
+                            textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 800,
+                            transition: 'opacity 0.3s'
+                        }}>
+                            {pressingTeam === nameB ? 'Manten presionado...' : 'Mantén presionado para elegir'}
+                        </p>
                     </div>
                 </div>
             )}
@@ -343,17 +362,8 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                                 animation:'victoryPulse 2s ease-in-out infinite, fadeInScale 0.6s ease-out'
                             }}>{winner}</h1>
 
-                            <p style={{
-                                fontSize:14,color:'#94A3B8',marginTop:16,fontWeight:700,
-                                animation:'fadeInUp 0.8s ease-out'
-                            }}>
-                                Votos: <span style={{color:TEAM_A_COLOR,fontWeight:900}}>{scoreA}</span>
-                                {' vs '}
-                                <span style={{color:TEAM_B_COLOR,fontWeight:900}}>{scoreB}</span>
-                            </p>
-
                             <button onClick={confirmWinner} style={{
-                                marginTop:32,padding:'16px 36px',borderRadius:16,
+                                marginTop:48,padding:'16px 36px',borderRadius:16,
                                 border:`2px solid ${winColor}`,background:`${winColor}22`,
                                 color:'white',fontSize:14,fontWeight:900,textTransform:'uppercase',
                                 letterSpacing:'0.1em',cursor:'pointer',
@@ -391,6 +401,10 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                 @keyframes victoryPulse {
                     0%,100% { transform: scale(1); }
                     50% { transform: scale(1.03); }
+                }
+                @keyframes fillProgress {
+                    0% { transform: scaleY(0); }
+                    100% { transform: scaleY(1); }
                 }
             `}</style>
         </div>

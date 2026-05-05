@@ -6,10 +6,11 @@ import {
     Users, FileText, Clock, Shield, CheckCircle, AlertCircle,
     ChevronRight, Loader2, Calendar, Eye, XCircle, AlertTriangle, 
     RefreshCw, Search, Phone, Mail, Award, Activity,
-    Shirt, BadgeCheck, Smartphone, User, Fingerprint, BarChart2
+    Shirt, BadgeCheck, Smartphone, User, Fingerprint, BarChart2, GraduationCap
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { MiniAvatar } from '@/components/ui/MiniAvatar';
+import TrainingModuleManager from '@/components/admin/TrainingModuleManager';
 
 // ── CONSTANTS ──
 const DOC_TYPES = [
@@ -45,7 +46,7 @@ export default function HRCommandCenter() {
     // UI State
     const [expandedStaff, setExpandedStaff] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeView, setActiveView] = useState('directory'); // directory | attendance
+    const [activeView, setActiveView] = useState('directory'); // directory | attendance | academia
     const [validatingDoc, setValidatingDoc] = useState(null);
     const [animatingDoc, setAnimatingDoc] = useState(null); // Para micro-interacciones de éxito
 
@@ -322,16 +323,15 @@ export default function HRCommandCenter() {
             <div className="flex justify-center md:justify-start mb-8">
                 <div className="relative bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-[20px] inline-flex backdrop-blur-xl shadow-[inset_4px_4px_10px_#d1d5db,inset_-4px_-4px_10px_#ffffff] dark:shadow-[inset_2px_2px_8px_rgba(0,0,0,0.5)] border border-white/60 dark:border-slate-700/50">
                     
-                    {/* The Sliding White Pill */}
+                    {/* The Sliding White Pill (3-way) */}
                     <div 
-                        className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-slate-50 dark:bg-slate-700 shadow-[4px_4px_10px_#cbd5e1,-4px_-4px_10px_#ffffff] dark:shadow-slate-900 rounded-[14px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                            activeView === 'directory' ? 'left-1.5' : 'left-[calc(50%+4.5px)]'
-                        }`}
+                        className={`absolute top-1.5 bottom-1.5 w-[calc(33.333%-6px)] bg-slate-50 dark:bg-slate-700 shadow-[4px_4px_10px_#cbd5e1,-4px_-4px_10px_#ffffff] dark:shadow-slate-900 rounded-[14px] transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]`}
+                        style={{ left: activeView === 'directory' ? '6px' : activeView === 'attendance' ? 'calc(33.333% + 2px)' : 'calc(66.666% + 0px)' }}
                     />
 
                     <button
                         onClick={() => setActiveView('directory')}
-                        className={`relative z-10 w-40 md:w-44 py-2.5 rounded-[14px] text-xs font-black tracking-widest uppercase transition-colors duration-500 flex items-center justify-center gap-2 ${
+                        className={`relative z-10 w-32 md:w-36 py-2.5 rounded-[14px] text-xs font-black tracking-widest uppercase transition-colors duration-500 flex items-center justify-center gap-2 ${
                             activeView === 'directory' 
                             ? 'text-emerald-600 dark:text-emerald-400' 
                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
@@ -343,13 +343,24 @@ export default function HRCommandCenter() {
 
                     <button
                         onClick={() => setActiveView('attendance')}
-                        className={`relative z-10 w-40 md:w-44 py-2.5 rounded-[14px] text-xs font-black tracking-widest uppercase transition-colors duration-500 flex items-center justify-center gap-2 ${
+                        className={`relative z-10 w-32 md:w-36 py-2.5 rounded-[14px] text-xs font-black tracking-widest uppercase transition-colors duration-500 flex items-center justify-center gap-2 ${
                             activeView === 'attendance' 
                             ? 'text-amber-600 dark:text-amber-400' 
                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
                         }`}
                     >
                         <Calendar size={16} strokeWidth={2.5} /> Asistencia
+                    </button>
+
+                    <button
+                        onClick={() => setActiveView('academia')}
+                        className={`relative z-10 w-32 md:w-36 py-2.5 rounded-[14px] text-xs font-black tracking-widest uppercase transition-colors duration-500 flex items-center justify-center gap-2 ${
+                            activeView === 'academia' 
+                            ? 'text-indigo-600 dark:text-indigo-400' 
+                            : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
+                        }`}
+                    >
+                        <GraduationCap size={16} strokeWidth={2.5} /> Academia
                     </button>
                 </div>
             </div>
@@ -734,6 +745,11 @@ export default function HRCommandCenter() {
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* ── ACADEMIA VIEW (Training Modules) ── */}
+            {activeView === 'academia' && (
+                <TrainingModuleManager />
             )}
         </div>
     );

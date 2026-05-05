@@ -236,6 +236,25 @@ export default function StaffDashboard() {
                                 setUserId(finalProfile.id);
                                 const testJourney = await ensureTestJourney(finalProfile.id, finalProfile.role);
                                 setJourneyId(TEST_JOURNEY_ID);
+
+                                // ── DEMO BYPASS: Skip MissionBrief and check-in directly to PrepChecklist ──
+                                setTodaySchool({
+                                    id: 'test-school',
+                                    school_name: 'Escuela Demo (Test)',
+                                    colonia: 'Demo',
+                                    fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }),
+                                    meta: {},
+                                    mission_state: null,
+                                    arrival_photo_taken_at: null,
+                                    pilot_name: finalProfile.role === 'pilot' ? finalProfile.full_name : 'Piloto Demo',
+                                    teacher_name: finalProfile.role === 'teacher' ? finalProfile.full_name : 'Docente Demo',
+                                    aux_name: finalProfile.role === 'assistant' ? finalProfile.full_name : 'Auxiliar Demo',
+                                });
+                                setNoSchoolToday(false);
+                                setShowBrief(false);
+                                setCheckInTimestamp(new Date().toISOString());
+                                setCurrentStep(0);
+
                                 setLoading(false);
                                 return;
                             }

@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck, School, RefreshCw, Compass, ChevronDown } from 'lucide-react';
+import { ClipboardList, Plane, FileText, Loader2, AlertCircle, MapPin, Calendar, LogOut, ChevronLeft, User, Truck, School, RefreshCw, Compass, ChevronDown, GraduationCap } from 'lucide-react';
 import UpcomingMissionsList from '@/components/staff/UpcomingMissionsList';
 import PrepChecklist from '@/components/staff/PrepChecklist';
 import StaffOperationLegacy from '@/components/staff/StaffOperationLegacy';
@@ -1200,6 +1200,26 @@ export default function StaffDashboard() {
                                 setUserId(finalProfile.id);
                                 const testJourney = await ensureTestJourney(finalProfile.id, finalProfile.role);
                                 setJourneyId(TEST_JOURNEY_ID);
+
+                                // ── DEMO BYPASS: Skip MissionBrief and check-in directly to PrepChecklist ──
+                                setTodaySchool({
+                                    id: 'test-school',
+                                    school_name: 'Escuela Demo (Test)',
+                                    colonia: 'Demo',
+                                    fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }),
+                                    meta: {},
+                                    mission_state: null,
+                                    arrival_photo_taken_at: null,
+                                    pilot_name: finalProfile.role === 'pilot' ? finalProfile.full_name : 'Piloto Demo',
+                                    teacher_name: finalProfile.role === 'teacher' ? finalProfile.full_name : 'Docente Demo',
+                                    aux_name: finalProfile.role === 'assistant' ? finalProfile.full_name : 'Auxiliar Demo',
+                                });
+                                setNoSchoolToday(false);
+                                setShowBrief(false);
+                                setCheckInTimestamp(new Date().toISOString());
+                                setCurrentStep(0);
+                                setLobbyMode(false);
+
                                 setLoading(false);
                                 return;
                             }
@@ -1993,7 +2013,7 @@ export default function StaffDashboard() {
     // --- MISSION LOBBY (always shown first until user picks a mission) ---
     if ((lobbyMode || noSchoolToday) && !todaySchool && !manualMission) {
         
-        const renderPilotLobby = () => {
+        const renderUnifiedLobby = () => {
             const nextMission = todaySchools.find(s => s.estatus === 'pendiente' || s.estatus === 'en_progreso') || todaySchools[0];
             const remainingMissions = todaySchools.filter(s => s.id !== nextMission?.id);
             const isCompleted = nextMission && (nextMission.estatus === 'completada' || nextMission.estatus === 'cerrada');
@@ -2041,9 +2061,65 @@ export default function StaffDashboard() {
                                             : 'bg-blue-500 text-white hover:bg-blue-400 active:scale-[0.98] shadow-md shadow-blue-500/20'
                                         }`}
                                     >
-                                        {isCompleted ? 'Misión Finalizada' : (isNotToday ? 'Aún no es la fecha' : 'Iniciar Preparativos')}
+                                        {isCompleted ? 'Misión Finalizada' : (isNotToday ? 'Aún no es la fecha' : 'Hacer Check-in')}
                                         {!isHeroDisabled && <ChevronLeft className="w-4 h-4 rotate-180" strokeWidth={3} />}
                                     </button>
+
+                                    {/* Secondary Button for Remaining Missions moved inside */}
+                                    {remainingMissions.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-slate-100/80">
+                                            <button
+                                                onClick={() => setShowAllMissions(!showAllMissions)}
+                                                className="w-full flex items-center justify-between py-2 text-sm font-bold text-slate-500 hover:text-slate-700 active:scale-[0.98] transition-all"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <School size={16} className="text-slate-400" />
+                                                    Otras misiones ({remainingMissions.length})
+                                                </span>
+                                                <ChevronDown size={16} className={`transition-transform duration-300 ${showAllMissions ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            
+                                            {/* Accordion List */}
+                                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showAllMissions ? 'max-h-[800px] mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                                <div className="space-y-2">
+                                                    {remainingMissions.map(school => {
+                                                        const schoolCompleted = school.estatus === 'completada' || school.estatus === 'cerrada';
+                                                        const schoolNotToday = school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+                                                        const schoolDisabled = schoolCompleted || schoolNotToday;
+                                                        return (
+                                                            <button
+                                                                key={school.id}
+                                                                onClick={() => !schoolDisabled && selectMission(school)}
+                                                                disabled={schoolDisabled}
+                                                                className={`w-full text-left rounded-2xl border p-3 transition-all group ${schoolDisabled
+                                                                    ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed ' + (schoolCompleted ? 'grayscale-[30%]' : '')
+                                                                    : 'bg-white border-slate-200 hover:border-blue-300 active:scale-[0.98]'
+                                                                    }`}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                                        <School className="w-4 h-4 text-slate-500" />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="font-bold text-slate-800 text-sm truncate">
+                                                                            {school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }) && <span className="text-blue-500 mr-1">{new Date(school.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short'})}</span>}
+                                                                            {school.school_name}
+                                                                        </p>
+                                                                        {school.colonia && (
+                                                                            <p className="text-xs text-slate-500 truncate">
+                                                                                {school.colonia}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                 </div>
                             </div>
                         ) : (
@@ -2057,183 +2133,42 @@ export default function StaffDashboard() {
                         )}
                     </div>
 
-                    {/* Secondary Button for Remaining Missions */}
-                    {remainingMissions.length > 0 && (
-                        <div>
-                            <button
-                                onClick={() => setShowAllMissions(!showAllMissions)}
-                                className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-50 active:scale-[0.98] transition-all"
+
+
+                    {/* Tarjeta 2: Academia / Bitácora POI */}
+                    {profile?.role === 'pilot' && (
+                        <div className="mt-8">
+                            <h2 className="text-lg font-extrabold text-slate-800 mb-3 px-1">Herramientas</h2>
+                            <div 
+                                onClick={() => router.push('/staff/academia')}
+                                className="bg-white rounded-[32px] p-6 border border-indigo-100/60 shadow-[0_8px_30px_rgba(79,70,229,0.06)] relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all hover:shadow-[0_8px_30px_rgba(79,70,229,0.12)] hover:border-indigo-200"
                             >
-                                <span className="flex items-center gap-2">
-                                    <School size={16} className="text-slate-400" />
-                                    Otras misiones ({remainingMissions.length})
-                                </span>
-                                <ChevronDown size={16} className={`transition-transform duration-300 ${showAllMissions ? 'rotate-180' : ''}`} />
-                            </button>
-                            
-                            {/* Accordion List */}
-                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showAllMissions ? 'max-h-[800px] mt-3 opacity-100' : 'max-h-0 opacity-0'}`}>
-                                <div className="space-y-2">
-                                    {remainingMissions.map(school => {
-                                        const schoolCompleted = school.estatus === 'completada' || school.estatus === 'cerrada';
-                                        const schoolNotToday = school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-                                        const schoolDisabled = schoolCompleted || schoolNotToday;
-                                        return (
-                                            <button
-                                                key={school.id}
-                                                onClick={() => !schoolDisabled && selectMission(school)}
-                                                disabled={schoolDisabled}
-                                                className={`w-full text-left rounded-2xl border p-4 transition-all group ${schoolDisabled
-                                                    ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed ' + (schoolCompleted ? 'grayscale-[30%]' : '')
-                                                    : 'bg-white border-slate-200 hover:border-blue-300 active:scale-[0.98]'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                        <School className="w-4 h-4 text-slate-500" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-slate-800 text-sm truncate">
-                                                            {school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }) && <span className="text-blue-500 mr-1">{new Date(school.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short'})}</span>}
-                                                            {school.school_name}
-                                                        </p>
-                                                        {school.colonia && (
-                                                            <p className="text-xs text-slate-500 truncate">
-                                                                {school.colonia}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
+                                {/* Decorative vibrant blur */}
+                                <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-200/40 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-300/40 transition-colors duration-500"></div>
+                                <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-500 pointer-events-none text-indigo-600">
+                                    <GraduationCap size={160} strokeWidth={1} />
+                                </div>
+                                
+                                <div className="relative z-10 flex items-center gap-5">
+                                    <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 group-hover:-translate-y-0.5 transition-all shrink-0">
+                                        <GraduationCap className="w-7 h-7 text-white" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-0.5">Academia</h3>
+                                        <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Explora el radar táctico y estudia tus objetivos.</p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition-colors shrink-0">
+                                        <ChevronLeft className="w-4 h-4 rotate-180 text-indigo-500" strokeWidth={3} />
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
-
-                    {/* Tarjeta 2: Academia / Bitácora POI */}
-                    <div className="mt-8">
-                        <h2 className="text-lg font-extrabold text-slate-800 mb-3 px-1">Herramientas</h2>
-                        <div 
-                            onClick={() => router.push('/staff/academia')}
-                            className="bg-white rounded-[32px] p-6 border border-indigo-100/60 shadow-[0_8px_30px_rgba(79,70,229,0.06)] relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all hover:shadow-[0_8px_30px_rgba(79,70,229,0.12)] hover:border-indigo-200"
-                        >
-                            {/* Decorative vibrant blur */}
-                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-200/40 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-300/40 transition-colors duration-500"></div>
-                            <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.04] group-hover:opacity-[0.08] transition-opacity duration-500 pointer-events-none text-indigo-600">
-                                <Compass size={160} strokeWidth={1} />
-                            </div>
-                            
-                            <div className="relative z-10 flex items-center gap-5">
-                                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 group-hover:-translate-y-0.5 transition-all shrink-0">
-                                    <Compass className="w-7 h-7 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-0.5">Academia POI</h3>
-                                    <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Explora el radar táctico y estudia tus objetivos.</p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition-colors shrink-0">
-                                    <ChevronLeft className="w-4 h-4 rotate-180 text-indigo-500" strokeWidth={3} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             );
         };
 
-        const renderDefaultLobby = () => (
-            <>
-                {todaySchools.length > 0 ? (
-                    <div className="space-y-3">
-                        <h2 className="text-lg font-extrabold text-slate-800">
-                            Misiones Asignadas
-                            <span className="ml-2 text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {todaySchools.length}
-                            </span>
-                        </h2>
-                        <p className="text-xs text-slate-500 -mt-1">Solo puedes iniciar misiones programadas para hoy.</p>
-
-                        {todaySchools.map((school, idx) => {
-                            const isCompleted = school.estatus === 'completada' || school.estatus === 'cerrada';
-                            const isNotToday = school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
-                            const isDisabled = isCompleted || isNotToday;
-                            return (
-                                <button
-                                    key={school.id}
-                                    onClick={() => !isDisabled && selectMission(school)}
-                                    disabled={isDisabled}
-                                    className={`w-full text-left rounded-2xl border p-4 transition-all group ${isDisabled
-                                        ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed ' + (isCompleted ? 'grayscale-[30%]' : '')
-                                        : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 active:scale-[0.98] cursor-pointer'
-                                        }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                                            <School className="w-5 h-5 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-slate-800 text-sm truncate group-hover:text-blue-600 transition-colors">
-                                                {school.fecha !== new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }) && <span className="text-blue-500 mr-1">[{new Date(school.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short'})}]</span>}
-                                                {school.school_name}
-                                            </p>
-                                            {school.colonia && (
-                                                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                                    <MapPin size={10} className="text-slate-400" />
-                                                    {school.colonia}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="text-slate-300 group-hover:text-blue-400 transition-colors">
-                                            {isCompleted ? (
-                                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">✅ Completada</span>
-                                            ) : (
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <polyline points="9 18 15 12 9 6" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Presence Avatars */}
-                                    {school.presence && school.presence.length > 0 && !isCompleted && (
-                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                                            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                                En misión
-                                            </span>
-                                            <div className="flex flex-row-reverse">
-                                                {school.presence.map((p, pi) => {
-                                                    const roleConfig = {
-                                                        pilot: { bg: 'bg-blue-500', label: 'P', title: 'Piloto' },
-                                                        teacher: { bg: 'bg-purple-500', label: 'D', title: 'Docente' },
-                                                        assistant: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
-                                                        auxiliar: { bg: 'bg-teal-500', label: 'A', title: 'Auxiliar' },
-                                                    };
-                                                    const cfg = roleConfig[p.role] || { bg: 'bg-slate-400', label: '?', title: p.role };
-                                                    return (
-                                                        <div
-                                                            key={`${p.role}-${pi}`}
-                                                            title={cfg.title}
-                                                            className={`w-7 h-7 rounded-full ${cfg.bg} border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm -ml-2 first:ml-0`}
-                                                        >
-                                                            {cfg.label}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <UpcomingMissionsList />
-                )}
-            </>
-        );
+        // renderDefaultLobby has been merged and replaced by renderUnifiedLobby
 
         return withDependencyOverlay(
             <div className="min-h-screen bg-slate-50 p-4">
@@ -2301,18 +2236,11 @@ export default function StaffDashboard() {
                         </div>
                     )}
 
-                    {/* Conditional Rendering by Role */}
-                    {profile?.role === 'pilot' ? renderPilotLobby() : renderDefaultLobby()}
+                    {/* Unified Premium Rendering */}
+                    {renderUnifiedLobby()}
 
-                    {/* Refresh button */}
-                    <button
-                        onClick={refreshMission}
-                        disabled={loading}
-                        className="w-full py-4 bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-400 font-bold rounded-[20px] text-[13px] hover:bg-slate-50 hover:text-amber-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                    >
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        Sincronizar Jornada
-                    </button>
+
+
 
                     {/* Admin manual selector (legacy) */}
                     {profile?.role === 'admin' && noSchoolToday && (
@@ -2320,10 +2248,13 @@ export default function StaffDashboard() {
                     )}
 
                     {/* Demo Mode FAB */}
-                    <StartDemoFab
-                        onDemoStarted={() => refreshMission()}
-                        schoolId={todaySchool?.id}
-                    />
+                    <div className="mt-8 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <StartDemoFab
+                            onDemoStarted={() => refreshMission()}
+                            schoolId={todaySchool?.id}
+                            minimal={true}
+                        />
+                    </div>
                 </div>
             </div>
         );

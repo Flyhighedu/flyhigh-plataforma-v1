@@ -43,6 +43,15 @@ function buildSystemPrompt(regenerate, fieldToRegenerate, currentValue) {
                 prompt += `\nEstos datos ya existen y NO debes repetirlos: ${currentValue}\nPROHIBIDO REESCRIBIR EL MISMO HECHO. Busca un ángulo COMPLETAMENTE DIFERENTE dentro del artículo.`;
             }
             prompt += `\nDevuelve un JSON que contenga SOLO las llaves "dato_clave_3" y "pregunta_estudio_3".`;
+        } else if (fieldToRegenerate === 'dato_clave_1' || fieldToRegenerate === 'dato_clave_2') {
+            // PAIRED REGENERATION: dato + pregunta juntos para mantener coherencia
+            const pairedQuestion = fieldToRegenerate === 'dato_clave_1' 
+                ? 'pregunta_estudio_1' : 'pregunta_estudio_2';
+            prompt += `\n\nIMPORTANTE (REGENERACIÓN DE PAR): El usuario quiere regenerar "${fieldToRegenerate}" Y su pregunta de estudio emparejada "${pairedQuestion}".`;
+            if (currentValue) {
+                prompt += `\nEl usuario RECHAZÓ este dato actual: "${currentValue}".\nPROHIBIDO REESCRIBIR EL MISMO HECHO. Debes buscar un ángulo, tema, evento o personaje COMPLETAMENTE DIFERENTE dentro del artículo.`;
+            }
+            prompt += `\nDevuelve un JSON que contenga SOLO las llaves "${fieldToRegenerate}" y "${pairedQuestion}".`;
         } else if (fieldToRegenerate) {
             prompt += `\n\nIMPORTANTE (REGENERACIÓN INDIVIDUAL): El usuario quiere regenerar el campo "${fieldToRegenerate}".`;
             if (currentValue) {
@@ -182,16 +191,38 @@ export async function POST(request) {
             try {
                 const parsed = await fn(article, poiName, systemPrompt, temperature);
 
-                // STRICT: if regenerating a single field, ONLY return that field
+                // STRICT: if regenerating a single field or pair, return only relevant fields
                 if (fieldToRegenerate) {
+                    // Paired regeneration for dato_clave_1/2 — return dato + paired pregunta
+                    if (fieldToRegenerate === 'dato_clave_1' || fieldToRegenerate === 'dato_clave_2') {
+                        const pairedQuestion = fieldToRegenerate === 'dato_clave_1' 
+                            ? 'pregunta_estudio_1' : 'pregunta_estudio_2';
+                        if (parsed[fieldToRegenerate]) {
+                            return NextResponse.json({
+                                [fieldToRegenerate]: parsed[fieldToRegenerate],
+                                [pairedQuestion]: parsed[pairedQuestion] || '',
+                                engine: engineId
+                            });
+                        }
+                        console.warn(`  ⚠ ${ENGINE_LABELS[engineId]} no devolvió ${fieldToRegenerate}`);
+                        continue;
+                    }
+                    // dato_clave_3 pair or single field
                     const value = parsed[fieldToRegenerate];
                     if (value) {
+                        // dato_clave_3 also returns its pregunta_estudio_3
+                        if (fieldToRegenerate === 'dato_clave_3') {
+                            return NextResponse.json({
+                                dato_clave_3: value,
+                                pregunta_estudio_3: parsed.pregunta_estudio_3 || '',
+                                engine: engineId
+                            });
+                        }
                         return NextResponse.json({
                             [fieldToRegenerate]: value,
                             engine: engineId
                         });
                     }
-                    // If the LLM didn't produce the requested field, try next engine
                     console.warn(`  ⚠ ${ENGINE_LABELS[engineId]} no devolvió ${fieldToRegenerate}`);
                     continue;
                 }

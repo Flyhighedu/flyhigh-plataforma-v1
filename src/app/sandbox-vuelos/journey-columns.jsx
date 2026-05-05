@@ -46,13 +46,53 @@ const formatNumberExact = (val) => new Intl.NumberFormat("es-MX", { minimumFract
 
 // --- Shared inline cell components ---
 
-function StatusTelemetryCell({ getValue, row }) {
-  const value = getValue() || "pending";
+function StatusTelemetryCell({ getValue, row, column, table }) {
+  const initialValue = getValue() || "pending";
+  const [value, setValue] = useState(initialValue);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  useEffect(() => setValue(initialValue), [initialValue]);
+
   const colors = statusColors[value] || statusColors.pending;
   const label = STATUS_LABELS[value] || value;
-  
+
+  const handleChange = async (e) => {
+    const nv = e.target.value;
+    if (nv === value) { setIsEditing(false); return; }
+    setValue(nv);
+    setIsEditing(false);
+    setIsSaving(true);
+    try {
+      await table.options.meta?.updateData(row.original.id, "status", nv);
+    } catch {
+      setValue(initialValue);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <select
+        autoFocus
+        value={value}
+        onChange={handleChange}
+        onBlur={() => setIsEditing(false)}
+        className="appearance-none cursor-pointer rounded-lg px-2 py-1 text-xs font-bold border-2 border-blue-400 outline-none bg-white shadow-lg w-full min-w-[140px]"
+      >
+        {Object.entries(STATUS_LABELS).map(([k, lbl]) => (
+          <option key={k} value={k}>{lbl}</option>
+        ))}
+      </select>
+    );
+  }
+
   return (
-    <div className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold select-none ring-1 ring-inset ring-black/5 ${colors}`} title={`Telemetría de la PWA: ${label}`}>
+    <div
+      onClick={() => setIsEditing(true)}
+      className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold cursor-pointer ring-1 ring-inset ring-black/5 hover:ring-2 hover:ring-blue-400 transition-all ${colors} ${isSaving ? "opacity-50 pointer-events-none" : ""}`}
+      title="Clic para cambiar fase manualmente"
+    >
       {label}
     </div>
   );

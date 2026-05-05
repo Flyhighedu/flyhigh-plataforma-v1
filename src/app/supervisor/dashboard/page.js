@@ -3818,18 +3818,26 @@ export default function SupervisorDashboard() {
         }
     }, [deleteMissionPassword, deleteMissionTarget, fetchData, supabase]);
 
+    const [globalMetrics, setGlobalMetrics] = useState({ totalMissions: 0, totalFlights: 0, totalStudents: 0 });
+
+    useEffect(() => {
+        fetch('/api/sandbox-dashboards?range=all')
+            .then(res => res.json())
+            .then(data => {
+                if (data?.impacto) {
+                    setGlobalMetrics({
+                        totalMissions: data.impacto.totalMissions || 0,
+                        totalFlights: data.impacto.totalFlights || 0,
+                        totalStudents: data.impacto.totalStudents || 0
+                    });
+                }
+            })
+            .catch(err => console.error("Error fetching global history overview:", err));
+    }, [missionHistory.length]);
+
     const historyOverview = useMemo(() => {
-        return missionHistory.reduce((acc, mission) => {
-            acc.totalMissions += 1;
-            acc.totalFlights += Number(mission.totalFlights || 0);
-            acc.totalStudents += Number(mission.totalStudents || 0);
-            return acc;
-        }, {
-            totalMissions: 0,
-            totalFlights: 0,
-            totalStudents: 0
-        });
-    }, [missionHistory]);
+        return globalMetrics;
+    }, [globalMetrics]);
 
     const hasLiveMission = Boolean(sel);
     const effectiveTab = (!hasLiveMission && dashboardTab === 'live') ? 'history' : dashboardTab;

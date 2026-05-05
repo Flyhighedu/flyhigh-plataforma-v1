@@ -332,12 +332,18 @@ export default function POIDetailModal({
                     if (fieldToRegenerate === 'dato_clave_3') {
                         if (data.dato_clave_3) { setDatoClave3(data.dato_clave_3); setAnimKeyDc3(k => k + 1); }
                         if (data.pregunta_estudio_3) { setPreguntaEstudio3(data.pregunta_estudio_3); setAnimKeyPe3(k => k + 1); }
+                    } else if (fieldToRegenerate === 'dato_clave_1') {
+                        // Paired: dato + pregunta juntos
+                        if (data.dato_clave_1) { setDatoClave1(data.dato_clave_1); setAnimKeyDc1(k => k + 1); }
+                        if (data.pregunta_estudio_1) { setPreguntaEstudio1(data.pregunta_estudio_1); setAnimKeyPe1(k => k + 1); }
+                    } else if (fieldToRegenerate === 'dato_clave_2') {
+                        // Paired: dato + pregunta juntos
+                        if (data.dato_clave_2) { setDatoClave2(data.dato_clave_2); setAnimKeyDc2(k => k + 1); }
+                        if (data.pregunta_estudio_2) { setPreguntaEstudio2(data.pregunta_estudio_2); setAnimKeyPe2(k => k + 1); }
                     } else {
                         const newValue = data[fieldToRegenerate];
                         if (newValue) {
-                            if (fieldToRegenerate === 'dato_clave_1') { setDatoClave1(newValue); setAnimKeyDc1(k => k + 1); }
-                            else if (fieldToRegenerate === 'dato_clave_2') { setDatoClave2(newValue); setAnimKeyDc2(k => k + 1); }
-                            else if (fieldToRegenerate === 'pregunta_estudio_1') { setPreguntaEstudio1(newValue); setAnimKeyPe1(k => k + 1); }
+                            if (fieldToRegenerate === 'pregunta_estudio_1') { setPreguntaEstudio1(newValue); setAnimKeyPe1(k => k + 1); }
                             else if (fieldToRegenerate === 'pregunta_estudio_2') { setPreguntaEstudio2(newValue); setAnimKeyPe2(k => k + 1); }
                             else if (fieldToRegenerate === 'pregunta_interaccion') { setPregunta(newValue); setAnimKeyPi(k => k + 1); }
                         }
@@ -443,6 +449,9 @@ export default function POIDetailModal({
 
     const cat = autoCategory(poi?.description);
     const gradient = HEADER_GRADIENTS[cat.emoji] || HEADER_GRADIENTS['📍'];
+    
+    // Determine if POI already exists in the database
+    const isSavedPoi = !!(poi?.id);
     
     // Si hay opciones de imagen cargadas, es estrictamente obligatorio elegir una.
     const isImageSelectionRequired = poiImages.length > 0 && !selectedImageUrl;
@@ -695,36 +704,62 @@ export default function POIDetailModal({
                         {/* AI Fill Button (Movido hacia arriba para lógica causa-efecto) */}
                         <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
                             {hasGeneratedFicha ? (
-                                !isEditingKeys ? (
-                                    <button
-                                        onClick={(e) => { e.preventDefault(); setIsEditingKeys(true); }}
-                                        style={{
-                                            flex: 1, padding: '16px', borderRadius: 12,
-                                            background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
-                                            border: '1px solid #E2E8F0',
-                                            color: '#475569', fontSize: 14, fontWeight: 600,
-                                            cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                            transition: 'all 0.2s ease',
-                                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                                        }}
-                                    >
-                                        <><BookOpen size={18} /> Habilitar Edición de Ficha</>
-                                    </button>
+                                isSavedPoi ? (
+                                    // ── POI YA GUARDADO: Flujo protegido "Habilitar / Finalizar Edición" ──
+                                    !isEditingKeys ? (
+                                        <button
+                                            onClick={(e) => { e.preventDefault(); setIsEditingKeys(true); }}
+                                            style={{
+                                                flex: 1, padding: '16px', borderRadius: 12,
+                                                background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+                                                border: '1px solid #E2E8F0',
+                                                color: '#475569', fontSize: 14, fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                                transition: 'all 0.2s ease',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                                            }}
+                                        >
+                                            <><BookOpen size={18} /> Habilitar Edición de Ficha</>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={(e) => { e.preventDefault(); setIsEditingKeys(false); }}
+                                            style={{
+                                                flex: 1, padding: '16px', borderRadius: 12,
+                                                background: 'rgba(15, 23, 42, 0.03)',
+                                                border: '1px solid transparent',
+                                                color: '#64748B', fontSize: 14, fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                        >
+                                            <><Check size={18} /> Finalizar Edición</>
+                                        </button>
+                                    )
                                 ) : (
+                                    // ── POI NO GUARDADO: Flujo libre — "Regenerar Ficha Completa" ──
                                     <button
-                                        onClick={(e) => { e.preventDefault(); setIsEditingKeys(false); }}
+                                        onClick={(e) => { e.preventDefault(); handleFillFicha(true); }}
+                                        disabled={isFillingFicha || regeneratingField !== null}
                                         style={{
                                             flex: 1, padding: '16px', borderRadius: 12,
-                                            background: 'rgba(15, 23, 42, 0.03)',
-                                            border: '1px solid transparent',
-                                            color: '#64748B', fontSize: 14, fontWeight: 600,
-                                            cursor: 'pointer',
+                                            background: (isFillingFicha || regeneratingField !== null) ? '#F1F5F9' : 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                                            border: 'none',
+                                            color: (isFillingFicha || regeneratingField !== null) ? '#94A3B8' : '#FFFFFF', fontSize: 15, fontWeight: 600,
+                                            cursor: (isFillingFicha || regeneratingField !== null) ? 'wait' : 'pointer',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                                             transition: 'all 0.2s ease',
+                                            boxShadow: (isFillingFicha || regeneratingField !== null) ? 'none' : '0 4px 16px rgba(139, 92, 246, 0.3)',
+                                            opacity: regeneratingField !== null ? 0.5 : 1
                                         }}
                                     >
-                                        <><Check size={18} /> Finalizar Edición</>
+                                        {isFillingFicha ? (
+                                            <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Regenerando Ficha...</>
+                                        ) : (
+                                            <><RefreshCw size={18} /> Regenerar Ficha Completa</>
+                                        )}
                                     </button>
                                 )
                             ) : (
@@ -765,8 +800,8 @@ export default function POIDetailModal({
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                                     Dato Clave 1
                                 </span>
-                                {(hasGeneratedFicha && isEditingKeys) && (
-                                    confirmRegenerateField === 'dato_clave_1' ? (
+                                {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                    (isSavedPoi && confirmRegenerateField === 'dato_clave_1') ? (
                                         <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                             <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                             <div style={{display: 'flex', gap: 8}}>
@@ -776,7 +811,7 @@ export default function POIDetailModal({
                                         </div>
                                     ) : (
                                         <button 
-                                            onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('dato_clave_1'); }}
+                                            onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('dato_clave_1') : handleFillFicha(true, 'dato_clave_1'); }}
                                             disabled={regeneratingField !== null || isFillingFicha}
                                             style={{ 
                                                 background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
@@ -798,7 +833,7 @@ export default function POIDetailModal({
                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                 placeholder="Un dato concreto que sorprenda..."
                                 rows={1}
-                                disabled={regeneratingField === 'dato_clave_1' || (hasGeneratedFicha && !isEditingKeys)}
+                                disabled={regeneratingField === 'dato_clave_1' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                 style={{
                                     width: '100%', padding: '0 0 12px 0', border: 'none', background: 'transparent',
                                     fontSize: 17, color: '#0F172A', fontWeight: 400,
@@ -823,8 +858,8 @@ export default function POIDetailModal({
                                             Con esta pregunta te evaluarás al entrar a "Repasar Fichas"
                                         </span>
                                     </div>
-                                    {(hasGeneratedFicha && isEditingKeys) && (
-                                        confirmRegenerateField === 'pregunta_estudio_1' ? (
+                                    {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                        (isSavedPoi && confirmRegenerateField === 'pregunta_estudio_1') ? (
                                             <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                                 <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                                 <div style={{display: 'flex', gap: 8}}>
@@ -834,7 +869,7 @@ export default function POIDetailModal({
                                             </div>
                                         ) : (
                                             <button 
-                                                onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('pregunta_estudio_1'); }}
+                                                onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('pregunta_estudio_1') : handleFillFicha(true, 'pregunta_estudio_1'); }}
                                                 disabled={regeneratingField !== null || isFillingFicha}
                                                 style={{ 
                                                     background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
@@ -856,7 +891,7 @@ export default function POIDetailModal({
                                     onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                     placeholder="Escribe una pregunta que te obligue a recordar el dato superior..."
                                     rows={1}
-                                    disabled={regeneratingField === 'pregunta_estudio_1' || (hasGeneratedFicha && !isEditingKeys)}
+                                    disabled={regeneratingField === 'pregunta_estudio_1' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                     style={{
                                         width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
                                         fontSize: 15, color: '#8B5CF6', fontWeight: 500, fontStyle: 'italic',
@@ -877,8 +912,8 @@ export default function POIDetailModal({
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                                     Dato Clave 2
                                 </span>
-                                {(hasGeneratedFicha && isEditingKeys) && (
-                                    confirmRegenerateField === 'dato_clave_2' ? (
+                                {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                    (isSavedPoi && confirmRegenerateField === 'dato_clave_2') ? (
                                         <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                             <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                             <div style={{display: 'flex', gap: 8}}>
@@ -888,7 +923,7 @@ export default function POIDetailModal({
                                         </div>
                                     ) : (
                                         <button 
-                                            onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('dato_clave_2'); }}
+                                            onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('dato_clave_2') : handleFillFicha(true, 'dato_clave_2'); }}
                                             disabled={regeneratingField !== null || isFillingFicha}
                                             style={{ 
                                                 background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
@@ -910,7 +945,7 @@ export default function POIDetailModal({
                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                 placeholder="Por qué este lugar importa..."
                                 rows={1}
-                                disabled={regeneratingField === 'dato_clave_2' || (hasGeneratedFicha && !isEditingKeys)}
+                                disabled={regeneratingField === 'dato_clave_2' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                 style={{
                                     width: '100%', padding: '0 0 12px 0', border: 'none', background: 'transparent',
                                     fontSize: 17, color: '#0F172A', fontWeight: 400,
@@ -935,8 +970,8 @@ export default function POIDetailModal({
                                             Con esta pregunta te evaluarás al entrar a "Repasar Fichas"
                                         </span>
                                     </div>
-                                    {(hasGeneratedFicha && isEditingKeys) && (
-                                        confirmRegenerateField === 'pregunta_estudio_2' ? (
+                                    {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                        (isSavedPoi && confirmRegenerateField === 'pregunta_estudio_2') ? (
                                             <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                                 <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                                 <div style={{display: 'flex', gap: 8}}>
@@ -946,7 +981,7 @@ export default function POIDetailModal({
                                             </div>
                                         ) : (
                                             <button 
-                                                onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('pregunta_estudio_2'); }}
+                                                onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('pregunta_estudio_2') : handleFillFicha(true, 'pregunta_estudio_2'); }}
                                                 disabled={regeneratingField !== null || isFillingFicha}
                                                 style={{ 
                                                     background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
@@ -968,7 +1003,7 @@ export default function POIDetailModal({
                                     onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                     placeholder="Escribe una pregunta que te obligue a recordar el dato superior..."
                                     rows={1}
-                                    disabled={regeneratingField === 'pregunta_estudio_2' || (hasGeneratedFicha && !isEditingKeys)}
+                                    disabled={regeneratingField === 'pregunta_estudio_2' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                     style={{
                                         width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
                                         fontSize: 15, color: '#8B5CF6', fontWeight: 500, fontStyle: 'italic',
@@ -995,8 +1030,8 @@ export default function POIDetailModal({
                                             Un dato adicional para profundizar tu dominio sobre este punto.
                                         </span>
                                     </div>
-                                    {(hasGeneratedFicha && isEditingKeys) && (
-                                        confirmRegenerateField === 'dato_clave_3' ? (
+                                    {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                        (isSavedPoi && confirmRegenerateField === 'dato_clave_3') ? (
                                             <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                                 <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                                 <div style={{display: 'flex', gap: 8}}>
@@ -1006,13 +1041,13 @@ export default function POIDetailModal({
                                             </div>
                                         ) : (
                                             <button 
-                                                onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('dato_clave_3'); }}
+                                                onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('dato_clave_3') : handleFillFicha(true, 'dato_clave_3'); }}
                                                 disabled={regeneratingField !== null || isFillingFicha}
                                                 style={{ 
                                                     background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
                                                     color: regeneratingField === 'dato_clave_3' ? '#10B981' : '#CBD5E1',
                                                     transition: 'color 0.2s', display: 'flex', alignItems: 'center',
-                                                    visibility: (hasGeneratedFicha && isEditingKeys) ? 'visible' : 'hidden'
+                                                    visibility: (hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) ? 'visible' : 'hidden'
                                                 }}
                                                 title="Regenerar este dato y su pregunta"
                                             >
@@ -1029,7 +1064,7 @@ export default function POIDetailModal({
                                     onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                     placeholder="Escribe el tercer dato clave aquí..."
                                     rows={1}
-                                    disabled={regeneratingField === 'dato_clave_3' || (hasGeneratedFicha && !isEditingKeys)}
+                                    disabled={regeneratingField === 'dato_clave_3' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                     style={{
                                         width: '100%', padding: '0 0 12px 0', border: 'none', background: 'transparent',
                                         fontSize: 16, color: '#0F172A', fontWeight: 500,
@@ -1056,7 +1091,7 @@ export default function POIDetailModal({
                                         onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                         placeholder="Escribe una pregunta que te obligue a recordar el dato superior..."
                                         rows={1}
-                                        disabled={regeneratingField === 'dato_clave_3' || (hasGeneratedFicha && !isEditingKeys)}
+                                        disabled={regeneratingField === 'dato_clave_3' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                         style={{
                                             width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
                                             fontSize: 15, color: '#10B981', fontWeight: 500, fontStyle: 'italic',
@@ -1112,8 +1147,8 @@ export default function POIDetailModal({
                                         Usa esta pregunta por el intercomunicador para detonar la curiosidad de los niños al pasar por este punto.
                                     </span>
                                 </div>
-                                {(hasGeneratedFicha && isEditingKeys) && (
-                                    confirmRegenerateField === 'pregunta_interaccion' ? (
+                                {(hasGeneratedFicha && (isEditingKeys || !isSavedPoi)) && (
+                                    (isSavedPoi && confirmRegenerateField === 'pregunta_interaccion') ? (
                                         <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FEF2F2', padding: '6px 12px', borderRadius: 12, border: '1px solid #FECACA' }}>
                                             <span style={{fontSize: 12, color: '#DC2626', fontWeight: 600}}>¿Regenerar?</span>
                                             <div style={{display: 'flex', gap: 8}}>
@@ -1123,7 +1158,7 @@ export default function POIDetailModal({
                                         </div>
                                     ) : (
                                         <button 
-                                            onClick={(e) => { e.preventDefault(); setConfirmRegenerateField('pregunta_interaccion'); }}
+                                            onClick={(e) => { e.preventDefault(); isSavedPoi ? setConfirmRegenerateField('pregunta_interaccion') : handleFillFicha(true, 'pregunta_interaccion'); }}
                                             disabled={regeneratingField !== null || isFillingFicha}
                                             style={{ 
                                                 background: 'none', border: 'none', padding: 4, cursor: (regeneratingField || isFillingFicha) ? 'not-allowed' : 'pointer',
@@ -1145,7 +1180,7 @@ export default function POIDetailModal({
                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                 placeholder="Una pregunta para detonar curiosidad..."
                                 rows={1}
-                                disabled={regeneratingField === 'pregunta_interaccion' || (hasGeneratedFicha && !isEditingKeys)}
+                                disabled={regeneratingField === 'pregunta_interaccion' || (hasGeneratedFicha && !isEditingKeys && isSavedPoi)}
                                 style={{
                                     width: '100%', padding: '0 0 8px 0', border: 'none', background: 'transparent',
                                     fontSize: 17, color: '#0F172A', fontWeight: 400,

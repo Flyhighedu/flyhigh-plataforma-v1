@@ -60,6 +60,9 @@ export default function AcademiaLobbyPage() {
     const [userName, setUserName] = useState('Piloto');
     const [userAvatarConfig, setUserAvatarConfig] = useState(null);
 
+    // Capacitación FlyHigh
+    const [trainingModules, setTrainingModules] = useState([]);
+
     // Study mode state
     const [studyMode, setStudyMode] = useState(false);
     const [studyDeck, setStudyDeck] = useState([]);
@@ -121,7 +124,18 @@ export default function AcademiaLobbyPage() {
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
                 if (error) throw error;
-                if (isMounted) setPois(data || []);
+
+                // Fetch published training modules and their approved cards
+                const { data: modulesData } = await supabase
+                    .from('training_modules')
+                    .select('*, training_cards(*)')
+                    .eq('status', 'published')
+                    .order('created_at', { ascending: false });
+
+                if (isMounted) {
+                    setPois(data || []);
+                    setTrainingModules(modulesData || []);
+                }
             } catch (err) {
                 console.error('Error fetching POIs:', err);
             } finally {
@@ -206,6 +220,38 @@ export default function AcademiaLobbyPage() {
         // Reset score
         // We could track a score state if desired, but for now we'll just track completion
     }, [pois]);
+
+    const startModuleStudy = useCallback((mod) => {
+        let granularDeck = [];
+        const approvedCards = (mod.training_cards || []).filter(c => c.status === 'approved');
+        
+        // Sort by order
+        approvedCards.sort((a, b) => a.sort_order - b.sort_order);
+
+        approvedCards.forEach((card, idx) => {
+            granularDeck.push({
+                id: `card-${card.id}`,
+                poiId: mod.id,
+                name: mod.title,
+                description: mod.description,
+                image_url: null,
+                icon: mod.icon,
+                color: mod.color,
+                question: card.question,
+                answer: card.answer,
+                type: card.card_type || 'knowledge',
+                indexLabel: `FICHA ${idx + 1} • ${card.difficulty === 1 ? 'BÁSICO' : card.difficulty === 2 ? 'INTERMEDIO' : 'AVANZADO'}`
+            });
+        });
+
+        if (granularDeck.length === 0) return;
+
+        setStudyDeck(granularDeck);
+        setCurrentCardIndex(0);
+        setIsFlipped(false);
+        setStudyComplete(false);
+        setStudyMode(true);
+    }, []);
 
     const flipCard = () => setIsFlipped(prev => !prev);
 
@@ -413,7 +459,12 @@ export default function AcademiaLobbyPage() {
                                         className="absolute inset-0 bg-white rounded-[32px] shadow-2xl flex flex-col overflow-hidden border border-slate-100/50"
                                         style={{ backfaceVisibility: 'hidden' }}
                                     >
-                                        {card.image_url ? (
+                                        {card.icon ? (
+                                            <div className="relative h-1/3 w-full shrink-0 flex flex-col items-center justify-center" style={{ background: (card.color || '#6366F1') + '18' }}>
+                                                <div className="text-5xl mb-2">{card.icon}</div>
+                                                <h2 className="text-xl font-black text-slate-800 px-4 text-center">{card.name}</h2>
+                                            </div>
+                                        ) : card.image_url ? (
                                             <div className="relative h-1/2 w-full shrink-0">
                                                 <img src={card.image_url} alt={card.name} className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -672,6 +723,65 @@ export default function AcademiaLobbyPage() {
                                 );
                             })}
                         </div>
+
+                        {/* ── SECCIÓN: CAPACITACIÓN FLYHIGH ── */}
+                        {trainingModules.length > 0 && (
+                            <div className="mt-8 mb-4 px-1">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                                        <Award size={14} className="text-slate-600" />
+                                    </div>
+                                    <h2 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">
+                                        Capacitación FlyHigh
+                                    </h2>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {trainingModules.map((mod) => {
+                                        const approvedCards = (mod.training_cards || []).filter(c => c.status === 'approved').length;
+                                        return (
+                                            <div 
+                                                key={mod.id} 
+                                                onClick={() => approvedCards > 0 && startModuleStudy(mod)}
+                                                className={`bg-white rounded-[24px] border shadow-sm p-5 transition-all group overflow-hidden relative flex flex-col ${approvedCards > 0 ? 'border-slate-100 hover:border-indigo-200 hover:shadow-md cursor-pointer active:scale-[0.98]' : 'border-slate-100 opacity-60 cursor-not-allowed'}`}
+                                            >
+                                                {approvedCards > 0 && (
+                                                    <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 opacity-20" style={{ background: mod.color || '#6366F1' }}></div>
+                                                )}
+                                                
+                                                <div className="flex items-start gap-4 relative z-10">
+                                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 shadow-inner" style={{ background: (mod.color || '#6366F1') + '18' }}>
+                                                        {mod.icon || '📋'}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-black text-[17px] text-slate-800 leading-tight mb-1 truncate">
+                                                            {mod.title}
+                                                        </h3>
+                                                        <p className="text-[13px] text-slate-500 font-medium truncate mb-3">
+                                                            {mod.description || 'Manual de capacitación'}
+                                                        </p>
+                                                        
+                                                        {approvedCards > 0 ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200">
+                                                                    {approvedCards} Fichas
+                                                                </span>
+                                                                <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors ml-auto">
+                                                                    <BookOpen size={12} strokeWidth={3} />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest bg-slate-50 text-slate-400 border border-slate-100">
+                                                                Próximamente
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center min-h-[45vh] text-center px-4">

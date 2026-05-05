@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reconocimiento a Escuelas - Fly High EDU</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" crossorigin="anonymous">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <!-- Librerías para exportar a PNG y PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'fly-blue': '#162846',
+                        'fly-gold': '#cd9e68',
+                        'fly-gray': '#5a6270',
+                        'fly-light': '#f4f6f9'
+                    },
+                    fontFamily: {
+                        'serif': ['"Playfair Display"', 'serif'],
+                        'sans': ['Montserrat', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #e5e7eb;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #toolbar {
+            background-color: #1f2937;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .btn {
+            background-color: #374151;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover { background-color: #4b5563; }
+        .btn-primary { background-color: #cd9e68; color: #162846; font-weight: 600; }
+        .btn-primary:hover { background-color: #b88a55; }
+
+        #workspace {
+            flex-grow: 1;
+            overflow: hidden;
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+            padding: 0;
+            position: relative;
+        }
+
+        #document-wrapper {
+            transform-origin: top left;
+            transition: transform 0.2s ease-out;
+            padding-bottom: 0;
+        }
+
+        #document-content {
+            width: 816px;
+            height: 1056px;
+            background-color: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .geometric-bg {
+            background: linear-gradient(135deg, #0f1c34 0%, #1c3258 100%);
+            position: relative;
+        }
+        
+        .geometric-bg::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                polygon(0 0, 100% 20%, 50% 100%, 0 100%),
+                polygon(100% 0, 100% 50%, 0 80%, 0 0);
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            opacity: 0.03;
+            background-color: white;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(31, 41, 55, 0.9);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        #loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        /* Filtro para el azul Fly High #162846 */
+        .filter-fly-blue {
+            filter: brightness(0) saturate(100%) invert(14%) sepia(23%) saturate(2641%) hue-rotate(191deg) brightness(96%) contrast(92%);
+        }
+
+        [contenteditable="true"]:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <i class="fas fa-spinner fa-spin text-5xl text-fly-gold mb-4"></i>
+        <h2 class="text-xl font-sans font-bold mb-2">Generando Reconocimiento</h2>
+        <p id="loading-text" class="font-sans text-gray-300">Preparando alta resolución...</p>
+    </div>
+
+
+
+    <div id="workspace">
+        <div id="document-wrapper">
+            
+            <div id="document-content">
+                <!-- Franja Lateral -->
+                <div class="w-20 geometric-bg h-full flex-shrink-0 flex flex-col justify-end pb-8">
+                    <div class="h-32 bg-fly-blue border-t border-fly-gold border-opacity-30"></div>
+                </div>
+
+                <!-- Contenido -->
+                <div class="flex-grow flex flex-col relative pt-12 pb-10 pr-16 pl-14 h-full">
+
+                    <!-- Cabecera -->
+                    <div class="flex justify-between items-end mb-6">
+                        <div class="text-fly-gray text-sm font-sans italic">
+                            <p>Uruapan, Michoacán. Mayo de 2026.</p>
+                        </div>
+                        <img src="https://i.postimg.cc/4dm7tdc0/1000x200.png" 
+                             alt="Fly High EDU" 
+                             class="h-10 object-contain opacity-90 filter-fly-blue"
+                             crossorigin="anonymous">
+                    </div>
+
+                    <!-- Título del Mensaje -->
+                    <div class="mb-6">
+                        <h2 class="text-fly-gray font-sans font-semibold tracking-[0.2em] text-[10px] uppercase mb-2">
+                            Alianza por la Educación
+                        </h2>
+                        <h1 class="font-serif text-5xl text-fly-blue font-bold leading-none">
+                            10,000 Gracias.
+                        </h1>
+                        <div class="w-10 h-[2px] bg-fly-gold mt-4"></div>
+                    </div>
+
+                    <!-- Destinatario y Cuerpo -->
+                    <div class="flex-grow flex flex-col">
+                        
+                        <div class="mb-6 flex flex-col items-start w-full">
+                            <p class="text-[10px] font-sans text-fly-gray mb-1 tracking-[0.15em] uppercase font-semibold">Reconocimiento otorgado a:</p>
+                            <h3 class="font-serif text-3xl text-fly-blue font-bold leading-tight border-b-2 border-fly-gold border-opacity-20 pb-1 w-full" 
+                                id="school-name" 
+                                contenteditable="true" 
+                                placeholder="Nombre de la Institución">
+                                Escuela Primaria "Constitución"
+                            </h3>
+                            <p class="text-[9px] font-sans text-fly-gray mt-2 tracking-[0.1em] uppercase font-medium italic">Sede oficial de despegue y aprendizaje</p>
+                        </div>
+
+                        <!-- Texto enfocado a la escuela -->
+                        <div id="letter-body" 
+                             contenteditable="true" 
+                             spellcheck="false" 
+                             class="flex flex-col gap-4 text-fly-gray font-sans text-justify leading-relaxed p-3 -mx-3 rounded-md outline-none border border-transparent hover:border-gray-200 focus:bg-white transition-all cursor-text text-[15px]">
+                            <p>
+                                Es un privilegio para el equipo de <strong>Fly High EDU</strong> expresar nuestra más profunda gratitud a esta noble institución educativa por haber abierto sus puertas y, sobre todo, por permitirnos convertir sus instalaciones en una plataforma de sueños.
+                            </p>
+                            <p>
+                                Gracias a su hospitalidad y a la increíble disposición de sus directivos y docentes, hemos logrado alcanzar un hito histórico: <strong>impactar la vida de los primeros 10,000 niños que han volado en Uruapan</strong>. Este logro representa el primer gran paso hacia nuestra meta final de 30,000 pequeños, y su escuela fue el escenario fundamental donde <strong>nuestros pequeños</strong> ampliaron sus horizontes y descubrieron que la tecnología y la educación no tienen límites.
+                            </p>
+                            <p>
+                                Reconocemos su compromiso incansable con el futuro de nuestra comunidad. Al trabajar juntos, estamos demostrando que el cielo es apenas el punto de partida cuando se tiene el corazón puesto en la niñez.
+                            </p>
+                            <p>
+                                Que este documento sea un testimonio del impacto positivo que logramos unidos. Gracias por ser parte fundamental de este gran vuelo institucional.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Firmas y Aliados -->
+                    <div class="mt-auto pt-4 flex justify-between items-end w-full">
+                        
+                        <div id="signature-block" class="flex flex-col w-[55%]">
+                            <p class="font-serif text-fly-blue text-lg mb-1 italic">Con profunda admiración,</p>
+                            <div class="flex justify-between gap-4 mt-2">
+                                <div class="flex flex-col w-1/2">
+                                    <div class="h-12"></div>
+                                    <div class="h-px w-full bg-gray-300 mb-1.5"></div>
+                                    <p class="font-sans font-bold text-fly-blue text-[8px] uppercase tracking-wide">David Sanchez</p>
+                                    <p class="font-sans text-fly-gray text-[7px] italic">Director General, Fly High EDU</p>
+                                </div>
+                                <div class="flex flex-col w-1/2">
+                                    <div class="h-12"></div>
+                                    <div class="h-px w-full bg-gray-300 mb-1.5"></div>
+                                    <p class="font-sans font-bold text-fly-blue text-[8px] uppercase tracking-wide">Anaid Ríos</p>
+                                    <p class="font-sans text-fly-gray text-[7px] italic leading-tight">Directora de Relaciones Inst.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col items-end pb-1 w-[45%] flex-shrink-0">
+                            <span class="text-fly-blue font-sans font-semibold tracking-[0.15em] text-[8px] uppercase mb-3 opacity-60">Aliados Institucionales</span>
+                            
+                            <div class="flex items-start justify-end gap-5">
+                                <div class="flex flex-col items-center gap-2 w-14">
+                                    <img src="https://i.postimg.cc/xdLSDm0y/logo-ccfdsp.png" alt="Aliado" class="h-8 w-auto object-contain filter-fly-blue opacity-90" crossorigin="anonymous">
+                                    <span class="text-[5px] font-sans font-bold uppercase text-fly-blue text-center opacity-70">Fábrica San Pedro</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-2 w-14">
+                                    <img src="https://i.postimg.cc/vm5dFnQ3/logo-huatapera.png" alt="Aliado" class="h-8 w-auto object-contain filter-fly-blue opacity-90" crossorigin="anonymous">
+                                    <span class="text-[5px] font-sans font-bold uppercase text-fly-blue text-center opacity-70">La Huatapera</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-2 w-14">
+                                    <img src="https://i.postimg.cc/XZNP9pBB/logo-parque.png" alt="Aliado" class="h-8 w-auto object-contain filter-fly-blue opacity-90" crossorigin="anonymous">
+                                    <span class="text-[5px] font-sans font-bold uppercase text-fly-blue text-center opacity-70">Parque Nacional</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-2 w-14">
+                                    <img src="https://i.postimg.cc/Pq1ksDtQ/logo-secretaria-cultura-y-turismo.png" alt="Aliado" class="h-8 w-auto object-contain filter-fly-blue opacity-90" crossorigin="anonymous">
+                                    <span class="text-[5px] font-sans font-bold uppercase text-fly-blue text-center opacity-70">Cultura y Turismo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN: Patrocinadores Oficiales (Margen aumentado) -->
+                    <div class="mt-6 pt-4 border-t border-gray-100 flex flex-col items-center w-full">
+                        <span class="text-fly-blue font-sans font-semibold tracking-[0.25em] text-[7px] uppercase mb-4 opacity-50">Patrocinadores Oficiales de la Campaña</span>
+                        <!-- gap-x aumentado de 6 a 9 para dar más aire -->
+                        <div class="flex flex-row justify-center items-center gap-x-9 gap-y-2 px-1 filter-fly-blue opacity-90 w-full overflow-hidden">
+                            <!-- Strong Plastic -->
+                            <img src="https://i.postimg.cc/Gm95xCWf/logo-Strong-plastic-pdf.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                            <!-- La Bonanza -->
+                            <img src="https://i.postimg.cc/8zs0mS29/Logo-La-Bonanza-Avocados-pdf.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                            <!-- Global Frut -->
+                            <img src="https://i.postimg.cc/0yrB0sTX/Logo-Global-Frut-png.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                            <!-- RV Fresh -->
+                            <img src="https://i.postimg.cc/rwzPNT6X/logo-RV-Fresh.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                            <!-- Aztecavo (Mantenido en h-10) -->
+                            <img src="https://i.postimg.cc/QtpNbP97/51d89e34-3d94-448c-9b34-16abb3360127.png" class="h-10 w-auto object-contain" crossorigin="anonymous">
+                            <!-- Madobox -->
+                            <img src="https://i.postimg.cc/DwmMPT99/Logo-Madobox.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                            <!-- Círculo Empresarial -->
+                            <img src="https://i.postimg.cc/kXjJfW4x/Diseno-sin-tituloww.png" class="h-14 w-auto object-contain" crossorigin="anonymous">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const documentWrapper = document.getElementById('document-wrapper');
+        const overlay = document.getElementById('loading-overlay');
+
+        async function exportPNG() {
+            const element = document.getElementById('document-content');
+            overlay.classList.add('active');
+
+            try {
+                await new Promise(r => setTimeout(r, 200));
+                const dataUrl = await htmlToImage.toPng(element, {
+                    pixelRatio: 4,
+                    backgroundColor: '#ffffff'
+                });
+                const link = document.createElement('a');
+                link.download = `Reconocimiento_Escuela_FlyHigh.png`;
+                link.href = dataUrl;
+                link.click();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                overlay.classList.remove('active');
+            }
+        }
+
+        async function exportPDF() {
+            const element = document.getElementById('document-content');
+            overlay.classList.add('active');
+
+            try {
+                await new Promise(r => setTimeout(r, 200));
+                const dataUrl = await htmlToImage.toJpeg(element, {
+                    pixelRatio: 4,
+                    quality: 1.0
+                });
+                const { jsPDF } = window.jsPDF ? window : window.jspdf;
+                const pdf = new jsPDF('p', 'in', 'letter');
+                pdf.addImage(dataUrl, 'JPEG', 0, 0, 8.5, 11);
+                pdf.save(`Reconocimiento_Escuela_FlyHigh.pdf`);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                overlay.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

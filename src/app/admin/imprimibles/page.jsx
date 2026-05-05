@@ -8,6 +8,7 @@ import FlyerNinos, { FLYER_NINOS_DEFAULTS } from "@/components/flyers/FlyerNinos
 import FlyerPadres, { FLYER_PADRES_DEFAULTS } from "@/components/flyers/FlyerPadres";
 import CircularDigital, { CIRCULAR_DIGITAL_DEFAULTS } from "@/components/flyers/CircularDigital";
 import CertificadoEscuela, { CERTIFICADO_DEFAULTS } from "@/components/flyers/CertificadoEscuela";
+import ReconocimientoEscuela, { RECONOCIMIENTO_DEFAULTS } from "@/components/flyers/ReconocimientoEscuela";
 import AiCanvasModal from "@/components/flyers/AiCanvasModal";
 import MassiveCertificateModal from "@/components/flyers/MassiveCertificateModal";
 import { formatFlyerDate, formatMoney, captureAsPDF, captureAsPNG, downloadAll } from "@/utils/flyerUtils";
@@ -51,6 +52,15 @@ const FLYER_CATALOG = [
     color: "#8b5cf6",
     defaults: CERTIFICADO_DEFAULTS,
   },
+  {
+    id: "reconocimiento",
+    label: "Reconocimiento",
+    subtitle: "Escuela · B/N · Carta",
+    icon: <Award size={22} className="text-slate-700" strokeWidth={2.5} />,
+    format: "PDF",
+    color: "#475569",
+    defaults: RECONOCIMIENTO_DEFAULTS,
+  },
 ];
 
 // ── Field label mapping for drawer form ──
@@ -79,6 +89,14 @@ const FIELD_LABELS = {
   cuerpoTexto: "Texto del Cuerpo",
   firmaNombre: "Nombre del Firmante",
   firmaCargo: "Cargo del Firmante",
+  // Reconocimiento
+  firmaNombre1: "Nombre Firmante 1",
+  firmaCargo1: "Cargo Firmante 1",
+  firmaOrganizacion1: "Org Firmante 1",
+  firmaNombre2: "Nombre Firmante 2",
+  firmaCargo2: "Cargo Firmante 2",
+  firmaOrganizacion2: "Org Firmante 2",
+  folio: "Folio del Reconocimiento",
 };
 
 export default function ImprimiblesPage() {
@@ -92,6 +110,7 @@ export default function ImprimiblesPage() {
     padres: { ...defaultConfig },
     digital: { ...defaultConfig },
     certificado: { ...certDefaultConfig },
+    reconocimiento: { ...certDefaultConfig },
   });
 
 
@@ -113,6 +132,7 @@ export default function ImprimiblesPage() {
     padres: {},
     digital: {},
     certificado: {},
+    reconocimiento: {},
   });
 
   const [editingFlyer, setEditingFlyer] = useState(null);
@@ -212,7 +232,8 @@ export default function ImprimiblesPage() {
   const padresRef = useRef(null);
   const digitalRef = useRef(null);
   const certificadoRef = useRef(null);
-  const refMap = { ninos: ninosRef, padres: padresRef, digital: digitalRef, certificado: certificadoRef };
+  const reconocimientoRef = useRef(null);
+  const refMap = { ninos: ninosRef, padres: padresRef, digital: digitalRef, certificado: certificadoRef, reconocimiento: reconocimientoRef };
 
   // ── Handlers ──
   const handleUpdateText = useCallback((flyerId, field, value) => {
@@ -231,8 +252,8 @@ export default function ImprimiblesPage() {
     const defaultConfig = { escuela: "ESCUELA EJEMPLO", fechaISO: today, cuota: 50, tarifa: 100, isDirty: false };
     const currentMonthYear = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' });
     const certDefaultConfig = { escuela: "Nombre de la Escuela", fechaTexto: currentMonthYear.replace(/^./, c => c.toUpperCase()), isDirty: false };
-    setConfigs({ ninos: { ...defaultConfig }, padres: { ...defaultConfig }, digital: { ...defaultConfig }, certificado: { ...certDefaultConfig } });
-    setTextOverrides({ ninos: {}, padres: {}, digital: {}, certificado: {} });
+    setConfigs({ ninos: { ...defaultConfig }, padres: { ...defaultConfig }, digital: { ...defaultConfig }, certificado: { ...certDefaultConfig }, reconocimiento: { ...certDefaultConfig } });
+    setTextOverrides({ ninos: {}, padres: {}, digital: {}, certificado: {}, reconocimiento: {} });
     setCustomAIFlyers([]);
   }, []);
 
@@ -299,6 +320,9 @@ export default function ImprimiblesPage() {
       } else if (type === "certificado") {
         const safeName = configs.certificado.escuela.replace(/\s+/g, "_");
         await captureAsPDF(certificadoRef.current, `Certificado - ${safeName}.pdf`);
+      } else if (type === "reconocimiento") {
+        const safeName = configs.reconocimiento.escuela.replace(/\s+/g, "_");
+        await captureAsPDF(reconocimientoRef.current, `Reconocimiento - ${safeName}.pdf`);
       } else {
         const ref = refMap[type];
         const safeName = configs[type].escuela.replace(/\s+/g, "_");
@@ -322,6 +346,11 @@ export default function ImprimiblesPage() {
     return { escuela: c.escuela, fecha: c.fechaTexto };
   };
 
+  const getReconocimientoProps = () => {
+    const c = configs.reconocimiento;
+    return { escuela: c.escuela, fecha: c.fechaTexto };
+  };
+
   const FlyerComponent = ({ id, forCapture = false, isCustom = false, html = null, overrideVariables = null }) => {
     if (isCustom && html) {
       const flyerRecord = customAIFlyers.find(f => f.id === id);
@@ -330,7 +359,15 @@ export default function ImprimiblesPage() {
       const processedHtml = React.useMemo(() => {
         if (!sourceId || typeof window === 'undefined') return html;
         
-        const props = sourceId === 'certificado' ? getCertificadoProps() : getFlyerProps(sourceId);
+        let props;
+        if (sourceId === 'certificado') {
+          props = getCertificadoProps();
+        } else if (sourceId === 'reconocimiento') {
+          props = getReconocimientoProps();
+        } else {
+          props = getFlyerProps(sourceId);
+        }
+        
         if (overrideVariables) {
           if (overrideVariables.escuela) props.escuela = overrideVariables.escuela;
           if (overrideVariables.cuota) props.monto = formatMoney(overrideVariables.cuota);
@@ -367,6 +404,13 @@ export default function ImprimiblesPage() {
       if (overrideVariables?.fecha) props.fecha = overrideVariables.fecha;
       const ref = forCapture ? certificadoRef : undefined;
       return <CertificadoEscuela ref={ref} {...props} />;
+    }
+    if (id === "reconocimiento") {
+      const props = { ...getReconocimientoProps(), texts: textOverrides.reconocimiento };
+      if (overrideVariables?.escuela) props.escuela = overrideVariables.escuela;
+      if (overrideVariables?.fecha) props.fecha = overrideVariables.fecha;
+      const ref = forCapture ? reconocimientoRef : undefined;
+      return <ReconocimientoEscuela ref={ref} {...props} />;
     }
     const props = { ...getFlyerProps(id), texts: textOverrides[id] };
     if (overrideVariables) {
@@ -438,18 +482,18 @@ export default function ImprimiblesPage() {
           return (
             <div
               key={flyer.id}
-              className="group bg-white rounded-[2rem] border border-slate-200/80 overflow-hidden shadow-xl shadow-slate-200/20 hover:shadow-2xl hover:shadow-slate-300/40 transition-all duration-500 relative flex flex-col hover:-translate-y-1"
+              className="group bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-lg shadow-slate-200/40 hover:shadow-xl hover:shadow-slate-300/50 transition-all duration-500 relative flex flex-col hover:-translate-y-1"
             >
               {/* Edit count / AI badge */}
               {(edits > 0 || flyer.isCustom) && (
-                <div className="absolute top-5 right-5 z-20 bg-gradient-to-r from-orange-500 to-rose-500 text-white text-[11px] font-black rounded-full px-3 py-1 flex items-center justify-center shadow-lg shadow-orange-500/30">
+                <div className="absolute top-5 right-5 z-20 bg-gradient-to-r from-orange-500 to-rose-500 text-white text-[10px] font-bold rounded-full px-3 py-1 flex items-center justify-center shadow-lg shadow-orange-500/20">
                   {flyer.isCustom ? "EDITADO POR IA ✨" : `${edits} ${edits === 1 ? 'CAMBIO' : 'CAMBIOS'}`}
                 </div>
               )}
 
               {/* Preview Container */}
               <div 
-                className="relative w-full overflow-hidden bg-slate-100/50 border-b border-slate-100 transition-all duration-300 cursor-pointer group/preview" 
+                className="relative w-full overflow-hidden bg-slate-50 border-b border-slate-100 transition-all duration-300 cursor-pointer group/preview" 
                 style={{ height: flyer.id === "digital" ? "460px" : "320px" }}
                 onClick={() => setPreviewFlyer(flyer.id)}
               >
@@ -457,7 +501,7 @@ export default function ImprimiblesPage() {
                   transform: (flyer.sourceId || flyer.id) === "digital" ? "scale(0.40)" : "scale(0.26)",
                   transformOrigin: "top center",
                 }}>
-                  <div className="shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-transform duration-500 group-hover:scale-[1.03]">
+                  <div className="shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] transition-transform duration-500 group-hover:scale-[1.03]">
                     <FlyerComponent id={flyer.id} isCustom={flyer.isCustom} html={flyer.html} />
                   </div>
                 </div>
@@ -466,76 +510,79 @@ export default function ImprimiblesPage() {
                 
                 {/* Hover overlay indicator */}
                 <div className="absolute inset-0 bg-indigo-900/0 group-hover/preview:bg-indigo-900/5 transition-all flex items-center justify-center opacity-0 group-hover/preview:opacity-100 z-10">
-                    <div className="bg-white/95 backdrop-blur-sm text-indigo-600 px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 transform translate-y-4 group-hover/preview:translate-y-0 transition-all">
+                    <div className="bg-white/95 backdrop-blur-sm text-indigo-600 px-5 py-2 rounded-full font-semibold text-xs tracking-wide shadow-xl flex items-center gap-2 transform translate-y-4 group-hover/preview:translate-y-0 transition-all">
                         <ImageIcon size={16} /> Ver Ampliado
                     </div>
                 </div>
               </div>
 
               {/* Info + Actions */}
-              <div className="p-6 md:p-8 flex-1 flex flex-col justify-between space-y-6 bg-white z-10 relative">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center border border-slate-100 shadow-inner" style={{ backgroundColor: flyer.color + '10' }}>
+              <div className="p-6 md:p-8 flex-1 flex flex-col justify-between bg-white z-10 relative">
+                
+                {/* Header Section */}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center border border-slate-100 shadow-sm transition-transform group-hover:scale-105" style={{ backgroundColor: flyer.color + '10', color: flyer.color }}>
                     {flyer.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight truncate">{flyer.label}</h3>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">{flyer.subtitle}</p>
+                    <h3 className="text-lg font-bold text-slate-800 tracking-tight truncate">{flyer.label}</h3>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">{flyer.subtitle}</p>
                   </div>
                 </div>
 
-                {/* ── PER-FLYER CONFIG ── */}
-                <div className="space-y-4">
+                {/* ── PER-FLYER CONFIG (Inline Canvas Style) ── */}
+                <div className="space-y-4 mb-6">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Nombre de Escuela</label>
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1 block">Nombre de Escuela</label>
                     <input 
                       type="text" 
                       value={configs[flyer.sourceId || flyer.id]?.escuela ?? configs["ninos"]?.escuela ?? ""}
-                      onChange={e => handleConfigChange(flyer.sourceId?.startsWith('nuevo_') ? 'ninos' : (flyer.sourceId || flyer.id), 'escuela', (flyer.sourceId || flyer.id) === 'certificado' ? e.target.value : e.target.value.toUpperCase())}
-                      className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
+                      onChange={e => handleConfigChange(flyer.sourceId?.startsWith('nuevo_') ? 'ninos' : (flyer.sourceId || flyer.id), 'escuela', ['certificado', 'reconocimiento'].includes(flyer.sourceId || flyer.id) ? e.target.value : e.target.value.toUpperCase())}
+                      className="w-full bg-transparent border-0 border-b-2 border-slate-100 px-0 py-1.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-0 transition-colors placeholder:text-slate-300"
+                      placeholder="Escribe aquí..."
                     />
                   </div>
-                  {(flyer.sourceId || flyer.id) === 'certificado' ? (
-                    /* Certificate: free-text date field */
+                  {['certificado', 'reconocimiento'].includes(flyer.sourceId || flyer.id) ? (
+                    /* Certificate/Reconocimiento: free-text date field */
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Fecha (texto libre)</label>
+                      <label className="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1 block">Fecha (texto libre)</label>
                       <input 
                         type="text" 
-                        value={configs.certificado.fechaTexto}
-                        onChange={e => handleConfigChange('certificado', 'fechaTexto', e.target.value)}
-                        placeholder="Abril de 2026"
-                        className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
+                        value={configs[flyer.sourceId || flyer.id]?.fechaTexto ?? configs.certificado.fechaTexto}
+                        onChange={e => handleConfigChange((flyer.sourceId || flyer.id), 'fechaTexto', e.target.value)}
+                        placeholder="Ej. Abril de 2026"
+                        className="w-full bg-transparent border-0 border-b-2 border-slate-100 px-0 py-1.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-0 transition-colors placeholder:text-slate-300"
                       />
                     </div>
                   ) : (
                     /* Flyers: ISO date + monetary fields */
                     <>
                       <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Fecha del Evento</label>
+                        <label className="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1 block">Fecha del Evento</label>
                         <input 
                           type="date" 
                           value={configs[flyer.sourceId || flyer.id]?.fechaISO ?? configs["ninos"]?.fechaISO ?? ""}
                           onChange={e => handleConfigChange(flyer.sourceId?.startsWith('nuevo_') ? 'ninos' : (flyer.sourceId || flyer.id), 'fechaISO', e.target.value)}
-                          className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
+                          className="w-full bg-transparent border-0 border-b-2 border-slate-100 px-0 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-400 focus:ring-0 transition-colors"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Cuota $</label>
+                          <label className="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1 block">Cuota $</label>
                           <input 
                             type="number" 
                             value={configs[flyer.sourceId || flyer.id]?.cuota ?? configs["ninos"]?.cuota ?? 0}
                             onChange={e => handleConfigChange(flyer.sourceId?.startsWith('nuevo_') ? 'ninos' : (flyer.sourceId || flyer.id), 'cuota', Number(e.target.value))}
-                            className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
+                            className="w-full bg-transparent border-0 border-b-2 border-slate-100 px-0 py-1.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-0 transition-colors"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Tarifa Base $</label>
+                          <label className="text-[11px] font-medium text-slate-400 uppercase tracking-widest mb-1 block">Tarifa Base $</label>
                           <input 
                             type="number" 
                             value={configs[flyer.sourceId || flyer.id]?.tarifa ?? configs["ninos"]?.tarifa ?? 0}
                             onChange={e => handleConfigChange(flyer.sourceId?.startsWith('nuevo_') ? 'ninos' : (flyer.sourceId || flyer.id), 'tarifa', Number(e.target.value))}
-                            className="w-full bg-slate-50 border-2 border-slate-100/80 rounded-xl px-4 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner text-center"
+                            className="w-full bg-transparent border-0 border-b-2 border-slate-100 px-0 py-1.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-0 transition-colors"
                           />
                         </div>
                       </div>
@@ -543,14 +590,15 @@ export default function ImprimiblesPage() {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2 pt-4 border-t border-slate-100/80 mt-auto">
-                  <div className="flex gap-2">
+                <div className="flex flex-col gap-4 mt-auto pt-2 border-t border-slate-50">
+                  {/* Secondary Tools */}
+                  <div className="flex items-center justify-center gap-6 text-slate-400 mb-1">
                     {!flyer.isCustom && (
                       <button
                         onClick={() => setEditingFlyer(flyer.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-black text-[10px] sm:text-xs uppercase tracking-tight transition-all border-2 border-slate-200 hover:border-slate-300 active:scale-95"
+                        className="flex items-center gap-1.5 text-[11px] font-medium hover:text-slate-700 transition-colors active:scale-95"
                       >
-                        <Pencil size={14} /> Editar Textos
+                        <Pencil size={13} /> Editar Textos
                       </button>
                     )}
                     {flyer.isCustom ? (
@@ -558,18 +606,17 @@ export default function ImprimiblesPage() {
                         onClick={async (e) => {
                           e.stopPropagation();
                           if (confirm("¿Eliminar esta variante personalizada?")) {
-                            // Optimistic delete
                             setCustomAIFlyers(prev => prev.filter(f => f.id !== flyer.id));
                             try {
                               await flyerStorage.deleteCustomFlyer(flyer.id);
                             } catch(err) {
-                              alert("Error al eliminar la variante de la base de datos.");
+                              alert("Error al eliminar la variante.");
                             }
                           }
                         }}
-                        className="flex-1 flex justify-center items-center gap-1.5 px-2 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-tight transition-all active:scale-95 border border-rose-100"
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-rose-400 hover:text-rose-600 transition-colors active:scale-95"
                       >
-                        <X size={14} /> Eliminar Copia
+                        <X size={13} /> Eliminar Copia
                       </button>
                     ) : (
                       <button
@@ -578,34 +625,35 @@ export default function ImprimiblesPage() {
                           setAiTarget(flyer.id);
                           setAiModalOpen(true);
                         }}
-                        className="flex-1 flex justify-center items-center gap-1.5 px-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-tight transition-all active:scale-95 border border-indigo-100"
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-indigo-400 hover:text-indigo-600 transition-colors active:scale-95"
                       >
-                        <Sparkles size={14} /> Editar con IA
+                        <Sparkles size={13} /> Editar con IA
                       </button>
                     )}
                   </div>
                   
+                  {/* Primary Action */}
                   <button
                     onClick={() => handleDownload(flyer.id)}
                     disabled={isAnyDownloading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold tracking-wide transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                     style={{
-                      backgroundColor: isDownloading ? "#f1f5f9" : flyer.color,
+                      backgroundColor: isDownloading ? "#f8fafc" : flyer.color,
                       color: isDownloading ? "#64748b" : "white",
-                      boxShadow: isDownloading ? "none" : `0 10px 25px -5px ${flyer.color}60`,
+                      boxShadow: isDownloading ? "none" : `0 4px 14px 0 ${flyer.color}30`,
                     }}
                   >
                     {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                    {isDownloading ? "..." : `Exportar ${flyer.format}`}
+                    {isDownloading ? "Generando..." : `Exportar ${flyer.format}`}
                   </button>
 
-                  {/* Add Massive Button for all flyers */}
+                  {/* Mass Generation Ghost Link */}
                   <button
                     onClick={() => setMassiveTarget(flyer)}
                     disabled={isAnyDownloading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all active:scale-95 shadow-sm border border-slate-200 mt-2 bg-slate-50 hover:bg-slate-100 text-indigo-700 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] font-medium uppercase tracking-widest text-slate-400 hover:text-indigo-500 transition-colors active:scale-95 disabled:opacity-50 mt-1"
                   >
-                    <Layers size={16} /> Generar Masivo (Varias Escuelas)
+                    <Layers size={13} /> Generación Masiva
                   </button>
                 </div>
               </div>
@@ -786,6 +834,7 @@ export default function ImprimiblesPage() {
         <FlyerPadres ref={padresRef} {...getFlyerProps("padres")} texts={textOverrides.padres} />
         <CircularDigital ref={digitalRef} {...getFlyerProps("digital")} texts={textOverrides.digital} />
         <CertificadoEscuela ref={certificadoRef} {...getCertificadoProps()} texts={textOverrides.certificado} />
+        <ReconocimientoEscuela ref={reconocimientoRef} {...getReconocimientoProps()} texts={textOverrides.reconocimiento} />
         
         {customAIFlyers.map(cf => (
           <FlyerComponent key={cf.id} id={cf.id} forCapture={true} isCustom={true} html={cf.html} />
