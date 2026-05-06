@@ -8,6 +8,7 @@ import SchoolCombobox from '@/components/admin/SchoolCombobox';
 import AdminLayout from '@/components/admin/AdminLayout';
 import AnalyticsView from '@/components/admin/AnalyticsView';
 import HRCommandCenter from '@/components/admin/HRCommandCenter';
+import MasterRouteStudio from '@/components/admin/MasterRouteStudio';
 import {
     Plane, Upload, Users, Radio, CheckCircle, AlertCircle, Loader2,
     Globe, Zap, School, Gem, FileText, Database, ArrowLeft,
@@ -1071,8 +1072,16 @@ export default function AdminPage() {
                 <AnalyticsView activeTab={activeTab} setActiveTab={setActiveTab} />
             )}
 
+            {/* TAB: RECURSOS HUMANOS (Sub-tabs) */}
+            {(activeTab === 'hr-directorio' || activeTab === 'hr-asistencia' || activeTab === 'hr-academia') && (
+                <HRCommandCenter externalView={activeTab.replace('hr-', '')} />
+            )}
+            {activeTab === 'hr-rutas' && (
+                <MasterRouteStudio />
+            )}
+
             {/* FOOTER - Hidden for full-canvas tabs */}
-            {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && (
+            {activeTab !== 'crm' && activeTab !== 'crm-escuelas' && activeTab !== 'hr-rutas' && (
                 <footer className="max-w-5xl mx-auto mt-12 pb-8 text-center text-slate-500 text-xs">
                     <p>Panel de Administración · Fly High Edu · {new Date().getFullYear()}</p>
                 </footer>

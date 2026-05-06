@@ -12,11 +12,13 @@ import {
   ExternalLink,
   ChevronRight,
   SlidersHorizontal,
-  Users,
   CheckCircle2,
   PhoneCall,
   PhoneMissed,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const PIPELINE_STAGES = [
   { id: 'sin_contacto',         label: 'Sin Contacto',    color: '#94a3b8', bg: 'bg-slate-100 text-slate-600' },
@@ -37,6 +39,13 @@ export default function AdminCRMPage() {
   const [viewMode, setViewMode] = useState("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStage, setFilterStage] = useState("all");
+  const [filters, setFilters] = useState({
+    nivel: [], // 'PRIMARIA', 'PREESCOLAR'
+    tipo: 'all', // 'all', 'publico', 'privado'
+    ordenAlumnos: null, // null | 'asc' | 'desc'
+    turno: [], // 'MATUTINO', 'VESPERTINO'
+  });
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [notifPermission, setNotifPermission] = useState("default");
   const [notasLocal, setNotasLocal] = useState("");
@@ -91,6 +100,39 @@ export default function AdminCRMPage() {
     return () => clearInterval(interval);
   }, [schools, notifPermission]);
 
+  // Realtime subscription for pipeline changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'crm_pipeline_log',
+        },
+        (payload) => {
+          const { cct, nombre_escuela, estado_nuevo, cambiado_por } = payload.new;
+          
+          // Muestra una notificación push web de que alguien cambió el estado
+          if (notifPermission === "granted") {
+            new Notification(`Actualización CRM: ${nombre_escuela}`, {
+              body: `${cambiado_por} movió la escuela a ${estado_nuevo.replace(/_/g, ' ').toUpperCase()}`,
+              icon: "/apple-icon.png"
+            });
+          }
+
+          // Actualizamos estado localmente sin refrescar todo si la escuela existe
+          setSchools(prev => prev.map(s => s.cct === cct ? { ...s, estado_pipeline: estado_nuevo } : s));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [notifPermission]);
+
   const handleUpdateSchool = useCallback(async (cct, updates) => {
     setSchools(prev => prev.map(s => s.cct === cct ? { ...s, ...updates } : s));
     if (selectedSchool?.cct === cct) {
@@ -119,7 +161,24 @@ export default function AdminCRMPage() {
 
   const filteredSchools = useMemo(() => {
     let result = schools;
+    // Pipeline stage
     if (filterStage !== "all") result = result.filter(s => s.estado_pipeline === filterStage);
+    
+    // Nivel educativo
+    if (filters.nivel.length > 0)
+        result = result.filter(s => filters.nivel.includes(s.nivel_educativo));
+    
+    // Tipo (público = todo excepto PRIVADO)
+    if (filters.tipo === 'publico')
+        result = result.filter(s => s.tipo !== 'PRIVADO');
+    else if (filters.tipo === 'privado')
+        result = result.filter(s => s.tipo === 'PRIVADO');
+    
+    // Turno
+    if (filters.turno.length > 0)
+        result = result.filter(s => filters.turno.includes(s.turno));
+
+    // Búsqueda text
     if (searchQuery) {
       const lq = searchQuery.toLowerCase();
       result = result.filter(s =>
@@ -127,8 +186,16 @@ export default function AdminCRMPage() {
         (s.cct || "").toLowerCase().includes(lq)
       );
     }
+    
+    // Orden Alumnos
+    if (filters.ordenAlumnos === 'asc') {
+      result = [...result].sort((a, b) => (a.ninos || 0) - (b.ninos || 0));
+    } else if (filters.ordenAlumnos === 'desc') {
+      result = [...result].sort((a, b) => (b.ninos || 0) - (a.ninos || 0));
+    }
+
     return result;
-  }, [schools, searchQuery, filterStage]);
+  }, [schools, searchQuery, filterStage, filters]);
 
   const stageCounts = useMemo(() => {
     const counts = {};
@@ -142,32 +209,32 @@ export default function AdminCRMPage() {
     <div className="flex flex-col h-full w-full overflow-hidden relative" style={{ background: 'var(--crm-bg, #f8fafc)' }}>
 
       {/* ── HEADER ── */}
-      <div className="shrink-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-              <Building2 size={20} strokeWidth={2.5} />
+      <div className="shrink-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm transition-all duration-300">
+        <div className="flex items-center justify-between px-4 md:px-6 pt-4 md:pt-5 pb-3 md:pb-4 gap-3 md:gap-4">
+          <div className="flex items-center gap-2.5 md:gap-3">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+              <Building2 size={18} strokeWidth={2.5} className="md:w-5 md:h-5" />
             </div>
             <div>
-              <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">CRM Escuelas</h1>
-              <p className="text-[11px] font-semibold text-slate-400">
+              <h1 className="text-base md:text-lg font-black text-slate-900 leading-tight tracking-tight">CRM Escuelas</h1>
+              <p className="text-[10px] md:text-[11px] font-semibold text-slate-400">
                 {filteredSchools.length} de {schools.length} registros
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="flex bg-slate-100 p-1 rounded-xl gap-0.5">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-all text-sm ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`p-1.5 md:p-2 rounded-lg transition-all text-sm ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                 title="Vista lista"
               >
                 <LayoutList size={17} />
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`p-2 rounded-lg transition-all text-sm ${viewMode === 'kanban' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`p-1.5 md:p-2 rounded-lg transition-all text-sm ${viewMode === 'kanban' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                 title="Vista Kanban"
               >
                 <Trello size={17} />
@@ -176,25 +243,137 @@ export default function AdminCRMPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="px-6 pb-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400" size={16} />
+        {/* Search & Filters */}
+        <div className="px-4 md:px-6 pb-3 md:pb-4 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 md:left-4 top-1/2 -translate-y-1/2 text-blue-400" size={16} />
             <input
               type="text"
               placeholder="Buscar escuela o CCT..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-100 border border-transparent rounded-xl text-sm font-medium outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
+              className="w-full pl-10 md:pl-11 pr-4 py-2.5 bg-slate-100 border border-transparent rounded-xl text-[13px] md:text-sm font-medium outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
             />
           </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 md:px-4 flex items-center justify-center gap-2 rounded-xl text-[13px] md:text-sm font-bold transition-all active:scale-95 ${showFilters ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+          >
+            <SlidersHorizontal size={16} />
+            <span className="hidden sm:inline">Filtros</span>
+          </button>
         </div>
 
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+          <div className="px-4 md:px-6 pb-4 border-b border-slate-100 mb-2 animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-white border border-slate-200/60 rounded-2xl shadow-lg shadow-slate-200/40 overflow-hidden flex flex-col max-h-[65vh] md:max-h-none ring-1 ring-black/5">
+              <div className="p-4 md:p-6 overflow-y-auto no-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Nivel */}
+                  <div className="flex flex-col gap-2.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nivel Educativo</label>
+                    <div className="flex bg-slate-100/80 p-1 rounded-xl">
+                      {['PREESCOLAR', 'PRIMARIA'].map(lvl => {
+                        const active = filters.nivel.includes(lvl);
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => {
+                              if (active) setFilters({...filters, nivel: filters.nivel.filter(n => n !== lvl)});
+                              else setFilters({...filters, nivel: [...filters.nivel, lvl]});
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all duration-200 ${active ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                          >
+                            {lvl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sostenimiento */}
+                  <div className="flex flex-col gap-2.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sostenimiento</label>
+                    <div className="flex bg-slate-100/80 p-1 rounded-xl">
+                      {[{id: 'all', label: 'Todos'}, {id: 'publico', label: 'Público'}, {id: 'privado', label: 'Privado'}].map(t => {
+                        const active = filters.tipo === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => setFilters({...filters, tipo: t.id})}
+                            className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all duration-200 ${active ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                          >
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Orden Alumnos */}
+                  <div className="flex flex-col gap-2.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cant. de Alumnos</label>
+                    <div className="flex bg-slate-100/80 p-1 rounded-xl">
+                      <button
+                        onClick={() => setFilters({...filters, ordenAlumnos: filters.ordenAlumnos === 'desc' ? null : 'desc'})}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold transition-all duration-200 ${filters.ordenAlumnos === 'desc' ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                      >
+                        <ArrowDown size={13} strokeWidth={3} /> Mayor a Menor
+                      </button>
+                      <button
+                        onClick={() => setFilters({...filters, ordenAlumnos: filters.ordenAlumnos === 'asc' ? null : 'asc'})}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold transition-all duration-200 ${filters.ordenAlumnos === 'asc' ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                      >
+                        <ArrowUp size={13} strokeWidth={3} /> Menor a Mayor
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Turno */}
+                  <div className="flex flex-col gap-2.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Turno</label>
+                    <div className="flex bg-slate-100/80 p-1 rounded-xl">
+                      {['MATUTINO', 'VESPERTINO'].map(t => {
+                        const active = filters.turno.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => {
+                              if (active) setFilters({...filters, turno: filters.turno.filter(n => n !== t)});
+                              else setFilters({...filters, turno: [...filters.turno, t]});
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all duration-200 ${active ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Reset Filters */}
+              {(filters.nivel.length > 0 || filters.tipo !== 'all' || filters.turno.length > 0 || filters.ordenAlumnos) && (
+                <div className="px-4 md:px-6 py-3 md:py-4 border-t border-slate-100 flex justify-end bg-slate-50/50 shrink-0">
+                  <button 
+                    onClick={() => setFilters({ nivel: [], tipo: 'all', ordenAlumnos: null, turno: [] })}
+                    className="flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 active:scale-95 transition-all w-full sm:w-auto shadow-sm"
+                  >
+                    <X size={14} strokeWidth={2.5} /> Restablecer Filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Stage Filter chips */}
-        <div className="px-6 pb-4 flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="px-4 md:px-6 pb-3 md:pb-4 flex gap-2 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setFilterStage("all")}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${filterStage === 'all' ? 'bg-slate-800 text-white shadow' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+            className={`shrink-0 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[11px] font-bold transition-all active:scale-95 ${filterStage === 'all' ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
             Todas · {schools.length}
           </button>
@@ -205,7 +384,7 @@ export default function AdminCRMPage() {
               <button
                 key={stage.id}
                 onClick={() => setFilterStage(stage.id === filterStage ? 'all' : stage.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${filterStage === stage.id ? 'text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`shrink-0 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-[11px] font-bold transition-all active:scale-95 border ${filterStage === stage.id ? 'text-white shadow-md border-transparent' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 style={filterStage === stage.id ? { backgroundColor: stage.color } : {}}
               >
                 {stage.label} · {count}
@@ -223,7 +402,7 @@ export default function AdminCRMPage() {
             <span className="text-xs font-bold uppercase tracking-widest">Cargando...</span>
           </div>
         ) : viewMode === "list" ? (
-          <div className="p-5 flex flex-col gap-2.5">
+          <div className="px-4 md:px-6 py-4 md:py-5 pb-24 md:pb-8 flex flex-col gap-3 md:gap-2.5">
             {filteredSchools.map(school => (
               <SchoolCard
                 key={school.cct}
@@ -414,57 +593,123 @@ function StageChip({ stageId }) {
 // ─── SchoolCard ──────────────────────────────────────────────
 function SchoolCard({ school, onClick, compact = false }) {
   const stage = PIPELINE_STAGES.find(s => s.id === school.estado_pipeline) || PIPELINE_STAGES[0];
-  const isReminderNear = school.reminder_at && new Date(school.reminder_at).getTime() < Date.now() + 86400000;
   const isReminderOverdue = school.reminder_at && new Date(school.reminder_at).getTime() < Date.now();
+  const isHighPriority = (school.ninos || 0) >= 300;
 
+  if (compact) {
+    return (
+      <div
+        onClick={onClick}
+        className={`group bg-white rounded-2xl border ${isHighPriority ? 'border-purple-200 shadow-purple-500/5' : 'border-slate-200/80 hover:border-blue-200'} hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer overflow-hidden flex items-stretch`}
+      >
+        <div className="w-1.5 shrink-0" style={{ backgroundColor: stage.color }} />
+        
+        <div className="flex-1 p-3 flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-extrabold text-slate-800 text-xs leading-snug truncate">
+                {school.nombre_escuela}
+              </h3>
+              <p className="text-[10px] font-semibold text-slate-400 mt-1 truncate flex items-center gap-1.5">
+                <span>{school.nivel_educativo === 'PREESCOLAR' ? 'Preescolar' : 'Primaria'}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-200"></span>
+                <span>{school.tipo === 'PRIVADO' ? 'Privado' : 'Público'}</span>
+              </p>
+            </div>
+            
+            <div className="flex flex-col items-end shrink-0 pl-2">
+              <span className={`text-sm font-black leading-none ${isHighPriority ? 'text-purple-600' : 'text-slate-700'}`}>
+                {school.ninos || 0}
+              </span>
+              <span className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mt-0.5">
+                Alumn.
+              </span>
+            </div>
+          </div>
+          
+          <div className="mt-3 flex items-center justify-between">
+            <StageChip stageId={school.estado_pipeline} />
+            <div className="flex items-center gap-1.5">
+               {school.whatsapp_phone && (
+                <MessageCircle size={12} className="text-green-500" />
+               )}
+               {school.reminder_at && (
+                <Bell size={12} className={isReminderOverdue ? 'text-rose-500 animate-pulse' : 'text-amber-500'} />
+               )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // List View
   return (
     <div
       onClick={onClick}
-      className={`group bg-white rounded-2xl border border-slate-200/80 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer overflow-hidden flex gap-0 ${compact ? '' : ''}`}
+      className={`group bg-white rounded-2xl border ${isHighPriority ? 'border-purple-200 shadow-purple-500/5' : 'border-slate-200/80 hover:border-blue-200'} hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer overflow-hidden flex items-stretch`}
     >
-      {/* Color bar */}
-      <div className="w-1 shrink-0 rounded-l-2xl" style={{ backgroundColor: stage.color }} />
+      <div className="w-1.5 shrink-0" style={{ backgroundColor: stage.color }} />
 
-      <div className={`flex-1 ${compact ? 'p-3' : 'p-4'}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <h3 className={`font-bold text-slate-800 leading-snug truncate ${compact ? 'text-xs' : 'text-sm'}`}>
-              {school.nombre_escuela}
-            </h3>
-            {!compact && (
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                {school.tipo} · {school.turno} · {school.ninos} alumnos
-              </p>
+      <div className="flex-1 p-3.5 md:p-5 flex items-center justify-between gap-2.5 md:gap-4">
+        
+        {/* Left content: Name, metadata, pipeline stage */}
+        <div className="flex flex-col gap-1.5 md:gap-2 min-w-0 flex-1">
+          <h3 className="font-extrabold text-slate-800 text-sm md:text-base leading-tight truncate pr-2 md:pr-4">
+            {school.nombre_escuela}
+          </h3>
+          
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-[11px] font-semibold text-slate-500">
+            <span>{school.nivel_educativo === 'PREESCOLAR' ? 'Preescolar' : 'Primaria'}</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+            <span>{school.tipo === 'PRIVADO' ? 'Privado' : 'Público'}</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+            <span>{school.turno}</span>
+            {school.cct && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                <span className="font-mono text-[9px] md:text-[10px] text-slate-400 truncate max-w-[80px] sm:max-w-none">{school.cct}</span>
+              </>
             )}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {school.whatsapp_phone && (
-              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-600" title="Chat activo">
-                <MessageCircle size={10} strokeWidth={3} />
-              </span>
-            )}
-            {school.reminder_at && (
-              <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center ${isReminderOverdue ? 'bg-rose-100 text-rose-600 animate-pulse' : 'bg-amber-100 text-amber-600'}`}
-                title="Recordatorio programado"
-              >
-                <Bell size={10} strokeWidth={3} />
-              </span>
-            )}
-            <ChevronRight size={14} className="text-slate-300 group-hover:text-blue-400 transition-colors" />
+          
+          <div className="mt-1 flex items-center gap-2.5 md:gap-3">
+            <StageChip stageId={school.estado_pipeline} />
+            
+            <div className="flex items-center gap-1.5 md:gap-2">
+              {school.whatsapp_phone && (
+                <span className="flex items-center justify-center w-5 h-5 md:w-auto md:h-auto md:px-2 md:py-0.5 bg-green-50 rounded-full md:rounded-full text-green-600">
+                  <MessageCircle size={12} strokeWidth={2.5} /> 
+                  <span className="hidden md:inline ml-1 text-[10px] font-bold">Chat</span>
+                </span>
+              )}
+              {school.reminder_at && (
+                <span className={`flex items-center justify-center md:gap-1 w-5 h-5 md:w-auto md:h-auto md:px-2 md:py-0.5 rounded-full ${isReminderOverdue ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
+                  <Bell size={12} strokeWidth={2.5} className={isReminderOverdue ? 'animate-pulse' : ''} /> 
+                  <span className="hidden md:inline text-[10px] font-bold">
+                    {new Date(school.reminder_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Right content: Prominent student count & arrow */}
+        <div className="flex items-center gap-3 md:gap-5 shrink-0 pl-3 md:pl-5 border-l border-slate-100">
+          <div className="flex flex-col items-end">
+            <span className={`text-2xl md:text-3xl font-black tracking-tighter leading-none ${isHighPriority ? 'text-purple-600' : 'text-slate-800'}`}>
+              {school.ninos || 0}
+            </span>
+            <span className="text-[8px] md:text-[9px] font-extrabold uppercase tracking-widest text-slate-400 mt-1.5">
+              Alumnos
+            </span>
+          </div>
+          <div className="hidden sm:flex w-10 h-10 rounded-full bg-slate-50 border border-slate-100 group-hover:bg-blue-50 group-hover:border-blue-100 items-center justify-center transition-all">
+            <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
           </div>
         </div>
 
-        {!compact && (
-          <div className="flex items-center gap-2 mt-2.5">
-            <StageChip stageId={school.estado_pipeline} />
-            {school.reminder_at && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isReminderOverdue ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
-                {new Date(school.reminder_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

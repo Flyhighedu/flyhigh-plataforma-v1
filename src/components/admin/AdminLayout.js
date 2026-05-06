@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart, Building2, Printer
+    Globe, Zap, School, Gem, FileText, Database, Heart, Building2, Printer, Map, GraduationCap
 } from 'lucide-react';
 import AdminAlarms from './AdminAlarms';
 
@@ -87,7 +87,18 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
         { id: 'cronograma', label: 'Cronograma', icon: <Calendar size={18} />, color: '#34d399' }, // Emerald
         { id: 'imprimibles', label: 'Imprimibles', icon: <Printer size={18} />, color: '#f97316' }, // Orange
         { id: 'operativos', label: 'FlyHigh Ops', icon: <Users size={18} />, color: '#2563eb' }, // Blue
-        { id: 'hr', label: 'Recursos Humanos', icon: <Heart size={18} />, color: '#ec4899' }, // Pink
+        { 
+            id: 'hr', 
+            label: 'Recursos Humanos', 
+            icon: <Heart size={18} />, 
+            color: '#ec4899',
+            subTabs: [
+                { id: 'hr-directorio', label: 'Directorio', icon: <Users size={18} /> },
+                { id: 'hr-asistencia', label: 'Asistencia', icon: <Calendar size={18} /> },
+                { id: 'hr-academia', label: 'Academia', icon: <GraduationCap size={18} /> },
+                { id: 'hr-rutas', label: 'Puntos Oficiales', icon: <Map size={18} /> },
+            ]
+        },
         { 
             id: 'analytics', 
             label: 'Analytics', 

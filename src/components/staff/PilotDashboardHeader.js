@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, Flame, ChevronRight, Award, MapPin, Target, Zap, Shield } from 'lucide-react';
+import { ChevronLeft, Flame, Award, MapPin, Zap, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { MiniAvatar } from '@/components/ui/MiniAvatar';
 
@@ -40,20 +40,35 @@ export default function PilotDashboardHeader({
                     <div className="w-10" />
                 </div>
 
-                {/* Left Content */}
+                {/* Left Content + Avatar */}
                 <div className="relative z-10 flex flex-col justify-center max-w-[65%] mt-2">
                     <div className="flex items-center gap-1.5 mb-2">
                         <Shield size={14} className="text-blue-300" strokeWidth={2.5} />
                         <span className="text-blue-200 font-black tracking-widest text-[10px] uppercase">{rankTitle}</span>
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-1 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
                     </div>
-                    <h2 className="text-4xl font-black text-white leading-none mb-4 drop-shadow-md tracking-tight">
+                    <h2 className="text-4xl font-black text-white leading-none mb-3 drop-shadow-md tracking-tight">
                         Hola, <br/>{userName.split(' ')[0]}
                     </h2>
-                    <button className="flex items-center gap-1.5 text-white/90 text-[11px] font-bold uppercase tracking-wider bg-white/15 hover:bg-white/25 px-4 py-2.5 rounded-full backdrop-blur-md transition-all w-fit border border-white/10 shadow-lg">
-                        <span>Ver Perfil</span>
-                        <ChevronRight size={14} strokeWidth={3} />
-                    </button>
+
+                    {/* Stats Pills — compact, inline with greeting */}
+                    <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <Flame size={11} className="text-orange-300" />
+                            <span className="text-white font-bold text-[11px]">3</span>
+                            <span className="text-white/50 font-medium text-[9px]">días</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <Zap size={11} className="text-blue-300" />
+                            <span className="text-white font-bold text-[11px]">{studyReadyCount}</span>
+                            <span className="text-white/50 font-medium text-[9px]">fichas</span>
+                        </div>
+                        <div className="flex items-center gap-1 bg-white/15 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
+                            <MapPin size={11} className="text-emerald-300" />
+                            <span className="text-white font-bold text-[11px]">{totalPoints}</span>
+                            <span className="text-white/50 font-medium text-[9px]">puntos</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Giant Avatar (Floating, no circle) */}
@@ -64,39 +79,8 @@ export default function PilotDashboardHeader({
                 </div>
             </div>
 
-            {/* ═══ DASHBOARD CONTENT ═══ */}
-            <div className="px-5 pt-6 pb-2 relative z-10">
-                {/* KPIs Row - Clean White Cards */}
-                <div className="flex gap-3 mb-5">
-                    {/* Racha */}
-                    <div className="flex-1 bg-white rounded-[28px] p-4 flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 hover:-translate-y-1 transition-transform">
-                        <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center mb-2">
-                            <Flame size={18} className="text-orange-500 fill-orange-500" />
-                        </div>
-                        <p className="text-[24px] font-black text-slate-800 leading-none mb-1">3 <span className="text-[11px] font-bold text-slate-400">días</span></p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Racha</span>
-                    </div>
-
-                    {/* Fichas */}
-                    <div className="flex-1 bg-white rounded-[28px] p-4 flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 hover:-translate-y-1 transition-transform">
-                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-2">
-                            <Zap size={18} className="text-blue-500 fill-blue-500" />
-                        </div>
-                        <p className="text-[24px] font-black text-slate-800 leading-none mb-1">{studyReadyCount}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Fichas</span>
-                    </div>
-
-                    {/* Puntos */}
-                    <div className="flex-1 bg-white rounded-[28px] p-4 flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100 hover:-translate-y-1 transition-transform">
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mb-2">
-                            <MapPin size={18} className="text-emerald-500 fill-emerald-500" />
-                        </div>
-                        <p className="text-[24px] font-black text-slate-800 leading-none mb-1">{totalPoints}</p>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Puntos</span>
-                    </div>
-                </div>
-
-                {/* XP Bar (Próximo Rango) */}
+            {/* ═══ XP PROGRESS BAR ═══ */}
+            <div className="px-5 pt-5 pb-2 relative z-10">
                 <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">

@@ -90,31 +90,36 @@ async function getTavilyUsageCount() {
 // ───────── Prompt universal (mismo para los 3 motores) ─────────
 function buildPrompt(name, type, context, lat, lon) {
     const systemPrompt = `Eres un investigador experto en geografía, infraestructura y turismo en México con capacidad de búsqueda web.
-Tu única tarea es investigar lugares y puntos de interés (POIs) específicos para generar una ficha operativa o un artículo educativo verídico.
+Tu única tarea es investigar lugares y puntos de interés (POIs) específicos para generar un artículo educativo verídico altamente detallado, profundo y enciclopédico.
 
 REGLAS ABSOLUTAS (CERO ALUCINACIÓN):
 1. Foco Estricto: Se te pregunta por un lugar ESPECÍFICO ("${name}"). NUNCA respondas con la historia general de la ciudad o municipio ("${context}") si no tienes datos del lugar en sí.
-2. Lugares Modernos/Industriales: Si el lugar es una planta (ej. Pemex), fábrica, hospital, gasolinera, o negocio, descríbelo como tal. Explica su función operativa, importancia económica o logística para la zona. No inventes "historia antigua" si no la tiene.
-3. Si dispones de búsqueda web, ÚSALA. Si no, basa tu respuesta en conocimiento verificable.
-4. Si no tienes información real sobre este punto ESPECÍFICO, di exactamente: "No se encontró información verificada para esta instalación/punto específico."
-5. NUNCA INVENTES DATOS. Si no estás 100% seguro de un dato, omítelo.
-6. Incluye AL MENOS 2 datos reales (año de construcción, capacidad, metros, impacto económico, etc.) si es posible.
+2. Si no tienes información real sobre este punto ESPECÍFICO, di exactamente: "No se encontró información verificada para esta instalación/punto específico."
+3. NUNCA INVENTES DATOS. Si no estás 100% seguro de un dato numérico, omítelo.
 
-ESTRUCTURA:
-- Introducción — Qué es exactamente (planta, museo, parque) y dónde está.
-- Relevancia u Operación — Su función o impacto (histórico si es cultural; económico/logístico si es industrial).
-- Dato Clave — Un hecho concreto o cifra sobre el lugar.
+ESTRUCTURA OBLIGATORIA DE LA RESPUESTA:
+Debes estructurar tu respuesta en dos partes claras:
 
-- 7-10 oraciones. Entre 600 y 1100 caracteres.
-- Español claro y profesional (o amigable si es turismo).
-- Sin formato Markdown. Solo texto plano con punto y seguido.`;
+PARTE 1: RESUMEN HISTÓRICO Y OPERATIVO ENVOLVENTE (Narrativa Profunda)
+Redacta un artículo enciclopédico muy detallado, rico y extenso (sin límite de palabras, puede extenderse hasta 1600 o 2000 palabras si hay mucha historia). Cuenta la historia profunda del lugar, quién lo fundó, por qué, qué pasaba en esa época, su evolución, significado cultural para la comunidad, anécdotas, personajes históricos involucrados y su estado o uso actual. Queremos una narrativa extensa, rica y apasionante, no un simple párrafo.
+
+PARTE 2: DATOS TÉCNICOS Y MÉTRICAS (Lista de KPIs)
+A continuación del artículo, añade un título "Datos Técnicos y Métricas:" y luego una lista con al menos 4 a 6 "Datos Duros" o métricas verificables sobre el lugar. Ejemplos de datos requeridos según el tipo de lugar:
+- Años de fundación, inauguración, clausura o remodelación.
+- Dimensiones: Altitudes (msnm), hectáreas, metros cuadrados, kilómetros de longitud, profundidad.
+- Capacidades: Aforo máximo, número de camas, capacidad de producción, volumen de captación de agua.
+- Cantidades: Número de visitantes anuales, número de trabajadores, piezas de exhibición, especies.
+
+FORMATO DE LA RESPUESTA:
+Escribe todo el artículo narrativo, luego un salto de línea, y presenta los datos técnicos como una lista simple (usando guiones).
+Nota: NO uses formato Markdown avanzado (como negritas con asteriscos o encabezados con #), usa solo texto plano limpio.`;
 
     let userMsg = `Investiga este lugar específico:\n`;
     userMsg += `Nombre: "${name}"\n`;
     userMsg += `Ciudad/Estado/Zona: ${context || 'México'}\n`;
     if (lat && lon) userMsg += `Coordenadas GPS: ${lat}, ${lon}\n`;
     if (type) userMsg += `Categoría referencial: ${type}\n`;
-    userMsg += `\nGenera la ficha descriptiva basándote SOLO en información de ese lugar específico.`;
+    userMsg += `\nGenera la investigación PROFUNDA Y EXTENSA asegurándote de incluir TODO el contexto histórico posible y, al final, la lista de Datos Técnicos y Métricas solicitada.`;
 
     return { systemPrompt, userMsg };
 }
@@ -219,7 +224,7 @@ async function researchWithRAG(name, type, context, lat, lon) {
             { role: 'user', content: `Datos web verificados sobre "${name}" (${context || 'México'}):\n\n${webContext}\n\nRedacta el artículo educativo basándote SOLO en estos datos.` }
         ],
         temperature: 0.25,
-        max_tokens: 800
+        max_tokens: 2500
     });
 
     let groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {

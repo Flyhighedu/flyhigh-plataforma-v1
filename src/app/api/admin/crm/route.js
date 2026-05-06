@@ -26,6 +26,8 @@ export async function GET(request) {
         tipo,
         ninos,
         estado_pipeline,
+        nivel_educativo,
+        codigo_postal,
         crm_escuelas_detalles (
           notas,
           reminder_at,
@@ -74,6 +76,8 @@ export async function GET(request) {
       tipo: school.tipo,
       ninos: school.ninos,
       estado_pipeline: school.estado_pipeline || 'sin_contacto',
+      nivel_educativo: school.nivel_educativo || '',
+      codigo_postal: school.codigo_postal || '',
       notas: school.crm_escuelas_detalles?.notas || '',
       reminder_at: school.crm_escuelas_detalles?.reminder_at || null,
       reminder_note: school.crm_escuelas_detalles?.reminder_note || '',
@@ -102,6 +106,15 @@ export async function PATCH(request) {
 
     // 1. Update estado_pipeline in catalogo_escuelas (if provided)
     if (estado_pipeline !== undefined) {
+      // Get current state BEFORE update for logging
+      const { data: currentSchool } = await supabase
+        .from('catalogo_escuelas')
+        .select('nombre_escuela, estado_pipeline')
+        .eq('cct', cct)
+        .single();
+
+      const previousState = currentSchool?.estado_pipeline || 'sin_contacto';
+
       const { error: catError } = await supabase
         .from('catalogo_escuelas')
         .update({ estado_pipeline })
@@ -110,6 +123,21 @@ export async function PATCH(request) {
       if (catError) {
         console.error("[CRM PATCH] Error updating catalogo_escuelas:", catError);
         return NextResponse.json({ error: catError.message }, { status: 500 });
+      }
+
+      // Log pipeline change for realtime notifications
+      if (previousState !== estado_pipeline) {
+        try {
+          await supabase.from('crm_pipeline_log').insert({
+            cct,
+            nombre_escuela: currentSchool?.nombre_escuela || cct,
+            estado_anterior: previousState,
+            estado_nuevo: estado_pipeline,
+            cambiado_por: body.cambiado_por || 'Admin'
+          });
+        } catch (logErr) {
+          console.warn('[CRM PATCH] Pipeline log insert failed (table may not exist yet):', logErr);
+        }
       }
     }
 

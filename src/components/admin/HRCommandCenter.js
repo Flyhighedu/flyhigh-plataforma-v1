@@ -36,7 +36,7 @@ const STATUS_CFG = {
     expiring_soon: { label: 'Por Vencer', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', icon: AlertTriangle },
 };
 
-export default function HRCommandCenter() {
+export default function HRCommandCenter({ externalView }) {
     const [loading, setLoading] = useState(true);
     const [staffList, setStaffList] = useState([]);
     const [hrDocs, setHrDocs] = useState([]);
@@ -49,6 +49,14 @@ export default function HRCommandCenter() {
     const [activeView, setActiveView] = useState('directory'); // directory | attendance | academia
     const [validatingDoc, setValidatingDoc] = useState(null);
     const [animatingDoc, setAnimatingDoc] = useState(null); // Para micro-interacciones de éxito
+
+    // Sync external view from sidebar sub-tab navigation
+    useEffect(() => {
+        if (!externalView) return;
+        const viewMap = { directorio: 'directory', asistencia: 'attendance', academia: 'academia' };
+        const mapped = viewMap[externalView] || externalView;
+        setActiveView(mapped);
+    }, [externalView]);
 
     // ── FETCH ALL DATA ──
     const fetchAll = useCallback(async () => {
@@ -320,6 +328,8 @@ export default function HRCommandCenter() {
             </header>
 
             {/* ── NAVIGATION SLIDER PILL (PERFECT NEUMORPHIC TOGGLE) ── */}
+            {/* Hidden when sidebar sub-tabs control navigation */}
+            {!externalView && (
             <div className="flex justify-center md:justify-start mb-8">
                 <div className="relative bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-[20px] inline-flex backdrop-blur-xl shadow-[inset_4px_4px_10px_#d1d5db,inset_-4px_-4px_10px_#ffffff] dark:shadow-[inset_2px_2px_8px_rgba(0,0,0,0.5)] border border-white/60 dark:border-slate-700/50">
                     
@@ -364,6 +374,7 @@ export default function HRCommandCenter() {
                     </button>
                 </div>
             </div>
+            )}
 
             {/* ── MAIN DIRECTORY VIEW ── */}
             {activeView === 'directory' && (

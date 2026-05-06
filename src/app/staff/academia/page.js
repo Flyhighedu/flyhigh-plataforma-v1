@@ -12,6 +12,7 @@ import {
 import { motion, useAnimation, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import POIDetailModal from '@/components/staff/POIDetailModal';
 import PilotDashboardHeader from '@/components/staff/PilotDashboardHeader';
+import FlightPathView from '@/components/staff/FlightPathView';
 
 // ═══════════════════════════════════════════════════════════════
 // autoCategory — reutilizada de POIDetailModal.js
@@ -91,8 +92,9 @@ export default function AcademiaLobbyPage() {
         setShowTutorial(true);
     };
 
-    // Gamification (static for now)
-    const studyReadyCount = pois.filter(p => p.dato_clave_1).length;
+    // Gamification
+    const fichasWithData = pois.filter(p => p.dato_clave_1).length;
+    const studyReadyCount = pois.length; // Total fichas in collection
     const totalPoints = pois.length;
     const nextLevelTarget = Math.max(totalPoints + 3, 5);
     const progressPercent = Math.min((totalPoints / nextLevelTarget) * 100, 100);
@@ -118,12 +120,27 @@ export default function AcademiaLobbyPage() {
                     setUserAvatarConfig(profile?.avatar_config || null);
                 }
 
-                const { data, error } = await supabase
+                const { data: personalPois, error: personalError } = await supabase
                     .from('pilot_pois')
                     .select('*')
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
-                if (error) throw error;
+                if (personalError) throw personalError;
+
+                // Fetch official POIs via server-side API (bypasses RLS)
+                let officialPois = [];
+                try {
+                    const officialRes = await fetch('/api/official-pois');
+                    if (officialRes.ok) {
+                        const officialData = await officialRes.json();
+                        officialPois = officialData.pois || [];
+                    }
+                } catch (e) { console.warn('Could not fetch official POIs:', e); }
+
+                const mergedPois = [
+                    ...officialPois,
+                    ...(personalPois || [])
+                ];
 
                 // Fetch published training modules and their approved cards
                 const { data: modulesData } = await supabase
@@ -133,7 +150,7 @@ export default function AcademiaLobbyPage() {
                     .order('created_at', { ascending: false });
 
                 if (isMounted) {
-                    setPois(data || []);
+                    setPois(mergedPois);
                     setTrainingModules(modulesData || []);
                 }
             } catch (err) {
@@ -579,29 +596,32 @@ export default function AcademiaLobbyPage() {
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-4 pt-5 pb-12">
 
+                {/* ═══ RUTA MAESTRA: Camino de Vuelo ═══ */}
+                <FlightPathView userId={userId} />
+
                 {/* ═══ CTA: EMPEZAR A ESTUDIAR (El "Play" del Juego) ═══ */}
                 <button
                     onClick={startStudy}
-                    disabled={studyReadyCount === 0}
+                    disabled={fichasWithData === 0}
                     className={`w-full rounded-[32px] py-6 px-6 flex flex-col items-center justify-center gap-2 transition-all mb-4 relative overflow-hidden group ${
-                        studyReadyCount > 0
+                        fichasWithData > 0
                             ? 'bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white shadow-[0_12px_40px_rgba(124,58,237,0.3)] hover:-translate-y-1 hover:shadow-[0_16px_50px_rgba(124,58,237,0.4)] active:scale-[0.98]'
                             : 'bg-white text-slate-400 cursor-not-allowed border-2 border-slate-100 shadow-[0_4px_15px_rgba(0,0,0,0.02)]'
                     }`}
                 >
-                    {studyReadyCount > 0 && (
+                    {fichasWithData > 0 && (
                         <>
                             <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
                         </>
                     )}
                     <div className="relative z-10 flex items-center justify-center gap-3">
-                        <BookOpen size={28} className={studyReadyCount > 0 ? "drop-shadow-lg" : ""} strokeWidth={2.5} />
-                        <span className="font-black text-[20px] tracking-tight">{studyReadyCount > 0 ? 'REPASAR FICHAS' : 'SIN FICHAS'}</span>
+                        <BookOpen size={28} className={fichasWithData > 0 ? "drop-shadow-lg" : ""} strokeWidth={2.5} />
+                        <span className="font-black text-[20px] tracking-tight">{fichasWithData > 0 ? 'REPASAR FICHAS' : 'SIN FICHAS'}</span>
                     </div>
-                    {studyReadyCount > 0 ? (
+                    {fichasWithData > 0 ? (
                         <span className="relative z-10 text-[11px] font-bold text-white/90 bg-black/20 px-4 py-1.5 rounded-full uppercase tracking-widest backdrop-blur-md shadow-sm border border-white/10">
-                            Tienes {studyReadyCount} pendiente{studyReadyCount !== 1 && 's'}
+                            Tienes {fichasWithData} pendiente{fichasWithData !== 1 && 's'}
                         </span>
                     ) : (
                         <span className="relative z-10 text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-4 py-1.5 rounded-full">
@@ -688,11 +708,17 @@ export default function AcademiaLobbyPage() {
                                             )}
                                         </div>
                                         
-                                        {/* Bottom Content Area */}
                                         <div className="flex-1 p-4 flex flex-col bg-white relative z-10 border-t border-slate-100/50">
-                                            <p className="text-[9px] font-bold uppercase tracking-widest mb-1 truncate" style={{ color: cat.color }}>
-                                                {cat.label}
-                                            </p>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className="text-[9px] font-bold uppercase tracking-widest truncate" style={{ color: cat.color }}>
+                                                    {cat.label}
+                                                </p>
+                                                {poi.is_official && (
+                                                    <span className="bg-blue-500 text-white text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm">
+                                                        Oficial
+                                                    </span>
+                                                )}
+                                            </div>
                                             <h3 className="font-black text-slate-800 text-[14px] leading-tight mb-3 line-clamp-2">
                                                 {poi.name}
                                             </h3>

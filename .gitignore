@@ -46,3 +46,8 @@ next-env.d.ts
 # Serwist
 public/sw*
 public/swe-worker*
+
+# Temporary scripts (may contain secrets)
+_migrate.js
+tmp-*.js
+tmp-*.json

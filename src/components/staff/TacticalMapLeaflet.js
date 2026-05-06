@@ -103,6 +103,13 @@ export default function TacticalMapLeaflet({
             attributionControl: false
         });
 
+        // ═══ RESIZE OBSERVER ═══
+        // Fixes broken grey tiles when the flex layout shifts width/height
+        const resizeObserver = new ResizeObserver(() => {
+            if (map) map.invalidateSize();
+        });
+        resizeObserver.observe(containerRef.current);
+
         L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 19, subdomains: 'abc' }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
@@ -162,6 +169,7 @@ export default function TacticalMapLeaflet({
         setTimeout(() => onBoundsChange?.(map.getBounds()), 100);
 
         return () => {
+            resizeObserver.disconnect();
             map.remove();
             mapRef.current = null;
         };
@@ -175,9 +183,10 @@ export default function TacticalMapLeaflet({
 
         if (userMarkerRef.current) {
             userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+            map.flyTo([userLocation.lat, userLocation.lng], map.getZoom(), { animate: true, duration: 0.5 });
         } else {
             userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, interactive: false }).addTo(map);
-            map.setView([userLocation.lat, userLocation.lng], 14);
+            map.flyTo([userLocation.lat, userLocation.lng], 14, { animate: true, duration: 0.5 });
         }
     }, [userLocation]);
 

@@ -85,8 +85,23 @@ export default function TacticalMapScreen({ userId, profile }) {
         const load = async () => {
             try {
                 const supabase = createClient();
-                const { data } = await supabase.from('pilot_pois').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-                setPois(data || []);
+                const { data: personalPois } = await supabase.from('pilot_pois').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+                
+                // Fetch official POIs via server-side API (bypasses RLS)
+                let officialPois = [];
+                try {
+                    const officialRes = await fetch('/api/official-pois');
+                    if (officialRes.ok) {
+                        const officialData = await officialRes.json();
+                        officialPois = officialData.pois || [];
+                    }
+                } catch (e) { console.warn('Could not fetch official POIs:', e); }
+                
+                const mergedPois = [
+                    ...officialPois,
+                    ...(personalPois || [])
+                ];
+                setPois(mergedPois);
             } catch (err) { console.warn('POI load error:', err); }
             finally { setLoading(false); }
         };
