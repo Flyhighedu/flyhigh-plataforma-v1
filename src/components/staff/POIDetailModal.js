@@ -53,7 +53,8 @@ const PLAYFUL_COLORS = [
 
 export default function POIDetailModal({
     isOpen, onClose, onSave, onDelete,
-    poi, isNewPin = false, geoContext = ''
+    poi, isNewPin = false, geoContext = '',
+    readOnly = false
 }) {
     // Form state
     const [title, setTitle] = useState('');
@@ -1309,7 +1310,8 @@ export default function POIDetailModal({
                     borderTop: '1px solid #E2E8F0',
                     display: 'flex', gap: 12, flexShrink: 0
                 }}>
-                    {poi?.id && onDelete && (
+                    {/* Delete button — hidden in readOnly mode */}
+                    {poi?.id && onDelete && !readOnly && (
                         <button onClick={() => onDelete(poi.id)} disabled={isSaving} style={{
                             width: 52, height: 52, borderRadius: 8,
                             border: '1px solid #FECACA', background: '#FEF2F2',
@@ -1320,26 +1322,44 @@ export default function POIDetailModal({
                             <Trash2 size={20} />
                         </button>
                     )}
-                    <button
-                        onClick={handleSave}
-                        disabled={!isValid || isSaving}
-                        style={{
-                            flex: 1, padding: '16px 0', borderRadius: 8,
-                            border: 'none',
-                            background: isValid ? '#2563EB' : '#E2E8F0',
-                            color: isValid ? '#FFFFFF' : '#94A3B8',
-                            fontSize: 16, fontWeight: 600,
-                            cursor: isValid ? 'pointer' : 'not-allowed',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                            transition: 'all 0.2s ease'
-                        }}
-                    >
-                        {isSaving ? (
-                            <><Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</>
-                        ) : (
-                            <>Guardar Punto</>
-                        )}
-                    </button>
+                    {readOnly ? (
+                        <button
+                            onClick={onClose}
+                            style={{
+                                flex: 1, padding: '16px 0', borderRadius: 8,
+                                border: 'none',
+                                background: '#1E293B',
+                                color: '#FFFFFF',
+                                fontSize: 16, fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            Cerrar
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSave}
+                            disabled={!isValid || isSaving}
+                            style={{
+                                flex: 1, padding: '16px 0', borderRadius: 8,
+                                border: 'none',
+                                background: isValid ? '#2563EB' : '#E2E8F0',
+                                color: isValid ? '#FFFFFF' : '#94A3B8',
+                                fontSize: 16, fontWeight: 600,
+                                cursor: isValid ? 'pointer' : 'not-allowed',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            {isSaving ? (
+                                <><Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</>
+                            ) : (
+                                <>Guardar Punto</>
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
 

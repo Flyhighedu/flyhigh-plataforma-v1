@@ -29,8 +29,8 @@ export default function MapeoTacticoPage() {
 
                 if (cancelled) return;
 
-                // Role guard: only pilots
-                if (prof?.role !== 'pilot') {
+                // Role guard: all operational staff
+                if (!['pilot', 'teacher', 'assistant'].includes(prof?.role)) {
                     setUnauthorized(true);
                     setLoading(false);
                     return;

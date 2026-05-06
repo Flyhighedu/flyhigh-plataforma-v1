@@ -2135,8 +2135,8 @@ export default function StaffDashboard() {
 
 
 
-                    {/* Tarjeta 2: Academia / Bitácora POI */}
-                    {profile?.role === 'pilot' && (
+                    {/* Tarjeta 2: Academia / Bitácora POI — Todos los roles */}
+                    {['pilot', 'teacher', 'assistant'].includes(profile?.role) && (
                         <div className="mt-8">
                             <h2 className="text-lg font-extrabold text-slate-800 mb-3 px-1">Herramientas</h2>
                             <div 
@@ -2155,7 +2155,7 @@ export default function StaffDashboard() {
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="text-lg font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-0.5">Academia</h3>
-                                        <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Explora el radar táctico y estudia tus objetivos.</p>
+                                        <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Estudia puntos de interés y repasa tus fichas.</p>
                                     </div>
                                     <div className="w-8 h-8 rounded-full bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition-colors shrink-0">
                                         <ChevronLeft className="w-4 h-4 rotate-180 text-indigo-500" strokeWidth={3} />

@@ -12,7 +12,6 @@ import {
 import { motion, useAnimation, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import POIDetailModal from '@/components/staff/POIDetailModal';
 import PilotDashboardHeader from '@/components/staff/PilotDashboardHeader';
-import FlightPathView from '@/components/staff/FlightPathView';
 
 // ═══════════════════════════════════════════════════════════════
 // autoCategory — reutilizada de POIDetailModal.js
@@ -58,8 +57,11 @@ export default function AcademiaLobbyPage() {
     const [loading, setLoading] = useState(true);
     const [pois, setPois] = useState([]);
     const [userId, setUserId] = useState(null);
-    const [userName, setUserName] = useState('Piloto');
+    const [userName, setUserName] = useState('Operativo');
     const [userAvatarConfig, setUserAvatarConfig] = useState(null);
+    const [userRole, setUserRole] = useState('pilot');
+
+    const ROLE_LABELS = { pilot: 'Piloto', teacher: 'Docente', assistant: 'Auxiliar' };
 
     // Capacitación FlyHigh
     const [trainingModules, setTrainingModules] = useState([]);
@@ -107,27 +109,33 @@ export default function AcademiaLobbyPage() {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) { router.replace('/staff/login'); return; }
                 
-                // Fetch profile data (avatar lives in staff_profiles, NOT profiles)
+                // Fetch profile data (avatar + role live in staff_profiles)
                 const { data: profile } = await supabase
                     .from('staff_profiles')
-                    .select('full_name, avatar_config')
+                    .select('full_name, avatar_config, role')
                     .eq('user_id', user.id)
                     .single();
 
+                const detectedRole = profile?.role || 'pilot';
+
                 if (isMounted) {
                     setUserId(user.id);
-                    setUserName(profile?.full_name || user.user_metadata?.full_name || 'Piloto');
+                    setUserRole(detectedRole);
+                    setUserName(profile?.full_name || user.user_metadata?.full_name || ROLE_LABELS[detectedRole] || 'Operativo');
                     setUserAvatarConfig(profile?.avatar_config || null);
                 }
 
-                const { data: personalPois, error: personalError } = await supabase
+                // Todos los roles pueden tener POIs personales — RLS garantiza aislamiento por user_id
+                let personalPois = [];
+                const { data, error: personalError } = await supabase
                     .from('pilot_pois')
                     .select('*')
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
                 if (personalError) throw personalError;
+                personalPois = data || [];
 
-                // Fetch official POIs via server-side API (bypasses RLS)
+                // Fetch official POIs via server-side API (bypasses RLS) — para TODOS los roles
                 let officialPois = [];
                 try {
                     const officialRes = await fetch('/api/official-pois');
@@ -139,7 +147,7 @@ export default function AcademiaLobbyPage() {
 
                 const mergedPois = [
                     ...officialPois,
-                    ...(personalPois || [])
+                    ...personalPois
                 ];
 
                 // Fetch published training modules and their approved cards
@@ -596,10 +604,7 @@ export default function AcademiaLobbyPage() {
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-4 pt-5 pb-12">
 
-                {/* ═══ RUTA MAESTRA: Camino de Vuelo ═══ */}
-                <FlightPathView userId={userId} />
-
-                {/* ═══ CTA: EMPEZAR A ESTUDIAR (El "Play" del Juego) ═══ */}
+                {/* CTA: EMPEZAR A ESTUDIAR (El "Play" del Juego) */}
                 <button
                     onClick={startStudy}
                     disabled={fichasWithData === 0}
@@ -630,7 +635,7 @@ export default function AcademiaLobbyPage() {
                     )}
                 </button>
 
-                {/* ═══ CTA: EXPLORAR MAPA (Añadir Puntos) ═══ */}
+                {/* ═══ CTA: EXPLORAR MAPA (Todos los roles) ═══ */}
                 <button
                     onClick={() => router.push('/staff/mapeo')}
                     className={`w-full rounded-[32px] py-6 px-6 flex flex-col items-center justify-center gap-2 transition-all mb-8 relative overflow-hidden group bg-gradient-to-br from-slate-800 to-slate-950 text-white shadow-[0_12px_40px_rgba(0,0,0,0.25)] hover:-translate-y-1 hover:shadow-[0_16px_50px_rgba(0,0,0,0.35)] active:scale-[0.98] border border-slate-700/50`}
@@ -830,7 +835,13 @@ export default function AcademiaLobbyPage() {
                 onClose={() => setIsPoiModalOpen(false)}
                 poi={selectedPoi}
                 isNewPin={false}
+                readOnly={!!selectedPoi?.is_official}
                 onSave={async (poiData) => {
+                    // Bloquear guardado solo para POIs oficiales
+                    if (poiData.is_official) {
+                        setIsPoiModalOpen(false);
+                        return;
+                    }
                     try {
                         const supabase = createClient();
                         const { error } = await supabase

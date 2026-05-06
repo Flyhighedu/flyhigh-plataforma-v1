@@ -197,7 +197,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                         return (
                             <div 
                                 key={tab.id} 
-                                className="flex flex-col md:rounded-2xl transition-all duration-500 overflow-visible md:overflow-hidden h-full md:h-auto justify-center md:justify-start shrink-0 md:shrink"
+                                className="flex flex-col md:rounded-2xl transition-all duration-500 overflow-visible md:overflow-hidden h-full md:h-auto justify-center md:justify-start shrink-0"
                                 style={{
                                     backgroundColor: isPrimaryActive ? (typeof window !== 'undefined' && window.innerWidth >= 768 ? sidebarBg : 'rgba(255,255,255,0.1)') : 'transparent',
                                     boxShadow: isPrimaryActive && typeof window !== 'undefined' && window.innerWidth >= 768 ? sideInner : 'none',
@@ -262,7 +262,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                                 
                                 {/* Sub Menú Desplegable (Adentro del contenedor hundido) - Solo Desktop o Modal en Móvil (simplificado a hidden en móvil por ahora) */}
                                 {tab.subTabs && (
-                                    <div className={`hidden md:block w-full overflow-hidden transition-all duration-[400ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] ${isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+                                    <div className={`hidden md:block w-full overflow-hidden transition-all duration-[400ms] ease-[cubic-bezier(0.34,1.2,0.64,1)] ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
                                         <div className="flex flex-col gap-1 pl-4 pr-3 pb-3">
                                             {tab.subTabs.map(sub => {
                                                 const isSubActive = activeTab === sub.id;
