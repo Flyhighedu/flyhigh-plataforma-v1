@@ -166,9 +166,18 @@ export default function TacticalMapLeaflet({
         });
 
         mapRef.current = map;
-        setTimeout(() => onBoundsChange?.(map.getBounds()), 100);
+        const initialBoundsTimeout = setTimeout(() => {
+            if (mapRef.current) {
+                try {
+                    onBoundsChange?.(map.getBounds());
+                } catch (e) {
+                    console.warn('Map not fully initialized for getBounds:', e);
+                }
+            }
+        }, 100);
 
         return () => {
+            clearTimeout(initialBoundsTimeout);
             resizeObserver.disconnect();
             map.remove();
             mapRef.current = null;
