@@ -87,6 +87,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
         { id: 'cronograma', label: 'Cronograma', icon: <Calendar size={18} />, color: '#34d399' }, // Emerald
         { id: 'imprimibles', label: 'Imprimibles', icon: <Printer size={18} />, color: '#f97316' }, // Orange
         { id: 'operativos', label: 'FlyHigh Ops', icon: <Users size={18} />, color: '#2563eb' }, // Blue
+        { id: 'hr-rutas', label: 'Puntos Oficiales', icon: <Map size={18} />, color: '#f59e0b' }, // Amber
         { 
             id: 'hr', 
             label: 'Recursos Humanos', 
@@ -96,7 +97,6 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
                 { id: 'hr-directorio', label: 'Directorio', icon: <Users size={18} /> },
                 { id: 'hr-asistencia', label: 'Asistencia', icon: <Calendar size={18} /> },
                 { id: 'hr-academia', label: 'Academia', icon: <GraduationCap size={18} /> },
-                { id: 'hr-rutas', label: 'Puntos Oficiales', icon: <Map size={18} /> },
             ]
         },
         { 
