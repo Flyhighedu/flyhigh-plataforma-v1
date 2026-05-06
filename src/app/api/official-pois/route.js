@@ -18,11 +18,12 @@ export async function GET() {
 
         // Get ONLY the "Directorio Global" route — single source of truth
         // This matches the same route the admin panel (MasterRouteStudio) uses
+        // Note: No status filter — the global route may have been created as 'draft'
+        // before the auto-publish logic existed. There's only one global route.
         const { data: routes, error: routeError } = await supabase
             .from('master_routes')
             .select('id, title')
-            .eq('title', 'Directorio Global')
-            .eq('status', 'published');
+            .eq('title', 'Directorio Global');
 
         if (routeError) throw routeError;
 
@@ -32,7 +33,7 @@ export async function GET() {
 
         const routeIds = routes.map(r => r.id);
 
-        // Get all POIs from published routes
+        // Get all POIs from the global route
         const { data: pois, error: poiError } = await supabase
             .from('master_route_pois')
             .select('*')
@@ -42,6 +43,9 @@ export async function GET() {
         if (poiError) throw poiError;
 
         // Mark all as official, normalize column names to match pilot_pois schema
+        // NOTE: Do NOT filter by coordinates here — POIs without coords are still
+        // valid in the Academia (flashcard study). The map component (TacticalMapLeaflet)
+        // already has a null-guard that skips markers with null coords.
         const routeMap = Object.fromEntries(routes.map(r => [r.id, r.title]));
         const enrichedPois = (pois || []).map(p => ({
             ...p,
@@ -50,6 +54,14 @@ export async function GET() {
             // Normalize lat/lng → latitude/longitude (pilot_pois uses latitude/longitude)
             latitude: p.lat ?? p.latitude ?? null,
             longitude: p.lng ?? p.longitude ?? null,
+            // Ensure ficha fields are passed to the PWA
+            dato_clave_1: p.dato_clave_1 || null,
+            dato_clave_2: p.dato_clave_2 || null,
+            dato_clave_3: p.dato_clave_3 || null,
+            pregunta_estudio_1: p.pregunta_estudio_1 || null,
+            pregunta_estudio_2: p.pregunta_estudio_2 || null,
+            pregunta_estudio_3: p.pregunta_estudio_3 || null,
+            pregunta_interaccion: p.pregunta_interaccion || null,
         }));
 
         return NextResponse.json({ pois: enrichedPois });

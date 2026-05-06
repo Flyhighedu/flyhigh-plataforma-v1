@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/retry-audio-audits",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

@@ -53,6 +53,7 @@ export default function MasterRouteStudio() {
     const [searchQuery, setSearchQuery] = useState('');
     const [creating, setCreating] = useState(false);
     const [expandedContext, setExpandedContext] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     // ═══ MAP STATE ═══
     const [mapBounds, setMapBounds] = useState(null);
@@ -382,7 +383,7 @@ export default function MasterRouteStudio() {
                         {/* ═══ INTERACTIVE MAP ═══ */}
                         <div className="neu-card overflow-hidden mb-4" style={{ height: 'calc(100vh - 140px)', minHeight: 500, position: 'relative' }}>
                             <MapWithNoSSR
-                                pois={pois.filter(p => p.latitude && p.longitude)}
+                                pois={pois.filter(p => (p.latitude || p.lat) && (p.longitude || p.lng)).map(p => ({ ...p, latitude: p.latitude || p.lat, longitude: p.longitude || p.lng, is_official: true }))}
                                 suggestedPois={suggestedPois}
                                 userLocation={userLocation || { lat: 19.4326, lng: -99.1332 }}
                                 onMarkerClick={handleMarkerClick}
@@ -391,12 +392,7 @@ export default function MasterRouteStudio() {
                                 onLongPress={handleLongPress}
                             />
 
-                            {/* Reverse Geocoding Toast */}
-                            {isReverseGeocoding && (
-                                <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '8px 16px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12, fontWeight: 700, color: '#334155' }}>
-                                    <Loader2 size={14} className="animate-spin" style={{ color: '#06B6D4' }} /> Identificando ubicación...
-                                </div>
-                            )}
+                            {/* Reverse geocoding toast moved to sidebar */}
 
                             {/* Floating Controls FABs */}
                             <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -463,6 +459,8 @@ export default function MasterRouteStudio() {
                                         finally { setSaving(false); }
                                     }
                                     setEditingPoi(null);
+                                    setSaveSuccess(true);
+                                    setTimeout(() => setSaveSuccess(false), 3000);
                                 }}
                                 onDelete={(id) => {
                                     deletePoi(id);
@@ -471,6 +469,17 @@ export default function MasterRouteStudio() {
                                 isNewPin={!editingPoi.dato_clave_1}
                                 geoContext={activeRoute.name}
                             />
+                        ) : isReverseGeocoding ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative overflow-hidden animate-in fade-in duration-300">
+                                <div className="absolute top-0 inset-x-0 h-1 bg-cyan-500 animate-pulse" />
+                                <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center mb-6 shadow-xl" style={{ background: 'linear-gradient(135deg, #06B6D4, #0891B2)', border: '4px solid #CFFAFE', color: 'white' }}>
+                                    <Loader2 size={40} className="animate-spin" />
+                                </div>
+                                <h4 className="font-black text-2xl mb-3 text-slate-800">Identificando ubicación...</h4>
+                                <p className="text-base font-medium text-slate-500 max-w-[280px] mx-auto leading-relaxed">
+                                    Analizando las coordenadas en el mapa para encontrar el nombre del lugar seleccionado.
+                                </p>
+                            </div>
                         ) : isAwaitingSelection ? (
                             isSearchingPois ? (
                                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative overflow-hidden">
@@ -501,8 +510,19 @@ export default function MasterRouteStudio() {
                                     </button>
                                 </div>
                             )
+                        ) : saveSuccess ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative overflow-hidden animate-in fade-in duration-500">
+                                <div className="absolute top-0 inset-x-0 h-1 bg-green-500 animate-pulse" />
+                                <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center mb-6 shadow-xl animate-bounce" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', border: '4px solid #D1FAE5', fontSize: '40px' }}>
+                                    ✅
+                                </div>
+                                <h4 className="font-black text-2xl mb-3 text-slate-800">Punto Oficial Guardado</h4>
+                                <p className="text-base font-medium text-slate-500 max-w-[280px] mx-auto leading-relaxed">
+                                    El punto ha sido registrado exitosamente y sincronizado en el mapa.
+                                </p>
+                            </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 animate-in fade-in duration-300">
                                 <div className="text-6xl mb-4">✨🗺️</div>
                                 <h4 className="font-black text-xl mb-2 text-slate-800">Crea un Punto Oficial</h4>
                                 <p className="text-sm font-medium text-slate-500 max-w-[250px] mx-auto leading-relaxed">

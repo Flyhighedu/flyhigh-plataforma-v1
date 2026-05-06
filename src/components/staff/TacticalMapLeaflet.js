@@ -53,10 +53,32 @@ function makeSuggestedIcon(name, category) {
     });
 }
 
-function makeIcon(category, name) {
+function makeIcon(poi, showLabels) {
+    const isOfficial = poi.is_official;
+    const category = poi.category || 'general';
+    const name = showLabels ? poi.name : null;
+    const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
+
+    if (isOfficial) {
+        return L.divIcon({
+            className: 'poi-marker-container',
+            html: `<div style="
+                width:40px;height:40px;border-radius:50%;
+                background:linear-gradient(135deg, #2563EB, #1D4ED8);border:3px solid #DBEAFE;
+                display:flex;align-items:center;justify-content:center;
+                font-size:22px;color:white;font-weight:900;
+                box-shadow:0 4px 12px rgba(37,99,235,0.4);
+                cursor:pointer;
+                z-index: 3000;
+            ">✓</div>
+            ${shortName ? `<div class="poi-marker-label" style="font-size:12px;padding:4px 8px;background:#1E3A8A;border-color:#3B82F6;color:white;font-weight:bold;">${shortName}</div>` : ''}`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+    }
+
     const color = CAT_COLORS[category] || CAT_COLORS.general;
     const emoji = CAT_EMOJI[category] || CAT_EMOJI.general;
-    const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
     return L.divIcon({
         className: 'poi-marker-container',
         html: `<div style="
@@ -151,6 +173,9 @@ export default function TacticalMapLeaflet({
         map.on('touchmove', (e) => { endPress(); }); // Always cancel on touch move (dragging)
         map.on('mouseup', endPress);
         map.on('touchend', endPress);
+        map.on('contextmenu', (e) => {
+            onLongPress?.(e.latlng.lat, e.latlng.lng);
+        });
 
         map.on('moveend', () => {
             onBoundsChange?.(map.getBounds());
@@ -207,9 +232,10 @@ export default function TacticalMapLeaflet({
         markersRef.current.forEach(m => map.removeLayer(m));
         markersRef.current = [];
 
-        pois.forEach(poi => {
+        pois.filter(p => p.latitude != null && p.longitude != null).forEach(poi => {
             const marker = L.marker([poi.latitude, poi.longitude], {
-                icon: makeIcon(poi.category, showLabels ? poi.name : null)
+                icon: makeIcon(poi, showLabels),
+                zIndexOffset: poi.is_official ? 3000 : 0
             }).addTo(map);
 
             marker.on('click', () => {

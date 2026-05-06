@@ -23,6 +23,8 @@ const AUDIO_MIME = 'audio/webm;codecs=opus';
 const TARGET_BITRATE = 16000; // 16 kbps — ~480KB per 4 minutes
 const TIMESLICE_MS = 5000; // Collect data every 5s for crash resilience
 
+import fixWebmDuration from 'fix-webm-duration';
+
 /**
  * @returns {{
  *   isSupported: boolean,
@@ -46,6 +48,7 @@ export default function useAudioRecorder() {
     const chunksRef = useRef([]);
     const timerRef = useRef(null);
     const resolveStopRef = useRef(null);
+    const durationRef = useRef(0);
 
     // Feature detection
     const isSupported = typeof window !== 'undefined' &&
@@ -113,10 +116,18 @@ export default function useAudioRecorder() {
 
             recorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: AUDIO_MIME });
-                // Resolve the stop promise
-                if (resolveStopRef.current) {
-                    resolveStopRef.current(blob);
-                    resolveStopRef.current = null;
+                if (durationRef.current > 0) {
+                    fixWebmDuration(blob, durationRef.current * 1000, (fixedBlob) => {
+                        if (resolveStopRef.current) {
+                            resolveStopRef.current(fixedBlob);
+                            resolveStopRef.current = null;
+                        }
+                    });
+                } else {
+                    if (resolveStopRef.current) {
+                        resolveStopRef.current(blob);
+                        resolveStopRef.current = null;
+                    }
                 }
             };
 
@@ -132,10 +143,12 @@ export default function useAudioRecorder() {
             setIsRecording(true);
             setIsPaused(false);
             setDurationSeconds(0);
+            durationRef.current = 0;
 
             // Duration timer
             timerRef.current = setInterval(() => {
-                setDurationSeconds(prev => prev + 1);
+                durationRef.current += 1;
+                setDurationSeconds(durationRef.current);
             }, 1000);
 
             return true;

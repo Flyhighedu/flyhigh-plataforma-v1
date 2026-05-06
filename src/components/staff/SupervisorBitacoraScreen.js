@@ -18,6 +18,7 @@ import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import useAudioRecorder from '@/hooks/useAudioRecorder';
 import IdentityScanner from '@/components/staff/IdentityScanner';
 import SquadronCalculator from '@/components/staff/SquadronCalculator';
+import { triggerAudioAudit } from '@/utils/triggerAudioAudit';
 import { Rocket, Send, ChevronRight, CheckCircle2, Mic, Zap, AlertTriangle, Radio } from 'lucide-react';
 
 export default function SupervisorBitacoraScreen({
@@ -51,6 +52,10 @@ export default function SupervisorBitacoraScreen({
     const timerRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedUrl, setUploadedUrl] = useState(null);
+
+    // AI Quality Monitoring — feedback toast state
+    const [qaFeedback, setQaFeedback] = useState(null);
+    const qaFeedbackTimerRef = useRef(null);
 
     // Audio recording (mission telemetry)
     const {
@@ -202,7 +207,39 @@ export default function SupervisorBitacoraScreen({
 
             const res = await fetch('/api/staff/upload-telemetry', { method: 'POST', body: formData });
             const data = await res.json();
-            if (data.ok && data.url) setUploadedUrl(data.url);
+            if (data.ok && data.url) {
+                setUploadedUrl(data.url);
+
+                const currentFlightNumber = bitacoraHistory.length + 1;
+
+                // 🧠 AI Quality Audit — fire-and-forget (never blocks ISA)
+                triggerAudioAudit({
+                    audioUrl: data.url,
+                    journeyId,
+                    flightNumber: currentFlightNumber,
+                    source: 'bitacora',
+                    userId,
+                    durationSeconds: recDuration,
+                    onFeedback: ({ score, feedback, strikes }) => {
+                        setQaFeedback({ score, feedback, strikes });
+                        
+                        // Save results to local history for averages
+                        setBitacoraHistory(prev => {
+                            const updated = prev.map(entry => {
+                                if (entry.flightNumber === currentFlightNumber) {
+                                    return { ...entry, score, strikes };
+                                }
+                                return entry;
+                            });
+                            try {
+                                const localKey = `flyhigh_escuadron_bitacora_${journeyId || 'local'}`;
+                                localStorage.setItem(localKey, JSON.stringify(updated));
+                            } catch {}
+                            return updated;
+                        });
+                    }
+                });
+            }
         } catch (err) {
             console.warn('⚠️ Telemetry upload error:', err);
         } finally {
@@ -478,6 +515,46 @@ export default function SupervisorBitacoraScreen({
                                 Inicia Timer · Activa Audio · Crea Plan
                             </span>
                         </button>
+
+                        {/* AI Stats Summary */}
+                        {(() => {
+                            const entriesWithScore = bitacoraHistory.filter(e => e.score !== undefined);
+                            if (entriesWithScore.length === 0) return null;
+                            const avgScore = Math.round(entriesWithScore.reduce((sum, e) => sum + e.score, 0) / entriesWithScore.length);
+                            const allStrikes = entriesWithScore.flatMap(e => e.strikes || []);
+                            
+                            return (
+                                <div style={{ 
+                                    background: 'linear-gradient(135deg, #1E293B, #0F172A)', 
+                                    borderRadius: 24, padding: 20, marginTop: 32,
+                                    border: '1px solid rgba(255,255,255,0.05)',
+                                    display: 'flex', gap: 20, alignItems: 'center',
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+                                }}>
+                                    <div style={{
+                                        width: 64, height: 64, borderRadius: '50%',
+                                        background: avgScore >= 80 ? 'rgba(16, 185, 129, 0.1)' : avgScore >= 60 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                        border: `2px solid ${avgScore >= 80 ? '#10B981' : avgScore >= 60 ? '#FBBF24' : '#F87171'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <span style={{ fontSize: 24, fontWeight: 900, color: avgScore >= 80 ? '#10B981' : avgScore >= 60 ? '#FBBF24' : '#F87171' }}>
+                                            {avgScore}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: 13, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 4px' }}>
+                                            Score Promedio
+                                        </p>
+                                        <p style={{ fontSize: 14, color: '#E2E8F0', margin: 0, lineHeight: 1.4 }}>
+                                            {allStrikes.length === 0 
+                                                ? '¡Excelente dinámica! Sigue así.' 
+                                                : `Has acumulado ${allStrikes.length} área${allStrikes.length === 1 ? '' : 's'} de mejora hoy.`}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* History */}
                         {bitacoraHistory.length > 0 && (
@@ -882,6 +959,85 @@ export default function SupervisorBitacoraScreen({
                     setMasterStep('briefing_final');
                 }}
             />
+
+            {/* 🧠 AI Quality Modal — Premium presentation for Score, Strikes & Feedback */}
+            {qaFeedback && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    zIndex: 99999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 20,
+                    animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}>
+                    <div style={{
+                        background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 32,
+                        width: '100%',
+                        maxWidth: 400,
+                        padding: 32,
+                        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center'
+                    }}>
+                        <div style={{
+                            width: 80, height: 80, borderRadius: '50%',
+                            background: qaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.1)' : qaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            border: `2px solid ${qaFeedback.score >= 80 ? '#10B981' : qaFeedback.score >= 60 ? '#FBBF24' : '#F87171'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginBottom: 20,
+                            boxShadow: `0 0 30px ${qaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.3)' : qaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                        }}>
+                            <span style={{ fontSize: 32, fontWeight: 900, color: qaFeedback.score >= 80 ? '#10B981' : qaFeedback.score >= 60 ? '#FBBF24' : '#F87171' }}>
+                                {qaFeedback.score}
+                            </span>
+                        </div>
+                        
+                        <h3 style={{ color: '#F8FAFC', fontSize: 24, fontWeight: 900, margin: '0 0 8px', textAlign: 'center' }}>
+                            Reporte de IA
+                        </h3>
+                        <p style={{ color: '#94A3B8', fontSize: 15, margin: '0 0 24px', textAlign: 'center', lineHeight: 1.5 }}>
+                            {qaFeedback.feedback}
+                        </p>
+
+                        {qaFeedback.strikes && qaFeedback.strikes.length > 0 && (
+                            <div style={{ width: '100%', background: 'rgba(0,0,0,0.2)', borderRadius: 16, padding: 16, marginBottom: 24 }}>
+                                <p style={{ color: '#F87171', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
+                                    Áreas de oportunidad ({qaFeedback.strikes.length})
+                                </p>
+                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {qaFeedback.strikes.map((strike, i) => (
+                                        <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                            <span style={{ color: '#F87171', fontSize: 16, lineHeight: 1 }}>✖</span>
+                                            <span style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{strike}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={() => setQaFeedback(null)}
+                            style={{
+                                width: '100%', padding: '16px', borderRadius: 16, border: 'none',
+                                background: 'linear-gradient(90deg, #4F46E5, #7C3AED)',
+                                color: 'white', fontSize: 16, fontWeight: 800, textTransform: 'uppercase',
+                                cursor: 'pointer', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.4)'
+                            }}
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @keyframes recPulse {

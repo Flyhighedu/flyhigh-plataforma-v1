@@ -17,6 +17,7 @@ import {
 import EvidenceViewerModal from '@/components/supervisor/EvidenceViewerModal';
 import V2MissionDetails from '@/components/supervisor/V2MissionDetails';
 import DeleteConfirmationModal from '@/components/supervisor/DeleteConfirmationModal';
+import AudioQualityWidget from '@/components/supervisor/AudioQualityWidget';
 
 /* ═══════════════ CONSTANTS ═══════════════ */
 const ROLE_ORDER = ['pilot', 'teacher', 'assistant'];
@@ -4114,9 +4115,9 @@ export default function SupervisorDashboard() {
     };
     const assistantActiveFlight = assistantOperation.activeFlight || null;
     const assistantFlights = assistantOperation.flights || [];
-    const operationRecorderRole = 'teacher';
+    const operationRecorderRole = 'pilot';
     const operationRoleCard = (sel.roleCards || []).find((card) => card.role === operationRecorderRole) || null;
-    const operationDisplayName = operationRoleCard?.person || 'Docente';
+    const operationDisplayName = operationRoleCard?.person || 'Piloto';
     const operationSectionEnabled = sel.phaseIndex >= 2 || Boolean(assistantActiveFlight) || assistantFlights.length > 0;
     const completionGraceVisible = sel.isInCompletionGrace === true;
     const completionGraceRemainingMinutes = completionGraceVisible
@@ -4126,6 +4127,48 @@ export default function SupervisorDashboard() {
     const liveProgressPct = completionGraceVisible ? 100 : sel.progress;
     const liveStateText = completionGraceVisible ? 'Cierre completado' : sel.stateText;
     const assistantInterFlightByNewerId = buildInterFlightItemsByNewerFlightId(assistantFlights);
+
+    // ── Build audio lookup from ALL sibling journeys (pilot + teacher + assistant) ──
+    // Returns { [flightNumber]: { pilotAudio, teacherAudio } }
+    const flightAudioByNumber = (() => {
+        if (!sel?.journey) return {};
+        const schoolId = String(sel.journey.school_id || '');
+        const selDate = sel.journey.date;
+        const siblings = journeys.filter(j => j.date === selDate && String(j.school_id || '') === schoolId);
+        const map = {};
+        const ensure = (fn) => { if (!map[fn]) map[fn] = { pilotAudio: null, teacherAudio: null }; };
+
+        siblings.forEach(j => {
+            let m = {};
+            try { m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {}); } catch { m = {}; }
+
+            // Pilot telemetry recordings (pilot journey meta)
+            if (Array.isArray(m.telemetry_recordings)) {
+                m.telemetry_recordings.forEach(rec => {
+                    const fn = Number(rec.flightNumber || 0);
+                    if (fn > 0) { ensure(fn); if (!map[fn].pilotAudio) map[fn].pilotAudio = rec; }
+                });
+            }
+
+            // Teacher bitácora history (teacher journey meta)
+            if (Array.isArray(m.escuadron_bitacora_history)) {
+                m.escuadron_bitacora_history.forEach((b, idx) => {
+                    const fn = Number(b.flightNumber || (idx + 1));
+                    if (fn > 0) {
+                        ensure(fn);
+                        if (!map[fn].teacherAudio) map[fn].teacherAudio = {
+                            url: b.audioUrl || null,
+                            durationSeconds: b.audioDurationSeconds || 0,
+                            teamName: b.nombreClave || null,
+                            destinations: b.destinos || null
+                        };
+                    }
+                });
+            }
+        });
+        return map;
+    })();
+
     const assistantTimelineRows = [];
 
     const latestClosedAssistantFlight = assistantFlights[0] || null;
@@ -5618,7 +5661,7 @@ export default function SupervisorDashboard() {
                                     <span className="text-sm font-semibold text-slate-400 tabular-nums">({fmtMMSS(phaseTimers.operation.seconds)})</span>
                                 )}
                             </h2>
-                            <p className="text-xs text-slate-500 mt-0.5">Registro operativo en tiempo real (primera etapa: Docente)</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Registro operativo en tiempo real (Piloto)</p>
                         </div>
                         {assistantActiveFlight ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
@@ -5643,7 +5686,7 @@ export default function SupervisorDashboard() {
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className={`material-symbols-outlined text-sm ${assistantActiveFlight ? 'text-primary animate-pulse' : 'text-emerald-500'}`}>school</span>
+                                            <span className={`material-symbols-outlined text-sm ${assistantActiveFlight ? 'text-primary animate-pulse' : 'text-emerald-500'}`}>flight</span>
                                             <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Registro de vuelos</h3>
                                         </div>
                                         <p className="text-xs text-slate-400 truncate">{operationDisplayName}</p>
@@ -5734,6 +5777,70 @@ export default function SupervisorDashboard() {
                                                                 </>
                                                             )}
                                                         </div>
+                                                        {/* ── Audio Players (Pilot + Teacher) ── */}
+                                                        {(() => {
+                                                            const audioData = flightAudioByNumber[flightNumber];
+                                                            if (!audioData) return null;
+                                                            const { pilotAudio, teacherAudio } = audioData;
+                                                            if (!pilotAudio?.url && !teacherAudio?.url) return null;
+                                                            return (
+                                                                <div className="mt-2 space-y-1.5">
+                                                                    {/* Pilot narration audio */}
+                                                                    {pilotAudio?.url && (
+                                                                        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
+                                                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                                                <span className="text-[10px]">✈️🎙️</span>
+                                                                                <span className="text-[10px] font-bold text-sky-300 uppercase tracking-wider">
+                                                                                    Narración del piloto
+                                                                                    {teacherAudio?.teamName && (
+                                                                                        <span className="text-sky-400/80 normal-case ml-1.5 px-1.5 py-0.5 rounded bg-sky-500/10">
+                                                                                            {teacherAudio.teamName}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                                <div className="flex items-center gap-2 ml-auto">
+                                                                                    {pilotAudio.durationSeconds > 0 && (
+                                                                                        <span className="text-[10px] text-slate-500 tabular-nums">{fmtMMSS(pilotAudio.durationSeconds)}</span>
+                                                                                    )}
+                                                                                    {pilotAudio.fileSizeKB > 0 && (
+                                                                                        <span className="text-[10px] text-slate-600">{pilotAudio.fileSizeKB} KB</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            <audio
+                                                                                controls
+                                                                                preload="none"
+                                                                                src={pilotAudio.url}
+                                                                                className="w-full h-8 rounded"
+                                                                                style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.85 }}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Teacher bitácora audio */}
+                                                                    {teacherAudio?.url && (
+                                                                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2">
+                                                                            <div className="flex items-center gap-2 mb-1.5">
+                                                                                <span className="text-[10px]">🎓🎙️</span>
+                                                                                <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">Bitácora docente</span>
+                                                                                {teacherAudio.durationSeconds > 0 && (
+                                                                                    <span className="text-[10px] text-slate-500 tabular-nums">{fmtMMSS(teacherAudio.durationSeconds)}</span>
+                                                                                )}
+                                                                                {teacherAudio.teamName && (
+                                                                                    <span className="text-[10px] text-violet-400/70 truncate max-w-[120px]">{teacherAudio.teamName}</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <audio
+                                                                                controls
+                                                                                preload="none"
+                                                                                src={teacherAudio.url}
+                                                                                className="w-full h-8 rounded"
+                                                                                style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.85 }}
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 );
                                             })}
@@ -5745,159 +5852,69 @@ export default function SupervisorDashboard() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3">
-                            {/* ── Telemetría de Audio (Supervisor) ── */}
-                            {(() => {
-                                const rawMeta = sel?.journey?.meta;
-                                const parsedMeta = typeof rawMeta === 'string'
-                                    ? (() => { try { return JSON.parse(rawMeta); } catch { return {}; } })()
-                                    : (rawMeta || {});
-                                const recordings = Array.isArray(parsedMeta.telemetry_recordings) ? parsedMeta.telemetry_recordings : [];
-
-                                return (
-                                    <div className="bg-surface-dark rounded-xl border border-slate-800 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="material-symbols-outlined text-sm text-violet-400" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
-                                                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Telemetría de Audio</h3>
-                                                </div>
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${recordings.length > 0 ? 'text-violet-300 bg-violet-500/10' : 'text-slate-500 bg-slate-800'}`}>
-                                                    {recordings.length} {recordings.length === 1 ? 'grabación' : 'grabaciones'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 mt-0.5">Audios capturados por el Supervisor durante el pre-vuelo.</p>
-                                        </div>
-
-                                        <div className="p-4">
-                                            {recordings.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {[...recordings].reverse().map((rec, idx) => (
-                                                        <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-800/40 px-3 py-2.5">
-                                                            <div className="flex items-center justify-between gap-2 mb-2">
-                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                    <span className="material-symbols-outlined text-xs text-violet-400">graphic_eq</span>
-                                                                    <p className="text-xs font-bold text-slate-200">
-                                                                        Grupo #{rec.flightNumber || (recordings.length - idx)}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                                    {rec.durationSeconds > 0 && (
-                                                                        <span className="text-[10px] font-bold text-slate-400 tabular-nums">
-                                                                            {fmtMMSS(rec.durationSeconds)}
-                                                                        </span>
-                                                                    )}
-                                                                    {rec.fileSizeKB > 0 && (
-                                                                        <span className="text-[10px] font-bold text-slate-500">
-                                                                            {rec.fileSizeKB}KB
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            {rec.url && (
-                                                                <audio
-                                                                    controls
-                                                                    preload="none"
-                                                                    className="w-full h-8"
-                                                                    style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.7 }}
-                                                                >
-                                                                    <source src={rec.url} type="audio/webm" />
-                                                                    Tu navegador no soporta audio.
-                                                                </audio>
-                                                            )}
-                                                            {rec.timestamp && (
-                                                                <p className="text-[10px] text-slate-500 mt-1.5">{fmtClock(rec.timestamp)}</p>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="rounded-xl border border-dashed border-slate-700/50 px-3 py-4 text-center">
-                                                    <span className="material-symbols-outlined text-2xl text-slate-600 mb-1">mic_off</span>
-                                                    <p className="text-xs text-slate-500">Sin grabaciones de audio para esta misión.</p>
-                                                    <p className="text-[10px] text-slate-600 mt-0.5">Se capturan automáticamente cuando el Supervisor usa el timer.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* ── Bitácora Digital (Escuadrones) ── */}
-                            {(() => {
-                                const rawMeta = sel?.journey?.meta;
-                                const parsedMeta = typeof rawMeta === 'string'
-                                    ? (() => { try { return JSON.parse(rawMeta); } catch { return {}; } })()
-                                    : (rawMeta || {});
-                                const bitacoras = Array.isArray(parsedMeta.escuadron_bitacora_history) ? parsedMeta.escuadron_bitacora_history : [];
-
-                                return (
-                                    <div className="bg-surface-dark rounded-xl border border-slate-800 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="material-symbols-outlined text-sm text-amber-400" style={{ fontVariationSettings: "'FILL' 1" }}>edit_note</span>
-                                                    <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Bitácora Digital</h3>
-                                                </div>
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bitacoras.length > 0 ? 'text-amber-300 bg-amber-500/10' : 'text-slate-500 bg-slate-800'}`}>
-                                                    {bitacoras.length} {bitacoras.length === 1 ? 'escuadrón' : 'escuadrones'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 mt-0.5">Grupos registrados por el Supervisor antes de cada vuelo.</p>
-                                        </div>
-
-                                        <div className="p-4">
-                                            {bitacoras.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {[...bitacoras].reverse().map((entry, idx) => (
-                                                        <div key={idx} className="rounded-lg border border-slate-700/40 bg-slate-800/40 px-3 py-2.5">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                    <span className="flex items-center justify-center size-6 rounded-md bg-amber-500/15 text-[10px] font-black text-amber-300 flex-shrink-0">
-                                                                        #{entry.flightNumber || (bitacoras.length - idx)}
-                                                                    </span>
-                                                                    <p className="text-xs font-bold text-slate-200 truncate">
-                                                                        &ldquo;{entry.nombreClave || 'Sin nombre'}&rdquo;
-                                                                    </p>
-                                                                </div>
-                                                                {entry.timestamp && (
-                                                                    <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">{fmtClock(entry.timestamp)}</span>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-1.5 flex items-center gap-3 flex-wrap">
-                                                                {entry.capitan && (
-                                                                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                                                                        <span className="material-symbols-outlined text-xs text-amber-400/70">military_tech</span>
-                                                                        {entry.capitan}
-                                                                    </span>
-                                                                )}
-                                                                {entry.destinos && (
-                                                                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                                                                        <span className="material-symbols-outlined text-xs text-sky-400/70">map</span>
-                                                                        {entry.destinos}
-                                                                    </span>
-                                                                )}
-                                                                {!entry.capitan && !entry.destinos && (
-                                                                    <span className="text-[10px] text-slate-600 italic">Sin datos adicionales</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="rounded-xl border border-dashed border-slate-700/50 px-3 py-4 text-center">
-                                                    <span className="material-symbols-outlined text-2xl text-slate-600 mb-1">groups</span>
-                                                    <p className="text-xs text-slate-500">Sin escuadrones registrados para esta misión.</p>
-                                                    <p className="text-[10px] text-slate-600 mt-0.5">El Supervisor registra cada grupo antes de iniciar su vuelo.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-                        </div>
+                        {/* Telemetría y Bitácora antiguas han sido unificadas en AudioQualityWidget */}
                     </div>
                 </section>
+
+                {/* ═══ OPERATIVA Y CALIDAD (UNIFIED TIMELINE) ═══ */}
+                {sel && (
+                    <section className={operationSectionEnabled ? '' : 'opacity-35 grayscale pointer-events-none'}>
+                        {(() => {
+                            // ── Collect ALL sibling journeys for this school+date ──
+                            // Each staff member (pilot, teacher, assistant) has their own journey
+                            // We need to merge their metas so telemetry_recordings + bitacora from ALL roles are visible
+                            const selJourney = sel?.journey;
+                            const schoolId = String(selJourney?.school_id || '');
+                            const selDate = selJourney?.date;
+
+                            const siblingJourneys = journeys.filter(j =>
+                                j.date === selDate && String(j.school_id || '') === schoolId
+                            );
+
+                            // Merge metas from all siblings
+                            const mergedMeta = {};
+                            let mergedTelemetry = [];
+                            let mergedBitacora = [];
+
+                            siblingJourneys.forEach(j => {
+                                let m = {};
+                                try {
+                                    m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {});
+                                } catch { m = {}; }
+                                // Merge top-level meta (later values win for scalar fields)
+                                Object.assign(mergedMeta, m);
+                                // Accumulate array data from all journeys
+                                if (Array.isArray(m.telemetry_recordings)) {
+                                    mergedTelemetry = [...mergedTelemetry, ...m.telemetry_recordings];
+                                }
+                                if (Array.isArray(m.escuadron_bitacora_history)) {
+                                    // Bitacora comes from teacher — only take if not already set
+                                    if (mergedBitacora.length === 0) mergedBitacora = m.escuadron_bitacora_history;
+                                }
+                            });
+
+                            mergedMeta.telemetry_recordings = mergedTelemetry;
+                            mergedMeta.escuadron_bitacora_history = mergedBitacora;
+
+                            // Collect all sibling journeyIds for the audit query
+                            const allJourneyIds = siblingJourneys.map(j => j.id).filter(Boolean);
+                            const primaryJourneyId = allJourneyIds[0] || selJourney?.id;
+
+                            return (
+                                <AudioQualityWidget
+                                    journeyId={primaryJourneyId}
+                                    journeyIds={allJourneyIds}
+                                    parsedMeta={mergedMeta}
+                                    style={{
+                                        background: 'rgba(30, 41, 59, 0.7)',
+                                        border: '1px solid rgba(148, 163, 184, 0.15)',
+                                        color: '#E2E8F0'
+                                    }}
+                                />
+                            );
+                        })()}
+                    </section>
+                )}
 
                 {/* ═══ FASE 4: DESMONTAJE ═══ */}
                 <section className={phase4Enabled ? '' : 'opacity-30 grayscale pointer-events-none'}>

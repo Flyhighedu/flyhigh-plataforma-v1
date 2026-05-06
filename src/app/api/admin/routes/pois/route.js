@@ -43,7 +43,14 @@ export async function POST(request) {
         const supabase = getAdminClient();
         const body = await request.json();
         
-        const { route_id, name, description, image_url, lat, lng, sort_order } = body;
+        const { route_id, name, description, image_url, sort_order,
+            dato_clave_1, dato_clave_2, dato_clave_3,
+            pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3,
+            pregunta_interaccion, ai_context } = body;
+
+        // Accept both lat/lng and latitude/longitude aliases
+        const lat = body.lat ?? body.latitude ?? null;
+        const lng = body.lng ?? body.longitude ?? null;
 
         if (!route_id) {
             return NextResponse.json({ error: 'route_id es requerido' }, { status: 400 });
@@ -59,17 +66,29 @@ export async function POST(request) {
 
         const nextOrder = sort_order ?? ((existing?.[0]?.sort_order ?? -1) + 1);
 
+        const insertPayload = {
+            route_id,
+            name: name || 'Nuevo Punto',
+            description: description || '',
+            image_url: image_url || '',
+            lat,
+            lng,
+            sort_order: nextOrder
+        };
+
+        // Include ficha fields if provided
+        if (dato_clave_1 !== undefined) insertPayload.dato_clave_1 = dato_clave_1;
+        if (dato_clave_2 !== undefined) insertPayload.dato_clave_2 = dato_clave_2;
+        if (dato_clave_3 !== undefined) insertPayload.dato_clave_3 = dato_clave_3;
+        if (pregunta_estudio_1 !== undefined) insertPayload.pregunta_estudio_1 = pregunta_estudio_1;
+        if (pregunta_estudio_2 !== undefined) insertPayload.pregunta_estudio_2 = pregunta_estudio_2;
+        if (pregunta_estudio_3 !== undefined) insertPayload.pregunta_estudio_3 = pregunta_estudio_3;
+        if (pregunta_interaccion !== undefined) insertPayload.pregunta_interaccion = pregunta_interaccion;
+        if (ai_context !== undefined) insertPayload.ai_context = ai_context;
+
         const { data, error } = await supabase
             .from('master_route_pois')
-            .insert({
-                route_id,
-                name: name || 'Nuevo Punto',
-                description: description || '',
-                image_url: image_url || '',
-                lat: lat || null,
-                lng: lng || null,
-                sort_order: nextOrder
-            })
+            .insert(insertPayload)
             .select()
             .single();
 
@@ -91,6 +110,10 @@ export async function PATCH(request) {
         if (!id) {
             return NextResponse.json({ error: 'id es requerido' }, { status: 400 });
         }
+
+        // Normalize latitude/longitude aliases → lat/lng (DB column names)
+        if (updates.latitude !== undefined) { updates.lat = updates.latitude; delete updates.latitude; }
+        if (updates.longitude !== undefined) { updates.lng = updates.longitude; delete updates.longitude; }
 
         const allowed = [
             'name', 'description', 'image_url', 'lat', 'lng',

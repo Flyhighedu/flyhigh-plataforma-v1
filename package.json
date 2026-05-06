@@ -34,6 +34,7 @@
     "date-fns": "^4.1.0",
     "emoji-picker-react": "^4.18.0",
     "file-saver": "^2.0.5",
+    "fix-webm-duration": "^1.0.6",
     "framer-motion": "^12.38.0",
     "gsap": "^3.13.0",
     "html-to-image": "^1.11.13",

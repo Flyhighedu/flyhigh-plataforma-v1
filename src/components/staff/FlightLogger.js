@@ -63,7 +63,8 @@ export default function FlightLogger({
     interFlightElapsedSeconds = 0,
     totalStudentsFlown = 0,
     totalOperationElapsedSeconds = 0,
-    showTotalOperationTimer = false
+    showTotalOperationTimer = false,
+    pilotRecording = false
 }) {
     const initialState = buildInitialFlightState(initialActiveFlight);
     const [status, setStatus] = useState(() => initialState.status); // 'idle' (pre-flight), 'active' (in-flight)
@@ -293,6 +294,12 @@ export default function FlightLogger({
                     {shouldShowOperationTimer && (
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide tabular-nums ${isIdle ? 'bg-white border border-emerald-200 text-emerald-700' : 'bg-emerald-500/15 border border-emerald-400/30 text-emerald-100'}`}>
                             Operación total: {formatTime(safeOperationElapsedSeconds)}
+                        </span>
+                    )}
+                    {!isIdle && pilotRecording && (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-400/30 text-[10px] font-black uppercase tracking-wide text-red-200">
+                            <span className="size-1.5 bg-red-400 rounded-full animate-pulse" />
+                            Grabando narración
                         </span>
                     )}
                 </div>

@@ -27,6 +27,9 @@ import SquadronBitacoraModal, { BitacoraPilotBanner } from '@/components/staff/S
 import EmotionRatingModal from '@/components/staff/EmotionRatingModal';
 import EscuadronDebriefModal from '@/components/staff/EscuadronDebriefModal';
 import { ROLE_TO_ESCUADRON, LOCAL_KEYS, META_KEYS } from '@/config/escuadronConfig';
+// ── Pilot Audio Recording ──
+import useAudioRecorder from '@/hooks/useAudioRecorder';
+import { triggerAudioAudit } from '@/utils/triggerAudioAudit';
 
 const ACTIVE_FLIGHT_KEY = 'flyhigh_active_flight';
 const CLOSED_FLIGHTS_KEY = 'flyhigh_recently_closed_flights';
@@ -291,6 +294,18 @@ export default function StaffOperationLegacy({
     const [editedStudentCount, setEditedStudentCount] = useState('0');
     const [flightEditReason, setFlightEditReason] = useState('');
     const [isSavingFlightEdit, setIsSavingFlightEdit] = useState(false);
+
+    // ── Pilot Audio Recording (fire-and-forget, never blocks flight ops) ──
+    const {
+        isSupported: pilotMicSupported,
+        isRecording: pilotRecording,
+        durationSeconds: pilotRecDuration,
+        startRecording: startPilotRecording,
+        stopRecording: stopPilotRecording,
+        cancelRecording: cancelPilotRecording
+    } = useAudioRecorder();
+    const pilotRecDurationRef = useRef(0);
+    useEffect(() => { pilotRecDurationRef.current = pilotRecDuration; }, [pilotRecDuration]);
 
     const recentlyClosedFlightIdsRef = useRef(new Set());
     const processingFlightIdsRef = useRef(new Set());
@@ -932,6 +947,35 @@ export default function StaffOperationLegacy({
         ? Math.max(0, Math.floor((nowMs - operationStartedAtMs) / 1000))
         : 0;
 
+    // ── Pilot Audio: Upload telemetry and trigger AI audit (fire-and-forget) ──
+    const uploadPilotTelemetry = useCallback(async (blob, flightNumber) => {
+        if (!blob || !journeyId || preview) return;
+        try {
+            const formData = new FormData();
+            formData.append('audio', blob, 'pilot_narration.webm');
+            formData.append('journeyId', journeyId);
+            formData.append('flightNumber', String(flightNumber || 0));
+            formData.append('userId', userId || '');
+            formData.append('durationSeconds', String(pilotRecDurationRef.current || 0));
+
+            const res = await fetch('/api/staff/upload-telemetry', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.ok && data.url) {
+                // 🧠 AI Quality Audit — fire-and-forget (never blocks Pilot)
+                triggerAudioAudit({
+                    audioUrl: data.url,
+                    journeyId,
+                    flightNumber,
+                    source: 'pilot_narration',
+                    userId,
+                    durationSeconds: pilotRecDurationRef.current || 0
+                });
+            }
+        } catch (err) {
+            console.warn('⚠️ Pilot telemetry upload error (non-blocking):', err);
+        }
+    }, [journeyId, userId, preview]);
+
     const clearActiveFlight = async (closedFlightId = null) => {
         if (closedFlightId && !preview) {
             rememberClosedFlightId(closedFlightId);
@@ -998,9 +1042,18 @@ export default function StaffOperationLegacy({
                 ? { operationStartedAt: fallbackOperationAnchor }
                 : undefined
         );
+
+        // ── Pilot Audio: Start recording on takeoff (fire-and-forget) ──
+        if (currentRole === 'pilot' && pilotMicSupported && !pilotRecording) {
+            startPilotRecording().catch(err => console.warn('⚠️ Pilot mic auto-start failed:', err));
+        }
     };
 
     const handleFlightCancel = async () => {
+        // ── Pilot Audio: Discard recording on cancel ──
+        if (pilotRecording) {
+            cancelPilotRecording();
+        }
         await clearActiveFlight();
     };
 
@@ -1099,6 +1152,16 @@ export default function StaffOperationLegacy({
 
         // Preview: solo actualizar UI local, no guardar en localStorage ni sincronizar
         try {
+            // ── Pilot Audio: Stop recording on landing (fire-and-forget) ──
+            if (currentRole === 'pilot' && pilotRecording) {
+                try {
+                    const blob = await stopPilotRecording();
+                    if (blob && blob.size > 0) {
+                        uploadPilotTelemetry(blob, completedFlightNumber);
+                    }
+                } catch (err) { console.warn('⚠️ Pilot mic stop failed:', err); }
+            }
+
             if (preview) {
                 const newLog = {
                     ...data,
@@ -1511,6 +1574,7 @@ export default function StaffOperationLegacy({
                     totalOperationElapsedSeconds={operationElapsedSeconds}
                     showTotalOperationTimer={operationStartedAtMs > 0}
                     disabled={!!activePause}
+                    pilotRecording={currentRole === 'pilot' && pilotRecording}
                 />
 
                 <div className="pt-4 border-t border-slate-200">
