@@ -454,9 +454,8 @@ export default function POIDetailModal({
     // Determine if POI already exists in the database
     const isSavedPoi = !!(poi?.id);
     
-    // Si hay opciones de imagen cargadas, es estrictamente obligatorio elegir una.
-    const isImageSelectionRequired = poiImages.length > 0 && !selectedImageUrl;
-    const isValid = title.trim().length >= 2 && !isImageSelectionRequired;
+    // La imagen de portada es opcional — si hay opciones pero no se elige una, se guarda sin imagen
+    const isValid = title.trim().length >= 2;
 
     return (
         <div style={{

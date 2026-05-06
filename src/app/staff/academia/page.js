@@ -546,14 +546,22 @@ export default function AcademiaLobbyPage() {
                                             </div>
                                             
                                             <div className="mt-10 flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-widest px-4">
-                                                <div className="flex flex-col items-center gap-1">
+                                                <button 
+                                                    onClick={async (e) => { e.stopPropagation(); if (showTutorial) skipTutorial(); await controls.start({ x: -window.innerWidth, opacity: 0, transition: { duration: 0.3 } }); handleNextCard(); }}
+                                                    className="flex flex-col items-center gap-1 px-5 py-3 -mx-2 rounded-2xl active:bg-orange-50 active:text-orange-500 transition-colors cursor-pointer"
+                                                    style={{ border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit', fontWeight: 'inherit' }}
+                                                >
                                                     <ArrowRight size={16} className="rotate-180" />
                                                     <span>Repasar</span>
-                                                </div>
-                                                <div className="flex flex-col items-center gap-1">
+                                                </button>
+                                                <button 
+                                                    onClick={async (e) => { e.stopPropagation(); if (showTutorial) skipTutorial(); await controls.start({ x: window.innerWidth, opacity: 0, transition: { duration: 0.3 } }); handleNextCard(); }}
+                                                    className="flex flex-col items-center gap-1 px-5 py-3 -mx-2 rounded-2xl active:bg-green-50 active:text-green-500 transition-colors cursor-pointer"
+                                                    style={{ border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit', fontWeight: 'inherit' }}
+                                                >
                                                     <ArrowRight size={16} />
                                                     <span>Lo sé</span>
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
