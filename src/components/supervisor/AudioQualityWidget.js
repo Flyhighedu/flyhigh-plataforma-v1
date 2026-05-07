@@ -247,7 +247,7 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                 >🔄</button>
             </div>
 
-            {noData ? (
+            {noData && !parsedMeta ? (
                 <div style={{
                     textAlign: 'center', padding: '32px 16px',
                     background: '#F8FAFC', borderRadius: 16,
@@ -418,9 +418,11 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                             </div>
                         </div>
                     )}
+                </>
+            )}
 
-                    {/* ── Unified Operations Timeline OR Old Individual Tanda Scores ── */}
-                    {!hideDetails && (
+            {/* ── Unified Operations Timeline — ALWAYS shown when parsedMeta has data ── */}
+            {!hideDetails && (
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                                 <p style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
@@ -632,8 +634,6 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                             )}
                         </div>
                     )}
-                </>
-            )}
         </div>
     );
 }
