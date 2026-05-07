@@ -435,6 +435,15 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                                         const audiosList = Array.isArray(parsedMeta.telemetry_recordings) ? parsedMeta.telemetry_recordings : [];
                                         const auditsList = audits || [];
 
+                                        // Separate audio by source tag
+                                        const pilotAudios = audiosList.filter(a => a.source === 'pilot_narration');
+                                        const teacherAudios = audiosList.filter(a => a.source === 'bitacora');
+                                        const untaggedAudios = audiosList.filter(a => !a.source || (a.source !== 'pilot_narration' && a.source !== 'bitacora'));
+
+                                        // Build a set of flight numbers that have bitácora entries (teacher flights)
+                                        const bitacoraFlightSet = new Set();
+                                        bitacoras.forEach((b, idx) => bitacoraFlightSet.add(b.flightNumber || (idx + 1)));
+
                                         let maxFlight = 0;
                                         bitacoras.forEach((b, i) => maxFlight = Math.max(maxFlight, b.flightNumber || (i + 1)));
                                         audiosList.forEach((a, i) => maxFlight = Math.max(maxFlight, a.flightNumber || (i + 1)));
@@ -443,18 +452,43 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                                         const unifiedOperations = [];
                                         for (let i = 1; i <= maxFlight; i++) {
                                             const bitacora = bitacoras.find((b, idx) => (b.flightNumber || (idx + 1)) === i);
-                                            const audio = audiosList.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
+                                            const pilotAudio = pilotAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
+                                            const teacherAudio = teacherAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
                                             const audit = auditsList.find(a => a.flight_number === i);
 
-                                            if (bitacora || audio || audit) {
+                                            // Handle untagged legacy audio: if bitácora entry exists, it's teacher audio
+                                            const untagged = untaggedAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
+                                            let effectivePilotAudio = pilotAudio;
+                                            let effectiveTeacherAudio = teacherAudio;
+                                            if (untagged && !pilotAudio && !teacherAudio) {
+                                                if (bitacoraFlightSet.has(i)) {
+                                                    effectiveTeacherAudio = untagged; // teacher audio
+                                                } else {
+                                                    effectivePilotAudio = untagged; // pilot audio
+                                                }
+                                            } else if (untagged && !pilotAudio && teacherAudio) {
+                                                // Already has teacher audio, untagged might be pilot
+                                                if (!bitacoraFlightSet.has(i)) effectivePilotAudio = untagged;
+                                            }
+
+                                            if (bitacora || effectivePilotAudio || effectiveTeacherAudio || audit) {
+                                                // Determine teacher audio URL: prefer bitacora entry, then tagged telemetry, then untagged
+                                                const teacherUrl = bitacora?.audioUrl || effectiveTeacherAudio?.url || null;
+                                                const teacherDuration = bitacora?.audioDurationSeconds || effectiveTeacherAudio?.durationSeconds || 0;
+
                                                 unifiedOperations.push({
                                                     flightNumber: i,
                                                     teamName: bitacora?.nombreClave || audit?.nombre_equipo_detectado || null,
                                                     destinations: bitacora?.destinos || null,
-                                                    audioUrl: audio?.url || null,
-                                                    audioSizeKB: audio?.fileSizeKB || 0,
-                                                    audioDurationSeconds: audio?.durationSeconds || 0,
-                                                    timestamp: bitacora?.timestamp || audio?.timestamp || audit?.created_at || null,
+                                                    // Pilot narration audio
+                                                    audioUrl: effectivePilotAudio?.url || null,
+                                                    audioSizeKB: effectivePilotAudio?.fileSizeKB || 0,
+                                                    audioDurationSeconds: effectivePilotAudio?.durationSeconds || 0,
+                                                    // Teacher bitácora audio
+                                                    teacherAudioUrl: teacherUrl,
+                                                    teacherAudioSizeKB: effectiveTeacherAudio?.fileSizeKB || bitacora?.audioSizeKB || 0,
+                                                    teacherAudioDurationSeconds: teacherDuration,
+                                                    timestamp: bitacora?.timestamp || effectivePilotAudio?.timestamp || effectiveTeacherAudio?.timestamp || audit?.created_at || null,
                                                     audit: audit || null
                                                 });
                                             }

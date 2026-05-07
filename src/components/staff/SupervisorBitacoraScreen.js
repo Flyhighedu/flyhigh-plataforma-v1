@@ -204,6 +204,7 @@ export default function SupervisorBitacoraScreen({
             formData.append('flightNumber', String(bitacoraHistory.length + 1));
             formData.append('userId', userId || '');
             formData.append('durationSeconds', String(recDuration));
+            formData.append('source', 'bitacora');
 
             const res = await fetch('/api/staff/upload-telemetry', { method: 'POST', body: formData });
             const data = await res.json();
@@ -211,6 +212,44 @@ export default function SupervisorBitacoraScreen({
                 setUploadedUrl(data.url);
 
                 const currentFlightNumber = bitacoraHistory.length + 1;
+
+                // 📎 Link audioUrl back into the bitácora history entry (non-blocking)
+                try {
+                    if (journeyId) {
+                        const supabaseClient = (await import('@/utils/supabase/client')).createClient();
+                        const { data: journeyRow } = await supabaseClient
+                            .from('staff_journeys')
+                            .select('meta')
+                            .eq('id', journeyId)
+                            .single();
+                        
+                        let currentMeta = {};
+                        try {
+                            currentMeta = typeof journeyRow?.meta === 'string'
+                                ? JSON.parse(journeyRow.meta)
+                                : (journeyRow?.meta || {});
+                        } catch { currentMeta = {}; }
+
+                        const history = Array.isArray(currentMeta.escuadron_bitacora_history)
+                            ? [...currentMeta.escuadron_bitacora_history]
+                            : [];
+                        
+                        const idx = history.findIndex(h => h.flightNumber === currentFlightNumber);
+                        if (idx >= 0) {
+                            history[idx] = {
+                                ...history[idx],
+                                audioUrl: data.url,
+                                audioDurationSeconds: recDuration,
+                                audioSizeKB: data.fileSizeKB || 0
+                            };
+                            await atomicMetaUpdate(journeyId, {
+                                escuadron_bitacora_history: history
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Failed to link audioUrl to bitácora entry (non-blocking):', err);
+                }
 
                 // 🧠 AI Quality Audit — fire-and-forget (never blocks ISA)
                 triggerAudioAudit({

@@ -34,6 +34,7 @@ export async function POST(request) {
         const journeyId = formData.get('journeyId');
         const flightNumber = formData.get('flightNumber');
         const userId = formData.get('userId');
+        const source = formData.get('source') || 'unknown'; // 'bitacora' | 'pilot_narration'
 
         if (!audioFile || !(audioFile instanceof Blob)) {
             return NextResponse.json({ ok: false, error: 'No audio file provided.' }, { status: 400 });
@@ -131,6 +132,7 @@ export async function POST(request) {
                 telemetryArray.push({
                     url: publicUrl,
                     flightNumber: flightNum,
+                    source, // 'bitacora' | 'pilot_narration' | 'unknown'
                     durationSeconds: Number(formData.get('durationSeconds')) || 0,
                     fileSizeKB: Math.round(audioFile.size / 1024),
                     userId: userId || null,

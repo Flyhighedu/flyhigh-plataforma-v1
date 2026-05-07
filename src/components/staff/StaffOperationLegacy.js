@@ -957,6 +957,7 @@ export default function StaffOperationLegacy({
             formData.append('flightNumber', String(flightNumber || 0));
             formData.append('userId', userId || '');
             formData.append('durationSeconds', String(pilotRecDurationRef.current || 0));
+            formData.append('source', 'pilot_narration');
 
             const res = await fetch('/api/staff/upload-telemetry', { method: 'POST', body: formData });
             const data = await res.json();

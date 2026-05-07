@@ -51,6 +51,9 @@ export default function UnifiedFlightCard({
     audioUrl,
     audioSizeKB,
     audioDurationSeconds,
+    teacherAudioUrl,
+    teacherAudioSizeKB,
+    teacherAudioDurationSeconds,
     timestamp,
     audit // The QA data object from AudioQualityWidget if it exists
 }) {
@@ -67,10 +70,10 @@ export default function UnifiedFlightCard({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     auditId: audit.id,
-                    audioUrl: audioUrl,
+                    audioUrl: audioUrl || teacherAudioUrl,
                     journeyId: audit.journey_id,
                     flightNumber: flightNumber,
-                    audioDurationSeconds: audioDurationSeconds
+                    audioDurationSeconds: audioDurationSeconds || teacherAudioDurationSeconds
                 })
             });
             const data = await res.json();
@@ -85,6 +88,10 @@ export default function UnifiedFlightCard({
             setIsRetrying(false);
         }
     };
+
+    const hasPilotAudio = !!audioUrl;
+    const hasTeacherAudio = !!teacherAudioUrl;
+    const hasAnyAudio = hasPilotAudio || hasTeacherAudio;
 
     return (
         <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden mb-3 shadow-sm">
@@ -140,13 +147,13 @@ export default function UnifiedFlightCard({
                     </div>
                 )}
 
-                {/* Audio Telemetry */}
-                {audioUrl && (
-                    <div className="pt-2">
+                {/* ── Pilot Narration Audio (Blue theme) ── */}
+                {hasPilotAudio && (
+                    <div className="pt-1">
                         <div className="flex items-center justify-between mb-1.5 px-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px] text-violet-400">mic</span>
-                                Telemetría
+                            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wide flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[12px]">flight</span>
+                                Narración del Piloto
                             </span>
                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 tabular-nums">
                                 {audioDurationSeconds > 0 && <span>{fmtMMSS(audioDurationSeconds)}</span>}
@@ -165,7 +172,32 @@ export default function UnifiedFlightCard({
                     </div>
                 )}
 
-                {(!destinations && !audioUrl) && (
+                {/* ── Teacher Bitácora Audio (Violet theme) ── */}
+                {hasTeacherAudio && (
+                    <div className="pt-1">
+                        <div className="flex items-center justify-between mb-1.5 px-1">
+                            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wide flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[12px]">record_voice_over</span>
+                                Bitácora Docente
+                            </span>
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 tabular-nums">
+                                {teacherAudioDurationSeconds > 0 && <span>{fmtMMSS(teacherAudioDurationSeconds)}</span>}
+                                {teacherAudioSizeKB > 0 && <span>{teacherAudioSizeKB}KB</span>}
+                            </div>
+                        </div>
+                        <audio
+                            controls
+                            preload="none"
+                            className="w-full h-8"
+                            style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.8 }}
+                        >
+                            <source src={teacherAudioUrl} type="audio/webm" />
+                            Tu navegador no soporta audio.
+                        </audio>
+                    </div>
+                )}
+
+                {(!destinations && !hasAnyAudio) && (
                     <p className="text-xs text-slate-500 italic">No hay datos de bitácora ni audio para esta tanda.</p>
                 )}
             </div>

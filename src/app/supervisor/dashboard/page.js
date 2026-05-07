@@ -4142,26 +4142,76 @@ export default function SupervisorDashboard() {
             let m = {};
             try { m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {}); } catch { m = {}; }
 
-            // Pilot telemetry recordings (pilot journey meta)
-            if (Array.isArray(m.telemetry_recordings)) {
-                m.telemetry_recordings.forEach(rec => {
-                    const fn = Number(rec.flightNumber || 0);
-                    if (fn > 0) { ensure(fn); if (!map[fn].pilotAudio) map[fn].pilotAudio = rec; }
-                });
-            }
-
-            // Teacher bitácora history (teacher journey meta)
+            // ── PASS 1: Process bitácora entries FIRST to know which flights have teacher data ──
+            // This is needed for backward compat with untagged telemetry recordings
+            const bitacoraFlights = new Set();
             if (Array.isArray(m.escuadron_bitacora_history)) {
                 m.escuadron_bitacora_history.forEach((b, idx) => {
                     const fn = Number(b.flightNumber || (idx + 1));
                     if (fn > 0) {
+                        bitacoraFlights.add(fn);
                         ensure(fn);
-                        if (!map[fn].teacherAudio) map[fn].teacherAudio = {
-                            url: b.audioUrl || null,
-                            durationSeconds: b.audioDurationSeconds || 0,
-                            teamName: b.nombreClave || null,
-                            destinations: b.destinos || null
-                        };
+                        if (!map[fn].teacherAudio) {
+                            map[fn].teacherAudio = {
+                                url: b.audioUrl || null,
+                                durationSeconds: b.audioDurationSeconds || 0,
+                                fileSizeKB: b.audioSizeKB || 0,
+                                teamName: b.nombreClave || null,
+                                destinations: b.destinos || null
+                            };
+                        } else {
+                            // Enrich existing teacherAudio with bitacora metadata
+                            map[fn].teacherAudio.teamName = b.nombreClave || map[fn].teacherAudio.teamName;
+                            map[fn].teacherAudio.destinations = b.destinos || map[fn].teacherAudio.destinations;
+                            if (b.audioUrl && !map[fn].teacherAudio.url) {
+                                map[fn].teacherAudio.url = b.audioUrl;
+                                map[fn].teacherAudio.durationSeconds = b.audioDurationSeconds || map[fn].teacherAudio.durationSeconds;
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ── PASS 2: Process telemetry recordings — use source tag when available ──
+            // For untagged legacy data, use bitacoraFlights to decide: if this flight has
+            // a bitácora entry, the untagged audio belongs to the teacher.
+            if (Array.isArray(m.telemetry_recordings)) {
+                m.telemetry_recordings.forEach(rec => {
+                    const fn = Number(rec.flightNumber || 0);
+                    if (fn > 0) {
+                        ensure(fn);
+                        if (rec.source === 'bitacora') {
+                            // Explicitly tagged as teacher audio
+                            if (!map[fn].teacherAudio) {
+                                map[fn].teacherAudio = {
+                                    url: rec.url || null,
+                                    durationSeconds: rec.durationSeconds || 0,
+                                    fileSizeKB: rec.fileSizeKB || 0,
+                                    teamName: null,
+                                    destinations: null
+                                };
+                            } else if (!map[fn].teacherAudio.url && rec.url) {
+                                map[fn].teacherAudio.url = rec.url;
+                                map[fn].teacherAudio.durationSeconds = rec.durationSeconds || map[fn].teacherAudio.durationSeconds;
+                                map[fn].teacherAudio.fileSizeKB = rec.fileSizeKB || 0;
+                            }
+                        } else if (rec.source === 'pilot_narration') {
+                            // Explicitly tagged as pilot audio
+                            if (!map[fn].pilotAudio) map[fn].pilotAudio = rec;
+                        } else {
+                            // ── Untagged legacy data: smart fallback ──
+                            // If this flight has a bitácora entry, the audio is from the teacher
+                            if (bitacoraFlights.has(fn)) {
+                                if (!map[fn].teacherAudio.url && rec.url) {
+                                    map[fn].teacherAudio.url = rec.url;
+                                    map[fn].teacherAudio.durationSeconds = rec.durationSeconds || 0;
+                                    map[fn].teacherAudio.fileSizeKB = rec.fileSizeKB || 0;
+                                }
+                            } else {
+                                // No bitácora entry → assume pilot
+                                if (!map[fn].pilotAudio) map[fn].pilotAudio = rec;
+                            }
+                        }
                     }
                 });
             }
