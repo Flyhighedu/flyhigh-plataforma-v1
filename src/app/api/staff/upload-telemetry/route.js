@@ -48,11 +48,15 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, error: 'Missing journeyId.' }, { status: 400 });
         }
 
-        // Generate deterministic path
+        // Generate deterministic path — detect format from filename
         const timestamp = Date.now();
         const safeJourneyId = String(journeyId).replace(/[^a-zA-Z0-9-_]/g, '');
         const flightNum = Number(flightNumber) || 0;
-        const storagePath = `${safeJourneyId}/telemetry_f${flightNum}_${timestamp}.webm`;
+        const uploadedName = audioFile.name || '';
+        const isMP3 = uploadedName.endsWith('.mp3') || (audioFile.type || '').includes('mp3');
+        const ext = isMP3 ? 'mp3' : 'webm';
+        const contentType = isMP3 ? 'audio/mpeg' : 'audio/webm';
+        const storagePath = `${safeJourneyId}/telemetry_f${flightNum}_${timestamp}.${ext}`;
 
         // Upload to Supabase Storage
         const arrayBuffer = await audioFile.arrayBuffer();
@@ -61,7 +65,7 @@ export async function POST(request) {
         const { error: uploadError } = await supabaseAdmin.storage
             .from(BUCKET_NAME)
             .upload(storagePath, buffer, {
-                contentType: 'audio/webm',
+                contentType,
                 cacheControl: '31536000', // 1 year — audio is immutable
                 upsert: false
             });

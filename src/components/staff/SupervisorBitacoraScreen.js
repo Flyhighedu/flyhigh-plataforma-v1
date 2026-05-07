@@ -198,8 +198,22 @@ export default function SupervisorBitacoraScreen({
         if (!blob || !journeyId) return;
         setIsUploading(true);
         try {
+            // Convert WebM→MP3 for OpenAI audio analysis compatibility
+            let uploadBlob = blob;
+            let uploadFilename = 'telemetry.webm';
+            try {
+                const { convertToMp3 } = await import('@/utils/convertToMp3');
+                const mp3Blob = await convertToMp3(blob);
+                if (mp3Blob && mp3Blob.size > 0) {
+                    uploadBlob = mp3Blob;
+                    uploadFilename = 'telemetry.mp3';
+                }
+            } catch (convErr) {
+                console.warn('⚠️ MP3 conversion skipped:', convErr?.message);
+            }
+
             const formData = new FormData();
-            formData.append('audio', blob, 'telemetry.webm');
+            formData.append('audio', uploadBlob, uploadFilename);
             formData.append('journeyId', journeyId);
             formData.append('flightNumber', String(bitacoraHistory.length + 1));
             formData.append('userId', userId || '');

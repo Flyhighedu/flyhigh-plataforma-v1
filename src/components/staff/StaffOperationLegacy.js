@@ -951,8 +951,24 @@ export default function StaffOperationLegacy({
     const uploadPilotTelemetry = useCallback(async (blob, flightNumber) => {
         if (!blob || !journeyId || preview) return;
         try {
+            // Convert WebM→MP3 for OpenAI audio analysis compatibility
+            let uploadBlob = blob;
+            let uploadFilename = 'pilot_narration.webm';
+            let uploadMime = 'audio/webm';
+            try {
+                const { convertToMp3 } = await import('@/utils/convertToMp3');
+                const mp3Blob = await convertToMp3(blob);
+                if (mp3Blob && mp3Blob.size > 0) {
+                    uploadBlob = mp3Blob;
+                    uploadFilename = 'pilot_narration.mp3';
+                    uploadMime = 'audio/mp3';
+                }
+            } catch (convErr) {
+                console.warn('⚠️ MP3 conversion skipped:', convErr?.message);
+            }
+
             const formData = new FormData();
-            formData.append('audio', blob, 'pilot_narration.webm');
+            formData.append('audio', uploadBlob, uploadFilename);
             formData.append('journeyId', journeyId);
             formData.append('flightNumber', String(flightNumber || 0));
             formData.append('userId', userId || '');

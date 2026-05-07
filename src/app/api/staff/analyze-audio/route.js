@@ -1,43 +1,44 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 
 // =====================================================
 // POST /api/staff/analyze-audio
 //
 // AI-Powered Audio Quality Monitoring — "El Cerebro"
+// ADAPTIVE DUAL-ENGINE STRATEGY
 //
-// Receives an audio URL (from Supabase Storage),
-// downloads it, sends it to Gemini 2.5 Flash for
-// native audio analysis, and stores the quality
-// scorecard in audio_quality_audits.
+// ENGINE 1 (always): Groq Whisper (free) + GPT-4o-mini
+//   → Transcribes + analyzes TEXT for content criteria
 //
-// FLOW:
-//   1. Receive audioUrl + journeyId + flightNumber
-//   2. Download audio from Storage (server-side)
-//   3. Convert to base64 for Gemini inlineData
-//   4. Send to Gemini with QA audit prompt
-//   5. Parse JSON scorecard from response
-//   6. Persist scorecard in audio_quality_audits
-//   7. Return scorecard to caller (for ISA feedback)
+// ENGINE 2 (conditional): gpt-4o-audio-preview
+//   → Native audio analysis for tone/emotion/energy
+//   → Triggered only when:
+//     a) Text score < 75 (potential issue detected)
+//     b) First flight of the day (baseline)
+//     c) Source is 'bitacora' (docente - higher priority)
 //
-// SECURITY: Uses dedicated GEMINI_AUDIO_API_KEY and
-//           SUPABASE_SERVICE_ROLE_KEY. No client secrets.
+// COST OPTIMIZATION:
+//   Engine 1: ~$0.0001/request (practically free)
+//   Engine 2: ~$0.04/request (only ~25% of requests)
+//   Total: ~$4 USD/month for 400 requests
 //
-// SAFETY: This endpoint is fire-and-forget from the PWA.
-//         Failures here must NEVER block ISA's workflow.
+// SAFETY: Fire-and-forget. Failures NEVER block ops.
 // =====================================================
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // Allow up to 60s for audio analysis
+export const maxDuration = 60;
 
-const GEMINI_AUDIO_KEY = process.env.GEMINI_AUDIO_API_KEY || process.env.GEMINI_API_KEY;
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
+const GROQ_KEY = process.env.GROQ_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const MODEL_ID = 'gemini-2.5-flash';
+const CHAT_MODEL = 'gpt-4o-mini';
+const AUDIO_MODEL = 'gpt-4o-audio-preview';
+const DEEP_ANALYSIS_THRESHOLD = 75; // Score below this triggers audio analysis
 const MIN_AUDIO_DURATION_SEC = 5;
-const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024; // 10MB safety cap
+const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
 
 // ───────── Supabase Admin Client ─────────
 function getSupabaseAdmin() {
@@ -47,460 +48,412 @@ function getSupabaseAdmin() {
     });
 }
 
-// ───────── Audit Prompt for Pre-Flight Dynamic ─────────
-const BITACORA_AUDIT_PROMPT = `Eres un supervisor de calidad de Fly High, una empresa de experiencias de vuelo educativas para niños en escuelas.
+// ───────── System Prompts ─────────
 
-Estás escuchando el audio de la DINÁMICA PREVIA AL VUELO que la Animadora (ISA) realiza con un grupo de niños antes de que suban al simulador.
+const DOCENTE_TEXT_PROMPT = `Eres un auditor de calidad para la empresa educativa Fly High. Analiza la transcripción del audio de esta dinámica infantil guiada por la docente en un entorno ruidoso. Devuelve un JSON con estas 5 claves:
 
-La dinámica tiene un protocolo de 4 pasos obligatorios:
+"menciona_nombre_equipo" (boolean): ¿La docente le pone un nombre al grupo de niños (ej: "Escuadrón Águilas") y se refiere a ellos por ese nombre?
 
-1. **NOMBRE DEL EQUIPO**: La animadora debe ponerle un nombre al grupo de niños (ej: "Escuadrón Águilas", "Escuadrón Tiburones") y referirse a ellos por ese nombre durante la dinámica. Los nombres son siempre de animales.
+"menciona_destino" (boolean): ¿La docente menciona a dónde van a "volar" (un destino, ciudad, país o lugar)?
 
-2. **MENCIÓN DEL DESTINO**: Debe mencionar a dónde van a "volar" — el destino o lugar especial que los niños eligieron. Puede ser una ciudad, país o lugar ficticio/imaginario.
+"dinamica_sube_sube" (boolean): ¿Se escucha que la docente dice "Sube, sube" y los niños responden "Hasta las nubes"? ¿O al menos intenta hacer esta dinámica interactiva?
 
-3. **DINÁMICA "¡SUBE SUBE!"**: Este es el momento clave. La animadora debe hacer la dinámica interactiva donde les explica que el dron necesita de SU VOZ para volar. Les dice: cuando yo diga "¡SUBE, SUBE, SUBE!", ustedes tienen que gritar muy fuerte "¡HASTA LAS NUBES!". Si no gritan fuerte, el dron se apaga. Debe practicarlo al menos una vez con los niños.
+"energia_positiva" (boolean): ¿La docente habla con entusiasmo, alegría y actitud positiva (sin sonar aburrida, monótona o demasiado seria)? Infiere esto del contenido textual: uso de exclamaciones, preguntas a los niños, palabras motivadoras.
 
-4. **ENERGÍA E INTERACCIÓN**: La animadora debe sonar entusiasta, con energía alta, proyectando la voz, haciendo participar activamente a los niños (no debe ser un monólogo; se deben escuchar respuestas o gritos de los niños).
+"feedback" (string o null): Si alguna es falsa, da un consejo constructivo, amable y corto (máximo 2 líneas). Si todas son verdaderas, null.`;
 
-INSTRUCCIONES DE ANÁLISIS:
-- Escucha el audio completo con atención.
-- El audio CONTIENE ruido ambiental significativo (estamos al aire libre, en una escuela, con niños pequeños). No penalices por ruido de fondo.
-- Si no puedes distinguir claramente si una parte se realizó o no debido al ruido, márcala como null (no_detectado) en vez de false.
-- El idioma es español mexicano.
-- Sé justo pero exigente. El score debe reflejar realmente la calidad de la dinámica.
+const PILOTO_TEXT_PROMPT = `Eres un auditor de calidad de vuelo para la empresa educativa Fly High. Analiza la transcripción del audio de este piloto narrando el vuelo. Devuelve un JSON con estas 5 claves:
 
-Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin markdown, sin backticks. Solo el JSON:
+"menciona_punto_interes" (boolean): ¿Menciona algún dato educativo, geográfico o histórico de lo que ven durante el vuelo?
 
+"mantiene_personaje" (boolean): ¿Habla con un tono profesional e inspirador de capitán/aviador?
+
+"energia_positiva" (boolean): ¿El piloto transmite asombro, emoción y actitud positiva? Infiere del texto: exclamaciones, descripciones vívidas, invitaciones a los niños.
+
+"fomenta_interaccion" (boolean): ¿El piloto intenta interactuar activamente con los niños (ej: les hace preguntas, los invita a observar algo específico)?
+
+"feedback" (string o null): Si alguna es falsa, da un consejo constructivo y corto. Si todas son verdaderas, null.`;
+
+const DOCENTE_AUDIO_PROMPT = `Eres un auditor de calidad para Fly High. ESCUCHA ATENTAMENTE este audio de una dinámica infantil. Evalúa el TONO DE VOZ y la ENERGÍA de la docente.
+
+Responde SOLO un JSON:
 {
-  "menciona_nombre_equipo": true | false | null,
-  "nombre_equipo_detectado": "nombre escuchado" | null,
-  "menciona_destino": true | false | null,
-  "destino_detectado": "destino mencionado" | null,
-  "dinamica_sube_sube": true | false | null,
-  "energia_interaccion": "alta" | "media" | "baja" | "no_detectado",
-  "participacion_ninos_audible": true | false | null,
-  "score": número de 0 a 100,
-  "feedback_para_isa": "Mensaje directo, amigable y constructivo para ISA en español. Si hizo todo bien, felicítala brevemente. Si faltó algo, dile exactamente qué faltó y cómo mejorarlo. Máximo 2 oraciones cortas.",
-  "resumen_supervisor": "Resumen técnico de una línea para el panel de administración."
-}`;
-
-// ───────── Audit Prompt for Pilot Flight Narration ─────────
-const PILOT_NARRATION_PROMPT = `Eres un supervisor de calidad de Fly High, una empresa de experiencias de vuelo educativas para niños en escuelas.
-
-Estás escuchando el audio de la NARRACIÓN DURANTE EL VUELO que el Piloto realiza mientras opera el dron con un grupo de niños a bordo del simulador.
-
-El piloto tiene un protocolo de 4 pasos obligatorios durante el vuelo:
-
-1. **NOMBRE DEL EQUIPO**: El piloto debe referirse al grupo de niños por su nombre de escuadrón (ej: "Escuadrón Águilas", "Escuadrón Tiburones"). El nombre fue asignado por la animadora antes del vuelo.
-
-2. **NARRACIÓN DEL DESTINO**: El piloto debe narrar sobre el destino al que están "volando". Debe hacer referencia al lugar (ciudad, país, o lugar imaginario) y describir lo que están "viendo" durante el vuelo para crear la experiencia inmersiva.
-
-3. **INTERACCIÓN CON LOS NIÑOS**: El piloto debe interactuar activamente con los niños durante el vuelo. No debe ser un monólogo. Debe hacerles preguntas, animarlos a mirar por la "ventana", invitarlos a gritar o reaccionar. Se deben escuchar respuestas o reacciones de los niños.
-
-4. **ENERGÍA Y ENTUSIASMO**: El piloto debe sonar emocionado, entusiasta y con buena proyección de voz. Debe transmitir emoción y aventura, no sonar monótono o aburrido.
-
-INSTRUCCIONES DE ANÁLISIS:
-- Escucha el audio completo con atención.
-- El audio CONTIENE ruido ambiental significativo (estamos al aire libre, en una escuela, con motor de dron, y niños). No penalices por ruido de fondo.
-- Si no puedes distinguir claramente si una parte se realizó o no debido al ruido, márcala como null (no_detectado) en vez de false.
-- El idioma es español mexicano.
-- Sé justo pero exigente. El score debe reflejar realmente la calidad de la narración del piloto.
-
-Responde ÚNICAMENTE con un objeto JSON válido. Sin texto adicional, sin markdown, sin backticks. Solo el JSON:
-
-{
-  "menciona_nombre_equipo": true | false | null,
-  "nombre_equipo_detectado": "nombre escuchado" | null,
-  "menciona_destino": true | false | null,
-  "destino_detectado": "destino mencionado" | null,
-  "dinamica_sube_sube": true | false | null,
-  "energia_interaccion": "alta" | "media" | "baja" | "no_detectado",
-  "participacion_ninos_audible": true | false | null,
-  "score": número de 0 a 100,
-  "feedback_para_isa": "Mensaje directo, amigable y constructivo para el PILOTO en español. Si hizo todo bien, felicítalo brevemente. Si faltó algo, dile exactamente qué faltó y cómo mejorarlo. Máximo 2 oraciones cortas.",
-  "resumen_supervisor": "Resumen técnico de una línea para el panel de administración."
-}`;
-
-// ───────── Select prompt based on audio source ─────────
-function getAuditPrompt(source) {
-    if (source === 'pilot_narration') return PILOT_NARRATION_PROMPT;
-    return BITACORA_AUDIT_PROMPT;
+  "energia_vocal": "alta" | "media" | "baja",
+  "tono_entusiasta": true | false,
+  "proyeccion_voz": true | false,
+  "participacion_ninos_audible": true | false,
+  "feedback_energia": "Consejo sobre la energía vocal (o null si es alta)"
 }
 
+IMPORTANTE: No analices el contenido de las palabras. Solo evalúa HOW she speaks: volumen, entusiasmo, variación tonal, energía. ¿Suena viva y emocionada o suena cansada y monótona?`;
+
+const PILOTO_AUDIO_PROMPT = `Eres un auditor de calidad de vuelo para Fly High. ESCUCHA ATENTAMENTE este audio de un piloto narrando un vuelo con niños. Evalúa el TONO DE VOZ y la ENERGÍA del piloto.
+
+Responde SOLO un JSON:
+{
+  "energia_vocal": "alta" | "media" | "baja",
+  "tono_entusiasta": true | false,
+  "proyeccion_voz": true | false,
+  "participacion_ninos_audible": true | false,
+  "feedback_energia": "Consejo sobre la energía vocal (o null si es alta)"
+}
+
+IMPORTANTE: Solo evalúa la voz: volumen, emoción, variación tonal. ¿Suena como un capitán emocionado o como alguien leyendo un guión?`;
+
+// ───────── JSON Schemas for Structured Output ─────────
+
+const TEXT_DOCENTE_SCHEMA = {
+    name: 'docente_text_audit',
+    strict: true,
+    schema: {
+        type: 'object',
+        properties: {
+            menciona_nombre_equipo: { type: 'boolean' },
+            menciona_destino: { type: 'boolean' },
+            dinamica_sube_sube: { type: 'boolean' },
+            energia_positiva: { type: 'boolean' },
+            feedback: { type: ['string', 'null'] }
+        },
+        required: ['menciona_nombre_equipo', 'menciona_destino', 'dinamica_sube_sube', 'energia_positiva', 'feedback'],
+        additionalProperties: false
+    }
+};
+
+const TEXT_PILOTO_SCHEMA = {
+    name: 'piloto_text_audit',
+    strict: true,
+    schema: {
+        type: 'object',
+        properties: {
+            menciona_punto_interes: { type: 'boolean' },
+            mantiene_personaje: { type: 'boolean' },
+            energia_positiva: { type: 'boolean' },
+            fomenta_interaccion: { type: 'boolean' },
+            feedback: { type: ['string', 'null'] }
+        },
+        required: ['menciona_punto_interes', 'mantiene_personaje', 'energia_positiva', 'fomenta_interaccion', 'feedback'],
+        additionalProperties: false
+    }
+};
 
 // ───────── Download audio from URL ─────────
 async function downloadAudio(url) {
     const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to download audio: ${response.status} ${response.statusText}`);
-    }
-
-    const contentLength = Number(response.headers.get('content-length') || 0);
-    if (contentLength > MAX_AUDIO_SIZE_BYTES) {
-        throw new Error(`Audio file too large: ${(contentLength / 1024 / 1024).toFixed(1)}MB`);
-    }
-
+    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
-    if (arrayBuffer.byteLength > MAX_AUDIO_SIZE_BYTES) {
-        throw new Error(`Audio buffer too large: ${(arrayBuffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
-    }
-
+    if (arrayBuffer.byteLength > MAX_AUDIO_SIZE_BYTES) throw new Error('Audio too large');
     return Buffer.from(arrayBuffer);
 }
 
-// ───────── Detect MIME type from URL ─────────
-function detectMimeType(url) {
-    const lower = (url || '').toLowerCase();
-    if (lower.includes('.webm')) return 'audio/webm';
-    if (lower.includes('.mp3'))  return 'audio/mp3';
-    if (lower.includes('.mp4'))  return 'audio/mp4';
-    if (lower.includes('.m4a'))  return 'audio/m4a';
-    if (lower.includes('.wav'))  return 'audio/wav';
-    if (lower.includes('.ogg'))  return 'audio/ogg';
-    if (lower.includes('.flac')) return 'audio/flac';
-    // Default: webm (our recorder outputs WebM/Opus)
-    return 'audio/webm';
+// ───────── Calculate score from booleans (25pts each) ─────────
+function calculateScore(analysis, role) {
+    const criteria = role === 'piloto'
+        ? [analysis.menciona_punto_interes, analysis.mantiene_personaje, analysis.energia_positiva, analysis.fomenta_interaccion]
+        : [analysis.menciona_nombre_equipo, analysis.menciona_destino, analysis.dinamica_sube_sube, analysis.energia_positiva];
+    return criteria.filter(v => v === true).length * 25;
 }
 
-// ───────── Parse JSON from Gemini response (fault-tolerant) ─────────
-function parseGeminiJSON(text) {
-    // Try direct parse first
-    try {
-        return JSON.parse(text);
-    } catch { /* try cleanup */ }
+// ───────── Generate supervisor summary ─────────
+function generateResumen(analysis, role, score, deepAnalysis) {
+    const label = role === 'piloto' ? 'Piloto' : 'Docente';
+    const energyNote = deepAnalysis ? ` | Energía vocal: ${deepAnalysis.energia_vocal}` : '';
+    if (score === 100) return `${label}: Excelente — todos los criterios cumplidos.${energyNote}`;
+    if (score >= 75) return `${label}: Buen desempeño — faltó 1 criterio.${energyNote}`;
+    if (score >= 50) return `${label}: Regular — 2 criterios pendientes.${energyNote}`;
+    return `${label}: Necesita mejora — 3+ criterios pendientes.${energyNote}`;
+}
 
-    // Strip markdown code fences if present
-    const cleaned = text
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
+// ───────── Map to DB columns ─────────
+function mapToDbColumns(textAnalysis, role, score, transcript, deepAnalysis) {
+    const energiaFromDeep = deepAnalysis?.energia_vocal || null;
+    const energiaFromText = textAnalysis.energia_positiva ? 'alta' : 'baja';
 
-    try {
-        return JSON.parse(cleaned);
-    } catch { /* try regex extraction */ }
-
-    // Last resort: extract first { ... } block
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-        try {
-            return JSON.parse(match[0]);
-        } catch { /* give up */ }
+    if (role === 'piloto') {
+        return {
+            menciona_nombre_equipo: null,
+            nombre_equipo_detectado: null,
+            menciona_destino: textAnalysis.menciona_punto_interes,
+            destino_detectado: null,
+            dinamica_sube_sube: null,
+            energia_interaccion: energiaFromDeep || energiaFromText,
+            participacion_ninos_audible: deepAnalysis?.participacion_ninos_audible ?? textAnalysis.fomenta_interaccion,
+            score,
+            feedback_para_isa: textAnalysis.feedback || deepAnalysis?.feedback_energia || null,
+            resumen_supervisor: generateResumen(textAnalysis, role, score, deepAnalysis),
+            raw_response: { textAnalysis, deepAnalysis, role, transcript },
+            model_used: deepAnalysis ? `groq-whisper+${CHAT_MODEL}+${AUDIO_MODEL}` : `groq-whisper+${CHAT_MODEL}`
+        };
     }
-
-    return null;
-}
-
-// ───────── Normalize scorecard values ─────────
-function normalizeScorecard(raw) {
-    const toBool = (v) => {
-        if (v === true || v === false) return v;
-        if (v === null || v === 'null' || v === 'no_detectado') return null;
-        if (v === 'true') return true;
-        if (v === 'false') return false;
-        return null;
-    };
-
-    const energyValues = ['alta', 'media', 'baja', 'no_detectado'];
-    const rawEnergy = String(raw.energia_interaccion || 'no_detectado').toLowerCase();
-
     return {
-        menciona_nombre_equipo: toBool(raw.menciona_nombre_equipo),
-        nombre_equipo_detectado: raw.nombre_equipo_detectado || null,
-        menciona_destino: toBool(raw.menciona_destino),
-        destino_detectado: raw.destino_detectado || null,
-        dinamica_sube_sube: toBool(raw.dinamica_sube_sube),
-        energia_interaccion: energyValues.includes(rawEnergy) ? rawEnergy : 'no_detectado',
-        participacion_ninos_audible: toBool(raw.participacion_ninos_audible),
-        score: Math.max(0, Math.min(100, Number(raw.score) || 0)),
-        feedback_para_isa: String(raw.feedback_para_isa || '').trim() || null,
-        resumen_supervisor: String(raw.resumen_supervisor || '').trim() || null
+        menciona_nombre_equipo: textAnalysis.menciona_nombre_equipo,
+        nombre_equipo_detectado: null,
+        menciona_destino: textAnalysis.menciona_destino,
+        destino_detectado: null,
+        dinamica_sube_sube: textAnalysis.dinamica_sube_sube,
+        energia_interaccion: energiaFromDeep || energiaFromText,
+        participacion_ninos_audible: deepAnalysis?.participacion_ninos_audible ?? null,
+        score,
+        feedback_para_isa: textAnalysis.feedback || deepAnalysis?.feedback_energia || null,
+        resumen_supervisor: generateResumen(textAnalysis, role, score, deepAnalysis),
+        raw_response: { textAnalysis, deepAnalysis, role, transcript },
+        model_used: deepAnalysis ? `groq-whisper+${CHAT_MODEL}+${AUDIO_MODEL}` : `groq-whisper+${CHAT_MODEL}`
     };
 }
 
-// ───────── Create initial audit record ─────────
+// ───────── Audit record helpers ─────────
 async function createAuditRecord(supabase, { journeyId, userId, flightNumber, source, audioUrl, durationSeconds }) {
     const { data, error } = await supabase
         .from('audio_quality_audits')
         .insert({
-            journey_id: journeyId,
-            user_id: userId || null,
-            flight_number: flightNumber || null,
-            source: source || 'bitacora',
-            audio_url: audioUrl || null,
-            audio_duration_seconds: durationSeconds || null,
+            journey_id: journeyId, user_id: userId || null,
+            flight_number: flightNumber || null, source: source || 'bitacora',
+            audio_url: audioUrl || null, audio_duration_seconds: durationSeconds || null,
             status: 'analyzing'
         })
-        .select('id')
-        .single();
-
+        .select('id').single();
     if (error) throw error;
     return data.id;
 }
 
-// ───────── Update audit record with results ─────────
 async function updateAuditRecord(supabase, auditId, updates) {
     const { error } = await supabase
         .from('audio_quality_audits')
-        .update({
-            ...updates,
-            analyzed_at: new Date().toISOString()
-        })
+        .update({ ...updates, analyzed_at: new Date().toISOString() })
         .eq('id', auditId);
-
-    if (error) console.warn('⚠️ Failed to update audit record:', error.message);
+    if (error) console.warn('⚠️ Failed to update audit:', error.message);
 }
 
 
 // ═════════════════════════════════════════════════════
-// POST Handler
+// POST Handler — Adaptive Dual-Engine
 // ═════════════════════════════════════════════════════
 export async function POST(request) {
     const startTime = Date.now();
 
     try {
-        // ── Validate server config ──
-        if (!GEMINI_AUDIO_KEY) {
-            return NextResponse.json(
-                { ok: false, error: 'Missing GEMINI_AUDIO_API_KEY configuration.' },
-                { status: 500 }
-            );
+        // ── Validate config ──
+        if (!OPENAI_KEY) {
+            return NextResponse.json({ ok: false, error: 'Missing OPENAI_API_KEY.' }, { status: 500 });
         }
-
         const supabase = getSupabaseAdmin();
         if (!supabase) {
-            return NextResponse.json(
-                { ok: false, error: 'Missing Supabase configuration.' },
-                { status: 500 }
-            );
+            return NextResponse.json({ ok: false, error: 'Missing Supabase config.' }, { status: 500 });
         }
 
-        // ── Parse request body ──
-        let body;
+        const openai = new OpenAI({ apiKey: OPENAI_KEY });
+
+        // ── Parse request ──
+        let audioUrl, journeyId, flightNumber, source, userId, durationSeconds, existingAuditId;
         const contentType = request.headers.get('content-type') || '';
 
-        if (contentType.includes('application/json')) {
-            body = await request.json();
-        } else if (contentType.includes('multipart/form-data')) {
+        if (contentType.includes('multipart/form-data')) {
             const formData = await request.formData();
-            body = {
-                audioUrl: formData.get('audioUrl'),
-                journeyId: formData.get('journeyId'),
-                flightNumber: Number(formData.get('flightNumber')) || null,
-                source: formData.get('source') || 'bitacora',
-                userId: formData.get('userId') || null,
-                durationSeconds: Number(formData.get('durationSeconds')) || null,
-                auditId: formData.get('auditId') || null
-            };
+            audioUrl = formData.get('audioUrl');
+            journeyId = formData.get('journeyId');
+            flightNumber = Number(formData.get('flightNumber')) || null;
+            source = formData.get('source') || formData.get('rol') === 'piloto' ? 'pilot_narration' : 'bitacora';
+            userId = formData.get('userId') || null;
+            durationSeconds = Number(formData.get('durationSeconds')) || null;
+            existingAuditId = formData.get('auditId') || null;
         } else {
-            body = await request.json();
+            const body = await request.json();
+            audioUrl = body.audioUrl;
+            journeyId = body.journeyId;
+            flightNumber = Number(body.flightNumber) || null;
+            source = body.source || 'bitacora';
+            userId = body.userId || null;
+            durationSeconds = Number(body.durationSeconds) || null;
+            existingAuditId = body.auditId || null;
         }
 
-        const { audioUrl, journeyId, flightNumber, source, userId, durationSeconds, auditId: existingAuditId } = body;
+        const effectiveRole = source === 'pilot_narration' ? 'piloto' : 'docente';
 
-        // ── Validate required fields ──
-        if (!audioUrl) {
-            return NextResponse.json(
-                { ok: false, error: 'Missing audioUrl.' },
-                { status: 400 }
-            );
-        }
+        // ── Validate ──
+        if (!audioUrl) return NextResponse.json({ ok: false, error: 'Missing audioUrl.' }, { status: 400 });
+        if (!journeyId && !existingAuditId) return NextResponse.json({ ok: false, error: 'Missing journeyId.' }, { status: 400 });
 
-        if (!journeyId && !existingAuditId) {
-            return NextResponse.json(
-                { ok: false, error: 'Missing journeyId.' },
-                { status: 400 }
-            );
-        }
-
-        // ── Check minimum duration (if provided) ──
+        // ── Duration check ──
         if (durationSeconds && durationSeconds < MIN_AUDIO_DURATION_SEC) {
-            // Create record but mark as too_short
             try {
-                if (existingAuditId) {
-                    await updateAuditRecord(supabase, existingAuditId, { status: 'too_short' });
-                } else {
-                    await createAuditRecord(supabase, {
-                        journeyId, userId, flightNumber, source, audioUrl, durationSeconds
-                    }).then(id => updateAuditRecord(supabase, id, { status: 'too_short' }));
-                }
+                if (existingAuditId) await updateAuditRecord(supabase, existingAuditId, { status: 'too_short' });
+                else await createAuditRecord(supabase, { journeyId, userId, flightNumber, source, audioUrl, durationSeconds })
+                    .then(id => updateAuditRecord(supabase, id, { status: 'too_short' }));
             } catch { /* non-blocking */ }
-
-            return NextResponse.json({
-                ok: true,
-                skipped: true,
-                reason: `Audio too short (${durationSeconds}s < ${MIN_AUDIO_DURATION_SEC}s minimum).`
-            });
+            return NextResponse.json({ ok: true, skipped: true, reason: `Audio too short (${durationSeconds}s).` });
         }
 
-        // ── Create or reuse audit record (status: analyzing) ──
+        // ── Create audit record ──
         let auditId = existingAuditId;
         try {
-            if (!auditId) {
-                auditId = await createAuditRecord(supabase, {
-                    journeyId, userId, flightNumber, source, audioUrl, durationSeconds
-                });
-            } else {
-                await updateAuditRecord(supabase, auditId, { status: 'analyzing', error_message: null });
-            }
-        } catch (err) {
-            console.error('⚠️ Failed to setup audit record:', err.message);
-            // Continue anyway — we can still return results even without DB
-        }
+            if (!auditId) auditId = await createAuditRecord(supabase, { journeyId, userId, flightNumber, source, audioUrl, durationSeconds });
+            else await updateAuditRecord(supabase, auditId, { status: 'analyzing', error_message: null });
+        } catch (err) { console.error('⚠️ Audit record setup error:', err.message); }
 
-        // ── Step 1: Download audio ──
+        // ── Download audio ──
         let audioBuffer;
         try {
             audioBuffer = await downloadAudio(audioUrl);
         } catch (err) {
-            if (auditId) {
-                await updateAuditRecord(supabase, auditId, {
-                    status: 'download_failed',
-                    error_message: err.message
-                });
-            }
-            return NextResponse.json(
-                { ok: false, error: `Audio download failed: ${err.message}` },
-                { status: 502 }
-            );
+            if (auditId) await updateAuditRecord(supabase, auditId, { status: 'download_failed', error_message: err.message });
+            return NextResponse.json({ ok: false, error: `Download failed: ${err.message}` }, { status: 502 });
         }
 
-        // ── Step 2: Convert to base64 ──
-        const base64Audio = audioBuffer.toString('base64');
-        const mimeType = detectMimeType(audioUrl);
+        // ══════════════════════════════════════════════
+        // ENGINE 1: Groq Whisper (free) + GPT-4o-mini
+        // ══════════════════════════════════════════════
 
-        const { SchemaType } = require('@google/generative-ai');
+        // Step 1a: Transcribe with Groq Whisper (FREE)
+        let transcript;
+        try {
+            const whisperClient = GROQ_KEY
+                ? new OpenAI({ apiKey: GROQ_KEY, baseURL: 'https://api.groq.com/openai/v1' })
+                : openai; // Fallback to OpenAI Whisper if no Groq key
 
-        const responseSchema = {
-            type: SchemaType.OBJECT,
-            properties: {
-                menciona_nombre_equipo: { type: SchemaType.BOOLEAN, nullable: true },
-                nombre_equipo_detectado: { type: SchemaType.STRING, nullable: true },
-                menciona_destino: { type: SchemaType.BOOLEAN, nullable: true },
-                destino_detectado: { type: SchemaType.STRING, nullable: true },
-                dinamica_sube_sube: { type: SchemaType.BOOLEAN, nullable: true },
-                energia_interaccion: { type: SchemaType.STRING, enum: ["alta", "media", "baja", "no_detectado"] },
-                participacion_ninos_audible: { type: SchemaType.BOOLEAN, nullable: true },
-                score: { type: SchemaType.INTEGER },
-                feedback_para_isa: { type: SchemaType.STRING },
-                resumen_supervisor: { type: SchemaType.STRING }
-            },
-            required: ["menciona_nombre_equipo", "menciona_destino", "dinamica_sube_sube", "energia_interaccion", "participacion_ninos_audible", "score", "feedback_para_isa", "resumen_supervisor"]
-        };
+            const audioFilename = (audioUrl || '').toLowerCase().includes('.mp3') ? 'audio.mp3' : 'audio.webm';
+            const audioMime = audioFilename.endsWith('.mp3') ? 'audio/mp3' : 'audio/webm';
+            const file = new File([audioBuffer], audioFilename, { type: audioMime });
 
-        const genAI = new GoogleGenerativeAI(GEMINI_AUDIO_KEY);
-        const model = genAI.getGenerativeModel({
-            model: MODEL_ID,
-            generationConfig: {
-                temperature: 0.2,      // Low temperature for consistent, factual analysis
-                responseMimeType: 'application/json',
-                responseSchema: responseSchema
+            const transcription = await whisperClient.audio.transcriptions.create({
+                file, model: 'whisper-large-v3', language: 'es', response_format: 'text'
+            });
+            transcript = typeof transcription === 'string' ? transcription : transcription.text || '';
+
+            if (!transcript || transcript.trim().length < 5) {
+                if (auditId) await updateAuditRecord(supabase, auditId, {
+                    status: 'no_speech', error_message: 'No speech detected', raw_response: { transcript: '' }
+                });
+                return NextResponse.json({ ok: true, skipped: true, reason: 'No speech detected.' });
             }
-        });
+        } catch (err) {
+            console.error('❌ Whisper failed:', err.message);
+            if (auditId) await updateAuditRecord(supabase, auditId, {
+                status: 'failed', error_message: `Whisper: ${err.message}`, raw_response: { error: err.message }
+            });
+            return NextResponse.json({ ok: false, error: `Transcription failed: ${err.message}` }, { status: 502 });
+        }
 
-        let geminiResponse;
-        let rawText = '';
+        // Step 1b: Analyze text with GPT-4o-mini (cheap)
+        let textAnalysis;
+        try {
+            const systemPrompt = effectiveRole === 'piloto' ? PILOTO_TEXT_PROMPT : DOCENTE_TEXT_PROMPT;
+            const jsonSchema = effectiveRole === 'piloto' ? TEXT_PILOTO_SCHEMA : TEXT_DOCENTE_SCHEMA;
 
-        // Attempt with 1 retry
-        for (let attempt = 1; attempt <= 2; attempt++) {
+            const completion = await openai.chat.completions.create({
+                model: CHAT_MODEL,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Transcripción:\n\n"${transcript}"` }
+                ],
+                response_format: { type: 'json_schema', json_schema: jsonSchema },
+                temperature: 0.2
+            });
+            textAnalysis = JSON.parse(completion.choices[0].message.content);
+        } catch (err) {
+            console.error('❌ GPT-4o-mini failed:', err.message);
+            if (auditId) await updateAuditRecord(supabase, auditId, {
+                status: 'failed', error_message: `GPT-4o-mini: ${err.message}`,
+                raw_response: { error: err.message, transcript }
+            });
+            return NextResponse.json({ ok: false, error: `Text analysis failed: ${err.message}` }, { status: 502 });
+        }
+
+        const textScore = calculateScore(textAnalysis, effectiveRole);
+
+        // ══════════════════════════════════════════════
+        // ENGINE 2: gpt-4o-audio-preview (conditional)
+        // Triggers 50% of the time: uno sí, uno no (impares sí, pares no)
+        // ══════════════════════════════════════════════
+
+        let deepAnalysis = null;
+        const isMP3 = (audioUrl || '').toLowerCase().includes('.mp3');
+        const currentFlightNum = flightNumber || 1;
+        const shouldDeepAnalyze = isMP3 && (currentFlightNum % 2 !== 0);
+
+        if (shouldDeepAnalyze) {
             try {
-                const result = await model.generateContent([
-                    { text: getAuditPrompt(source) },
-                    {
-                        inlineData: {
-                            mimeType,
-                            data: base64Audio
+                const base64Audio = audioBuffer.toString('base64');
+                const audioPrompt = effectiveRole === 'piloto' ? PILOTO_AUDIO_PROMPT : DOCENTE_AUDIO_PROMPT;
+
+                const audioCompletion = await openai.chat.completions.create({
+                    model: AUDIO_MODEL,
+                    messages: [
+                        { role: 'system', content: audioPrompt },
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'input_audio', input_audio: { data: base64Audio, format: 'mp3' } }
+                            ]
                         }
-                    }
-                ]);
-
-                rawText = result.response.text();
-                geminiResponse = parseGeminiJSON(rawText);
-
-                if (geminiResponse) break; // Success
-
-            } catch (err) {
-                console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err.message);
-                if (attempt === 2) {
-                    // Both attempts failed
-                    if (auditId) {
-                        await updateAuditRecord(supabase, auditId, {
-                            status: 'failed',
-                            error_message: `Gemini error: ${err.message}`,
-                            raw_response: { error: err.message, rawText }
-                        });
-                    }
-                    return NextResponse.json(
-                        { ok: false, error: `AI analysis failed: ${err.message}` },
-                        { status: 502 }
-                    );
-                }
-                // Wait 2s before retry
-                await new Promise(r => setTimeout(r, 2000));
-            }
-        }
-
-        // ── Step 4: Parse & Validate scorecard ──
-        if (!geminiResponse) {
-            if (auditId) {
-                await updateAuditRecord(supabase, auditId, {
-                    status: 'parse_failed',
-                    error_message: 'Could not parse JSON from Gemini response',
-                    raw_response: { rawText }
+                    ],
+                    modalities: ['text'],
+                    temperature: 0.2
                 });
+
+                const rawDeep = audioCompletion.choices?.[0]?.message?.content || '';
+                // Parse JSON from response (might have markdown fences)
+                const cleaned = rawDeep.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                try {
+                    deepAnalysis = JSON.parse(cleaned);
+                } catch {
+                    const match = cleaned.match(/\{[\s\S]*\}/);
+                    if (match) deepAnalysis = JSON.parse(match[0]);
+                }
+
+                console.log(`🎧 Deep audio analysis: energia_vocal=${deepAnalysis?.energia_vocal}`);
+
+                // Override text-based energia with audio-based if available
+                if (deepAnalysis?.energia_vocal) {
+                    if (deepAnalysis.energia_vocal === 'baja' || !deepAnalysis.tono_entusiasta) {
+                        textAnalysis.energia_positiva = false;
+                    } else if (deepAnalysis.energia_vocal === 'alta' && deepAnalysis.tono_entusiasta) {
+                        textAnalysis.energia_positiva = true;
+                    }
+                }
+            } catch (err) {
+                console.warn('⚠️ Deep audio analysis failed (non-blocking):', err.message);
+                // Continue with text-only results — deep analysis is a bonus
             }
-            return NextResponse.json(
-                { ok: false, error: 'Failed to parse AI response.' },
-                { status: 502 }
-            );
         }
 
-        const scorecard = normalizeScorecard(geminiResponse);
+        // ── Final score (may be adjusted by deep analysis) ──
+        const finalScore = calculateScore(textAnalysis, effectiveRole);
+        const dbColumns = mapToDbColumns(textAnalysis, effectiveRole, finalScore, transcript, deepAnalysis);
 
-        // ── Step 5: Persist scorecard ──
+        // ── Persist ──
         if (auditId) {
             await updateAuditRecord(supabase, auditId, {
-                status: 'completed',
-                score: scorecard.score,
-                menciona_nombre_equipo: scorecard.menciona_nombre_equipo,
-                nombre_equipo_detectado: scorecard.nombre_equipo_detectado,
-                menciona_destino: scorecard.menciona_destino,
-                destino_detectado: scorecard.destino_detectado,
-                dinamica_sube_sube: scorecard.dinamica_sube_sube,
-                energia_interaccion: scorecard.energia_interaccion,
-                participacion_ninos_audible: scorecard.participacion_ninos_audible,
-                feedback_para_isa: scorecard.feedback_para_isa,
-                resumen_supervisor: scorecard.resumen_supervisor,
-                raw_response: geminiResponse,
-                model_used: MODEL_ID,
-                error_message: null
+                status: 'completed', ...dbColumns, error_message: null
             });
         }
 
-        // ── Step 6: Return scorecard ──
+        // ── Return ──
         const elapsed = Date.now() - startTime;
-        console.log(`✅ Audio audit completed: score=${scorecard.score}, time=${elapsed}ms, audit=${auditId}`);
+        const engines = deepAnalysis ? 'groq-whisper→gpt4o-mini→audio-preview' : 'groq-whisper→gpt4o-mini';
+        console.log(`✅ Audit [${effectiveRole}]: score=${finalScore}, engines=${engines}, time=${elapsed}ms`);
 
         return NextResponse.json({
             ok: true,
             auditId,
-            score: scorecard.score,
-            menciona_nombre_equipo: scorecard.menciona_nombre_equipo,
-            nombre_equipo_detectado: scorecard.nombre_equipo_detectado,
-            menciona_destino: scorecard.menciona_destino,
-            destino_detectado: scorecard.destino_detectado,
-            dinamica_sube_sube: scorecard.dinamica_sube_sube,
-            energia_interaccion: scorecard.energia_interaccion,
-            participacion_ninos_audible: scorecard.participacion_ninos_audible,
-            feedback_para_isa: scorecard.feedback_para_isa,
-            resumen_supervisor: scorecard.resumen_supervisor,
+            role: effectiveRole,
+            analysis: textAnalysis,
+            deepAnalysis,
+            transcript,
+            engines,
+            score: finalScore,
+            menciona_nombre_equipo: dbColumns.menciona_nombre_equipo,
+            nombre_equipo_detectado: dbColumns.nombre_equipo_detectado,
+            menciona_destino: dbColumns.menciona_destino,
+            destino_detectado: dbColumns.destino_detectado,
+            dinamica_sube_sube: dbColumns.dinamica_sube_sube,
+            energia_interaccion: dbColumns.energia_interaccion,
+            participacion_ninos_audible: dbColumns.participacion_ninos_audible,
+            feedback_para_isa: dbColumns.feedback_para_isa,
+            resumen_supervisor: dbColumns.resumen_supervisor,
             elapsedMs: elapsed
         });
 
     } catch (error) {
-        console.error('❌ Analyze-audio fatal error:', error);
-        return NextResponse.json(
-            { ok: false, error: error?.message || 'Internal server error.' },
-            { status: 500 }
-        );
+        console.error('❌ Analyze-audio fatal:', error);
+        return NextResponse.json({ ok: false, error: error?.message || 'Internal server error.' }, { status: 500 });
     }
 }
