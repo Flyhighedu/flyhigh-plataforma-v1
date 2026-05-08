@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { StopCircle, Clock, Plane, AlertTriangle, XCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { StopCircle, Clock, Plane, AlertTriangle, XCircle, Mic, MicOff, Settings, RefreshCw } from 'lucide-react';
 import CounterData from './CounterData';
 import IncidentReporter from './IncidentReporter';
 
@@ -64,8 +64,52 @@ export default function FlightLogger({
     totalStudentsFlown = 0,
     totalOperationElapsedSeconds = 0,
     showTotalOperationTimer = false,
-    pilotRecording = false
+    pilotRecording = false,
+    pilotMicPermission = null,
+    pilotMicSupported = false,
+    onRetryMicPermission = null
 }) {
+    const [micBannerDismissed, setMicBannerDismissed] = useState(false);
+    const [micRetrying, setMicRetrying] = useState(false);
+    const [micRetryResult, setMicRetryResult] = useState(null); // 'success' | 'failed' | null
+
+    // Detect platform and execution context for instructions
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    const isStandalone = typeof window !== 'undefined' && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator?.standalone === true
+    );
+
+    const micIsDenied = pilotMicPermission === 'denied';
+    const micIsPrompt = pilotMicPermission === 'prompt';
+    const micNeedsAttention = (micIsDenied || (pilotMicSupported && micIsPrompt)) && !micBannerDismissed;
+
+    const handleRetryMic = useCallback(async () => {
+        if (!onRetryMicPermission || micRetrying) return;
+        setMicRetrying(true);
+        setMicRetryResult(null);
+        try {
+            const ok = await onRetryMicPermission();
+            setMicRetryResult(ok ? 'success' : 'failed');
+            if (ok) {
+                // Auto-dismiss banner after success
+                setTimeout(() => setMicBannerDismissed(true), 1500);
+            }
+        } catch {
+            setMicRetryResult('failed');
+        } finally {
+            setMicRetrying(false);
+        }
+    }, [onRetryMicPermission, micRetrying]);
+
+    // Reset banner dismiss when permission changes to granted
+    useEffect(() => {
+        if (pilotMicPermission === 'granted') {
+            setMicBannerDismissed(false);
+            setMicRetryResult(null);
+        }
+    }, [pilotMicPermission]);
     const initialState = buildInitialFlightState(initialActiveFlight);
     const [status, setStatus] = useState(() => initialState.status); // 'idle' (pre-flight), 'active' (in-flight)
     const [startTime, setStartTime] = useState(() => initialState.startTime);
@@ -302,6 +346,12 @@ export default function FlightLogger({
                             Grabando narración
                         </span>
                     )}
+                    {!isIdle && !pilotRecording && micIsDenied && (
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-[10px] font-black uppercase tracking-wide text-amber-200">
+                            <MicOff size={10} />
+                            Sin grabación
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -319,6 +369,112 @@ export default function FlightLogger({
                User requested logic: "The staff must FIRST input... Once entered.. enable button".
                It implies input is a pre-requisite step. Let's leave them editable during flight just in case of correction, but emphasize PRE-flight input.
             */}
+
+            {/* ── Microphone Permission Banner ── */}
+            {isIdle && micNeedsAttention && pilotMicPermission !== 'granted' && (
+                <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3 shadow-sm animate-in fade-in duration-300">
+                    <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                            <MicOff size={20} className="text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-bold text-amber-800 mb-0.5">
+                                {micIsDenied ? '🎙️ Micrófono Bloqueado' : '🎙️ Micrófono No Activado'}
+                            </h4>
+                            <p className="text-xs text-amber-700 leading-relaxed">
+                                {micIsDenied
+                                    ? 'Tu narración de vuelo no se podrá grabar. Necesitas activar el micrófono manualmente.'
+                                    : 'Activa el micrófono para que tu narración se grabe automáticamente en cada vuelo.'
+                                }
+                            </p>
+                        </div>
+                    </div>
+
+                    {micIsDenied && (
+                        <div className="rounded-xl bg-white border border-amber-200 p-3 space-y-2">
+                            <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                                {isStandalone
+                                    ? (isIOS ? '📱 Pasos en iPhone (app instalada):' : isAndroid ? '📱 Pasos en Android (app instalada):' : '📱 Cómo activarlo:')
+                                    : (isIOS ? '🌐 Pasos en Safari:' : isAndroid ? '🌐 Pasos en Chrome:' : '🌐 Cómo activarlo:')
+                                }
+                            </p>
+                            {isAndroid && isStandalone ? (
+                                <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
+                                    <li>Abre <strong>Ajustes</strong> de tu teléfono</li>
+                                    <li>Ve a <strong>Apps → &quot;FlyHigh&quot;</strong> (o Chrome)</li>
+                                    <li>Toca <strong>Permisos → Micrófono</strong></li>
+                                    <li>Selecciona <strong>&quot;Permitir&quot;</strong></li>
+                                    <li>Regresa aquí y toca el botón de abajo</li>
+                                </ol>
+                            ) : isAndroid && !isStandalone ? (
+                                <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
+                                    <li>Toca el ícono <strong>🔒</strong> en la barra de dirección (arriba)</li>
+                                    <li>Toca <strong>&quot;Permisos&quot;</strong> o <strong>&quot;Configuración del sitio&quot;</strong></li>
+                                    <li>Activa <strong>Micrófono</strong></li>
+                                    <li>Toca el botón de abajo para verificar</li>
+                                </ol>
+                            ) : isIOS && isStandalone ? (
+                                <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
+                                    <li>Abre <strong>Ajustes</strong> del iPhone</li>
+                                    <li>Ve a <strong>Safari</strong></li>
+                                    <li>Toca <strong>Micrófono → Permitir</strong></li>
+                                    <li>Regresa aquí y toca el botón de abajo</li>
+                                </ol>
+                            ) : isIOS && !isStandalone ? (
+                                <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
+                                    <li>Toca <strong>&quot;aA&quot;</strong> en la barra de dirección</li>
+                                    <li>Toca <strong>&quot;Configuración del sitio web&quot;</strong></li>
+                                    <li>Activa <strong>Micrófono</strong></li>
+                                    <li>Toca el botón de abajo para verificar</li>
+                                </ol>
+                            ) : (
+                                <ol className="text-xs text-amber-700 space-y-1.5 list-decimal list-inside">
+                                    <li>Abre los <strong>Ajustes</strong> de tu dispositivo</li>
+                                    <li>Busca la app del navegador o &quot;FlyHigh&quot;</li>
+                                    <li>Activa el permiso de <strong>Micrófono</strong></li>
+                                    <li>Regresa aquí y toca el botón de abajo</li>
+                                </ol>
+                            )}
+                        </div>
+                    )}
+
+                    {micRetryResult === 'success' && (
+                        <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 flex items-center gap-2">
+                            <Mic size={14} className="text-emerald-600" />
+                            <span className="text-xs font-bold text-emerald-700">¡Micrófono activado correctamente! ✅</span>
+                        </div>
+                    )}
+
+                    {micRetryResult === 'failed' && (
+                        <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 flex items-center gap-2">
+                            <MicOff size={14} className="text-red-500" />
+                            <span className="text-xs font-bold text-red-600">Aún no se detecta el micrófono. Sigue los pasos de arriba.</span>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleRetryMic}
+                            disabled={micRetrying || micRetryResult === 'success'}
+                            className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:active:scale-100"
+                        >
+                            {micRetrying ? (
+                                <><RefreshCw size={14} className="animate-spin" /> Verificando...</>
+                            ) : micRetryResult === 'success' ? (
+                                <><Mic size={14} /> Activado ✅</>
+                            ) : (
+                                <><RefreshCw size={14} /> {micIsDenied ? 'Ya lo activé, verificar' : 'Activar micrófono'}</>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setMicBannerDismissed(true)}
+                            className="px-4 h-11 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            Omitir
+                        </button>
+                    </div>
+                </div>
+            )}
             <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${!isIdle ? 'opacity-80' : ''}`}>
                 <CounterData
                     label="Alumnos"

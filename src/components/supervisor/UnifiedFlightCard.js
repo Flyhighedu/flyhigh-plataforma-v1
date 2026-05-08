@@ -2,292 +2,239 @@
 
 import { useState } from 'react';
 
-const CHECKLIST_LABELS = {
-    menciona_nombre_equipo: { label: 'Nombre del equipo', emoji: '✋' },
-    menciona_destino: { label: 'Mención del destino', emoji: '🗺️' },
-    dinamica_sube_sube: { label: 'Dinámica ¡Sube Sube!', emoji: '🚀' },
-    participacion_ninos_audible: { label: 'Participación de niños', emoji: '👧' }
+// ── Checklist: Docente (ISA) ──
+const DOCENTE_CHECKLIST = {
+    menciona_nombre_equipo: { label: 'Nombre del equipo', failMsg: 'no mencionó el nombre del equipo', passMsg: 'mencionó el nombre del equipo' },
+    menciona_destino: { label: 'Destino del vuelo', failMsg: 'no mencionó el destino', passMsg: 'mencionó el destino del vuelo' },
+    dinamica_sube_sube: { label: '¡Sube Sube!', failMsg: 'no realizó la dinámica ¡Sube Sube!', passMsg: 'realizó la dinámica ¡Sube Sube!' },
+    energia_positiva: { label: 'Energía positiva', failMsg: 'no transmitió energía positiva', passMsg: 'transmitió energía positiva' },
+    participacion_ninos_audible: { label: 'Participación niños', failMsg: 'no se escuchó participación de los niños', passMsg: 'se escuchó participación de los niños' }
+};
+
+// ── Checklist: Piloto ──
+const PILOT_CHECKLIST = {
+    menciona_destino: { label: 'Dato educativo/geográfico', failMsg: 'no mencionó datos educativos o geográficos', passMsg: 'mencionó datos educativos o geográficos' },
+    energia_positiva: { label: 'Energía positiva', failMsg: 'no transmitió energía positiva', passMsg: 'transmitió energía positiva' },
+    fomenta_interaccion: { label: 'Fomenta interacción', failMsg: 'no fomentó la interacción con los niños', passMsg: 'fomentó la interacción con los niños' },
+    participacion_ninos_audible: { label: 'Participación niños', failMsg: 'no se escuchó participación de los niños', passMsg: 'se escuchó participación de los niños' }
 };
 
 const ENERGY_COLORS = {
-    alta: { bg: '#DCFCE7', text: '#16A34A', label: 'Alta' },
-    media: { bg: '#FEF9C3', text: '#CA8A04', label: 'Media' },
-    baja: { bg: '#FEE2E2', text: '#DC2626', label: 'Baja' }
+    alta: { text: '#4ADE80', label: 'Alta' },
+    media: { text: '#FACC15', label: 'Media' },
+    baja: { text: '#F87171', label: 'Baja' }
 };
 
-function scoreColor(score) {
-    if (score >= 80) return '#16A34A';
-    if (score >= 60) return '#CA8A04';
-    if (score >= 40) return '#EA580C';
-    return '#DC2626';
+function scoreColor(s) { if (s >= 80) return '#4ADE80'; if (s >= 60) return '#FACC15'; if (s >= 40) return '#FB923C'; return '#F87171'; }
+function scoreBg(s) { if (s >= 80) return 'rgba(74,222,128,0.12)'; if (s >= 60) return 'rgba(250,204,21,0.12)'; if (s >= 40) return 'rgba(251,146,60,0.12)'; return 'rgba(248,113,113,0.12)'; }
+function scoreGrade(s) { if (s >= 90) return 'Excelente'; if (s >= 75) return 'Bien'; if (s >= 60) return 'Regular'; if (s >= 40) return 'Bajo'; return 'Crítico'; }
+
+function fmtMMSS(sec) { if (!sec || isNaN(sec)) return '00:00'; return `${Math.floor(sec / 60).toString().padStart(2, '0')}:${Math.floor(sec % 60).toString().padStart(2, '0')}`; }
+function fmtClock(iso) { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }); } catch { return ''; } }
+
+function getChecklistForAudit(audit) {
+    if (!audit) return DOCENTE_CHECKLIST;
+    return audit.source === 'pilot_narration' ? PILOT_CHECKLIST : DOCENTE_CHECKLIST;
 }
 
-function scoreBg(score) {
-    if (score >= 80) return '#F0FDF4';
-    if (score >= 60) return '#FEFCE8';
-    if (score >= 40) return '#FFF7ED';
-    return '#FEF2F2';
+function getRoleName(audit, isaName) {
+    if (!audit) return isaName || 'La docente';
+    if (audit.source === 'pilot_narration') return 'El piloto';
+    return isaName || 'La docente';
 }
 
-function fmtMMSS(sec) {
-    if (!sec || isNaN(sec)) return '00:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+function getRoleLabel(audit) {
+    if (!audit) return 'Docente';
+    return audit.source === 'pilot_narration' ? 'Piloto' : 'Docente';
 }
 
-function fmtClock(isoString) {
-    if (!isoString) return '';
-    try {
-        const d = new Date(isoString);
-        return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Mexico_City' });
-    } catch { return ''; }
+function buildMiniReport(audit, isaName) {
+    if (!audit || audit.status !== 'completed' || audit.score === null) return null;
+    const checklist = getChecklistForAudit(audit);
+    const name = getRoleName(audit, isaName);
+    const passed = [];
+    const failed = [];
+    Object.entries(checklist).forEach(([key, cfg]) => {
+        if (audit[key] === true) passed.push(cfg);
+        else if (audit[key] === false) failed.push(cfg);
+    });
+
+    const grade = scoreGrade(audit.score);
+    const energyKey = audit.energia_interaccion;
+    const energyLabel = ENERGY_COLORS[energyKey]?.label?.toLowerCase() || null;
+
+    let report = `${name} obtuvo una calificación ${grade.toLowerCase()} (${audit.score}/100).`;
+    if (passed.length > 0) {
+        const passNames = passed.map(p => p.passMsg);
+        if (passNames.length <= 2) report += ` ${capitalize(passNames.join(' y '))}.`;
+        else report += ` ${capitalize(passNames.slice(0, -1).join(', '))} y ${passNames[passNames.length - 1]}.`;
+    }
+    if (failed.length > 0) {
+        const failNames = failed.map(f => f.failMsg);
+        if (failNames.length === 1) report += ` Sin embargo, ${failNames[0]}.`;
+        else report += ` Sin embargo, ${failNames.slice(0, -1).join(', ')} y ${failNames[failNames.length - 1]}.`;
+    }
+    if (energyLabel) report += ` Su energía vocal fue ${energyLabel}.`;
+    return report;
 }
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 export default function UnifiedFlightCard({
-    flightNumber,
-    teamName,
-    destinations,
-    audioUrl,
-    audioSizeKB,
-    audioDurationSeconds,
-    teacherAudioUrl,
-    teacherAudioSizeKB,
-    teacherAudioDurationSeconds,
-    timestamp,
-    audit // The QA data object from AudioQualityWidget if it exists
+    flightNumber, teamName, destinations,
+    audioUrl, audioSizeKB, audioDurationSeconds,
+    timestamp, audit, isaName
 }) {
-    // If there's an audit and score is < 60, start expanded to draw attention
-    const [isExpanded, setIsExpanded] = useState(audit && audit.score !== null && audit.score < 60);
     const [isRetrying, setIsRetrying] = useState(false);
     const [retrySuccess, setRetrySuccess] = useState(false);
+    const [showChecklist, setShowChecklist] = useState(false);
 
     const handleRetry = async () => {
         setIsRetrying(true);
         try {
             const res = await fetch('/api/staff/analyze-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    auditId: audit.id,
-                    audioUrl: audioUrl || teacherAudioUrl,
-                    journeyId: audit.journey_id,
-                    flightNumber: flightNumber,
-                    audioDurationSeconds: audioDurationSeconds || teacherAudioDurationSeconds
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auditId: audit.id, audioUrl: audioUrl, journeyId: audit.journey_id, flightNumber, audioDurationSeconds })
             });
             const data = await res.json();
-            if (data.ok) {
-                setRetrySuccess(true);
-            } else {
-                alert('Falló el reintento: ' + data.error);
-            }
-        } catch (e) {
-            alert('Error de red al reintentar.');
-        } finally {
-            setIsRetrying(false);
-        }
+            if (data.ok) setRetrySuccess(true); else alert('Falló: ' + data.error);
+        } catch { alert('Error de red.'); }
+        finally { setIsRetrying(false); }
     };
 
     const hasPilotAudio = !!audioUrl;
-    const hasTeacherAudio = !!teacherAudioUrl;
-    const hasAnyAudio = hasPilotAudio || hasTeacherAudio;
+    const hasAnyAudio = hasPilotAudio;
+    const audioRoleLabel = audit?.source === 'pilot_narration' ? 'Piloto' : 'Docente';
+    const audioRoleColor = audit?.source === 'pilot_narration' ? 'text-sky-400' : 'text-violet-400';
+    const isAuditOk = audit && audit.status === 'completed' && audit.score !== null;
+    const needsAttention = isAuditOk && audit.score < 60;
+
+    // Select the correct checklist based on the audit's source
+    const checklist = getChecklistForAudit(audit);
+    const roleLabel = getRoleLabel(audit);
+    const passedCount = isAuditOk ? Object.keys(checklist).filter(k => audit[k] === true).length : 0;
+    const totalCriteria = Object.keys(checklist).length;
+    const energyKey = audit?.energia_interaccion;
+    const energyInfo = ENERGY_COLORS[energyKey] || null;
+    const miniReport = isAuditOk ? buildMiniReport(audit, isaName) : null;
+
+    // Role-based accent color
+    const roleAccent = audit?.source === 'pilot_narration' ? '#38BDF8' : '#A78BFA';
 
     return (
-        <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden mb-3 shadow-sm">
-            {/* ── HEADER ── */}
-            <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between bg-slate-800/60">
-                <div className="flex flex-col gap-0.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <span className="flex items-center justify-center size-6 rounded-md bg-violet-500/15 text-[10px] font-black text-violet-300 flex-shrink-0">
-                            #{flightNumber}
-                        </span>
-                        <h3 className="text-sm font-extrabold text-white truncate">
-                            {teamName ? `"${teamName}"` : 'Sin nombre de equipo'}
+        <div className={`rounded-xl border overflow-hidden shadow-md backdrop-blur-sm transition-all duration-300 ${needsAttention ? 'border-rose-500/30 bg-slate-900/60' : 'border-white/5 bg-slate-900/40 hover:border-white/10'}`}>
+            {/* HEADER COMPACTO Y ELÁSTICO */}
+            <div className={`px-4 py-3 flex flex-row items-start justify-between border-b gap-3 ${needsAttention ? 'bg-rose-500/10 border-rose-500/20' : 'bg-slate-800/50 border-white/5'}`}>
+                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-[16px] font-black text-indigo-300/80 tracking-tighter">#{flightNumber}</span>
+                        <h3 className="text-[14px] font-bold text-white whitespace-normal break-words leading-tight">
+                            {teamName ? `"${teamName}"` : 'Sin equipo'}
                         </h3>
                     </div>
-                    <div className="flex items-center gap-2 ml-8">
-                        {timestamp && (
-                            <p className="text-[10px] text-slate-500">{fmtClock(timestamp)}</p>
-                        )}
-                        {audit?.source === 'pilot_narration' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">✈️ Piloto</span>
-                        ) : audit?.source === 'bitacora' ? (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/20">🎓 Docente</span>
-                        ) : null}
-                    </div>
+                    {/* Role badge */}
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit" style={{ color: roleAccent, background: `${roleAccent}15`, border: `1px solid ${roleAccent}30` }}>
+                        {roleLabel}
+                    </span>
                 </div>
 
-                {audit && audit.status === 'completed' && audit.score !== null && (
-                    <div
-                        className="flex items-center justify-center px-2 py-1 rounded-md flex-shrink-0 border gap-1.5 shadow-sm"
-                        style={{
-                            background: scoreBg(audit.score),
-                            borderColor: `${scoreColor(audit.score)}40`,
-                            color: scoreColor(audit.score)
-                        }}
-                        title={`Calificación de la IA: ${audit.score}/100`}
-                    >
-                        <span className="text-[10px] font-extrabold tracking-widest uppercase opacity-75">🤖 SCORE IA</span>
-                        <div className="flex items-baseline gap-0.5">
-                            <span className="text-[14px] font-black leading-none tabular-nums tracking-tight">{audit.score}</span>
-                            <span className="text-[9px] font-bold opacity-60 leading-none">/100</span>
-                        </div>
+                {isAuditOk && (
+                    <div className="flex items-baseline gap-0.5 px-2.5 py-1 rounded-md border shadow-inner mt-0.5 flex-shrink-0" style={{ background: scoreBg(audit.score), borderColor: `${scoreColor(audit.score)}40`, color: scoreColor(audit.score) }}>
+                        <span className="text-[16px] font-black leading-none tracking-tight">{audit.score}</span>
+                        <span className="text-[10px] font-bold opacity-70 leading-none">/100</span>
                     </div>
                 )}
             </div>
 
-            {/* ── BODY (Bitácora & Audio) ── */}
-            <div className="px-4 py-3 space-y-3">
-                {/* Destinos */}
-                {destinations && (
-                    <div className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-sm text-sky-400/80 mt-0.5 flex-shrink-0">map</span>
-                        <p className="text-xs text-slate-300 leading-relaxed">{destinations}</p>
-                    </div>
-                )}
-
-                {/* ── Pilot Narration Audio (Blue theme) ── */}
-                {hasPilotAudio && (
-                    <div className="pt-1">
-                        <div className="flex items-center justify-between mb-1.5 px-1">
-                            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wide flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">flight</span>
-                                Narración del Piloto
-                            </span>
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 tabular-nums">
-                                {audioDurationSeconds > 0 && <span>{fmtMMSS(audioDurationSeconds)}</span>}
-                                {audioSizeKB > 0 && <span>{audioSizeKB}KB</span>}
+            {/* BODY COMPACTO */}
+            <div className="px-3 py-2">
+                {/* Audio player — solo Piloto */}
+                <div className="flex flex-col gap-1.5">
+                    {hasPilotAudio && (
+                        <div className="flex items-center gap-2 bg-slate-950/40 rounded border border-slate-800/60 px-2 py-1 shadow-inner">
+                            <div className="flex flex-col justify-center w-16 flex-shrink-0">
+                                <span className={`text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 ${audioRoleColor}`}>
+                                    <span className="material-symbols-outlined text-[11px]">mic</span> {audioRoleLabel}
+                                </span>
+                                {audioDurationSeconds > 0 && <span className="text-[8px] text-slate-500 font-medium">{fmtMMSS(audioDurationSeconds)}</span>}
                             </div>
+                            <audio controls preload="none" className="flex-1 h-6 opacity-70 hover:opacity-100 transition-opacity" style={{ filter: 'invert(1) hue-rotate(180deg)' }}>
+                                <source src={audioUrl} type="audio/webm" />
+                            </audio>
                         </div>
-                        <audio
-                            controls
-                            preload="none"
-                            className="w-full h-8"
-                            style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.8 }}
-                        >
-                            <source src={audioUrl} type="audio/webm" />
-                            Tu navegador no soporta audio.
-                        </audio>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {/* ── Teacher Bitácora Audio (Violet theme) ── */}
-                {hasTeacherAudio && (
-                    <div className="pt-1">
-                        <div className="flex items-center justify-between mb-1.5 px-1">
-                            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wide flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[12px]">record_voice_over</span>
-                                Bitácora Docente
-                            </span>
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 tabular-nums">
-                                {teacherAudioDurationSeconds > 0 && <span>{fmtMMSS(teacherAudioDurationSeconds)}</span>}
-                                {teacherAudioSizeKB > 0 && <span>{teacherAudioSizeKB}KB</span>}
+                {!hasAnyAudio && <p className="text-[10px] text-slate-500 italic py-1 text-center">Sin registros de audio.</p>}
+
+                {/* ── Mini Reporte IA ── */}
+                {miniReport && (
+                    <div className="mt-2 rounded bg-slate-800/30 p-2.5 border border-white/5 flex flex-col gap-1" style={{ borderLeft: `2px solid ${scoreColor(audit.score)}` }}>
+                        <p className="text-[11px] text-slate-300 leading-relaxed m-0 font-medium whitespace-normal break-words">{miniReport}</p>
+                        {audit.feedback_para_isa && (
+                            <div className="flex items-start gap-1.5 mt-1 border-l-2 border-indigo-500/20 pl-2">
+                                <span className="material-symbols-outlined text-[12px] text-indigo-400/80 mt-0.5">chat</span>
+                                <p className="text-[10px] text-indigo-300/80 italic m-0 leading-relaxed font-medium whitespace-normal break-words">
+                                    "{audit.feedback_para_isa}"
+                                </p>
                             </div>
-                        </div>
-                        <audio
-                            controls
-                            preload="none"
-                            className="w-full h-8"
-                            style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.8 }}
-                        >
-                            <source src={teacherAudioUrl} type="audio/webm" />
-                            Tu navegador no soporta audio.
-                        </audio>
+                        )}
                     </div>
-                )}
-
-                {(!destinations && !hasAnyAudio) && (
-                    <p className="text-xs text-slate-500 italic">No hay datos de bitácora ni audio para esta tanda.</p>
                 )}
             </div>
 
-            {/* ── FOOTER (AI Audit Breakdown) ── */}
+            {/* FOOTER */}
             {audit && (
-                <div className="border-t border-slate-700/50">
+                <div className="border-t border-white/5 bg-slate-900/80">
                     {(audit.status === 'failed' || audit.status === 'parse_failed') ? (
-                        <div className="px-4 py-3 bg-rose-500/10 flex flex-col gap-2">
-                            <div className="flex items-start gap-2">
-                                <span className="material-symbols-outlined text-sm text-rose-400 mt-0.5">error</span>
-                                <div className="flex-1">
-                                    <p className="text-xs font-bold text-rose-400">La IA no pudo analizar este audio</p>
-                                    <p className="text-[10px] text-rose-300/70 mt-0.5 leading-tight">{audit.error_message || 'Servidor ocupado'}</p>
-                                </div>
+                        <div className="px-3 py-2 flex items-center justify-between gap-3 bg-rose-500/5">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[14px] text-rose-400">error</span>
+                                <span className="text-[10px] font-bold text-rose-400">Error IA: {audit.error_message || 'Fallo'}</span>
                             </div>
-                            <button
-                                onClick={handleRetry}
-                                disabled={isRetrying || retrySuccess}
-                                className="self-start mt-1 px-3 py-1.5 rounded-md bg-rose-500/20 text-rose-300 text-[11px] font-bold border border-rose-500/30 hover:bg-rose-500/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                                <span className={`material-symbols-outlined text-[14px] ${isRetrying ? 'animate-spin' : ''}`}>
-                                    {retrySuccess ? 'check_circle' : 'refresh'}
-                                </span>
-                                {retrySuccess ? 'Enviado, actualiza la página' : isRetrying ? 'Reintentando...' : 'Forzar Reintento Manual'}
+                            <button onClick={handleRetry} disabled={isRetrying || retrySuccess} className="px-2 py-1 rounded bg-rose-500/10 text-rose-300 text-[9px] font-bold border border-rose-500/20 hover:bg-rose-500/20 flex items-center gap-1 transition-colors">
+                                <span className={`material-symbols-outlined text-[12px] ${isRetrying ? 'animate-spin' : ''}`}>{retrySuccess ? 'check' : 'refresh'}</span>
+                                {retrySuccess ? 'OK' : 'Reintentar'}
                             </button>
                         </div>
-                    ) : audit.status === 'completed' && (
-                        <>
-                            <button
-                                onClick={() => setIsExpanded(!isExpanded)}
-                                className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-bold text-slate-300 hover:bg-slate-700/30 transition-colors"
-                            >
-                                <span className="flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm text-amber-400">smart_toy</span>
-                                    Evaluación de Calidad IA
-                                </span>
-                                <span className={`material-symbols-outlined text-sm text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                    expand_more
-                                </span>
-                            </button>
-
-                            {isExpanded && (
-                                <div className="px-4 pb-4 pt-1 bg-slate-800/20">
-                                    {/* Checklist */}
-                                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3">
-                                        {Object.entries(CHECKLIST_LABELS).map(([key, config]) => {
-                                            const val = audit[key];
-                                            const isPass = val === true;
-                                            const isFail = val === false;
-                                            return (
-                                                <div key={key} className={`flex items-center gap-1.5 text-[11px] font-bold ${isPass ? 'text-emerald-400' : isFail ? 'text-rose-400' : 'text-slate-500'}`}>
-                                                    <span>{isPass ? '✅' : isFail ? '❌' : '❓'}</span>
-                                                    <span className="truncate">{config.label}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Energy Badge */}
-                                    {audit.energia_interaccion && audit.energia_interaccion !== 'no_detectado' && (
-                                        <div
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold mb-3"
-                                            style={{
-                                                background: ENERGY_COLORS[audit.energia_interaccion]?.bg || '#F1F5F9',
-                                                color: ENERGY_COLORS[audit.energia_interaccion]?.text || '#64748B'
-                                            }}
-                                        >
-                                            ⚡ Energía {ENERGY_COLORS[audit.energia_interaccion]?.label || audit.energia_interaccion}
-                                        </div>
+                    ) : isAuditOk && (
+                        <div className="px-3 py-2 flex flex-col">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-[10px]">
+                                    <span className="font-bold text-slate-300">{passedCount}/{totalCriteria} criterios cumplidos</span>
+                                    {energyInfo && (
+                                        <>
+                                            <span className="text-slate-600">|</span>
+                                            <span style={{ color: energyInfo.text }} className="font-bold flex items-center gap-0.5">
+                                                <span className="material-symbols-outlined text-[12px]">bolt</span> {energyInfo.label}
+                                            </span>
+                                        </>
                                     )}
+                                </div>
+                                <button onClick={() => setShowChecklist(!showChecklist)} className="text-indigo-400 font-bold hover:text-indigo-300 text-[10px] flex items-center gap-0.5 transition-colors">
+                                    {showChecklist ? 'Cerrar' : 'Ver checklist'}
+                                    <span className={`material-symbols-outlined text-[14px] transition-transform ${showChecklist ? 'rotate-180' : ''}`}>expand_more</span>
+                                </button>
+                            </div>
 
-                                    {/* Supervisor Summary */}
-                                    {audit.resumen_supervisor && (
-                                        <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 mb-2">
-                                            <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                                                <span className="mr-1.5">📋</span>{audit.resumen_supervisor}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Feedback to ISA */}
-                                    {audit.feedback_para_isa && (
-                                        <p className="text-[11px] text-violet-300 leading-relaxed font-semibold italic bg-violet-500/10 rounded px-2 py-1.5 border border-violet-500/20">
-                                            💬 Feedback a ISA: "{audit.feedback_para_isa}"
-                                        </p>
-                                    )}
+                            {showChecklist && (
+                                <div className="mt-2.5 grid grid-cols-2 gap-1.5 p-2 bg-black/20 rounded-lg border border-white/5 shadow-inner">
+                                    {Object.entries(checklist).map(([key, config]) => {
+                                        const val = audit[key];
+                                        const isPass = val === true;
+                                        const isFail = val === false;
+                                        return (
+                                            <div key={key} className={`flex items-center gap-1.5 text-[10px] font-medium ${isPass ? 'text-emerald-400/90' : isFail ? 'text-rose-400/90' : 'text-slate-500'}`}>
+                                                <span className="material-symbols-outlined text-[13px]">
+                                                    {isPass ? 'check_circle' : isFail ? 'cancel' : 'remove'}
+                                                </span>
+                                                <span className="truncate">{config.label}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
-                        </>
+                        </div>
                     )}
                 </div>
             )}

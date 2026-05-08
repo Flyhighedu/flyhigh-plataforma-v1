@@ -1,382 +1,269 @@
 'use client';
 
 // =====================================================
-// AudioQualityWidget.js
-//
-// Premium dashboard widget for supervisors to monitor
-// ISA's pre-flight dynamic quality scores in real-time.
-//
-// Displays:
-//   - Average score gauge
-//   - Per-criteria compliance bars
-//   - Energy distribution
-//   - Alerts for low-scoring tandas
-//   - Individual tanda scorecards (expandable)
-//
-// Data source: GET /api/admin/audio-quality
+// AudioQualityWidget.js — V3 (Plan de Implementación Aprobado)
+// Contextual Metrics, Global Narrative & Progress Bars
 // =====================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import UnifiedFlightCard from './UnifiedFlightCard';
 
 const CHECKLIST_LABELS = {
-    menciona_nombre_equipo: { label: 'Nombre del equipo', emoji: '✋', desc: 'Dijo "Escuadrón X"' },
-    menciona_destino: { label: 'Mención del destino', emoji: '🗺️', desc: 'Mencionó a dónde volarían' },
-    dinamica_sube_sube: { label: 'Dinámica ¡Sube Sube!', emoji: '🚀', desc: 'Hizo la dinámica interactiva' },
-    participacion_ninos_audible: { label: 'Participación de niños', emoji: '👧', desc: 'Se escuchan respuestas de los niños' }
+    menciona_nombre_equipo: { label: 'Mencionó el nombre del equipo', icon: 'badge', action: 'mencionar al equipo', failMsg: 'no mencionó el equipo', passMsg: 'mencionó el equipo' },
+    menciona_destino: { label: 'Anunció el destino del vuelo', icon: 'explore', action: 'anunciar el destino', failMsg: 'no mencionó el destino', passMsg: 'mencionó el destino' },
+    dinamica_sube_sube: { label: 'Realizó la dinámica ¡Sube Sube!', icon: 'flight_takeoff', action: 'realizar la dinámica Sube Sube', failMsg: 'no realizó la dinámica Sube Sube', passMsg: 'realizó la dinámica Sube Sube' },
+    energia_positiva: { label: 'Transmitió energía positiva', icon: 'mood', action: 'transmitir energía positiva', failMsg: 'no transmitió energía positiva', passMsg: 'transmitió energía positiva' },
+    participacion_ninos_audible: { label: 'Logró participación de los niños', icon: 'groups', action: 'lograr la participación de los niños', failMsg: 'no logró participación de los niños', passMsg: 'logró participación de los niños' }
 };
 
 const ENERGY_COLORS = {
-    alta: { bg: '#DCFCE7', text: '#16A34A', label: 'Alta' },
-    media: { bg: '#FEF9C3', text: '#CA8A04', label: 'Media' },
-    baja: { bg: '#FEE2E2', text: '#DC2626', label: 'Baja' }
+    alta: { bg: 'rgba(34,197,94,0.15)', text: '#4ADE80', label: 'Alta' },
+    media: { bg: 'rgba(234,179,8,0.15)', text: '#FACC15', label: 'Media' },
+    baja: { bg: 'rgba(239,68,68,0.15)', text: '#F87171', label: 'Baja' }
 };
 
-function scoreColor(score) {
-    if (score >= 80) return '#16A34A';
-    if (score >= 60) return '#CA8A04';
-    if (score >= 40) return '#EA580C';
-    return '#DC2626';
+function scoreColor(s) { if (s >= 80) return '#4ADE80'; if (s >= 60) return '#FACC15'; if (s >= 40) return '#FB923C'; return '#F87171'; }
+function scoreGrade(s) { if (s >= 90) return 'Excelente'; if (s >= 75) return 'Bien'; if (s >= 60) return 'Regular'; if (s >= 40) return 'Bajo'; return 'Crítico'; }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function buildGlobalNarrative(summary, name) {
+    if (!summary || summary.totalAudited === 0) return null;
+    const passed = [];
+    const failed = [];
+    Object.entries(CHECKLIST_LABELS).forEach(([key, cfg]) => {
+        const rate = summary.checklist[key].rate;
+        if (rate >= 60) passed.push(cfg.action);
+        else failed.push(cfg.action);
+    });
+
+    const grade = scoreGrade(summary.avgScore);
+    let report = `En las últimas ${summary.totalAudited} misiones, ${name} obtuvo una calificación global ${grade.toLowerCase()}.`;
+    
+    if (passed.length > 0) {
+        if (passed.length <= 2) report += ` Demostró dominio al ${passed.join(' y ')}.`;
+        else report += ` Demostró dominio al ${passed.slice(0, -1).join(', ')} y ${passed[passed.length - 1]}.`;
+    }
+    if (failed.length > 0) {
+        if (failed.length === 1) report += ` Su principal área de oportunidad es ${failed[0]}.`;
+        else report += ` Requiere atención urgente para ${failed.slice(0, -1).join(', ')} y ${failed[failed.length - 1]}.`;
+    }
+    return report;
 }
 
-function scoreBg(score) {
-    if (score >= 80) return '#F0FDF4';
-    if (score >= 60) return '#FEFCE8';
-    if (score >= 40) return '#FFF7ED';
-    return '#FEF2F2';
+function buildNarrative(alert, isaName, audits) {
+    const name = isaName || 'la Docente';
+    const grade = scoreGrade(alert.score);
+    const audit = (audits || []).find(a => a.id === alert.id);
+    if (!audit) return { headline: `La calificación de ${name} fue ${grade.toLowerCase()}.`, failedNames: [], details: [], tip: alert.feedback };
+
+    const failed = [];
+    const passed = [];
+    Object.entries(CHECKLIST_LABELS).forEach(([key, cfg]) => {
+        if (audit[key] === true) passed.push({ ...cfg, ok: true });
+        else if (audit[key] === false) failed.push({ ...cfg, ok: false });
+    });
+
+    const energyKey = audit.energia_interaccion;
+    const energyLabel = ENERGY_COLORS[energyKey]?.label || null;
+
+    let headline = `La calificación de ${name} fue ${grade.toLowerCase()}.`;
+    if (energyLabel) headline += ` Su energía vocal fue ${energyLabel.toLowerCase()}`;
+    if (failed.length > 0) {
+        const failNames = failed.map(f => f.failMsg);
+        if (failed.length === 1) {
+            headline += `${energyLabel ? ' y' : ''} ${failNames[0]} (1 de ${failed.length + passed.length} fallado).`;
+        } else {
+            const last = failNames.pop();
+            headline += `${energyLabel ? ',' : ''} ${failNames.join(', ')} y ${last} (${failed.length} de ${failed.length + passed.length} fallados).`;
+        }
+    } else {
+        headline += '.';
+    }
+
+    const details = [...failed.map(f => ({ ok: false, text: capitalize(f.failMsg) })), ...passed.map(p => ({ ok: true, text: capitalize(p.passMsg) }))];
+    const tip = audit.feedback_para_isa || alert.feedback || null;
+    return { headline, details, tip };
 }
 
-function scoreGrade(score) {
-    if (score >= 90) return 'Excelente';
-    if (score >= 75) return 'Bien';
-    if (score >= 60) return 'Regular';
-    if (score >= 40) return 'Bajo';
-    return 'Crítico';
-}
-
-function fmtTime(iso) {
-    if (!iso) return '--:--';
-    try {
-        return new Date(iso).toLocaleTimeString('es-MX', {
-            hour: '2-digit', minute: '2-digit', hour12: false,
-            timeZone: 'America/Mexico_City'
-        });
-    } catch { return '--:--'; }
-}
-
-export default function AudioQualityWidget({ journeyId, journeyIds, date, style, hideDetails = false, parsedMeta = null }) {
+export default function AudioQualityWidget({ journeyId, journeyIds, date, style, hideDetails = false, parsedMeta = null, isaName = null }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [expandedAudit, setExpandedAudit] = useState(null);
+    const [alertsExpanded, setAlertsExpanded] = useState(null);
+    const [isGlobalReportOpen, setIsGlobalReportOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            
-            // If we have multiple journeyIds, fetch audits for ALL of them
-            const idsToFetch = (Array.isArray(journeyIds) && journeyIds.length > 0)
-                ? journeyIds
-                : (journeyId ? [journeyId] : []);
+            const idsToFetch = (Array.isArray(journeyIds) && journeyIds.length > 0) ? journeyIds : (journeyId ? [journeyId] : []);
 
             if (idsToFetch.length > 0) {
-                // Fetch all in parallel
-                const responses = await Promise.all(
-                    idsToFetch.map(id =>
-                        fetch(`/api/admin/audio-quality?journeyId=${id}`).then(r => r.json()).catch(() => ({ ok: false }))
-                    )
-                );
-
-                // Merge audits from all responses
+                const responses = await Promise.all(idsToFetch.map(id => fetch(`/api/admin/audio-quality?journeyId=${id}`).then(r => r.json()).catch(() => ({ ok: false }))));
                 let allAudits = [];
-                responses.forEach(json => {
-                    if (json.ok && Array.isArray(json.audits)) {
-                        allAudits = [...allAudits, ...json.audits];
-                    }
-                });
-
-                // De-duplicate by ID
+                responses.forEach(json => { if (json.ok && Array.isArray(json.audits)) allAudits = [...allAudits, ...json.audits]; });
                 const seen = new Set();
-                allAudits = allAudits.filter(a => {
-                    if (seen.has(a.id)) return false;
-                    seen.add(a.id);
-                    return true;
-                });
+                allAudits = allAudits.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
 
-                // Rebuild summary from merged audits
-                const completed = allAudits.filter(a => a.score !== null);
+                // ── ISOLATION: Global metrics use DOCENTE audits only ──
+                // Pilot audits appear in individual cards but NEVER contaminate the global report
+                const docenteAudits = allAudits.filter(a => a.source !== 'pilot_narration');
+                const completed = docenteAudits.filter(a => a.score !== null);
                 const totalAudited = completed.length;
-                const avgScore = totalAudited > 0
-                    ? Math.round(completed.reduce((sum, a) => sum + a.score, 0) / totalAudited)
-                    : null;
+                const avgScore = totalAudited > 0 ? Math.round(completed.reduce((s, a) => s + a.score, 0) / totalAudited) : null;
+                const countTrue = (f) => completed.filter(a => a[f] === true).length;
+                const rate = (f) => totalAudited > 0 ? Math.round((countTrue(f) / totalAudited) * 100) : null;
 
-                const countTrue = (field) => completed.filter(a => a[field] === true).length;
-                const rate = (field) => totalAudited > 0 ? Math.round((countTrue(field) / totalAudited) * 100) : null;
+                const energy = { alta: 0, media: 0, baja: 0 };
+                completed.forEach(a => { if (a.energia_interaccion && energy.hasOwnProperty(a.energia_interaccion)) energy[a.energia_interaccion]++; });
+                const dominantEnergy = Object.entries(energy).sort((a, b) => b[1] - a[1])[0];
 
-                const energyCounts = { alta: 0, media: 0, baja: 0 };
-                completed.forEach(a => {
-                    if (a.energia_interaccion && energyCounts.hasOwnProperty(a.energia_interaccion)) {
-                        energyCounts[a.energia_interaccion]++;
-                    }
-                });
+                // Alerts also use docente-only audits
+                const alerts = completed.filter(a => a.score < 60).map(a => ({
+                    id: a.id, flight_number: a.flight_number, score: a.score,
+                    nombre_equipo: a.nombre_equipo_detectado, resumen: a.resumen_supervisor, feedback: a.feedback_para_isa
+                }));
 
-                const alerts = completed
-                    .filter(a => a.score !== null && a.score < 60)
-                    .map(a => ({
-                        id: a.id,
-                        flight_number: a.flight_number,
-                        score: a.score,
-                        nombre_equipo: a.nombre_equipo_detectado,
-                        resumen: a.resumen_supervisor,
-                        feedback: a.feedback_para_isa
-                    }));
+                const checklist = {};
+                Object.keys(CHECKLIST_LABELS).forEach(k => { checklist[k] = { passed: countTrue(k), rate: rate(k) }; });
 
-                setData({
-                    ok: true,
-                    summary: {
-                        totalAudited,
-                        avgScore,
-                        checklist: {
-                            menciona_nombre_equipo: { passed: countTrue('menciona_nombre_equipo'), rate: rate('menciona_nombre_equipo') },
-                            menciona_destino: { passed: countTrue('menciona_destino'), rate: rate('menciona_destino') },
-                            dinamica_sube_sube: { passed: countTrue('dinamica_sube_sube'), rate: rate('dinamica_sube_sube') },
-                            participacion_ninos_audible: { passed: countTrue('participacion_ninos_audible'), rate: rate('participacion_ninos_audible') }
-                        },
-                        energy: energyCounts,
-                        equiposConNombre: { count: countTrue('menciona_nombre_equipo'), total: totalAudited }
-                    },
-                    alerts,
-                    audits: allAudits
-                });
+                // Pass ALL audits (both roles) so carousel cards can render each one with its own checklist
+                setData({ ok: true, summary: { totalAudited, avgScore, checklist, energy, dominantEnergy: dominantEnergy?.[1] > 0 ? dominantEnergy[0] : null }, alerts, audits: allAudits });
                 setError(null);
             } else if (date) {
                 const res = await fetch(`/api/admin/audio-quality?date=${date}`);
                 const json = await res.json();
-                if (json.ok) { setData(json); setError(null); }
-                else { setError(json.error || 'Error desconocido'); }
+                if (json.ok) { setData(json); setError(null); } else { setError(json.error || 'Error'); }
             } else {
                 const res = await fetch(`/api/admin/audio-quality?days=1`);
                 const json = await res.json();
-                if (json.ok) { setData(json); setError(null); }
-                else { setError(json.error || 'Error desconocido'); }
+                if (json.ok) { setData(json); setError(null); } else { setError(json.error || 'Error'); }
             }
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { setError(err.message); }
+        finally { setLoading(false); }
     }, [journeyId, journeyIds, date]);
 
-    useEffect(() => {
-        fetchData();
-        // Auto-refresh every 60 seconds
-        const interval = setInterval(fetchData, 60000);
-        return () => clearInterval(interval);
-    }, [fetchData]);
+    useEffect(() => { fetchData(); const iv = setInterval(fetchData, 60000); return () => clearInterval(iv); }, [fetchData]);
 
-    if (loading && !data) {
-        return (
-            <div style={{
-                ...baseCard, ...style,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minHeight: 200, gap: 12
-            }}>
-                <div style={{
-                    width: 24, height: 24, border: '3px solid #E2E8F0',
-                    borderTopColor: '#7C3AED', borderRadius: '50%',
-                    animation: 'qaWidgetSpin 0.8s linear infinite'
-                }} />
-                <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>
-                    Cargando métricas de calidad…
-                </span>
-                <style>{`@keyframes qaWidgetSpin { to { transform: rotate(360deg); } }`}</style>
-            </div>
-        );
-    }
+    if (loading && !data) return (
+        <div style={{ ...baseCard, ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160, gap: 12 }}>
+            <div style={{ width: 24, height: 24, border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#A78BFA', borderRadius: '50%', animation: 'qaWidgetSpin 0.8s linear infinite' }} />
+            <span style={{ fontSize: 13, color: '#94A3B8', fontWeight: 600 }}>Cargando reporte IA…</span>
+            <style>{`@keyframes qaWidgetSpin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
 
-    if (error && !data) {
-        return (
-            <div style={{
-                ...baseCard, ...style,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                minHeight: 120, color: '#94A3B8', fontSize: 13
-            }}>
-                ⚠️ {error}
-            </div>
-        );
-    }
+    if (error && !data) return (
+        <div style={{ ...baseCard, ...style, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120, color: '#F87171', fontSize: 13, fontWeight: 600 }}>⚠️ {error}</div>
+    );
 
     const { summary, alerts, audits } = data || {};
     const noData = !summary || summary.totalAudited === 0;
+    const displayName = isaName || 'la Docente';
+
+    const isAlertsOpen = alertsExpanded !== null ? alertsExpanded : (alerts?.length || 0) <= 2;
+    const globalNarrative = summary ? buildGlobalNarrative(summary, displayName) : null;
 
     return (
         <div style={{ ...baseCard, ...style }}>
-            {/* ── Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 18, boxShadow: '0 4px 10px rgba(124, 58, 237, 0.3)'
-                    }}>🎙️</div>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(91,33,182,0.4))', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                        <span className="material-symbols-outlined" style={{ color: '#C4B5FD', fontSize: 18 }}>mic_external_on</span>
+                    </div>
                     <div>
-                        <h3 style={{ fontSize: 16, fontWeight: 900, color: '#F8FAFC', margin: 0, letterSpacing: '0.02em' }}>
-                            Calidad de Dinámica
-                        </h3>
-                        <p style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, margin: 0 }}>
-                            Monitorización IA · {summary?.totalAudited || 0} {summary?.totalAudited === 1 ? 'tanda analizada' : 'tandas analizadas'}
+                        <h3 style={{ fontSize: 14, fontWeight: 800, color: '#F8FAFC', margin: 0, letterSpacing: '-0.01em' }}>Desempeño Docente IA</h3>
+                        <p style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, margin: '2px 0 0' }}>
+                            {summary?.totalAudited || 0} misiones evaluadas{isaName ? ` · ${displayName}` : ''}
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={fetchData}
-                    disabled={loading}
-                    style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        border: '1px solid rgba(255, 255, 255, 0.15)', background: 'rgba(255, 255, 255, 0.05)',
-                        color: '#F8FAFC',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', fontSize: 14,
-                        opacity: loading ? 0.5 : 1,
-                        transition: 'all 0.2s ease',
-                    }}
-                    title="Actualizar"
-                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-                >🔄</button>
+                <button onClick={fetchData} disabled={loading} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: loading ? 0.5 : 1, transition: 'background 0.2s' }} title="Actualizar">
+                    <span className={`material-symbols-outlined ${loading ? 'animate-spin' : ''}`} style={{ fontSize: 16 }}>refresh</span>
+                </button>
             </div>
 
             {noData && !parsedMeta ? (
-                <div style={{
-                    textAlign: 'center', padding: '32px 16px',
-                    background: '#F8FAFC', borderRadius: 16,
-                    border: '1px dashed #CBD5E1'
-                }}>
-                    <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>🎙️</span>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#64748B', margin: '0 0 4px' }}>
-                        Sin auditorías aún
-                    </p>
-                    <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>
-                        Los audios se analizarán automáticamente cuando ISA complete cada tanda.
-                    </p>
+                <div style={{ textAlign: 'center', padding: '30px 20px', background: 'rgba(15,23,42,0.3)', borderRadius: 12, border: '1px dashed rgba(148,163,184,0.2)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: 0.5, color: '#94A3B8' }}>mic_off</span>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#E2E8F0', margin: '0 0 4px' }}>Sin análisis recientes</p>
+                    <p style={{ fontSize: 12, color: '#94A3B8', margin: 0 }}>La IA procesará los audios tras cada vuelo.</p>
                 </div>
             ) : (
                 <>
-                    {/* ── Score Gauge + Quick Stats ── */}
-                    <div style={{
-                        display: 'grid', gridTemplateColumns: '1fr 1fr',
-                        gap: 12, marginBottom: 20
-                    }}>
-                        {/* Score Gauge */}
-                        <div style={{
-                            background: scoreBg(summary.avgScore),
-                            borderRadius: 16, padding: '20px 16px',
-                            textAlign: 'center',
-                            border: `1px solid ${scoreColor(summary.avgScore)}20`
-                        }}>
-                            <p style={{
-                                fontSize: 42, fontWeight: 900, margin: 0,
-                                color: scoreColor(summary.avgScore),
-                                lineHeight: 1, fontVariantNumeric: 'tabular-nums'
-                            }}>
-                                {summary.avgScore}
-                            </p>
-                            <p style={{
-                                fontSize: 11, fontWeight: 800, margin: '6px 0 0',
-                                color: scoreColor(summary.avgScore),
-                                textTransform: 'uppercase', letterSpacing: '0.08em'
-                            }}>
-                                {scoreGrade(summary.avgScore)}
-                            </p>
-                            <p style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, margin: '4px 0 0', lineHeight: 1.2 }}>
-                                Promedio general de la IA <br/>(basado en {summary.totalAudited} {summary.totalAudited === 1 ? 'tanda' : 'tandas'})
+                    {/* ── Panel de Reporte de Desempeño (Veredicto y Progreso) ── */}
+                    <div style={{ background: 'rgba(15,23,42,0.4)', borderRadius: 14, padding: '20px 16px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                            <p style={{ fontSize: 11, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                                Reporte de Desempeño Global
                             </p>
                         </div>
-
-                        {/* Energy Distribution */}
-                        <div style={{
-                            background: '#F8FAFC', borderRadius: 16, padding: '16px',
-                            border: '1px solid #E2E8F0',
-                            display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8
-                        }}>
-                            <p style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-                                Niveles de Energía (Por Tanda)
-                            </p>
-                            {Object.entries(ENERGY_COLORS).map(([key, config]) => {
-                                const count = summary.energyDist?.[key] || 0;
-                                const pct = summary.totalAudited > 0 ? Math.round((count / summary.totalAudited) * 100) : 0;
-                                return (
-                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <div style={{
-                                            width: 8, height: 8, borderRadius: '50%',
-                                            background: config.text, flexShrink: 0
-                                        }} />
-                                        <span style={{ fontSize: 11, fontWeight: 600, color: '#334155', flex: 1, lineHeight: 1.2 }}>
-                                            <strong>{count} {count === 1 ? 'tanda' : 'tandas'}</strong> con energía {config.label}
-                                        </span>
-                                        <span style={{
-                                            fontSize: 12, fontWeight: 800, color: config.text,
-                                            fontVariantNumeric: 'tabular-nums'
-                                        }}>
-                                            {pct}%
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                            <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+                                <svg width="64" height="64" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+                                    <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                                    <circle cx="50" cy="50" r="44" fill="none" stroke={scoreColor(summary.avgScore)} strokeWidth="8" strokeDasharray="276" strokeDashoffset={276 - (276 * (summary.avgScore || 0) / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
+                                </svg>
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: 20, fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{summary.avgScore ?? '–'}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 800, color: '#94A3B8', marginTop: 2 }}>/ 100</span>
+                                </div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <p style={{ fontSize: 13, fontWeight: 800, color: scoreColor(summary.avgScore), margin: '0 0 4px' }}>
+                                    {scoreGrade(summary.avgScore)}
+                                </p>
+                                {summary.dominantEnergy && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: ENERGY_COLORS[summary.dominantEnergy].bg, border: `1px solid ${ENERGY_COLORS[summary.dominantEnergy].text}40`, padding: '2px 8px', borderRadius: 20 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 13, color: ENERGY_COLORS[summary.dominantEnergy].text }}>bolt</span>
+                                        <span style={{ fontSize: 10, fontWeight: 800, color: ENERGY_COLORS[summary.dominantEnergy].text, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            Energía: {ENERGY_COLORS[summary.dominantEnergy].label}
                                         </span>
                                     </div>
-                                );
-                            })}
+                                )}
+                            </div>
                         </div>
-                    </div>
 
-                    {/* ── Checklist Compliance Bars ── */}
-                    <div style={{ marginBottom: 20 }}>
-                        <p style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-                            Cumplimiento por Criterio
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {/* Veredicto Narrativo de la IA (Colapsable) */}
+                        {globalNarrative && (
+                            <div style={{ marginBottom: 20 }}>
+                                <button onClick={() => setIsGlobalReportOpen(!isGlobalReportOpen)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.2s ease', color: '#C7D2FE', position: 'relative', zIndex: 2 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#818CF8' }}>memory</span>
+                                        <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leer análisis del Supervisor IA</span>
+                                    </div>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 18, transform: isGlobalReportOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>expand_more</span>
+                                </button>
+                                {isGlobalReportOpen && (
+                                    <div style={{ background: 'rgba(99,102,241,0.04)', borderRadius: '0 0 10px 10px', padding: '16px 12px 12px', border: '1px solid rgba(99,102,241,0.1)', borderTop: 'none', borderLeft: `3px solid ${scoreColor(summary.avgScore)}`, marginTop: -6, position: 'relative', zIndex: 1, animation: 'qaFadeIn 0.2s ease-out' }}>
+                                        <p style={{ fontSize: 12, color: '#E2E8F0', margin: 0, lineHeight: 1.6 }}>{globalNarrative}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Lista de Cumplimiento (Progress Bars) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                             {Object.entries(CHECKLIST_LABELS).map(([key, config]) => {
                                 const item = summary.checklist?.[key];
-                                const rate = item?.rate ?? 0;
-                                const passed = item?.passed ?? 0;
+                                const r = item?.rate ?? 0;
+                                const passedAmt = item?.passed ?? 0;
                                 const total = summary.totalAudited;
-
+                                const ok = r >= 60;
                                 return (
-                                    <div key={key}>
-                                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
-                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flex: 1 }}>
-                                                <span style={{ fontSize: 14 }}>{config.emoji}</span>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontSize: 12, fontWeight: 700, color: 'currentColor', opacity: 0.9 }}>
-                                                        {config.label}
-                                                    </span>
-                                                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginTop: 2 }}>
-                                                        {passed === 0 ? 'No se cumplió en ninguna tanda' : 
-                                                         `Cumplido en ${passed} de ${total} ${total === 1 ? 'tanda' : 'tandas'}`}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <span style={{
-                                                fontSize: 13, fontWeight: 800,
-                                                color: rate >= 75 ? '#16A34A' : rate >= 50 ? '#CA8A04' : '#DC2626',
-                                                fontVariantNumeric: 'tabular-nums',
-                                                paddingTop: 2
-                                            }}>
-                                                {rate}%
+                                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#94A3B8' }}>{config.icon}</span>
+                                                {config.label}
+                                            </span>
+                                            <span style={{ fontSize: 10, fontWeight: 800, color: ok ? '#4ADE80' : '#F87171' }}>
+                                                {passedAmt} de {total} misiones
                                             </span>
                                         </div>
-                                        <div style={{
-                                            height: 6, borderRadius: 3,
-                                            background: '#F1F5F9', overflow: 'hidden'
-                                        }}>
-                                            <div style={{
-                                                height: '100%', borderRadius: 3,
-                                                width: `${rate}%`,
-                                                background: rate >= 75
-                                                    ? 'linear-gradient(90deg, #22C55E, #16A34A)'
-                                                    : rate >= 50
-                                                        ? 'linear-gradient(90deg, #EAB308, #CA8A04)'
-                                                        : 'linear-gradient(90deg, #EF4444, #DC2626)',
-                                                transition: 'width 0.6s ease'
-                                            }} />
+                                        <div style={{ width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 6, overflow: 'hidden', position: 'relative' }}>
+                                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, background: ok ? '#4ADE80' : '#F87171', width: `${r}%`, transition: 'width 1s ease-out' }} />
                                         </div>
                                     </div>
                                 );
@@ -384,247 +271,49 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                         </div>
                     </div>
 
-                    {/* ── Alerts ── */}
+                    {/* ── Collapsible Alerts ── */}
                     {alerts && alerts.length > 0 && (
-                        <div style={{ marginBottom: 20 }}>
-                            <p style={{ fontSize: 10, fontWeight: 800, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-                                ⚠️ Alertas ({alerts.length})
-                            </p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {alerts.map(alert => (
-                                    <div key={alert.id} style={{
-                                        background: '#FEF2F2', borderRadius: 12,
-                                        padding: '12px 14px', border: '1px solid #FECACA'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                            <span style={{ fontSize: 13, fontWeight: 800, color: '#991B1B' }}>
-                                                Tanda #{alert.flight_number || '?'}
-                                                {alert.nombre_equipo ? ` · "${alert.nombre_equipo}"` : ''}
-                                            </span>
-                                            <span style={{
-                                                fontSize: 11, fontWeight: 900,
-                                                color: 'white', background: '#DC2626',
-                                                padding: '2px 8px', borderRadius: 6,
-                                                display: 'flex', alignItems: 'center', gap: 4
-                                            }}>
-                                                <span>🤖</span> Score: {alert.score}
-                                            </span>
-                                        </div>
-                                        <p style={{ fontSize: 12, color: '#7F1D1D', margin: 0, lineHeight: 1.4 }}>
-                                            {alert.resumen || alert.feedback}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* ── Unified Operations Timeline — ALWAYS shown when parsedMeta has data ── */}
-            {!hideDetails && (
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                <p style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-                                    {parsedMeta ? 'Bitácora Operativa (Vuelos)' : 'Detalle por tanda'}
-                                </p>
-                            </div>
-                            
-                            {parsedMeta ? (
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {(() => {
-                                        const bitacoras = Array.isArray(parsedMeta.escuadron_bitacora_history) ? parsedMeta.escuadron_bitacora_history : [];
-                                        const audiosList = Array.isArray(parsedMeta.telemetry_recordings) ? parsedMeta.telemetry_recordings : [];
-                                        const auditsList = audits || [];
-
-                                        // Separate audio by source tag
-                                        const pilotAudios = audiosList.filter(a => a.source === 'pilot_narration');
-                                        const teacherAudios = audiosList.filter(a => a.source === 'bitacora');
-                                        const untaggedAudios = audiosList.filter(a => !a.source || (a.source !== 'pilot_narration' && a.source !== 'bitacora'));
-
-                                        // Build a set of flight numbers that have bitácora entries (teacher flights)
-                                        const bitacoraFlightSet = new Set();
-                                        bitacoras.forEach((b, idx) => bitacoraFlightSet.add(b.flightNumber || (idx + 1)));
-
-                                        let maxFlight = 0;
-                                        bitacoras.forEach((b, i) => maxFlight = Math.max(maxFlight, b.flightNumber || (i + 1)));
-                                        audiosList.forEach((a, i) => maxFlight = Math.max(maxFlight, a.flightNumber || (i + 1)));
-                                        auditsList.forEach(a => maxFlight = Math.max(maxFlight, a.flight_number || 0));
-
-                                        const unifiedOperations = [];
-                                        for (let i = 1; i <= maxFlight; i++) {
-                                            const bitacora = bitacoras.find((b, idx) => (b.flightNumber || (idx + 1)) === i);
-                                            const pilotAudio = pilotAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
-                                            const teacherAudio = teacherAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
-                                            const audit = auditsList.find(a => a.flight_number === i);
-
-                                            // Handle untagged legacy audio: if bitácora entry exists, it's teacher audio
-                                            const untagged = untaggedAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
-                                            let effectivePilotAudio = pilotAudio;
-                                            let effectiveTeacherAudio = teacherAudio;
-                                            if (untagged && !pilotAudio && !teacherAudio) {
-                                                if (bitacoraFlightSet.has(i)) {
-                                                    effectiveTeacherAudio = untagged; // teacher audio
-                                                } else {
-                                                    effectivePilotAudio = untagged; // pilot audio
-                                                }
-                                            } else if (untagged && !pilotAudio && teacherAudio) {
-                                                // Already has teacher audio, untagged might be pilot
-                                                if (!bitacoraFlightSet.has(i)) effectivePilotAudio = untagged;
-                                            }
-
-                                            if (bitacora || effectivePilotAudio || effectiveTeacherAudio || audit) {
-                                                // Determine teacher audio URL: prefer bitacora entry, then tagged telemetry, then untagged
-                                                const teacherUrl = bitacora?.audioUrl || effectiveTeacherAudio?.url || null;
-                                                const teacherDuration = bitacora?.audioDurationSeconds || effectiveTeacherAudio?.durationSeconds || 0;
-
-                                                unifiedOperations.push({
-                                                    flightNumber: i,
-                                                    teamName: bitacora?.nombreClave || audit?.nombre_equipo_detectado || null,
-                                                    destinations: bitacora?.destinos || null,
-                                                    // Pilot narration audio
-                                                    audioUrl: effectivePilotAudio?.url || null,
-                                                    audioSizeKB: effectivePilotAudio?.fileSizeKB || 0,
-                                                    audioDurationSeconds: effectivePilotAudio?.durationSeconds || 0,
-                                                    // Teacher bitácora audio
-                                                    teacherAudioUrl: teacherUrl,
-                                                    teacherAudioSizeKB: effectiveTeacherAudio?.fileSizeKB || bitacora?.audioSizeKB || 0,
-                                                    teacherAudioDurationSeconds: teacherDuration,
-                                                    timestamp: bitacora?.timestamp || effectivePilotAudio?.timestamp || effectiveTeacherAudio?.timestamp || audit?.created_at || null,
-                                                    audit: audit || null
-                                                });
-                                            }
-                                        }
-
-                                        if (unifiedOperations.length === 0) {
-                                            return <p style={{ fontSize: 12, color: '#94A3B8', fontStyle: 'italic' }}>No hay operaciones registradas aún.</p>;
-                                        }
-
-                                        return unifiedOperations.reverse().map((op) => (
-                                            <UnifiedFlightCard key={op.flightNumber} {...op} />
-                                        ));
-                                    })()}
+                        <div style={{ marginBottom: 16 }}>
+                            <button onClick={() => setAlertsExpanded(!isAlertsOpen)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: 10, padding: '8px 12px', cursor: 'pointer', marginBottom: isAlertsOpen ? 10 : 0, transition: 'all 0.2s ease' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F43F5E', boxShadow: '0 0 10px rgba(244,63,94,0.6)', animation: 'qaAlertPulse 2s ease-in-out infinite' }} />
+                                    <span style={{ fontSize: 10, fontWeight: 800, color: '#F43F5E', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Requiere Atención</span>
                                 </div>
-                            ) : (
-                                /* ── Old render path (fallback if parsedMeta is not passed) ── */
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {audits && audits.map(audit => {
-                                        const isExpanded = expandedAudit === audit.id;
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ background: 'rgba(244,63,94,0.2)', color: '#FDA4AF', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>{alerts.length} misiones</span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#FDA4AF', transform: isAlertsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>expand_more</span>
+                                </div>
+                            </button>
+                            <style>{`@keyframes qaAlertPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
 
+                            {isAlertsOpen && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, animation: 'qaFadeIn 0.2s ease-out' }}>
+                                    <style>{`@keyframes qaFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+                                    {alerts.map(alert => {
+                                        const narr = buildNarrative(alert, isaName, audits);
                                         return (
-                                            <div key={audit.id} style={{
-                                                background: 'white', borderRadius: 12,
-                                                border: `1px solid ${isExpanded ? '#7C3AED40' : '#E2E8F0'}`,
-                                                overflow: 'hidden',
-                                                transition: 'border-color 0.2s'
-                                            }}>
-                                                {/* Row header (always visible) */}
-                                                <button
-                                                    onClick={() => setExpandedAudit(isExpanded ? null : audit.id)}
-                                                    style={{
-                                                        width: '100%', padding: '10px 14px',
-                                                        border: 'none', background: 'transparent',
-                                                        display: 'flex', alignItems: 'center', gap: 10,
-                                                        cursor: 'pointer', textAlign: 'left'
-                                                    }}
-                                                >
-                                                    {/* Score pill */}
-                                                    <div style={{
-                                                        width: 36, height: 36, borderRadius: 10,
-                                                        background: scoreBg(audit.score),
-                                                        border: `1px solid ${scoreColor(audit.score)}30`,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        flexShrink: 0
-                                                    }}>
-                                                        <span style={{
-                                                            fontSize: 14, fontWeight: 900,
-                                                            color: scoreColor(audit.score),
-                                                            fontVariantNumeric: 'tabular-nums'
-                                                        }}>{audit.score}</span>
-                                                    </div>
-
-                                                    {/* Info */}
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <p style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', margin: 0 }}>
-                                                            Tanda #{audit.flight_number || '?'}
-                                                            {audit.nombre_equipo_detectado ? ` · "${audit.nombre_equipo_detectado}"` : ''}
-                                                        </p>
-                                                        <p style={{ fontSize: 11, color: '#94A3B8', margin: '2px 0 0', fontWeight: 600 }}>
-                                                            {fmtTime(audit.created_at)}
-                                                            {audit.destino_detectado ? ` · 📍 ${audit.destino_detectado}` : ''}
-                                                        </p>
-                                                    </div>
-
-                                                    {/* Expand chevron */}
-                                                    <span style={{
-                                                        fontSize: 14, color: '#94A3B8',
-                                                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)',
-                                                        transition: 'transform 0.2s'
-                                                    }}>▼</span>
-                                                </button>
-
-                                                {/* Expanded detail */}
-                                                {isExpanded && (
-                                                    <div style={{
-                                                        padding: '0 14px 14px',
-                                                        borderTop: '1px solid #F1F5F9'
-                                                    }}>
-                                                        {/* Mini checklist */}
-                                                        <div style={{
-                                                            display: 'grid', gridTemplateColumns: '1fr 1fr',
-                                                            gap: 6, marginTop: 10, marginBottom: 10
-                                                        }}>
-                                                            {Object.entries(CHECKLIST_LABELS).map(([key, config]) => {
-                                                                const val = audit[key];
-                                                                const icon = val === true ? '✅' : val === false ? '❌' : '❓';
-                                                                return (
-                                                                    <div key={key} style={{
-                                                                        fontSize: 11, fontWeight: 600,
-                                                                        color: val === true ? '#16A34A' : val === false ? '#DC2626' : '#94A3B8',
-                                                                        display: 'flex', alignItems: 'center', gap: 4
-                                                                    }}>
-                                                                        <span>{icon}</span>
-                                                                        <span>{config.label}</span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-
-                                                        {/* Energy badge */}
-                                                        {audit.energia_interaccion && audit.energia_interaccion !== 'no_detectado' && (
-                                                            <div style={{
-                                                                display: 'inline-flex', alignItems: 'center', gap: 6,
-                                                                background: ENERGY_COLORS[audit.energia_interaccion]?.bg || '#F1F5F9',
-                                                                color: ENERGY_COLORS[audit.energia_interaccion]?.text || '#64748B',
-                                                                padding: '4px 10px', borderRadius: 8,
-                                                                fontSize: 11, fontWeight: 700, marginBottom: 8
-                                                            }}>
-                                                                ⚡ Energía {ENERGY_COLORS[audit.energia_interaccion]?.label || audit.energia_interaccion}
+                                            <div key={alert.id} style={{ background: 'rgba(244,63,94,0.04)', borderRadius: 10, padding: '12px', border: '1px solid rgba(244,63,94,0.15)', borderLeft: '3px solid #F43F5E' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                    <span style={{ fontSize: 11, fontWeight: 800, color: '#FDA4AF' }}>
+                                                        Tanda #{alert.flight_number || '?'}{alert.nombre_equipo ? ` · "${alert.nombre_equipo}"` : ''}
+                                                    </span>
+                                                    <span style={{ fontSize: 10, fontWeight: 800, color: '#FFE4E6', background: 'rgba(225,29,72,0.3)', padding: '2px 6px', borderRadius: 4 }}>Score: {alert.score}</span>
+                                                </div>
+                                                <p style={{ fontSize: 11, color: '#FECDD3', margin: '0 0 8px', lineHeight: 1.5, fontWeight: 500 }}>{narr.headline}</p>
+                                                {narr.details.length > 0 && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: narr.tip ? 8 : 0 }}>
+                                                        {narr.details.map((d, i) => (
+                                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 2 }}>
+                                                                <span className="material-symbols-outlined" style={{ fontSize: 13, color: d.ok ? '#4ADE80' : '#F87171' }}>{d.ok ? 'check_circle' : 'cancel'}</span>
+                                                                <span style={{ fontSize: 11, color: d.ok ? 'rgba(74,222,128,0.9)' : 'rgba(254,205,211,0.9)', fontWeight: 500 }}>{d.text}</span>
                                                             </div>
-                                                        )}
-
-                                                        {/* Supervisor summary */}
-                                                        {audit.resumen_supervisor && (
-                                                            <p style={{
-                                                                fontSize: 12, color: '#475569', margin: '0 0 6px',
-                                                                lineHeight: 1.45, fontWeight: 600,
-                                                                background: '#F8FAFC', padding: '8px 10px',
-                                                                borderRadius: 8, border: '1px solid #E2E8F0'
-                                                            }}>
-                                                                📋 {audit.resumen_supervisor}
-                                                            </p>
-                                                        )}
-
-                                                        {/* Feedback sent to ISA */}
-                                                        {audit.feedback_para_isa && (
-                                                            <p style={{
-                                                                fontSize: 11, color: '#7C3AED', margin: 0,
-                                                                lineHeight: 1.4, fontWeight: 600,
-                                                                fontStyle: 'italic'
-                                                            }}>
-                                                                💬 Feedback a ISA: "{audit.feedback_para_isa}"
-                                                            </p>
-                                                        )}
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {narr.tip && (
+                                                    <div style={{ background: 'rgba(139,92,246,0.1)', borderRadius: 8, padding: '6px 10px', border: '1px solid rgba(139,92,246,0.2)', marginTop: 4, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#C4B5FD', marginTop: 1 }}>chat</span>
+                                                        <p style={{ fontSize: 10, color: '#C4B5FD', margin: 0, lineHeight: 1.5, fontStyle: 'italic', fontWeight: 500 }}>{narr.tip}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -634,14 +323,129 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                             )}
                         </div>
                     )}
+                </>
+            )}
+
+            {/* ── Timeline (Horizontal Carousel) ── */}
+            {!hideDetails && (
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <p style={{ fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {parsedMeta ? 'Bitácora & Reportes' : 'Detalle por tanda'}
+                            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#6366F1', animation: 'qaSwipeHint 2s infinite ease-in-out' }}>swipe</span>
+                        </p>
+                    </div>
+                    <style>{`
+                        @keyframes qaSwipeHint { 0%, 100% { transform: translateX(0); opacity: 0.5; } 50% { transform: translateX(4px); opacity: 1; } }
+                        .qa-carousel::-webkit-scrollbar { height: 4px; }
+                        .qa-carousel::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+                        .qa-carousel::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 4px; }
+                    `}</style>
+
+                    {parsedMeta ? (
+                        <div className="qa-carousel" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', gap: 12, paddingBottom: 12, margin: '0 -10px', padding: '0 10px 12px 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin', scrollbarColor: 'rgba(99,102,241,0.4) transparent' }}>
+                            {(() => {
+                                const bitacoras = Array.isArray(parsedMeta.escuadron_bitacora_history) ? parsedMeta.escuadron_bitacora_history : [];
+                                const audiosList = Array.isArray(parsedMeta.telemetry_recordings) ? parsedMeta.telemetry_recordings : [];
+                                const auditsList = audits || [];
+                                const pilotAudios = audiosList.filter(a => a.source === 'pilot_narration');
+                                const teacherAudios = audiosList.filter(a => a.source === 'bitacora');
+                                const untaggedAudios = audiosList.filter(a => !a.source || (a.source !== 'pilot_narration' && a.source !== 'bitacora'));
+                                const bitacoraFlightSet = new Set();
+                                bitacoras.forEach((b, idx) => bitacoraFlightSet.add(b.flightNumber || (idx + 1)));
+
+                                // Dedup audits: keep only the latest (first in list) per flight_number + source
+                                const seenAuditKeys = new Set();
+                                const dedupedAudits = auditsList.filter(a => {
+                                    const key = `${a.flight_number}-${a.source || 'unknown'}`;
+                                    if (seenAuditKeys.has(key)) return false;
+                                    seenAuditKeys.add(key);
+                                    return true;
+                                });
+
+                                // Dedup pilot audios by flightNumber (keep first occurrence)
+                                const seenPilotFlights = new Set();
+                                const dedupedPilotAudios = pilotAudios.filter(a => {
+                                    const fn = a.flightNumber || 0;
+                                    if (seenPilotFlights.has(fn)) return false;
+                                    seenPilotFlights.add(fn);
+                                    return true;
+                                });
+
+                                let maxFlight = 0;
+                                bitacoras.forEach((b, i) => maxFlight = Math.max(maxFlight, b.flightNumber || (i + 1)));
+                                audiosList.forEach((a, i) => maxFlight = Math.max(maxFlight, a.flightNumber || (i + 1)));
+                                dedupedAudits.forEach(a => maxFlight = Math.max(maxFlight, a.flight_number || 0));
+
+                                const ops = [];
+                                for (let i = 1; i <= maxFlight; i++) {
+                                    const bitacora = bitacoras.find((b, idx) => (b.flightNumber || (idx + 1)) === i);
+                                    const pilotAudio = dedupedPilotAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
+                                    const untagged = untaggedAudios.find((a, idx) => (a.flightNumber || (idx + 1)) === i);
+
+                                    // Resolve pilot audio (explicit or untagged fallback)
+                                    let ePilot = pilotAudio;
+                                    if (!ePilot && untagged && !bitacoraFlightSet.has(i)) ePilot = untagged;
+
+                                    // Find SEPARATE audits for each role
+                                    const pilotAudit = dedupedAudits.find(a => a.flight_number === i && a.source === 'pilot_narration') || null;
+                                    const docenteAudit = dedupedAudits.find(a => a.flight_number === i && a.source !== 'pilot_narration') || null;
+
+
+                                    // Pilot cards now render inline in flight record cards (page.js)
+
+                                    // Card for DOCENTE (if docente audit exists)
+                                    if (docenteAudit) {
+                                        const teacherAudio = teacherAudios.find(a => (a.flightNumber || 0) === i) || null;
+                                        ops.push({
+                                            flightNumber: i,
+                                            teamName: bitacora?.nombreClave || docenteAudit?.nombre_equipo_detectado || null,
+                                            destinations: bitacora?.destinos || null,
+                                            audioUrl: teacherAudio?.url || bitacora?.audioUrl || null,
+                                            audioSizeKB: teacherAudio?.sizeKB || 0,
+                                            audioDurationSeconds: teacherAudio?.durationSeconds || 0,
+                                            timestamp: bitacora?.timestamp || docenteAudit?.created_at || null,
+                                            audit: docenteAudit,
+                                            isaName
+                                        });
+                                    }
+
+                                    // Fallback: if NO audit exists for either role but bitacora exists, show placeholder
+                                    if (!pilotAudit && !docenteAudit && !ePilot && bitacora) {
+                                        ops.push({
+                                            flightNumber: i,
+                                            teamName: bitacora?.nombreClave || null,
+                                            destinations: bitacora?.destinos || null,
+                                            audioUrl: null,
+                                            audioSizeKB: 0,
+                                            audioDurationSeconds: 0,
+                                            timestamp: bitacora?.timestamp || null,
+                                            audit: null,
+                                            isaName
+                                        });
+                                    }
+                                }
+                                if (ops.length === 0) return <p style={{ fontSize: 11, color: '#64748B', fontStyle: 'italic', textAlign: 'center', padding: 16, width: '100%' }}>No hay misiones registradas aún.</p>;
+                                return ops.map((op, idx) => (
+                                    <div key={`${op.flightNumber}-${op.audit?.source || 'none'}-${idx}`} style={{ flex: '0 0 92%', maxWidth: '92%', scrollSnapAlign: 'center' }}>
+                                        <UnifiedFlightCard {...op} />
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    ) : (
+                        <div className="qa-carousel" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', gap: 12, paddingBottom: 12, margin: '0 -10px', padding: '0 10px 12px 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin', scrollbarColor: 'rgba(99,102,241,0.4) transparent' }}>
+                            {audits && audits.map(audit => (
+                                <div key={audit.id} style={{ flex: '0 0 92%', maxWidth: '92%', scrollSnapAlign: 'center' }}>
+                                    <UnifiedFlightCard flightNumber={audit.flight_number} audit={audit} timestamp={audit.created_at} teamName={audit.nombre_equipo_detectado} isaName={isaName} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
 
-const baseCard = {
-    background: 'white',
-    borderRadius: 20,
-    border: '1px solid #E2E8F0',
-    padding: '20px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-};
+const baseCard = { background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', padding: '20px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' };

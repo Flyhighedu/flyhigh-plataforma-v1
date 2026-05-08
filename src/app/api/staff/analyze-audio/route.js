@@ -75,8 +75,6 @@ Responde ÚNICAMENTE con un JSON válido con estas claves:
 
 "menciona_punto_interes" (boolean): ¿El piloto menciona algún dato educativo, geográfico o histórico de lo que ven durante el vuelo?
 
-"mantiene_personaje" (boolean): ¿El piloto habla con un tono profesional e inspirador de capitán/aviador?
-
 "energia_positiva" (boolean): ¿El piloto SUENA con asombro, emoción y actitud positiva? Evalúa directamente su TONO DE VOZ.
 
 "fomenta_interaccion" (boolean): ¿El piloto intenta interactuar activamente con los niños (les hace preguntas, los invita a observar algo)?
@@ -108,12 +106,15 @@ function getAudioMime(url) {
     return 'audio/webm'; // Default for our recordings
 }
 
-// ───────── Calculate score from booleans (25pts each) ─────────
+// ───────── Calculate score from booleans (20pts each, 5 criteria) ─────────
 function calculateScore(analysis, role) {
-    const criteria = role === 'piloto'
-        ? [analysis.menciona_punto_interes, analysis.mantiene_personaje, analysis.energia_positiva, analysis.fomenta_interaccion]
-        : [analysis.menciona_nombre_equipo, analysis.menciona_destino, analysis.dinamica_sube_sube, analysis.energia_positiva];
-    return criteria.filter(v => v === true).length * 25;
+    if (role === 'piloto') {
+        const criteria = [analysis.menciona_punto_interes, analysis.energia_positiva, analysis.fomenta_interaccion, analysis.participacion_ninos_audible];
+        return criteria.filter(v => v === true).length * 25;
+    } else {
+        const criteria = [analysis.menciona_nombre_equipo, analysis.menciona_destino, analysis.dinamica_sube_sube, analysis.energia_positiva, analysis.participacion_ninos_audible];
+        return criteria.filter(v => v === true).length * 20;
+    }
 }
 
 // ───────── Generate supervisor summary ─────────
@@ -135,6 +136,7 @@ function mapToDbColumns(analysis, role, score) {
             menciona_destino: analysis.menciona_punto_interes,
             destino_detectado: null,
             dinamica_sube_sube: null,
+            energia_positiva: analysis.energia_positiva ?? null,
             energia_interaccion: analysis.energia_vocal || (analysis.energia_positiva ? 'alta' : 'baja'),
             participacion_ninos_audible: analysis.participacion_ninos_audible ?? null,
             score,
@@ -150,6 +152,7 @@ function mapToDbColumns(analysis, role, score) {
         menciona_destino: analysis.menciona_destino,
         destino_detectado: null,
         dinamica_sube_sube: analysis.dinamica_sube_sube,
+        energia_positiva: analysis.energia_positiva ?? null,
         energia_interaccion: analysis.energia_vocal || (analysis.energia_positiva ? 'alta' : 'baja'),
         participacion_ninos_audible: analysis.participacion_ninos_audible ?? null,
         score,

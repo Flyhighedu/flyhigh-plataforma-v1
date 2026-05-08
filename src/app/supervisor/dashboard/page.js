@@ -1786,6 +1786,7 @@ export default function SupervisorDashboard() {
     const [deleteMissionPassword, setDeleteMissionPassword] = useState('');
     const [deleteMissionError, setDeleteMissionError] = useState('');
     const [deleteMissionSubmitting, setDeleteMissionSubmitting] = useState(false);
+    const [pilotAuditsMap, setPilotAuditsMap] = useState({});  // { [flightNumber]: auditData }
     const hadIssue = useRef(false);
     const knownIds = useRef(new Set());
     const knownMissionIds = useRef(new Set());
@@ -2936,6 +2937,7 @@ export default function SupervisorDashboard() {
                     missionState: j.mission_state,
                     taskFlow,
                     activeTask,
+                    micBlocked: role === 'pilot' ? !!meta.pilot_mic_blocked : role === 'teacher' ? !!meta.teacher_mic_blocked : false,
                     updatedAt: j.updated_at || j.created_at
                 };
             });
@@ -3835,6 +3837,45 @@ export default function SupervisorDashboard() {
             })
             .catch(err => console.error("Error fetching global history overview:", err));
     }, [missionHistory.length]);
+
+    // ── Fetch pilot audit data for inline display in flight record cards ──
+    useEffect(() => {
+        const sel = (() => {
+            if (!selectedId) return null;
+            const j = journeys.find(j => j.id === selectedId);
+            return j || null;
+        })();
+        if (!sel) { setPilotAuditsMap({}); return; }
+        const schoolId = String(sel.school_id || '');
+        const selDate = sel.date;
+        const siblingIds = journeys
+            .filter(j => j.date === selDate && String(j.school_id || '') === schoolId)
+            .map(j => j.id)
+            .filter(Boolean);
+        if (siblingIds.length === 0) { setPilotAuditsMap({}); return; }
+
+        Promise.all(
+            siblingIds.map(id =>
+                fetch(`/api/admin/audio-quality?journeyId=${id}`)
+                    .then(r => r.json())
+                    .catch(() => ({ ok: false }))
+            )
+        ).then(responses => {
+            let allAudits = [];
+            responses.forEach(json => {
+                if (json.ok && Array.isArray(json.audits)) allAudits = [...allAudits, ...json.audits];
+            });
+            // Dedup by id
+            const seen = new Set();
+            allAudits = allAudits.filter(a => { if (seen.has(a.id)) return false; seen.add(a.id); return true; });
+            // Keep only pilot_narration, dedup by flight_number (keep latest = first)
+            const map = {};
+            allAudits
+                .filter(a => a.source === 'pilot_narration' && a.status === 'completed' && a.score !== null)
+                .forEach(a => { if (!map[a.flight_number]) map[a.flight_number] = a; });
+            setPilotAuditsMap(map);
+        }).catch(() => setPilotAuditsMap({}));
+    }, [selectedId, journeys]);
 
     const historyOverview = useMemo(() => {
         return globalMetrics;
@@ -5061,6 +5102,24 @@ export default function SupervisorDashboard() {
                                             )}
                                         </div>
 
+                                        {/* Mic blocked alert */}
+                                        {card.micBlocked && (
+                                            <div style={{
+                                                display: 'flex', alignItems: 'center', gap: 6,
+                                                margin: '0 16px', padding: '6px 10px',
+                                                borderRadius: 10,
+                                                background: 'rgba(245, 158, 11, 0.12)',
+                                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                fontSize: 11, fontWeight: 700, color: '#FBBF24',
+                                                marginTop: 8
+                                            }}>
+                                                <span style={{ fontSize: 13 }}>🎙️❌</span>
+                                                {card.role === 'pilot'
+                                                    ? 'El piloto tiene el micrófono desactivado'
+                                                    : 'El/la docente tiene el micrófono desactivado'}
+                                            </div>
+                                        )}
+
                                         {/* Main content */}
                                         {card.postArrivalEnabled && (
                                             <div className="px-4 pb-3">
@@ -5808,6 +5867,47 @@ export default function SupervisorDashboard() {
                                                 const flight = row.flight;
                                                 const flightNumber = flight.flightNumber || row.fallbackFlightNumber;
 
+                                                const pAudit = pilotAuditsMap[flightNumber];
+                                                let scCol = 'rgba(51, 65, 85, 0.4)'; // border-slate-700/40
+                                                let scBg = 'rgba(30, 41, 59, 0.4)'; // bg-slate-800/40
+                                                let sc = null;
+                                                let scGrade = null;
+                                                let PILOT_CL = null;
+                                                let passed = [];
+                                                let failed = [];
+                                                let energyKey = null;
+                                                let energyLabel = null;
+                                                let energyColor = null;
+
+                                                if (pAudit) {
+                                                    sc = pAudit.score;
+                                                    scCol = sc >= 80 ? '#4ADE80' : sc >= 60 ? '#FACC15' : sc >= 40 ? '#FB923C' : '#F87171';
+                                                    scBg = sc >= 80 ? 'rgba(74,222,128,0.1)' : sc >= 60 ? 'rgba(250,204,21,0.1)' : sc >= 40 ? 'rgba(251,146,60,0.1)' : 'rgba(248,113,113,0.1)';
+                                                    scGrade = sc >= 90 ? 'Excelente' : sc >= 75 ? 'Bien' : sc >= 60 ? 'Regular' : sc >= 40 ? 'Bajo' : 'Crítico';
+                                                    PILOT_CL = {
+                                                        menciona_destino: 'Dato educativo',
+                                                        energia_positiva: 'Energía positiva',
+                                                        fomenta_interaccion: 'Fomenta interacción',
+                                                        participacion_ninos_audible: 'Participación niños'
+                                                    };
+                                                    passed = Object.keys(PILOT_CL).filter(k => pAudit[k] === true);
+                                                    failed = Object.keys(PILOT_CL).filter(k => pAudit[k] === false);
+                                                    energyKey = pAudit.energia_interaccion;
+                                                    energyLabel = energyKey === 'alta' ? 'Alta' : energyKey === 'media' ? 'Media' : energyKey === 'baja' ? 'Baja' : null;
+                                                    energyColor = energyKey === 'alta' ? '#4ADE80' : energyKey === 'media' ? '#FACC15' : '#F87171';
+                                                }
+
+                                                const isExpandable = !!pAudit;
+                                                const expandId = `flight-ia-${flightNumber}`;
+                                                
+                                                const audioData = flightAudioByNumber[flightNumber];
+                                                const pilotAudio = audioData?.pilotAudio;
+                                                const teacherAudio = audioData?.teacherAudio;
+
+                                                const showPilotSection = pilotAudio?.url || pAudit;
+                                                const InnerWrapper = isExpandable ? 'details' : 'div';
+                                                const InnerHeader = isExpandable ? 'summary' : 'div';
+
                                                 return (
                                                     <div key={row.key} className="rounded-lg border border-slate-700/40 bg-slate-800/40 px-3 py-2">
                                                         <div className="flex items-center justify-between gap-2">
@@ -5827,33 +5927,29 @@ export default function SupervisorDashboard() {
                                                                 </>
                                                             )}
                                                         </div>
-                                                        {/* ── Audio Players (Pilot + Teacher) ── */}
-                                                        {(() => {
-                                                            const audioData = flightAudioByNumber[flightNumber];
-                                                            if (!audioData) return null;
-                                                            const { pilotAudio, teacherAudio } = audioData;
-                                                            if (!pilotAudio?.url && !teacherAudio?.url) return null;
-                                                            return (
-                                                                <div className="mt-2 space-y-1.5">
-                                                                    {/* Pilot narration audio */}
+
+                                                        {/* ── Pilot Unified Card (Audio + IA) ── */}
+                                                        {showPilotSection && (
+                                                            <InnerWrapper id={isExpandable ? expandId : undefined} className="mt-2 rounded-lg overflow-hidden transition-colors duration-300" style={pAudit ? { border: `1px solid ${scCol}60`, background: scBg } : { border: '1px solid rgba(14,165,233,0.2)', background: 'rgba(14,165,233,0.05)' }}>
+                                                                <InnerHeader className={`px-2.5 py-2 ${isExpandable ? 'cursor-pointer select-none list-none' : ''}`}>
                                                                     {pilotAudio?.url && (
-                                                                        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
+                                                                        <div onClick={e => isExpandable && e.stopPropagation()}>
                                                                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                                                                 <span className="text-[10px]">✈️🎙️</span>
-                                                                                <span className="text-[10px] font-bold text-sky-300 uppercase tracking-wider">
+                                                                                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: pAudit ? scCol : '#7DD3FC' }}>
                                                                                     Narración del piloto
                                                                                     {teacherAudio?.teamName && (
-                                                                                        <span className="text-sky-400/80 normal-case ml-1.5 px-1.5 py-0.5 rounded bg-sky-500/10">
+                                                                                        <span className="normal-case ml-1.5 px-1.5 py-0.5 rounded" style={{ backgroundColor: pAudit ? `${scCol}15` : 'rgba(14,165,233,0.1)', color: pAudit ? scCol : '#38BDF8' }}>
                                                                                             {teacherAudio.teamName}
                                                                                         </span>
                                                                                     )}
                                                                                 </span>
                                                                                 <div className="flex items-center gap-2 ml-auto">
                                                                                     {pilotAudio.durationSeconds > 0 && (
-                                                                                        <span className="text-[10px] text-slate-500 tabular-nums">{fmtMMSS(pilotAudio.durationSeconds)}</span>
+                                                                                        <span className="text-[10px] text-slate-400 tabular-nums">{fmtMMSS(pilotAudio.durationSeconds)}</span>
                                                                                     )}
                                                                                     {pilotAudio.fileSizeKB > 0 && (
-                                                                                        <span className="text-[10px] text-slate-600">{pilotAudio.fileSizeKB} KB</span>
+                                                                                        <span className="text-[10px] text-slate-500">{pilotAudio.fileSizeKB} KB</span>
                                                                                     )}
                                                                                 </div>
                                                                             </div>
@@ -5866,31 +5962,68 @@ export default function SupervisorDashboard() {
                                                                             />
                                                                         </div>
                                                                     )}
-                                                                    {/* Teacher bitácora audio */}
-                                                                    {teacherAudio?.url && (
-                                                                        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2">
-                                                                            <div className="flex items-center gap-2 mb-1.5">
-                                                                                <span className="text-[10px]">🎓🎙️</span>
-                                                                                <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">Bitácora docente</span>
-                                                                                {teacherAudio.durationSeconds > 0 && (
-                                                                                    <span className="text-[10px] text-slate-500 tabular-nums">{fmtMMSS(teacherAudio.durationSeconds)}</span>
-                                                                                )}
-                                                                                {teacherAudio.teamName && (
-                                                                                    <span className="text-[10px] text-violet-400/70 truncate max-w-[120px]">{teacherAudio.teamName}</span>
+
+                                                                    {pAudit && (
+                                                                        <div className="mt-2 flex items-center justify-between px-2 py-1.5 rounded-md" style={{ background: `linear-gradient(90deg, ${scCol}15 0%, rgba(0,0,0,0.1) 100%)`, border: `1px solid ${scCol}30` }}>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[11px]">🤖</span>
+                                                                                <span className="text-[10px] font-bold text-slate-200 uppercase tracking-wider">Análisis IA</span>
+                                                                                {energyLabel && (
+                                                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: energyColor, background: `${energyColor}15`, border: `1px solid ${energyColor}30` }}>
+                                                                                        ⚡ {energyLabel}
+                                                                                    </span>
                                                                                 )}
                                                                             </div>
-                                                                            <audio
-                                                                                controls
-                                                                                preload="none"
-                                                                                src={teacherAudio.url}
-                                                                                className="w-full h-8 rounded"
-                                                                                style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.85 }}
-                                                                            />
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[9px] font-bold text-slate-400">{passed.length}/{Object.keys(PILOT_CL).length}</span>
+                                                                                <span className="text-[13px] font-black tabular-nums px-2 py-0.5 rounded shadow-sm" style={{ color: '#fff', background: scCol }}>
+                                                                                    {sc}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
                                                                     )}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                                </InnerHeader>
+
+                                                                {pAudit && (
+                                                                    <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: `${scCol}30` }}>
+                                                                        {/* Mini narrative */}
+                                                                        <p className="text-[11px] text-slate-300 leading-relaxed m-0 mb-3 font-medium">
+                                                                            El piloto obtuvo <span style={{ color: scCol, fontWeight: 800 }}>{scGrade.toLowerCase()}</span> ({sc}/100).
+                                                                            {failed.length > 0 && ` No logró: ${failed.map(k => PILOT_CL[k].toLowerCase()).join(', ')}.`}
+                                                                            {passed.length > 0 && failed.length === 0 && ' Cumplió todos los criterios.'}
+                                                                            {energyLabel && ` Energía vocal: ${energyLabel.toLowerCase()}.`}
+                                                                        </p>
+                                                                        {/* Checklist grid */}
+                                                                        <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3">
+                                                                            {Object.entries(PILOT_CL).map(([key, label]) => {
+                                                                                const val = pAudit[key];
+                                                                                const ok = val === true;
+                                                                                const no = val === false;
+                                                                                return (
+                                                                                    <div key={key} className="flex items-center gap-1.5">
+                                                                                        <span className="material-symbols-outlined" style={{ fontSize: 14, color: ok ? '#4ADE80' : no ? '#F87171' : '#475569' }}>
+                                                                                            {ok ? 'check_circle' : no ? 'cancel' : 'remove'}
+                                                                                        </span>
+                                                                                        <span className="text-[11px] font-medium" style={{ color: ok ? 'rgba(255,255,255,0.9)' : no ? 'rgba(248,113,113,0.9)' : '#64748B' }}>
+                                                                                            {label}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                        {/* AI feedback */}
+                                                                        {pAudit.feedback_para_isa && (
+                                                                            <div className="rounded-md px-3 py-2 flex items-start gap-2 shadow-inner" style={{ background: 'rgba(0,0,0,0.15)', border: `1px solid ${scCol}20` }}>
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: 14, color: scCol, marginTop: 1, flexShrink: 0 }}>tips_and_updates</span>
+                                                                                <p className="text-[11px] text-slate-300 m-0 leading-relaxed font-medium">
+                                                                                    {pAudit.feedback_para_isa}
+                                                                                </p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </InnerWrapper>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -5950,11 +6083,22 @@ export default function SupervisorDashboard() {
                             const allJourneyIds = siblingJourneys.map(j => j.id).filter(Boolean);
                             const primaryJourneyId = allJourneyIds[0] || selJourney?.id;
 
+                            // Resolve ISA teacher name from check-in data
+                            const isaTeacherName = (() => {
+                                const fromCheckin = sel?.checkins?.teacher?.name;
+                                if (fromCheckin && typeof fromCheckin === 'string' && fromCheckin.trim().length > 0) {
+                                    // Get first name only for readability
+                                    return fromCheckin.trim().split(' ')[0];
+                                }
+                                return null;
+                            })();
+
                             return (
                                 <AudioQualityWidget
                                     journeyId={primaryJourneyId}
                                     journeyIds={allJourneyIds}
                                     parsedMeta={mergedMeta}
+                                    isaName={isaTeacherName}
                                     style={{
                                         background: 'rgba(30, 41, 59, 0.7)',
                                         border: '1px solid rgba(148, 163, 184, 0.15)',
