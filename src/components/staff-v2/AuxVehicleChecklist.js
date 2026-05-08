@@ -41,7 +41,7 @@ function getOfflineQueue(journeyId) {
     try {
         const raw = localStorage.getItem(`flyhigh_aux_queue_2_${journeyId}`);
         return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+    } catch (_e) { return []; }
 }
 
 function addToOfflineQueue(journeyId, event) {

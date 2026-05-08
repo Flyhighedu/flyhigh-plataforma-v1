@@ -56,7 +56,7 @@ export default function EmotionRatingModal({
                 const existing = JSON.parse(localStorage.getItem(LOCAL_KEYS.EMOTION_SCORES) || '[]');
                 existing.push(scoreData);
                 localStorage.setItem(LOCAL_KEYS.EMOTION_SCORES, JSON.stringify(existing));
-            } catch { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
 
             await onSubmit?.(scoreData);
         } catch (err) {

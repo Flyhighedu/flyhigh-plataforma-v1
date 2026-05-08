@@ -35,7 +35,7 @@ export async function GET() {
                         email: user?.email || 'N/A',
                         phone: user?.phone || 'No registrado'
                     };
-                } catch {
+                } catch (_e) {
                     return { ...profile, email: 'N/A', phone: 'No registrado' };
                 }
             })

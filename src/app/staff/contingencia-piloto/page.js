@@ -55,7 +55,7 @@ function safeParseJson(value, fallback = null) {
     try {
         if (!value) return fallback;
         return typeof value === 'string' ? JSON.parse(value) : value;
-    } catch {
+    } catch (_e) {
         return fallback;
     }
 }

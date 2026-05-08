@@ -103,7 +103,7 @@ function parseMetaLike(meta) {
     if (typeof meta === 'string') {
         try {
             return JSON.parse(meta);
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }
@@ -120,7 +120,7 @@ function parseObject(value) {
             return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
                 ? parsed
                 : Object.create(null);
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }
@@ -1858,7 +1858,7 @@ export default function SupervisorDashboard() {
                 const { data: p } = await supabase.from('staff_profiles').select('user_id, full_name, role, is_active').eq('user_id', user.id).single();
                 if (!p || p.role !== 'supervisor') { router.push('/staff/login'); return; }
                 if (!cancel) { setProfile(p); setAuthOk(true); }
-            } catch { router.push('/staff/login'); }
+            } catch (_e) { router.push('/staff/login'); }
         })();
         return () => { cancel = true; };
     }, [router, supabase]);
@@ -3400,7 +3400,7 @@ export default function SupervisorDashboard() {
                         return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
                             ? parsed
                             : Object.create(null);
-                    } catch {
+                    } catch (_e) {
                         return Object.create(null);
                     }
                 }
@@ -4181,7 +4181,7 @@ export default function SupervisorDashboard() {
 
         siblings.forEach(j => {
             let m = {};
-            try { m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {}); } catch { m = {}; }
+            try { m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {}); } catch (_e) { m = {}; }
 
             // ── PASS 1: Process bitácora entries FIRST to know which flights have teacher data ──
             // This is needed for backward compat with untagged telemetry recordings
@@ -6063,7 +6063,7 @@ export default function SupervisorDashboard() {
                                 let m = {};
                                 try {
                                     m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {});
-                                } catch { m = {}; }
+                                } catch (_e) { m = {}; }
                                 // Merge top-level meta (later values win for scalar fields)
                                 Object.assign(mergedMeta, m);
                                 // Accumulate array data from all journeys

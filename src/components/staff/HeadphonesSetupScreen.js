@@ -113,7 +113,7 @@ export default function HeadphonesSetupScreen({
         if (typeof rawMeta === 'string') return rawMeta;
         try {
             return JSON.stringify(rawMeta);
-        } catch {
+        } catch (_e) {
             return '';
         }
     })();

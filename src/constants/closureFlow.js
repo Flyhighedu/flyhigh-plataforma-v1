@@ -63,7 +63,7 @@ function parseMetaLike(meta) {
                 return Object.create(null);
             }
             return parsed;
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }

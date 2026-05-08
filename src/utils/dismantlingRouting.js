@@ -83,7 +83,7 @@ function normalizeDismantlingMeta(meta) {
                 return Object.create(null);
             }
             return parsed;
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }

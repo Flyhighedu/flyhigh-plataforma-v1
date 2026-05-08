@@ -353,7 +353,7 @@ export default function UnloadAssignmentActionScreen({
                                         if (typeof e.currentTarget.setPointerCapture === 'function') {
                                             try {
                                                 e.currentTarget.setPointerCapture(e.pointerId);
-                                            } catch {
+                                            } catch (_e) {
                                                 // noop
                                             }
                                         }
@@ -365,7 +365,7 @@ export default function UnloadAssignmentActionScreen({
                                         if (typeof e.currentTarget.releasePointerCapture === 'function') {
                                             try {
                                                 e.currentTarget.releasePointerCapture(e.pointerId);
-                                            } catch {
+                                            } catch (_e) {
                                                 // noop
                                             }
                                         }

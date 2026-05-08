@@ -179,7 +179,7 @@ export default function SeatDeploymentScreen({
         if (typeof rawMeta === 'string') return rawMeta;
         try {
             return JSON.stringify(rawMeta);
-        } catch {
+        } catch (_e) {
             return '';
         }
     })();

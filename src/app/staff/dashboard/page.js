@@ -185,7 +185,7 @@ function normalizeMeta(meta) {
                 return Object.create(null);
             }
             return parsed;
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }
@@ -718,7 +718,7 @@ export default function StaffDashboard() {
                 const bytes = new Uint8Array(buf);
                 let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
                 new Audio('data:audio/wav;base64,' + btoa(bin)).play().catch(() => { });
-            } catch { }
+            } catch (_e) { }
         }
     }, [todaySchool?.meta, profile?.role]);
 

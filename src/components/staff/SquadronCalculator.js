@@ -56,7 +56,7 @@ export default function SquadronCalculator({ isOpen, onClose, onComplete, timerS
     }, [isOpen, reset]);
 
     const vibrate = (pattern = [50]) => {
-        try { navigator.vibrate?.(pattern); } catch { }
+        try { navigator.vibrate?.(pattern); } catch (_e) { }
     };
 
     const handleSelectRoute = (r) => {

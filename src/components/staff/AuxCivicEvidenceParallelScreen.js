@@ -41,7 +41,7 @@ const NOTIFICATION_BEEP_B64 = (() => {
         let binary = '';
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return 'data:audio/wav;base64,' + btoa(binary);
-    } catch { return ''; }
+    } catch (_e) { return ''; }
 })();
 
 function playNotificationBeep() {
@@ -50,7 +50,7 @@ function playNotificationBeep() {
         const audio = new Audio(NOTIFICATION_BEEP_B64);
         audio.volume = 0.5;
         audio.play().catch(() => { });
-    } catch { }
+    } catch (_e) { }
 }
 
 export default function AuxCivicEvidenceParallelScreen({

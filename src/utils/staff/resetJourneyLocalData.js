@@ -13,7 +13,7 @@ function safeParseJson(raw, fallback) {
     try {
         if (!raw) return fallback;
         return JSON.parse(raw);
-    } catch {
+    } catch (_e) {
         return fallback;
     }
 }

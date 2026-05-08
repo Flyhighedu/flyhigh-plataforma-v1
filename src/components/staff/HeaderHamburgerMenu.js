@@ -112,7 +112,7 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
             } else {
                 const resolvedSchoolId = schoolId
                     || localStorage.getItem('flyhigh_selected_mission_id')
-                    || (() => { try { return JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}')?.id; } catch { return null; } })();
+                    || (() => { try { return JSON.parse(localStorage.getItem('flyhigh_staff_mission') || '{}')?.id; } catch (_e) { return null; } })();
 
                 if (resolvedSchoolId) {
                     const { data: { user } } = await supabase.auth.getUser();

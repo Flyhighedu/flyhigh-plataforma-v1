@@ -150,7 +150,7 @@ export default function useVoiceRecorder() {
                 recorder = mimeType
                     ? new MediaRecorder(stream, { mimeType })
                     : new MediaRecorder(stream);
-            } catch {
+            } catch (_e) {
                 recorder = new MediaRecorder(stream);
             }
 
@@ -272,7 +272,7 @@ export default function useVoiceRecorder() {
             ignoreNextStopRef.current = true;
             try {
                 recorder.stop();
-            } catch {
+            } catch (_e) {
                 // noop
             }
         }

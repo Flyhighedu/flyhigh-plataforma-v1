@@ -49,7 +49,7 @@ export default function POIMapEditor({ isOpen, onClose, profile }) {
             const data = await res.json();
             if (data.ok) {
                 setPois(data.pois || []);
-                try { localStorage.setItem('flyhigh_poi_cache', JSON.stringify(data.pois)); } catch {}
+                try { localStorage.setItem('flyhigh_poi_cache', JSON.stringify(data.pois)); } catch (_e) {}
             } else {
                 throw new Error(data.error || 'Error cargando POIs');
             }
@@ -59,7 +59,7 @@ export default function POIMapEditor({ isOpen, onClose, profile }) {
             try {
                 const cached = localStorage.getItem('flyhigh_poi_cache');
                 if (cached) setPois(JSON.parse(cached));
-            } catch {}
+            } catch (_e) {}
         } finally {
             setLoading(false);
         }
@@ -92,7 +92,7 @@ export default function POIMapEditor({ isOpen, onClose, profile }) {
                 setPois(prev => [...prev, data.poi]);
                 setShowForm(false);
                 setNewPoiName('');
-                try { navigator.vibrate?.(100); } catch {}
+                try { navigator.vibrate?.(100); } catch (_e) {}
             } else {
                 setError(data.error);
             }
@@ -115,7 +115,7 @@ export default function POIMapEditor({ isOpen, onClose, profile }) {
             const data = await res.json();
             if (data.ok) {
                 setPois(prev => prev.filter(p => p.id !== id));
-                try { navigator.vibrate?.(50); } catch {}
+                try { navigator.vibrate?.(50); } catch (_e) {}
             }
         } catch (err) {
             console.warn('Delete error:', err);

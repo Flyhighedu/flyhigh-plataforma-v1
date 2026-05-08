@@ -30,7 +30,7 @@ function scoreBg(s) { if (s >= 80) return 'rgba(74,222,128,0.12)'; if (s >= 60) 
 function scoreGrade(s) { if (s >= 90) return 'Excelente'; if (s >= 75) return 'Bien'; if (s >= 60) return 'Regular'; if (s >= 40) return 'Bajo'; return 'Crítico'; }
 
 function fmtMMSS(sec) { if (!sec || isNaN(sec)) return '00:00'; return `${Math.floor(sec / 60).toString().padStart(2, '0')}:${Math.floor(sec % 60).toString().padStart(2, '0')}`; }
-function fmtClock(iso) { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }); } catch { return ''; } }
+function fmtClock(iso) { if (!iso) return ''; try { return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }); } catch (_e) { return ''; } }
 
 function getChecklistForAudit(audit) {
     if (!audit) return DOCENTE_CHECKLIST;
@@ -98,7 +98,7 @@ export default function UnifiedFlightCard({
             });
             const data = await res.json();
             if (data.ok) setRetrySuccess(true); else alert('Falló: ' + data.error);
-        } catch { alert('Error de red.'); }
+        } catch (_e) { alert('Error de red.'); }
         finally { setIsRetrying(false); }
     };
 

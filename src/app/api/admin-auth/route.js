@@ -22,7 +22,7 @@ export function verifyToken(token) {
         // Check expiration (24 hours)
         if (payload.exp && Date.now() > payload.exp) return null;
         return payload;
-    } catch {
+    } catch (_e) {
         return null;
     }
 }

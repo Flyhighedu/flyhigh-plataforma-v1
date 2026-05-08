@@ -59,7 +59,7 @@ export default function SquadronBitacoraModal({
                 const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
                 existing.push(bitacoraEntry);
                 localStorage.setItem(localKey, JSON.stringify(existing));
-            } catch { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
 
             setSaved(true);
             setTimeout(() => {

@@ -80,7 +80,7 @@ export const DISMANTLING_TASK_OVERRIDES = Object.freeze({
 export function isNoPilotContingency(meta) {
     if (!meta) return false;
     const parsed = typeof meta === 'string' ? (() => {
-        try { return JSON.parse(meta); } catch { return null; }
+        try { return JSON.parse(meta); } catch (_e) { return null; }
     })() : meta;
     return parsed?.contingency_no_pilot === true;
 }

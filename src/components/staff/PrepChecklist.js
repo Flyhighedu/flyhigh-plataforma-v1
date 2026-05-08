@@ -317,7 +317,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                         if (parsedMeta && typeof parsedMeta === 'object' && !Array.isArray(parsedMeta)) {
                             safeMeta = { ...parsedMeta };
                         }
-                    } catch {
+                    } catch (_e) {
                         safeMeta = {};
                     }
                 }

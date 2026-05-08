@@ -37,7 +37,7 @@ function playSuccessBeep() {
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.15);
         setTimeout(() => ctx.close(), 300);
-    } catch { /* non-critical */ }
+    } catch (_e) { /* non-critical */ }
 }
 
 const HOLD_DURATION_MS = 1000;

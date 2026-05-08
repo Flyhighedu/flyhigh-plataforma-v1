@@ -40,7 +40,7 @@ export async function verifyAdminToken(token) {
         const payload = JSON.parse(data);
         if (payload.exp && Date.now() > payload.exp) return null;
         return payload;
-    } catch {
+    } catch (_e) {
         return null;
     }
 }

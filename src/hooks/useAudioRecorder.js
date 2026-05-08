@@ -68,7 +68,7 @@ export default function useAudioRecorder() {
                     result.onchange = () => setPermissionState(result.state);
                 })
                 .catch(() => setPermissionState('prompt'));
-        } catch {
+        } catch (_e) {
             setPermissionState('prompt');
         }
     }, [isSupported]);
@@ -80,7 +80,7 @@ export default function useAudioRecorder() {
             try {
                 mediaRecorderRef.current?.stop();
                 streamRef.current?.getTracks().forEach(t => t.stop());
-            } catch { /* cleanup best-effort */ }
+            } catch (_e) { /* cleanup best-effort */ }
         };
     }, []);
 
@@ -196,7 +196,7 @@ export default function useAudioRecorder() {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
                 mediaRecorderRef.current.stop();
             }
-        } catch { /* best-effort */ }
+        } catch (_e) { /* best-effort */ }
 
         streamRef.current?.getTracks().forEach(track => track.stop());
         streamRef.current = null;

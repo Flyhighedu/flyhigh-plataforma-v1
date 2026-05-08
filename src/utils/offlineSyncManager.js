@@ -311,8 +311,8 @@ async function _notifySubscribers() {
     try {
         const status = await getSyncStatus();
         const snapshot = { pending: status.pending, failed: status.failed, total: status.total };
-        _subscribers.forEach(fn => { try { fn(snapshot); } catch { } });
-    } catch { }
+        _subscribers.forEach(fn => { try { fn(snapshot); } catch (_e) { } });
+    } catch (_e) { }
 }
 
 /**

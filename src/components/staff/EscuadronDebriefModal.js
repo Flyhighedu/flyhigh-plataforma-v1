@@ -97,7 +97,7 @@ export default function EscuadronDebriefModal({
                 const existing = JSON.parse(localStorage.getItem(localKey) || '{}');
                 existing[escuadronRole] = debriefData;
                 localStorage.setItem(localKey, JSON.stringify(existing));
-            } catch { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
 
             onComplete?.();
         } catch (err) {

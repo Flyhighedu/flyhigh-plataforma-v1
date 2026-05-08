@@ -79,14 +79,14 @@ export default function SupervisorBitacoraScreen({
                 setBitacoraHistory(history);
                 return;
             }
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
 
         // Fallback to localStorage
         try {
             const localKey = `flyhigh_escuadron_bitacora_${journeyId || 'local'}`;
             const local = JSON.parse(localStorage.getItem(localKey) || '[]');
             if (Array.isArray(local)) setBitacoraHistory(local);
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
     }, [missionInfo?.meta, journeyId]);
 
     // Timer logic
@@ -159,7 +159,7 @@ export default function SupervisorBitacoraScreen({
                 const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
                 existing.push(bitacoraEntry);
                 localStorage.setItem(localKey, JSON.stringify(existing));
-            } catch { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
 
             setBitacoraHistory(prev => [...prev, bitacoraEntry]);
             setSaved(true);
@@ -242,7 +242,7 @@ export default function SupervisorBitacoraScreen({
                             currentMeta = typeof journeyRow?.meta === 'string'
                                 ? JSON.parse(journeyRow.meta)
                                 : (journeyRow?.meta || {});
-                        } catch { currentMeta = {}; }
+                        } catch (_e) { currentMeta = {}; }
 
                         const history = Array.isArray(currentMeta.escuadron_bitacora_history)
                             ? [...currentMeta.escuadron_bitacora_history]
@@ -287,7 +287,7 @@ export default function SupervisorBitacoraScreen({
                             try {
                                 const localKey = `flyhigh_escuadron_bitacora_${journeyId || 'local'}`;
                                 localStorage.setItem(localKey, JSON.stringify(updated));
-                            } catch {}
+                            } catch (_e) {}
                             return updated;
                         });
                     }
@@ -331,7 +331,7 @@ export default function SupervisorBitacoraScreen({
             setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
             setTimerRunning(true);
             if (micSupported && !micRecording) {
-                try { startRecording(); } catch { /* non-blocking */ }
+                try { startRecording(); } catch (_e) { /* non-blocking */ }
             }
         }
     }, [timerRunning, micSupported, micRecording, startRecording]);
@@ -352,7 +352,7 @@ export default function SupervisorBitacoraScreen({
         clearInterval(timerRef.current);
         setTimerSeconds(PREFLIGHT_TIMER_SECONDS);
         if (micRecording) {
-            try { stopRecording(); } catch { /* non-blocking */ }
+            try { stopRecording(); } catch (_e) { /* non-blocking */ }
         }
         setScannerOpen(false);
         setCalcOpen(false);

@@ -58,7 +58,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
     const startBattle = useCallback(() => {
         if (!nameA || !nameB || nameA === nameB) return;
         setPhase('battle');
-        try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch {}
+        try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch (_e) {}
     }, [nameA, nameB]);
 
     const handleSelectWinner = useCallback((teamName) => {
@@ -67,18 +67,18 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
         setTimeout(() => setShowVictory(true), 50);
         setTimeout(() => {
             setShowName(true);
-            try { navigator.vibrate?.([100, 50, 200]); } catch {}
+            try { navigator.vibrate?.([100, 50, 200]); } catch (_e) {}
         }, 300);
     }, []);
 
     const handlePressStart = useCallback((teamName) => {
         setPressingTeam(teamName);
-        try { navigator.vibrate?.(50); } catch {}
+        try { navigator.vibrate?.(50); } catch (_e) {}
         
         if (pressTimer.current) clearTimeout(pressTimer.current);
         
         pressTimer.current = setTimeout(() => {
-            try { navigator.vibrate?.(200); } catch {}
+            try { navigator.vibrate?.(200); } catch (_e) {}
             handleSelectWinner(teamName);
             setPressingTeam(null);
             pressTimer.current = null;
@@ -122,7 +122,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                             "¡Hola! Bienvenidos a su misión. El día de hoy ustedes ya son tripulantes oficiales de FlyHigh. ¿Están listos para volar?"
                         </p>
                     </div>
-                    <button onClick={() => { setPhase('radar'); try { navigator.vibrate?.(100); } catch {} }} style={{
+                    <button onClick={() => { setPhase('radar'); try { navigator.vibrate?.(100); } catch (_e) {} }} style={{
                         marginTop:24,padding:'20px 48px',borderRadius:20,border:'none',
                         background:NEON_GREEN,color:'#0A0A0F',fontSize:18,fontWeight:900,
                         textTransform:'uppercase',cursor:'pointer',boxShadow:`0 0 40px ${NEON_GREEN}66`,

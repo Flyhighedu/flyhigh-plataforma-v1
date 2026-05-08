@@ -74,7 +74,7 @@ async function fetchImageAsDataUri(src, timeoutMs = 8000) {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
           resolve(canvas.toDataURL('image/png'));
-        } catch {
+        } catch (_e) {
           console.warn(`Canvas fallback also failed for ${src}`);
           resolve(null);
         }

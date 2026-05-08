@@ -25,7 +25,7 @@ export default function useUploadQueueStatus() {
                 setStatus({ pending: s.pending, failed: s.failed, total: s.total });
                 // If there are pending items but drain isn't running, restart it
                 if (s.total > 0) startBackgroundDrain();
-            } catch { }
+            } catch (_e) { }
         }, 10_000);
 
         return () => {
@@ -38,7 +38,7 @@ export default function useUploadQueueStatus() {
         try {
             const s = await getSyncStatus();
             setStatus({ pending: s.pending, failed: s.failed, total: s.total });
-        } catch { }
+        } catch (_e) { }
     }, []);
 
     return {

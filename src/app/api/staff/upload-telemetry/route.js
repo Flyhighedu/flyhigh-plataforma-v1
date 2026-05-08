@@ -126,7 +126,7 @@ export async function POST(request) {
                     currentMeta = typeof journeyRow?.meta === 'string'
                         ? JSON.parse(journeyRow.meta)
                         : (journeyRow?.meta || {});
-                } catch { currentMeta = {}; }
+                } catch (_e) { currentMeta = {}; }
 
                 // Append to telemetry array
                 const telemetryArray = Array.isArray(currentMeta.telemetry_recordings)

@@ -18,7 +18,7 @@ function parseObject(value) {
             return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
                 ? parsed
                 : Object.create(null);
-        } catch {
+        } catch (_e) {
             return Object.create(null);
         }
     }

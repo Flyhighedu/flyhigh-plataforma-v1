@@ -130,7 +130,7 @@ function readJourneyStudentsFromLocalLogs(journeyId) {
     try {
         const logs = JSON.parse(localStorage.getItem('flyhigh_flight_logs') || '[]');
         return sumStudentsFromFlightLogs(logs, targetJourneyId);
-    } catch {
+    } catch (_e) {
         return 0;
     }
 }
@@ -231,7 +231,7 @@ function getErrorMessage(error) {
     try {
         const serialized = JSON.stringify(error);
         if (serialized && serialized !== '{}') return serialized;
-    } catch {
+    } catch (_e) {
         // no-op
     }
 
@@ -425,7 +425,7 @@ export default function CheckoutScreen({
                 const remoteCount = await fetchJourneyStudentsCount({ journeyId, missionId });
                 if (cancelled) return;
                 setStudentsCount(Math.max(localCount, remoteCount));
-            } catch {
+            } catch (_e) {
                 if (!cancelled) {
                     setStudentsCount(localCount);
                 }

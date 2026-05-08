@@ -194,7 +194,7 @@ function parseGeminiJson(text) {
 
     try {
         return JSON.parse(cleaned);
-    } catch {
+    } catch (_e) {
         // Try extracting JSON object from the response
         const match = cleaned.match(/\{[\s\S]*\}/);
         if (match) return JSON.parse(match[0]);
@@ -255,7 +255,7 @@ export async function POST(request) {
                 if (existingAuditId) await updateAuditRecord(supabase, existingAuditId, { status: 'too_short' });
                 else await createAuditRecord(supabase, { journeyId, userId, flightNumber, source, audioUrl, durationSeconds })
                     .then(id => updateAuditRecord(supabase, id, { status: 'too_short' }));
-            } catch { /* non-blocking */ }
+            } catch (_e) { /* non-blocking */ }
             return NextResponse.json({ ok: true, skipped: true, reason: `Audio too short (${durationSeconds}s).` });
         }
 

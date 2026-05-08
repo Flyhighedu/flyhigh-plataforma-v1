@@ -50,7 +50,7 @@ function safeParseJson(input, fallback = null) {
     try {
         if (!input) return fallback;
         return JSON.parse(input);
-    } catch {
+    } catch (_e) {
         return fallback;
     }
 }
@@ -768,7 +768,7 @@ export default function StaffOperationLegacy({
         try {
             const localDebrief = JSON.parse(localStorage.getItem(debriefLocalKey) || '{}');
             debriefAlreadyDone = Boolean(localDebrief[escuadronRole]);
-        } catch { /* non-blocking */ }
+        } catch (_e) { /* non-blocking */ }
 
         if (!debriefAlreadyDone && escuadronRole) {
             setShowDebriefModal(true);
@@ -786,7 +786,7 @@ export default function StaffOperationLegacy({
         setCloseOperationError(null);
         try {
             await handleCloseDay();
-        } catch {
+        } catch (_e) {
             // Error already handled inside handleCloseDay (sets closeOperationError)
         }
     }, [handleCloseDay]);

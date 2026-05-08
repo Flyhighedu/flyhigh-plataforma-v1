@@ -39,7 +39,7 @@ export async function GET() {
                     await supabase.from('audio_quality_audits').update({ energia_positiva: val }).eq('id', row.id);
                     updated++;
                 }
-            } catch { /* skip */ }
+            } catch (_e) { /* skip */ }
         }
     }
 

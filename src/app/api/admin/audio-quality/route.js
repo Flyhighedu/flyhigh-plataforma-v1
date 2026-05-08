@@ -145,7 +145,7 @@ export async function GET(request) {
                     try {
                         const raw = typeof a.raw_response === 'string' ? JSON.parse(a.raw_response) : a.raw_response;
                         energiaPositiva = raw?.analysis?.energia_positiva ?? null;
-                    } catch { energiaPositiva = null; }
+                    } catch (_e) { energiaPositiva = null; }
                 }
                 return {
                     id: a.id,
