@@ -294,58 +294,18 @@ export default function StaffOperationLegacy({
     const [editedStudentCount, setEditedStudentCount] = useState('0');
     const [flightEditReason, setFlightEditReason] = useState('');
     const [isSavingFlightEdit, setIsSavingFlightEdit] = useState(false);
-    const [pilotQaFeedback, setPilotQaFeedback] = useState(null);
 
     // ── Pilot Audio Recording (fire-and-forget, never blocks flight ops) ──
     const {
         isSupported: pilotMicSupported,
         isRecording: pilotRecording,
         durationSeconds: pilotRecDuration,
-        permissionState: pilotMicPermission,
         startRecording: startPilotRecording,
         stopRecording: stopPilotRecording,
         cancelRecording: cancelPilotRecording
     } = useAudioRecorder();
     const pilotRecDurationRef = useRef(0);
     useEffect(() => { pilotRecDurationRef.current = pilotRecDuration; }, [pilotRecDuration]);
-
-    // ── Notify supervisor of mic permission status via journey meta ──
-    const lastReportedMicStateRef = useRef(null);
-    useEffect(() => {
-        if (!journeyId || preview) return;
-        if (currentRole !== 'pilot' && currentRole !== 'teacher') return;
-        if (pilotMicPermission !== 'denied' && pilotMicPermission !== 'granted') return;
-
-        const isBlocked = pilotMicPermission === 'denied';
-        const roleKey = currentRole === 'pilot' ? 'pilot_mic_blocked' : 'teacher_mic_blocked';
-
-        // Avoid redundant writes
-        if (lastReportedMicStateRef.current === `${roleKey}:${isBlocked}`) return;
-        lastReportedMicStateRef.current = `${roleKey}:${isBlocked}`;
-
-        const supabase = createClient();
-        supabase.from('staff_journeys')
-            .select('meta')
-            .eq('id', journeyId)
-            .single()
-            .then(({ data, error: readErr }) => {
-                if (readErr) throw readErr;
-                const currentMeta = parseMetaLike(data?.meta);
-                // Only write if value actually changed
-                if (currentMeta[roleKey] === isBlocked) return;
-                return supabase.from('staff_journeys')
-                    .update({
-                        meta: {
-                            ...currentMeta,
-                            [roleKey]: isBlocked,
-                            [`${roleKey}_at`]: new Date().toISOString()
-                        },
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', journeyId);
-            })
-            .catch(err => console.warn('⚠️ No se pudo reportar estado del micrófono:', err));
-    }, [journeyId, pilotMicPermission, currentRole, preview]);
 
     const recentlyClosedFlightIdsRef = useRef(new Set());
     const processingFlightIdsRef = useRef(new Set());
@@ -1025,10 +985,7 @@ export default function StaffOperationLegacy({
                     flightNumber,
                     source: 'pilot_narration',
                     userId,
-                    durationSeconds: pilotRecDurationRef.current || 0,
-                    onFeedback: ({ score, feedback, strikes }) => {
-                        setPilotQaFeedback({ score, feedback, strikes });
-                    }
+                    durationSeconds: pilotRecDurationRef.current || 0
                 });
             }
         } catch (err) {
@@ -1635,13 +1592,6 @@ export default function StaffOperationLegacy({
                     showTotalOperationTimer={operationStartedAtMs > 0}
                     disabled={!!activePause}
                     pilotRecording={currentRole === 'pilot' && pilotRecording}
-                    pilotMicPermission={currentRole === 'pilot' ? pilotMicPermission : null}
-                    pilotMicSupported={currentRole === 'pilot' ? pilotMicSupported : false}
-                    onRetryMicPermission={currentRole === 'pilot' ? async () => {
-                        const ok = await startPilotRecording();
-                        if (ok) cancelPilotRecording();
-                        return ok;
-                    } : null}
                 />
 
                 <div className="pt-4 border-t border-slate-200">
@@ -1921,85 +1871,6 @@ export default function StaffOperationLegacy({
                     resetCloseDayHold();
                 }}
             />
-
-            {/* 🧠 AI Quality Modal (Pilot Feedback) */}
-            {pilotQaFeedback && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
-                    zIndex: 99999,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 20,
-                    animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}>
-                    <div style={{
-                        background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: 32,
-                        width: '100%',
-                        maxWidth: 400,
-                        padding: 32,
-                        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center'
-                    }}>
-                        <div style={{
-                            width: 80, height: 80, borderRadius: '50%',
-                            background: pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.1)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            border: `2px solid ${pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171'}`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginBottom: 20,
-                            boxShadow: `0 0 30px ${pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.3)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                        }}>
-                            <span style={{ fontSize: 32, fontWeight: 900, color: pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171' }}>
-                                {pilotQaFeedback.score}
-                            </span>
-                        </div>
-                        
-                        <h3 style={{ color: '#F8FAFC', fontSize: 24, fontWeight: 900, margin: '0 0 8px', textAlign: 'center' }}>
-                            Reporte de IA
-                        </h3>
-                        <p style={{ color: '#94A3B8', fontSize: 15, margin: '0 0 24px', textAlign: 'center', lineHeight: 1.5 }}>
-                            {pilotQaFeedback.feedback}
-                        </p>
-
-                        {pilotQaFeedback.strikes && pilotQaFeedback.strikes.length > 0 && (
-                            <div style={{ width: '100%', background: 'rgba(0,0,0,0.2)', borderRadius: 16, padding: 16, marginBottom: 24 }}>
-                                <p style={{ color: '#F87171', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
-                                    Áreas de oportunidad ({pilotQaFeedback.strikes.length})
-                                </p>
-                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {pilotQaFeedback.strikes.map((strike, i) => (
-                                        <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                                            <span style={{ color: '#F87171', fontSize: 16, lineHeight: 1 }}>✖</span>
-                                            <span style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{strike}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        <button 
-                            onClick={() => setPilotQaFeedback(null)}
-                            style={{
-                                width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-                                background: 'linear-gradient(90deg, #4F46E5, #7C3AED)',
-                                color: 'white', fontSize: 16, fontWeight: 800, textTransform: 'uppercase',
-                                cursor: 'pointer', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.4)'
-                            }}
-                        >
-                            Entendido
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
