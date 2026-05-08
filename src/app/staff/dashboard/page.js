@@ -824,8 +824,12 @@ export default function StaffDashboard() {
                 
                 if (match && !matchIsCompleted && !matchIsNotToday) {
                     // Auto-resume the previously selected mission
-                    await selectMission(match);
-                    return;
+                    try {
+                        await selectMission(match);
+                        return;
+                    } catch (resumeErr) {
+                        console.warn('⚠️ Auto-resume failed, falling through to recovery:', resumeErr);
+                    }
                 }
                 
                 if (matchIsCompleted || matchIsNotToday) {
@@ -833,40 +837,151 @@ export default function StaffDashboard() {
                     localStorage.removeItem('flyhigh_selected_mission_id');
                 }
 
-                // ── RECOVERY LOGIC: If no auto-resume match, check backend for active journey ──
-                if (!match) {
+                // ── RECOVERY LOGIC: Multi-path detection for ejected sessions ──
+                // Runs ALWAYS when we reach this point (auto-resume failed or no match)
+                // Path 1: Check localStorage flyhigh_staff_mission (survives refresh)
+                // Path 2: Check staff_journeys directly for today's active journeys for this user
+                // Path 3: Check staff_presence as final fallback
+                {
                     try {
-                        const { data: recentPresence } = await supabase
-                            .from('staff_presence')
-                            .select('journey_id')
-                            .eq('user_id', userId)
-                            .order('last_seen_at', { ascending: false })
-                            .limit(1);
-
-                        if (recentPresence && recentPresence.length > 0) {
-                            const jId = recentPresence[0].journey_id;
-                            const { data: journeyData } = await supabase
-                                .from('staff_journeys')
-                                .select('school_id, status, date, school_name')
-                                .eq('id', jId)
-                                .single();
-
-                            if (journeyData && journeyData.date === today && !['closed', 'report'].includes(journeyData.status)) {
-                                let recoverySchool = schools.find(s => String(s.id) === String(journeyData.school_id));
-                                if (!recoverySchool) {
-                                    const { data: schoolData } = await supabase
-                                        .from('proximas_escuelas')
-                                        .select('*')
-                                        .eq('id', journeyData.school_id)
+                        let recoveredSchool = null;
+                        console.log('🔍 [Recovery] Starting multi-path recovery check...');
+                        console.log('🔍 [Recovery] savedId:', savedId, '| match:', !!match, '| schools count:', schools.length);
+                        
+                        // PATH 1: localStorage cached mission data
+                        const cachedMissionStr = localStorage.getItem('flyhigh_staff_mission');
+                        console.log('🔍 [Recovery-Path1] Cached mission exists:', !!cachedMissionStr);
+                        if (cachedMissionStr && !recoveredSchool) {
+                            try {
+                                const cachedMission = JSON.parse(cachedMissionStr);
+                                if (cachedMission && cachedMission.id) {
+                                    console.log('🔍 [Recovery-Path1] Cached school id:', cachedMission.id, '| name:', cachedMission.school_name || cachedMission.nombre_escuela);
+                                    // Verify this mission is still active via backend
+                                    const { data: verifyJourney, error: verifyErr } = await supabase
+                                        .from('staff_journeys')
+                                        .select('id, mission_state, status, date, school_id')
+                                        .eq('date', today)
+                                        .eq('school_id', cachedMission.id)
                                         .single();
-                                    if (schoolData) recoverySchool = schoolData;
+                                    
+                                    console.log('🔍 [Recovery-Path1] Journey verify result:', verifyJourney ? `status=${verifyJourney.status}, state=${verifyJourney.mission_state}` : 'NOT FOUND', verifyErr ? `error: ${verifyErr.message}` : '');
+                                    if (verifyJourney && !['closed'].includes(verifyJourney.status)) {
+                                        console.log('🛡️ [Recovery-Path1] Found active mission via localStorage cache:', cachedMission.school_name || cachedMission.nombre_escuela);
+                                        // Use cached data directly — it has full school details
+                                        recoveredSchool = cachedMission;
+                                    }
                                 }
-                                
-                                if (recoverySchool && recoverySchool.estatus !== 'cerrada' && recoverySchool.estatus !== 'completada') {
-                                    console.log('🚨 Ejected user detected. Triggering recovery prompt for:', recoverySchool.nombre_escuela || recoverySchool.school_name);
-                                    setRecoveryMission(recoverySchool);
+                            } catch (e) { console.warn('[Recovery-Path1] Parse error:', e); }
+                        }
+
+                        // PATH 2: Query staff_journeys for any active journey today where user participated
+                        if (!recoveredSchool) {
+                            console.log('🔍 [Recovery-Path2] Checking staff_journeys for active journeys today...');
+                            const { data: activeJourneys, error: jErr } = await supabase
+                                .from('staff_journeys')
+                                .select('id, school_id, school_name, status, mission_state, date')
+                                .eq('date', today)
+                                .not('status', 'in', '("closed")');
+
+                            console.log('🔍 [Recovery-Path2] Active journeys found:', activeJourneys?.length || 0, jErr ? `error: ${jErr.message}` : '');
+                            if (activeJourneys && activeJourneys.length > 0) {
+                                // Check which journey this user was part of via prep_events or presence
+                                for (const journey of activeJourneys) {
+                                    const { data: userCheckIn } = await supabase
+                                        .from('staff_prep_events')
+                                        .select('id')
+                                        .eq('journey_id', journey.id)
+                                        .eq('user_id', userId)
+                                        .eq('event_type', 'checkin')
+                                        .limit(1);
+                                    
+                                    if (userCheckIn && userCheckIn.length > 0) {
+                                        // This user checked into this journey — build recovery school
+                                        let schoolObj = schools.find(s => String(s.id) === String(journey.school_id));
+                                        if (!schoolObj) {
+                                            const { data: schoolData } = await supabase
+                                                .from('proximas_escuelas')
+                                                .select('*')
+                                                .eq('id', journey.school_id)
+                                                .single();
+                                            if (schoolData) {
+                                                schoolObj = {
+                                                    id: schoolData.id,
+                                                    school_name: (schoolData.nombre_escuela || '').trim(),
+                                                    nombre_escuela: schoolData.nombre_escuela,
+                                                    cct: schoolData.cct || null,
+                                                    colonia: schoolData.colonia,
+                                                    fecha: schoolData.fecha_programada,
+                                                    pilot_id: schoolData.pilot_id,
+                                                    teacher_id: schoolData.teacher_id,
+                                                    aux_id: schoolData.aux_id,
+                                                    estatus: schoolData.estatus,
+                                                };
+                                            } else {
+                                                // Even if school not in proximas_escuelas (demo), build synthetic
+                                                schoolObj = {
+                                                    id: journey.school_id,
+                                                    school_name: journey.school_name || 'Misión Activa',
+                                                    nombre_escuela: journey.school_name || 'Misión Activa',
+                                                    estatus: 'en_progreso',
+                                                    fecha: today,
+                                                };
+                                            }
+                                        }
+                                        console.log('🛡️ [Recovery-Path2] Found active journey via check-in history:', schoolObj.school_name || schoolObj.nombre_escuela);
+                                        recoveredSchool = schoolObj;
+                                        break;
+                                    }
                                 }
                             }
+                        }
+
+                        // PATH 3: staff_presence fallback  
+                        if (!recoveredSchool) {
+                            const { data: recentPresence } = await supabase
+                                .from('staff_presence')
+                                .select('journey_id')
+                                .eq('user_id', userId)
+                                .order('last_seen_at', { ascending: false })
+                                .limit(1);
+
+                            if (recentPresence && recentPresence.length > 0) {
+                                const jId = recentPresence[0].journey_id;
+                                const { data: journeyData } = await supabase
+                                    .from('staff_journeys')
+                                    .select('school_id, status, date, school_name')
+                                    .eq('id', jId)
+                                    .single();
+
+                                if (journeyData && journeyData.date === today && !['closed', 'report'].includes(journeyData.status)) {
+                                    let schoolObj = schools.find(s => String(s.id) === String(journeyData.school_id));
+                                    if (!schoolObj) {
+                                        schoolObj = {
+                                            id: journeyData.school_id,
+                                            school_name: journeyData.school_name || 'Misión Activa',
+                                            nombre_escuela: journeyData.school_name || 'Misión Activa',
+                                            estatus: 'en_progreso',
+                                            fecha: today,
+                                        };
+                                    }
+                                    console.log('🛡️ [Recovery-Path3] Found active journey via presence:', schoolObj.school_name || schoolObj.nombre_escuela);
+                                    recoveredSchool = schoolObj;
+                                }
+                            }
+                        }
+
+                        // Trigger recovery modal if we found an active mission
+                        if (recoveredSchool) {
+                            const estatus = recoveredSchool.estatus || '';
+                            console.log('🚨 [Recovery] RECOVERED school:', recoveredSchool.school_name || recoveredSchool.nombre_escuela, '| estatus:', estatus);
+                            if (estatus !== 'cerrada' && estatus !== 'completada') {
+                                console.log('🚨 [Recovery] ✅ Setting recoveryMission — modal should appear!');
+                                setRecoveryMission(recoveredSchool);
+                            } else {
+                                console.log('🚨 [Recovery] ❌ Skipped — estatus is completed/cerrada');
+                            }
+                        } else {
+                            console.log('🔍 [Recovery] No active mission found via any path.');
                         }
                     } catch (e) {
                         console.warn('Failed to check backend recovery:', e);
