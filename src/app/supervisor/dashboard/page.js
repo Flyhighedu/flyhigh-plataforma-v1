@@ -493,6 +493,7 @@ function normalizeAuxActiveFlight(raw, nowMs) {
         studentCount: Number.isFinite(students) ? students : 0,
         staffCount: Number.isFinite(staff) ? staff : 0,
         createdByName: raw.createdByName || null,
+        teamName: raw.teamName || raw.nombreClave || raw.equipo || null,
         updatedAt: raw.updatedAt || null,
         elapsedSec: Math.max(0, Math.floor((nowMs - startedAtMs) / 1000))
     };
@@ -1777,6 +1778,7 @@ export default function SupervisorDashboard() {
     const [historyLogsByMission, setHistoryLogsByMission] = useState({});
     const [historyCheckinsByMission, setHistoryCheckinsByMission] = useState({});
     const [historyJourneyMetaByMission, setHistoryJourneyMetaByMission] = useState({});
+    const [historySiblingJourneysByMission, setHistorySiblingJourneysByMission] = useState({});
     const [historyLogsLoadingMission, setHistoryLogsLoadingMission] = useState(null);
     const [historySchoolLookupMap, setHistorySchoolLookupMap] = useState({});
     const [historyFlightSnapshotLookup, setHistoryFlightSnapshotLookup] = useState({});
@@ -2553,6 +2555,38 @@ export default function SupervisorDashboard() {
             const missEvCount = ROLE_ORDER.flatMap(r => roleBlocks[r] || []).flatMap(b => b.items).filter(i => i.reqEvidence && !i.done).length;
 
             const meta = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {});
+            
+            let teacherTeamName = null;
+            // Gather meta from current journey + all sibling journeys for the same school/date
+            const siblingJourneys = journeys.filter(x => x.id !== j.id && x.date === j.date && String(x.school_id) === String(j.school_id));
+            const allMetas = [meta];
+            for (const sib of siblingJourneys) {
+                try {
+                    const sMeta = typeof sib.meta === 'string' ? JSON.parse(sib.meta || '{}') : (sib.meta || {});
+                    allMetas.push(sMeta);
+                } catch (_e) {}
+            }
+
+            // Try to find team name from any meta source
+            for (const m of allMetas) {
+                if (teacherTeamName) break;
+                if (m?.escuadron_bitacora_current?.nombreClave) {
+                    teacherTeamName = m.escuadron_bitacora_current.nombreClave;
+                    break;
+                }
+                if (Array.isArray(m?.escuadron_bitacora_history) && m.escuadron_bitacora_history.length > 0) {
+                    const lastEntry = m.escuadron_bitacora_history[m.escuadron_bitacora_history.length - 1];
+                    if (lastEntry?.nombreClave) {
+                        teacherTeamName = lastEntry.nombreClave;
+                        break;
+                    }
+                }
+                if (m?.escuadron_bitacora_draft?.nombreClave) {
+                    teacherTeamName = m.escuadron_bitacora_draft.nombreClave;
+                    break;
+                }
+            }
+
             const routeStartedEvent = jStaff
                 .filter((ev) => ev.type === 'ROUTE_STARTED')
                 .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0] || null;
@@ -2586,6 +2620,27 @@ export default function SupervisorDashboard() {
             } = buildOperationFlightsWithNumbers(operationFlightsRaw);
 
             const activeAuxFlightRaw = normalizeAuxActiveFlight(meta.aux_operation_active_flight, now);
+            if (activeAuxFlightRaw) {
+                // Try flight-number-specific match first from bitacora
+                const activeFlightNum = activeAuxFlightRaw.flightNumber || (operationHistoryAsc.length + 1);
+                if (!activeAuxFlightRaw.teamName) {
+                    for (const m of allMetas) {
+                        if (Array.isArray(m?.escuadron_bitacora_history)) {
+                            const match = m.escuadron_bitacora_history.find(b => Number(b.flightNumber) === Number(activeFlightNum));
+                            if (match?.nombreClave) { activeAuxFlightRaw.teamName = match.nombreClave; break; }
+                        }
+                        if (Number(m?.escuadron_bitacora_current?.flightNumber) === Number(activeFlightNum) && m.escuadron_bitacora_current?.nombreClave) {
+                            activeAuxFlightRaw.teamName = m.escuadron_bitacora_current.nombreClave;
+                            break;
+                        }
+                    }
+                }
+                // Fallback to generic last team name
+                if (!activeAuxFlightRaw.teamName && teacherTeamName) {
+                    activeAuxFlightRaw.teamName = teacherTeamName;
+                }
+            }
+            
             const activeAlreadyClosed = activeAuxFlightRaw
                 ? operationHistory.some((flight) => {
                     if (activeAuxFlightRaw.flightId && flight.flightId) {
@@ -3651,23 +3706,56 @@ export default function SupervisorDashboard() {
                     console.warn('SV history checkin events error (non-blocking):', checkinErr);
                 }
 
-                // [ENRICHMENT] Fetch journey meta for timeline phases
-                try {
-                    const { data: journeyRows } = await supabase
-                        .from('staff_journeys')
-                        .select('meta')
-                        .in('id', journeyIds)
-                        .limit(1)
-                        .single();
-                    if (journeyRows?.meta) {
-                        const jm = typeof journeyRows.meta === 'string' ? JSON.parse(journeyRows.meta) : journeyRows.meta;
-                        setHistoryJourneyMetaByMission((prev) => ({
-                            ...prev,
-                            [missionKey]: jm
-                        }));
+                // [ENRICHMENT] Fetch sibling journeys and MERGE metas for timeline phases and AudioQualityWidget
+                if (missionIds.length > 0) {
+                    try {
+                        const mCreatedAtMs = toMs(mission?.createdAt || mission?.missionDateTime || '');
+                        if (mCreatedAtMs > 0) {
+                            const { data: siblingJourneys } = await supabase
+                                .from('staff_journeys')
+                                .select('id, created_at, meta')
+                                .in('school_id', missionIds);
+                            
+                            if (siblingJourneys) {
+                                const msDay = 24 * 60 * 60 * 1000;
+                                const relatedJourneys = siblingJourneys.filter(j => Math.abs(toMs(j.created_at) - mCreatedAtMs) < msDay);
+                                const relatedIds = relatedJourneys.map(j => j.id).filter(Boolean);
+                                const finalAllIds = [...new Set([...journeyIds, ...relatedIds])];
+                                
+                                setHistorySiblingJourneysByMission((prev) => ({
+                                    ...prev,
+                                    [missionKey]: finalAllIds
+                                }));
+
+                                // Merge metas to ensure teacher telemetry and bitacoras are included
+                                const mergedMeta = {};
+                                let mergedTelemetry = [];
+                                let mergedBitacora = [];
+
+                                relatedJourneys.forEach(j => {
+                                    let m = {};
+                                    try { m = typeof j.meta === 'string' ? JSON.parse(j.meta || '{}') : (j.meta || {}); } catch (_e) { m = {}; }
+                                    Object.assign(mergedMeta, m);
+                                    if (Array.isArray(m.telemetry_recordings)) {
+                                        mergedTelemetry = [...mergedTelemetry, ...m.telemetry_recordings];
+                                    }
+                                    if (Array.isArray(m.escuadron_bitacora_history)) {
+                                        if (mergedBitacora.length === 0) mergedBitacora = m.escuadron_bitacora_history;
+                                    }
+                                });
+
+                                mergedMeta.telemetry_recordings = mergedTelemetry;
+                                mergedMeta.escuadron_bitacora_history = mergedBitacora;
+
+                                setHistoryJourneyMetaByMission((prev) => ({
+                                    ...prev,
+                                    [missionKey]: mergedMeta
+                                }));
+                            }
+                        }
+                    } catch (sibErr) {
+                        console.warn('SV sibling journeys fetch error (non-blocking):', sibErr);
                     }
-                } catch (jmErr) {
-                    console.warn('SV journey meta fetch error (non-blocking):', jmErr);
                 }
             }
         } catch (error) {
@@ -4033,6 +4121,19 @@ export default function SupervisorDashboard() {
                                                                                                         journeyMeta={historyJourneyMetaByMission?.[mission?.key] || null}
                                                     />
 
+                                                <div className="mt-4 pt-4 border-t border-slate-800">
+                                                    <AudioQualityWidget
+                                                        journeyId={mission.journeyId}
+                                                        journeyIds={historySiblingJourneysByMission[mission.key] || (mission.journeyId ? [mission.journeyId] : [])}
+                                                        parsedMeta={historyJourneyMetaByMission?.[mission?.key] || null}
+                                                        style={{
+                                                            background: 'rgba(15, 23, 42, 0.4)',
+                                                            border: '1px solid rgba(148, 163, 184, 0.15)',
+                                                            color: '#E2E8F0'
+                                                        }}
+                                                    />
+                                                </div>
+
                                                 {canDeleteHistoryMission && (
                                                     <div className="pt-3">
                                                         <button
@@ -4159,7 +4260,7 @@ export default function SupervisorDashboard() {
     const operationRecorderRole = 'pilot';
     const operationRoleCard = (sel.roleCards || []).find((card) => card.role === operationRecorderRole) || null;
     const operationDisplayName = operationRoleCard?.person || 'Piloto';
-    const operationSectionEnabled = sel.phaseIndex >= 2 || Boolean(assistantActiveFlight) || assistantFlights.length > 0;
+    const operationSectionEnabled = sel.phaseIndex >= 2 || sel.isPostRoute || sel.isClosed || ['dismantling', 'completed', 'FINISHED'].includes(String(sel.journey?.mission_state)) || Boolean(assistantActiveFlight) || assistantFlights.length > 0;
     const completionGraceVisible = sel.isInCompletionGrace === true;
     const completionGraceRemainingMinutes = completionGraceVisible
         ? Math.max(1, Math.ceil((sel.completionGraceRemainingMs || 0) / 60000))
@@ -5773,8 +5874,8 @@ export default function SupervisorDashboard() {
                             <p className="text-xs text-slate-500 mt-0.5">Registro operativo en tiempo real (Piloto)</p>
                         </div>
                         {assistantActiveFlight ? (
-                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/15 text-primary uppercase tracking-wide flex items-center gap-1.5">
-                                <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-400 uppercase tracking-wide flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-sky-400 animate-pulse" />
                                 En vuelo
                             </span>
                         ) : operationSectionEnabled ? (
@@ -5786,21 +5887,21 @@ export default function SupervisorDashboard() {
 
                     <div className="space-y-3">
                         <div className={`bg-surface-dark rounded-xl overflow-hidden border shadow-sm relative transition-all duration-300 ${assistantActiveFlight
-                            ? 'border-primary/50 shadow-[0_0_15px_-3px_rgba(19,146,236,0.15)] ring-1 ring-primary/20'
+                            ? 'border-sky-500/40 shadow-[0_0_20px_-3px_rgba(56,189,248,0.2)] ring-1 ring-sky-400/25'
                             : 'border-slate-800'
                             }`}>
-                            {assistantActiveFlight && <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />}
+                            {assistantActiveFlight && <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-transparent via-sky-400 to-transparent opacity-60" />}
 
                             <div className="px-4 py-3 border-b border-slate-800 bg-surface-darker/45">
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className={`material-symbols-outlined text-sm ${assistantActiveFlight ? 'text-primary animate-pulse' : 'text-emerald-500'}`}>flight</span>
+                                            <span className={`material-symbols-outlined text-sm ${assistantActiveFlight ? 'text-sky-400 animate-pulse' : 'text-emerald-500'}`}>flight</span>
                                             <h3 className="text-sm font-extrabold uppercase tracking-wide text-white">Registro de vuelos</h3>
                                         </div>
                                         <p className="text-xs text-slate-400 truncate">{operationDisplayName}</p>
                                     </div>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${assistantActiveFlight ? 'text-primary bg-primary/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${assistantActiveFlight ? 'text-sky-300 bg-sky-500/15' : 'text-emerald-400 bg-emerald-500/10'}`}>
                                         {assistantOperation.totalFlights} vuelos
                                     </span>
                                 </div>
@@ -5808,19 +5909,24 @@ export default function SupervisorDashboard() {
 
                             <div className="p-4 space-y-3">
                                 {assistantActiveFlight ? (
-                                    <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3">
+                                    <div className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-500/10 to-sky-600/5 px-4 py-3.5">
                                         <div className="flex items-center justify-between gap-3">
-                                            <div>
-                                                <p className="text-[11px] font-bold text-primary uppercase tracking-wide">
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-extrabold text-sky-400 uppercase tracking-widest drop-shadow-sm">
                                                     Vuelo #{assistantActiveFlight.flightNumber || assistantOperation.nextFlightNumber} en curso
                                                 </p>
+                                                {assistantActiveFlight.teamName && (
+                                                    <p className="text-sm font-black text-white mt-0.5 mb-0.5 drop-shadow-sm truncate">
+                                                        &ldquo;{assistantActiveFlight.teamName}&rdquo;
+                                                    </p>
+                                                )}
                                                 <p className="text-xs text-slate-300">Despegue: {fmtClock(assistantActiveFlight.startedAt)}</p>
                                             </div>
-                                            <p className="text-xl font-black text-primary tabular-nums">{fmtMMSS(assistantActiveFlight.elapsedSec)}</p>
+                                            <p className="text-2xl font-black text-sky-400 tabular-nums tracking-tight drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]">{fmtMMSS(assistantActiveFlight.elapsedSec)}</p>
                                         </div>
-                                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300">Alumnos: {assistantActiveFlight.studentCount}</span>
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300">Personal: {assistantActiveFlight.staffCount}</span>
+                                        <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/20">Alumnos: {assistantActiveFlight.studentCount}</span>
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">Personal: {assistantActiveFlight.staffCount}</span>
                                         </div>
                                     </div>
                                 ) : (
@@ -5885,10 +5991,10 @@ export default function SupervisorDashboard() {
                                                     scBg = sc >= 80 ? 'rgba(74,222,128,0.1)' : sc >= 60 ? 'rgba(250,204,21,0.1)' : sc >= 40 ? 'rgba(251,146,60,0.1)' : 'rgba(248,113,113,0.1)';
                                                     scGrade = sc >= 90 ? 'Excelente' : sc >= 75 ? 'Bien' : sc >= 60 ? 'Regular' : sc >= 40 ? 'Bajo' : 'Crítico';
                                                     PILOT_CL = {
-                                                        menciona_destino: 'Dato educativo',
-                                                        energia_positiva: 'Energía positiva',
-                                                        fomenta_interaccion: 'Fomenta interacción',
-                                                        participacion_ninos_audible: 'Participación niños'
+                                                        menciona_destino: { label: 'Dato educativo', passMsg: 'mencionó datos educativos o geográficos durante el vuelo', failMsg: 'no mencionó datos educativos ni geográficos' },
+                                                        energia_positiva: { label: 'Energía positiva', passMsg: 'transmitió energía positiva y entusiasmo', failMsg: 'no transmitió suficiente energía positiva' },
+                                                        fomenta_interaccion: { label: 'Fomenta interacción', passMsg: 'fomentó la interacción con los niños', failMsg: 'no fomentó la interacción con los niños' },
+                                                        participacion_ninos_audible: { label: 'Participación niños', passMsg: 'se escuchó participación activa de los niños', failMsg: 'no se escuchó participación de los niños' }
                                                     };
                                                     passed = Object.keys(PILOT_CL).filter(k => pAudit[k] === true);
                                                     failed = Object.keys(PILOT_CL).filter(k => pAudit[k] === false);
@@ -5994,16 +6100,37 @@ export default function SupervisorDashboard() {
 
                                                                 {hasValidAudit && (
                                                                     <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: `${scCol}30` }}>
-                                                                        {/* Mini narrative */}
+                                                                        {/* Mini narrative — rich, matching docente style */}
                                                                         <p className="text-[11px] text-slate-300 leading-relaxed m-0 mb-3 font-medium">
-                                                                            El piloto obtuvo <span style={{ color: scCol, fontWeight: 800 }}>{scGrade.toLowerCase()}</span> ({sc}/100).
-                                                                            {failed.length > 0 && ` No logró: ${failed.map(k => PILOT_CL[k].toLowerCase()).join(', ')}.`}
-                                                                            {passed.length > 0 && failed.length === 0 && ' Cumplió todos los criterios.'}
-                                                                            {energyLabel && ` Energía vocal: ${energyLabel.toLowerCase()}.`}
+                                                                            {(() => {
+                                                                                const pilotName = operationDisplayName || 'El piloto';
+                                                                                const passedMsgs = passed.map(k => PILOT_CL[k].passMsg);
+                                                                                const failedMsgs = failed.map(k => PILOT_CL[k].failMsg);
+                                                                                const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+                                                                                let txt = `${pilotName} obtuvo una calificación `;
+                                                                                return txt;
+                                                                            })()}
+                                                                            <span style={{ color: scCol, fontWeight: 800 }}>{scGrade.toLowerCase()}</span>{` (${sc}/100). `}
+                                                                            {(() => {
+                                                                                const passedMsgs = passed.map(k => PILOT_CL[k].passMsg);
+                                                                                const failedMsgs = failed.map(k => PILOT_CL[k].failMsg);
+                                                                                const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+                                                                                let narrative = '';
+                                                                                if (passedMsgs.length > 0) {
+                                                                                    if (passedMsgs.length <= 2) narrative += `${cap(passedMsgs.join(' y '))}. `;
+                                                                                    else narrative += `${cap(passedMsgs.slice(0, -1).join(', '))} y ${passedMsgs[passedMsgs.length - 1]}. `;
+                                                                                }
+                                                                                if (failedMsgs.length > 0) {
+                                                                                    if (failedMsgs.length === 1) narrative += `Sin embargo, ${failedMsgs[0]}. `;
+                                                                                    else narrative += `Sin embargo, ${failedMsgs.slice(0, -1).join(', ')} y ${failedMsgs[failedMsgs.length - 1]}. `;
+                                                                                }
+                                                                                if (energyLabel) narrative += `Su energía vocal fue ${energyLabel.toLowerCase()}.`;
+                                                                                return narrative;
+                                                                            })()}
                                                                         </p>
                                                                         {/* Checklist grid */}
                                                                         <div className="grid grid-cols-2 gap-y-2 gap-x-4 mb-3">
-                                                                            {Object.entries(PILOT_CL).map(([key, label]) => {
+                                                                            {Object.entries(PILOT_CL).map(([key, cfg]) => {
                                                                                 const val = pAudit[key];
                                                                                 const ok = val === true;
                                                                                 const no = val === false;
@@ -6013,7 +6140,7 @@ export default function SupervisorDashboard() {
                                                                                             {ok ? 'check_circle' : no ? 'cancel' : 'remove'}
                                                                                         </span>
                                                                                         <span className="text-[11px] font-medium" style={{ color: ok ? 'rgba(255,255,255,0.9)' : no ? 'rgba(248,113,113,0.9)' : '#64748B' }}>
-                                                                                            {label}
+                                                                                            {cfg.label}
                                                                                         </span>
                                                                                     </div>
                                                                                 );

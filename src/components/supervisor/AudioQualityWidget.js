@@ -85,7 +85,7 @@ function buildNarrative(alert, isaName, audits) {
     return { headline, details, tip };
 }
 
-export default function AudioQualityWidget({ journeyId, journeyIds, date, style, hideDetails = false, parsedMeta = null, isaName = null }) {
+export default function AudioQualityWidget({ journeyId, journeyIds, date, style, hideDetails = false, parsedMeta = null, isaName = null, flightLogs = [] }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -376,6 +376,12 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                                 bitacoras.forEach((b, i) => maxFlight = Math.max(maxFlight, b.flightNumber || (i + 1)));
                                 audiosList.forEach((a, i) => maxFlight = Math.max(maxFlight, a.flightNumber || (i + 1)));
                                 dedupedAudits.forEach(a => maxFlight = Math.max(maxFlight, a.flight_number || 0));
+                                if (Array.isArray(flightLogs)) {
+                                    maxFlight = Math.max(maxFlight, flightLogs.length);
+                                    flightLogs.forEach(log => {
+                                        if (log.flight_number) maxFlight = Math.max(maxFlight, log.flight_number);
+                                    });
+                                }
 
                                 const ops = [];
                                 for (let i = 1; i <= maxFlight; i++) {
@@ -394,31 +400,32 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
 
                                     // Pilot cards now render inline in flight record cards (page.js)
 
-                                    // Card for DOCENTE (if docente audit exists)
+                                    // Card for DOCENTE (if docente audit exists or there is teacher data)
+                                    const teacherAudio = teacherAudios.find(a => (a.flightNumber || 0) === i) || null;
+                                    const log = Array.isArray(flightLogs) ? flightLogs.find((l, idx) => (l.flight_number || l.flightNumber || (idx + 1)) === i) : null;
+                                    const hasTeacherData = bitacora || teacherAudio || log;
+
                                     if (docenteAudit) {
-                                        const teacherAudio = teacherAudios.find(a => (a.flightNumber || 0) === i) || null;
                                         ops.push({
                                             flightNumber: i,
                                             teamName: bitacora?.nombreClave || docenteAudit?.nombre_equipo_detectado || null,
                                             destinations: bitacora?.destinos || null,
                                             audioUrl: teacherAudio?.url || bitacora?.audioUrl || null,
-                                            audioSizeKB: teacherAudio?.sizeKB || 0,
-                                            audioDurationSeconds: teacherAudio?.durationSeconds || 0,
+                                            audioSizeKB: teacherAudio?.fileSizeKB || bitacora?.audioSizeKB || 0,
+                                            audioDurationSeconds: teacherAudio?.durationSeconds || bitacora?.audioDurationSeconds || 0,
                                             timestamp: bitacora?.timestamp || docenteAudit?.created_at || null,
                                             audit: docenteAudit,
                                             isaName
                                         });
-                                    }
-
-                                    // Fallback: if NO audit exists for either role but bitacora exists, show placeholder
-                                    if (!pilotAudit && !docenteAudit && !ePilot && bitacora) {
+                                    } else if (hasTeacherData) {
+                                        // Fallback: if NO audit exists for DOCENTE but there is teacher data, show placeholder
                                         ops.push({
                                             flightNumber: i,
                                             teamName: bitacora?.nombreClave || null,
                                             destinations: bitacora?.destinos || null,
-                                            audioUrl: null,
-                                            audioSizeKB: 0,
-                                            audioDurationSeconds: 0,
+                                            audioUrl: teacherAudio?.url || bitacora?.audioUrl || null,
+                                            audioSizeKB: teacherAudio?.fileSizeKB || bitacora?.audioSizeKB || 0,
+                                            audioDurationSeconds: teacherAudio?.durationSeconds || bitacora?.audioDurationSeconds || 0,
                                             timestamp: bitacora?.timestamp || null,
                                             audit: null,
                                             isaName
