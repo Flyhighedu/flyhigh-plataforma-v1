@@ -23,6 +23,7 @@ import HeaderHamburgerMenu from './HeaderHamburgerMenu';
 import { useRouter } from 'next/navigation';
 import { clearJourneyLocalOperationalData } from '@/utils/staff/resetJourneyLocalData';
 import { getPendingUploads, syncAllPending, clearLocalProgress, removePendingUpload } from '@/utils/offlineSyncManager';
+import PerformanceReportModal from './PerformanceReportModal';
 
 const TEAM_ROLES = ['pilot', 'teacher', 'assistant'];
 
@@ -393,6 +394,9 @@ export default function CheckoutScreen({
     const [syncRequired, setSyncRequired] = useState(false);
     const [pendingSyncItems, setPendingSyncItems] = useState([]);
     const [isSyncingCheckout, setIsSyncingCheckout] = useState(false);
+    const [performanceReportData, setPerformanceReportData] = useState(null);
+    const [showReportBanner, setShowReportBanner] = useState(false);
+    const [showPerformanceReport, setShowPerformanceReport] = useState(false);
 
     const isWithinRange = distance !== null && distance <= STAFF_CONFIG.GEOFENCE_RADIUS_METERS;
     const hasCurrentUserCheckedOut = activeTeamRoles.includes(normalizedRole) && teamCheckoutStatus[normalizedRole] === true;
@@ -561,6 +565,44 @@ export default function CheckoutScreen({
         const timeout = setTimeout(() => setFeedback(''), 3200);
         return () => clearTimeout(timeout);
     }, [feedback]);
+
+    // ── Silent pre-fetch Performance Report (non-blocking) ──
+    // Fetches AI report in background. When ready, shows a subtle banner.
+    // User taps banner → modal opens instantly with data already loaded.
+    useEffect(() => {
+        if (!journeyId) return;
+        if (normalizedRole !== 'pilot' && normalizedRole !== 'teacher') return;
+        let cancelled = false;
+
+        const prefetch = async () => {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+                const res = await fetch('/api/staff/generate-performance-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ journeyId, role: normalizedRole, actorName }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (!res.ok || cancelled) return;
+                const data = await res.json();
+                if (cancelled || !data.ok || !data.report?.narrative) return;
+
+                setPerformanceReportData(data.report);
+                // Small delay so the banner doesn't flash immediately
+                setTimeout(() => { if (!cancelled) setShowReportBanner(true); }, 800);
+            } catch (_e) {
+                // Silent fail — report is optional
+            }
+        };
+
+        // Start fetch after 2s so the checkout screen renders first
+        const delay = setTimeout(prefetch, 2000);
+        return () => { cancelled = true; clearTimeout(delay); };
+    }, [journeyId, normalizedRole, actorName]);
 
     const handleFinalizeCheckout = async () => {
         if (!journeyId || isSubmitting || hasCurrentUserCheckedOut) return;
@@ -1168,6 +1210,49 @@ export default function CheckoutScreen({
                     </button>
                 </div>
             </div>
+
+            {/* ── Performance Report Banner (slides up when AI report is ready) ── */}
+            {showReportBanner && !showPerformanceReport && (
+                <div
+                    className="fixed bottom-6 left-1/2 z-[150] w-[92%] max-w-[400px] cursor-pointer"
+                    style={{ transform: 'translateX(-50%)', animation: 'prm_bannerIn 0.5s cubic-bezier(0.16,1,0.3,1)' }}
+                    onClick={() => {
+                        if (navigator.vibrate) navigator.vibrate(10);
+                        setShowReportBanner(false);
+                        setShowPerformanceReport(true);
+                    }}
+                >
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 px-4 py-3.5 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                            <span className="text-lg">🤖</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold text-slate-800 m-0">Tu reporte de hoy está listo</p>
+                            <p className="text-[11px] text-slate-500 font-medium m-0 mt-0.5">Toca para ver tu evaluación IA</p>
+                        </div>
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">→</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Performance Report Modal (non-blocking, data pre-loaded) ── */}
+            <PerformanceReportModal
+                isOpen={showPerformanceReport}
+                onClose={() => setShowPerformanceReport(false)}
+                report={performanceReportData}
+                role={normalizedRole}
+                actorName={actorName}
+            />
+
+            {/* ── Banner animation ── */}
+            <style jsx>{`
+                @keyframes prm_bannerIn {
+                    from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+                    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+                }
+            `}</style>
         </div>
     );
 }
