@@ -18,12 +18,11 @@
 // =====================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import fixWebmDuration from 'fix-webm-duration';
 
 const AUDIO_MIME = 'audio/webm;codecs=opus';
 const TARGET_BITRATE = 16000; // 16 kbps — ~480KB per 4 minutes
 const TIMESLICE_MS = 5000; // Collect data every 5s for crash resilience
-
-import fixWebmDuration from 'fix-webm-duration';
 
 /**
  * @returns {{
