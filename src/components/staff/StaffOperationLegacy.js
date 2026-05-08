@@ -262,6 +262,12 @@ export default function StaffOperationLegacy({
     missionState = null,
     onRefresh = null
 }) {
+    const currentRole = profile?.role || null;
+    const firstName = profile?.full_name?.split(' ')[0] || 'Auxiliar';
+    const roleName = ROLE_LABELS[currentRole] || currentRole || 'Auxiliar';
+    const shouldUseSyncHeader = useSyncHeader && !hideMenu;
+    const canEditCompletedFlights = currentRole === 'assistant' || currentRole === 'auxiliar' || currentRole === 'teacher';
+
     const [currentMission, setCurrentMission] = useState(null);
     const [isRestoring, setIsRestoring] = useState(true);
     const [flightLogs, setFlightLogs] = useState([]);
@@ -919,11 +925,6 @@ export default function StaffOperationLegacy({
         console.warn('No se pudo sincronizar vuelo activo en journey meta:', lastError);
     }, [journeyId, preview]);
 
-    const currentRole = profile?.role || null;
-    const firstName = profile?.full_name?.split(' ')[0] || 'Auxiliar';
-    const roleName = ROLE_LABELS[currentRole] || currentRole || 'Auxiliar';
-    const shouldUseSyncHeader = useSyncHeader && !hideMenu;
-    const canEditCompletedFlights = currentRole === 'assistant' || currentRole === 'auxiliar' || currentRole === 'teacher';
 
     const missionMeta = parseMetaLike(currentMission?.meta || initialMission?.meta);
     const missionStateKey = String(missionState || '').trim();
