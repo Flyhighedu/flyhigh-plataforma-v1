@@ -552,6 +552,7 @@ export default function StaffDashboard() {
     const [error, setError] = useState(null);
     const [noSchoolToday, setNoSchoolToday] = useState(false);
     const [showBrief, setShowBrief] = useState(true);
+    const [recoveryMission, setRecoveryMission] = useState(null);
     const [checkInTimestamp, setCheckInTimestamp] = useState(null);
     const [waitingForAux, setWaitingForAux] = useState(false);
     const [auxFlowState, setAuxFlowState] = useState(null); // 'waiting' | 'checklist' | null
@@ -820,14 +821,56 @@ export default function StaffDashboard() {
                 const match = savedId ? schools.find(s => String(s.id) === savedId) : null;
                 const matchIsCompleted = match && (match.estatus === 'completada' || match.estatus === 'cerrada');
                 const matchIsNotToday = match && match.fecha !== today;
+                
                 if (match && !matchIsCompleted && !matchIsNotToday) {
                     // Auto-resume the previously selected mission
                     await selectMission(match);
                     return;
                 }
+                
                 if (matchIsCompleted || matchIsNotToday) {
                     // Don't auto-resume into a completed or future mission
                     localStorage.removeItem('flyhigh_selected_mission_id');
+                }
+
+                // ── RECOVERY LOGIC: If no auto-resume match, check backend for active journey ──
+                if (!match) {
+                    try {
+                        const { data: recentPresence } = await supabase
+                            .from('staff_presence')
+                            .select('journey_id')
+                            .eq('user_id', userId)
+                            .order('last_seen_at', { ascending: false })
+                            .limit(1);
+
+                        if (recentPresence && recentPresence.length > 0) {
+                            const jId = recentPresence[0].journey_id;
+                            const { data: journeyData } = await supabase
+                                .from('staff_journeys')
+                                .select('school_id, status, date, school_name')
+                                .eq('id', jId)
+                                .single();
+
+                            if (journeyData && journeyData.date === today && !['closed', 'report'].includes(journeyData.status)) {
+                                let recoverySchool = schools.find(s => String(s.id) === String(journeyData.school_id));
+                                if (!recoverySchool) {
+                                    const { data: schoolData } = await supabase
+                                        .from('proximas_escuelas')
+                                        .select('*')
+                                        .eq('id', journeyData.school_id)
+                                        .single();
+                                    if (schoolData) recoverySchool = schoolData;
+                                }
+                                
+                                if (recoverySchool && recoverySchool.estatus !== 'cerrada' && recoverySchool.estatus !== 'completada') {
+                                    console.log('🚨 Ejected user detected. Triggering recovery prompt for:', recoverySchool.nombre_escuela || recoverySchool.school_name);
+                                    setRecoveryMission(recoverySchool);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to check backend recovery:', e);
+                    }
                 }
                 // Otherwise stay in lobby mode — user must pick
             }
@@ -1035,6 +1078,7 @@ export default function StaffDashboard() {
                 // [EMERGENCY BYPASS] Allow bypassing check-in wall if contingency is active
                 if (checkInAvailable) {
                     let serverStep = 0;
+                    // [EMERGENCY BYPASS] Allow bypassing check-in wall if contingency is active
                     if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
                         serverStep = 0;
                     } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
@@ -1058,11 +1102,16 @@ export default function StaffDashboard() {
                             if (localProgress.showBrief === false) {
                                 setShowBrief(false);
                             }
+                        } else if (checkInAvailable) {
+                            setShowBrief(false);
                         }
                     } catch (e) {
                         console.warn('[CrashRecovery] Could not read IndexedDB:', e);
                     }
 
+                    if (checkInAvailable && finalStep >= 0 && showBrief) {
+                        setShowBrief(false);
+                    }
                     setCurrentStep(finalStep);
                 } else {
                     // If NOT checked in, we stay at default (MissionBrief / Prep)
@@ -2256,6 +2305,40 @@ export default function StaffDashboard() {
                         />
                     </div>
                 </div>
+
+                {/* ── RECOVERY MODAL ── */}
+                {recoveryMission && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95 duration-300 border border-amber-100">
+                            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mb-6 mx-auto border border-amber-100/50 relative">
+                                <div className="absolute inset-0 bg-amber-400/20 blur-xl rounded-full animate-pulse"></div>
+                                <AlertCircle className="text-amber-500 relative z-10" size={32} />
+                            </div>
+                            <h3 className="text-xl font-extrabold text-slate-900 mb-2 text-center">Sesión Interrumpida</h3>
+                            <p className="text-slate-600 text-[15px] mb-6 text-center leading-relaxed">
+                                Detectamos una misión activa en curso. ¿Deseas reincorporarte a tu puesto en <strong>{recoveryMission.nombre_escuela || recoveryMission.school_name}</strong>?
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        setRecoveryMission(null);
+                                        selectMission(recoveryMission);
+                                    }}
+                                    className="w-full py-4 bg-amber-500 text-white font-extrabold rounded-2xl hover:bg-amber-400 active:scale-[0.98] transition-all shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2"
+                                >
+                                    Reincorporarse
+                                    <ChevronLeft className="w-4 h-4 rotate-180" strokeWidth={3} />
+                                </button>
+                                <button
+                                    onClick={() => setRecoveryMission(null)}
+                                    className="w-full py-3 bg-slate-50 text-slate-500 font-bold rounded-2xl hover:bg-slate-100 hover:text-slate-700 active:scale-[0.98] transition-all border border-slate-200"
+                                >
+                                    Permanecer en Menú
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
