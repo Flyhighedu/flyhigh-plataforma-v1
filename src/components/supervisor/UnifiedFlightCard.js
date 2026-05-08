@@ -102,8 +102,7 @@ export default function UnifiedFlightCard({
         finally { setIsRetrying(false); }
     };
 
-    const hasPilotAudio = !!audioUrl;
-    const hasAnyAudio = hasPilotAudio;
+    const hasAudio = !!audioUrl;
     const audioRoleLabel = audit?.source === 'pilot_narration' ? 'Piloto' : 'Docente';
     const audioRoleColor = audit?.source === 'pilot_narration' ? 'text-sky-400' : 'text-violet-400';
     const isAuditOk = audit && audit.status === 'completed' && audit.score !== null;
@@ -148,9 +147,9 @@ export default function UnifiedFlightCard({
 
             {/* BODY COMPACTO */}
             <div className="px-3 py-2">
-                {/* Audio player — solo Piloto */}
+                {/* Audio player */}
                 <div className="flex flex-col gap-1.5">
-                    {hasPilotAudio && (
+                    {hasAudio && (
                         <div className="flex items-center gap-2 bg-slate-950/40 rounded border border-slate-800/60 px-2 py-1 shadow-inner">
                             <div className="flex flex-col justify-center w-16 flex-shrink-0">
                                 <span className={`text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 ${audioRoleColor}`}>
@@ -165,7 +164,7 @@ export default function UnifiedFlightCard({
                     )}
                 </div>
 
-                {!hasAnyAudio && <p className="text-[10px] text-slate-500 italic py-1 text-center">Sin registros de audio.</p>}
+                {!hasAudio && <p className="text-[10px] text-slate-500 italic py-1 text-center">Sin registros de audio.</p>}
 
                 {/* ── Mini Reporte IA ── */}
                 {miniReport && (

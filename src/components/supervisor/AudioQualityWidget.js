@@ -437,7 +437,15 @@ export default function AudioQualityWidget({ journeyId, journeyIds, date, style,
                         <div className="qa-carousel" style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', gap: 12, paddingBottom: 12, margin: '0 -10px', padding: '0 10px 12px 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin', scrollbarColor: 'rgba(99,102,241,0.4) transparent' }}>
                             {audits && audits.map(audit => (
                                 <div key={audit.id} style={{ flex: '0 0 92%', maxWidth: '92%', scrollSnapAlign: 'center' }}>
-                                    <UnifiedFlightCard flightNumber={audit.flight_number} audit={audit} timestamp={audit.created_at} teamName={audit.nombre_equipo_detectado} isaName={isaName} />
+                                    <UnifiedFlightCard 
+                                        flightNumber={audit.flight_number} 
+                                        audit={audit} 
+                                        timestamp={audit.created_at} 
+                                        teamName={audit.nombre_equipo_detectado} 
+                                        isaName={isaName} 
+                                        audioUrl={audit.audio_url}
+                                        audioDurationSeconds={audit.audio_duration_seconds}
+                                    />
                                 </div>
                             ))}
                         </div>

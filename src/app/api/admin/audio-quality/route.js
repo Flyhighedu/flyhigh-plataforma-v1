@@ -165,7 +165,9 @@ export async function GET(request) {
                     feedback_para_isa: a.feedback_para_isa,
                     resumen_supervisor: a.resumen_supervisor,
                     source: a.source,
-                    created_at: a.created_at
+                    created_at: a.created_at,
+                    audio_url: a.audio_url,
+                    audio_duration_seconds: a.audio_duration_seconds
                 };
             })
         });

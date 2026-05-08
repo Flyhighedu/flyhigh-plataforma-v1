@@ -53,6 +53,8 @@ Responde ÚNICAMENTE con un JSON válido con estas claves:
 
 "menciona_nombre_equipo" (boolean): ¿La docente le pone un nombre al grupo de niños (ej: "Escuadrón Águilas", "Equipo Dragones") y se refiere a ellos por ese nombre?
 
+"nombre_equipo_detectado" (string o null): Si menciona el nombre del equipo, escríbelo aquí. Si no, null.
+
 "menciona_destino" (boolean): ¿La docente menciona a dónde van a "volar" (un destino, ciudad, país o lugar)?
 
 "dinamica_sube_sube" (boolean): ¿Se escucha que la docente dice "Sube, sube" y los niños responden "Hasta las nubes"? ¿O al menos intenta hacer esta dinámica interactiva?
@@ -148,7 +150,7 @@ function mapToDbColumns(analysis, role, score) {
     }
     return {
         menciona_nombre_equipo: analysis.menciona_nombre_equipo,
-        nombre_equipo_detectado: null,
+        nombre_equipo_detectado: analysis.nombre_equipo_detectado || null,
         menciona_destino: analysis.menciona_destino,
         destino_detectado: null,
         dinamica_sube_sube: analysis.dinamica_sube_sube,

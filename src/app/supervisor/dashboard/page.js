@@ -3871,7 +3871,7 @@ export default function SupervisorDashboard() {
             // Keep only pilot_narration, dedup by flight_number (keep latest = first)
             const map = {};
             allAudits
-                .filter(a => a.source === 'pilot_narration' && a.status === 'completed' && a.score !== null)
+                .filter(a => a.source === 'pilot_narration')
                 .forEach(a => { if (!map[a.flight_number]) map[a.flight_number] = a; });
             setPilotAuditsMap(map);
         }).catch(() => setPilotAuditsMap({}));
@@ -5897,14 +5897,17 @@ export default function SupervisorDashboard() {
                                                     energyColor = energyKey === 'alta' ? '#4ADE80' : energyKey === 'media' ? '#FACC15' : '#F87171';
                                                 }
 
-                                                const isExpandable = !!pAudit;
-                                                const expandId = `flight-ia-${flightNumber}`;
-                                                
                                                 const audioData = flightAudioByNumber[flightNumber];
                                                 const pilotAudio = audioData?.pilotAudio;
                                                 const teacherAudio = audioData?.teacherAudio;
 
-                                                const showPilotSection = pilotAudio?.url || pAudit;
+                                                const pilotAudioUrl = pilotAudio?.url || pAudit?.audio_url;
+                                                const pilotAudioDuration = pilotAudio?.durationSeconds || pAudit?.audio_duration_seconds || 0;
+                                                const showPilotSection = pilotAudioUrl || pAudit;
+                                                const hasValidAudit = pAudit && pAudit.status === 'completed' && pAudit.score !== null;
+                                                const isExpandable = !!hasValidAudit;
+                                                const expandId = `flight-ia-${flightNumber}`;
+                                                
                                                 const InnerWrapper = isExpandable ? 'details' : 'div';
                                                 const InnerHeader = isExpandable ? 'summary' : 'div';
 
@@ -5930,25 +5933,30 @@ export default function SupervisorDashboard() {
 
                                                         {/* ── Pilot Unified Card (Audio + IA) ── */}
                                                         {showPilotSection && (
-                                                            <InnerWrapper id={isExpandable ? expandId : undefined} className="mt-2 rounded-lg overflow-hidden transition-colors duration-300" style={pAudit ? { border: `1px solid ${scCol}60`, background: scBg } : { border: '1px solid rgba(14,165,233,0.2)', background: 'rgba(14,165,233,0.05)' }}>
+                                                            <InnerWrapper id={isExpandable ? expandId : undefined} className="mt-2 rounded-lg overflow-hidden transition-colors duration-300" style={hasValidAudit ? { border: `1px solid ${scCol}60`, background: scBg } : { border: '1px solid rgba(14,165,233,0.2)', background: 'rgba(14,165,233,0.05)' }}>
                                                                 <InnerHeader className={`px-2.5 py-2 ${isExpandable ? 'cursor-pointer select-none list-none' : ''}`}>
-                                                                    {pilotAudio?.url && (
+                                                                    {pilotAudioUrl && (
                                                                         <div onClick={e => isExpandable && e.stopPropagation()}>
                                                                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                                                                 <span className="text-[10px]">✈️🎙️</span>
-                                                                                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: pAudit ? scCol : '#7DD3FC' }}>
+                                                                                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: hasValidAudit ? scCol : '#7DD3FC' }}>
                                                                                     Narración del piloto
                                                                                     {teacherAudio?.teamName && (
-                                                                                        <span className="normal-case ml-1.5 px-1.5 py-0.5 rounded" style={{ backgroundColor: pAudit ? `${scCol}15` : 'rgba(14,165,233,0.1)', color: pAudit ? scCol : '#38BDF8' }}>
+                                                                                        <span className="normal-case ml-1.5 px-1.5 py-0.5 rounded" style={{ backgroundColor: hasValidAudit ? `${scCol}15` : 'rgba(14,165,233,0.1)', color: hasValidAudit ? scCol : '#38BDF8' }}>
                                                                                             {teacherAudio.teamName}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {(!teacherAudio?.teamName && pAudit?.nombre_equipo_detectado) && (
+                                                                                        <span className="normal-case ml-1.5 px-1.5 py-0.5 rounded" style={{ backgroundColor: hasValidAudit ? `${scCol}15` : 'rgba(14,165,233,0.1)', color: hasValidAudit ? scCol : '#38BDF8' }}>
+                                                                                            {pAudit.nombre_equipo_detectado}
                                                                                         </span>
                                                                                     )}
                                                                                 </span>
                                                                                 <div className="flex items-center gap-2 ml-auto">
-                                                                                    {pilotAudio.durationSeconds > 0 && (
-                                                                                        <span className="text-[10px] text-slate-400 tabular-nums">{fmtMMSS(pilotAudio.durationSeconds)}</span>
+                                                                                    {pilotAudioDuration > 0 && (
+                                                                                        <span className="text-[10px] text-slate-400 tabular-nums">{fmtMMSS(pilotAudioDuration)}</span>
                                                                                     )}
-                                                                                    {pilotAudio.fileSizeKB > 0 && (
+                                                                                    {pilotAudio?.fileSizeKB > 0 && (
                                                                                         <span className="text-[10px] text-slate-500">{pilotAudio.fileSizeKB} KB</span>
                                                                                     )}
                                                                                 </div>
@@ -5956,14 +5964,14 @@ export default function SupervisorDashboard() {
                                                                             <audio
                                                                                 controls
                                                                                 preload="none"
-                                                                                src={pilotAudio.url}
+                                                                                src={pilotAudioUrl}
                                                                                 className="w-full h-8 rounded"
                                                                                 style={{ filter: 'invert(1) hue-rotate(180deg)', opacity: 0.85 }}
                                                                             />
                                                                         </div>
                                                                     )}
 
-                                                                    {pAudit && (
+                                                                    {hasValidAudit && (
                                                                         <div className="mt-2 flex items-center justify-between px-2 py-1.5 rounded-md" style={{ background: `linear-gradient(90deg, ${scCol}15 0%, rgba(0,0,0,0.1) 100%)`, border: `1px solid ${scCol}30` }}>
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="text-[11px]">🤖</span>
@@ -5984,7 +5992,7 @@ export default function SupervisorDashboard() {
                                                                     )}
                                                                 </InnerHeader>
 
-                                                                {pAudit && (
+                                                                {hasValidAudit && (
                                                                     <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: `${scCol}30` }}>
                                                                         {/* Mini narrative */}
                                                                         <p className="text-[11px] text-slate-300 leading-relaxed m-0 mb-3 font-medium">
