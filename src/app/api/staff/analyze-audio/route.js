@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
 // =====================================================
 // POST /api/staff/analyze-audio
 //
 // AI-Powered Audio Quality Monitoring — "El Cerebro"
-// ADAPTIVE DUAL-ENGINE STRATEGY
+// SINGLE ENGINE: Gemini 2.5 Flash (Native Audio)
 //
-// ENGINE 1 (always): Groq Whisper (free) + GPT-4o-mini
-//   → Transcribes + analyzes TEXT for content criteria
+// Gemini receives the raw audio file and analyzes it
+// directly — no transcription step needed.
 //
-// ENGINE 2 (conditional): gpt-4o-audio-preview
-//   → Native audio analysis for tone/emotion/energy
-//   → Triggered only when:
-//     a) Text score < 75 (potential issue detected)
-//     b) First flight of the day (baseline)
-//     c) Source is 'bitacora' (docente - higher priority)
-//
-// COST OPTIMIZATION:
-//   Engine 1: ~$0.0001/request (practically free)
-//   Engine 2: ~$0.04/request (only ~25% of requests)
-//   Total: ~$4 USD/month for 400 requests
+// ADVANTAGES over previous triple-engine stack:
+//   ✅ 1 API call instead of 3
+//   ✅ 100% coverage (was 50% — odd flights only)
+//   ✅ Native tone/energy analysis on EVERY audio
+//   ✅ Detects children participation from audio
+//   ✅ ~$0.001/request (was ~$0.04)
+//   ✅ Single point of failure instead of 3
 //
 // SAFETY: Fire-and-forget. Failures NEVER block ops.
 // =====================================================
@@ -29,14 +25,11 @@ import { createClient } from '@supabase/supabase-js';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY;
-const GROQ_KEY = process.env.GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const CHAT_MODEL = 'gpt-4o-mini';
-const AUDIO_MODEL = 'gpt-4o-audio-preview';
-const DEEP_ANALYSIS_THRESHOLD = 75; // Score below this triggers audio analysis
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const MIN_AUDIO_DURATION_SEC = 5;
 const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -48,93 +41,53 @@ function getSupabaseAdmin() {
     });
 }
 
-// ───────── System Prompts ─────────
+// ───────── Unified Prompts (Audio-Native) ─────────
+// These prompts are designed for Gemini listening to raw audio.
+// They combine content + tone analysis in a single pass.
 
-const DOCENTE_TEXT_PROMPT = `Eres un auditor de calidad para la empresa educativa Fly High. Analiza la transcripción del audio de esta dinámica infantil guiada por la docente en un entorno ruidoso. Devuelve un JSON con estas 5 claves:
+const DOCENTE_PROMPT = `Eres un auditor de calidad para la empresa educativa Fly High. ESCUCHA ATENTAMENTE este audio de una dinámica infantil guiada por la docente.
 
-"menciona_nombre_equipo" (boolean): ¿La docente le pone un nombre al grupo de niños (ej: "Escuadrón Águilas") y se refiere a ellos por ese nombre?
+Evalúa TANTO el contenido de lo que dice COMO el tono de voz y la energía. Es un entorno ruidoso con niños — eso es normal.
+
+Responde ÚNICAMENTE con un JSON válido con estas claves:
+
+"menciona_nombre_equipo" (boolean): ¿La docente le pone un nombre al grupo de niños (ej: "Escuadrón Águilas", "Equipo Dragones") y se refiere a ellos por ese nombre?
 
 "menciona_destino" (boolean): ¿La docente menciona a dónde van a "volar" (un destino, ciudad, país o lugar)?
 
 "dinamica_sube_sube" (boolean): ¿Se escucha que la docente dice "Sube, sube" y los niños responden "Hasta las nubes"? ¿O al menos intenta hacer esta dinámica interactiva?
 
-"energia_positiva" (boolean): ¿La docente habla con entusiasmo, alegría y actitud positiva (sin sonar aburrida, monótona o demasiado seria)? Infiere esto del contenido textual: uso de exclamaciones, preguntas a los niños, palabras motivadoras.
+"energia_positiva" (boolean): ¿La docente SUENA con entusiasmo, alegría y actitud positiva? Evalúa directamente su TONO DE VOZ: ¿suena viva y emocionada o cansada y monótona?
 
-"feedback" (string o null): Si alguna es falsa, da un consejo constructivo, amable y corto (máximo 2 líneas). Si todas son verdaderas, null.`;
+"participacion_ninos_audible" (boolean): ¿Se escuchan voces de niños participando activamente (respondiendo, gritando, cantando)? No solo ruido de fondo.
 
-const PILOTO_TEXT_PROMPT = `Eres un auditor de calidad de vuelo para la empresa educativa Fly High. Analiza la transcripción del audio de este piloto narrando el vuelo. Devuelve un JSON con estas 5 claves:
+"energia_vocal" (string): Evalúa la energía general de la voz de la docente. Responde "alta", "media" o "baja".
 
-"menciona_punto_interes" (boolean): ¿Menciona algún dato educativo, geográfico o histórico de lo que ven durante el vuelo?
+"feedback" (string o null): Si algún criterio es falso, da un consejo constructivo, amable y corto (máximo 2 líneas) para mejorar. Si todos son verdaderos, null.
 
-"mantiene_personaje" (boolean): ¿Habla con un tono profesional e inspirador de capitán/aviador?
+IMPORTANTE: Escucha el audio completo antes de responder. No asumas — evalúa lo que realmente escuchas.`;
 
-"energia_positiva" (boolean): ¿El piloto transmite asombro, emoción y actitud positiva? Infiere del texto: exclamaciones, descripciones vívidas, invitaciones a los niños.
+const PILOTO_PROMPT = `Eres un auditor de calidad de vuelo para la empresa educativa Fly High. ESCUCHA ATENTAMENTE este audio de un piloto narrando un vuelo con niños.
 
-"fomenta_interaccion" (boolean): ¿El piloto intenta interactuar activamente con los niños (ej: les hace preguntas, los invita a observar algo específico)?
+Evalúa TANTO el contenido de la narración COMO el tono de voz y la energía del piloto.
 
-"feedback" (string o null): Si alguna es falsa, da un consejo constructivo y corto. Si todas son verdaderas, null.`;
+Responde ÚNICAMENTE con un JSON válido con estas claves:
 
-const DOCENTE_AUDIO_PROMPT = `Eres un auditor de calidad para Fly High. ESCUCHA ATENTAMENTE este audio de una dinámica infantil. Evalúa el TONO DE VOZ y la ENERGÍA de la docente.
+"menciona_punto_interes" (boolean): ¿El piloto menciona algún dato educativo, geográfico o histórico de lo que ven durante el vuelo?
 
-Responde SOLO un JSON:
-{
-  "energia_vocal": "alta" | "media" | "baja",
-  "tono_entusiasta": true | false,
-  "proyeccion_voz": true | false,
-  "participacion_ninos_audible": true | false,
-  "feedback_energia": "Consejo sobre la energía vocal (o null si es alta)"
-}
+"mantiene_personaje" (boolean): ¿El piloto habla con un tono profesional e inspirador de capitán/aviador?
 
-IMPORTANTE: No analices el contenido de las palabras. Solo evalúa HOW she speaks: volumen, entusiasmo, variación tonal, energía. ¿Suena viva y emocionada o suena cansada y monótona?`;
+"energia_positiva" (boolean): ¿El piloto SUENA con asombro, emoción y actitud positiva? Evalúa directamente su TONO DE VOZ.
 
-const PILOTO_AUDIO_PROMPT = `Eres un auditor de calidad de vuelo para Fly High. ESCUCHA ATENTAMENTE este audio de un piloto narrando un vuelo con niños. Evalúa el TONO DE VOZ y la ENERGÍA del piloto.
+"fomenta_interaccion" (boolean): ¿El piloto intenta interactuar activamente con los niños (les hace preguntas, los invita a observar algo)?
 
-Responde SOLO un JSON:
-{
-  "energia_vocal": "alta" | "media" | "baja",
-  "tono_entusiasta": true | false,
-  "proyeccion_voz": true | false,
-  "participacion_ninos_audible": true | false,
-  "feedback_energia": "Consejo sobre la energía vocal (o null si es alta)"
-}
+"participacion_ninos_audible" (boolean): ¿Se escuchan voces de niños participando o respondiendo al piloto?
 
-IMPORTANTE: Solo evalúa la voz: volumen, emoción, variación tonal. ¿Suena como un capitán emocionado o como alguien leyendo un guión?`;
+"energia_vocal" (string): Evalúa la energía general de la voz del piloto. Responde "alta", "media" o "baja".
 
-// ───────── JSON Schemas for Structured Output ─────────
+"feedback" (string o null): Si algún criterio es falso, da un consejo constructivo y corto. Si todos son verdaderos, null.
 
-const TEXT_DOCENTE_SCHEMA = {
-    name: 'docente_text_audit',
-    strict: true,
-    schema: {
-        type: 'object',
-        properties: {
-            menciona_nombre_equipo: { type: 'boolean' },
-            menciona_destino: { type: 'boolean' },
-            dinamica_sube_sube: { type: 'boolean' },
-            energia_positiva: { type: 'boolean' },
-            feedback: { type: ['string', 'null'] }
-        },
-        required: ['menciona_nombre_equipo', 'menciona_destino', 'dinamica_sube_sube', 'energia_positiva', 'feedback'],
-        additionalProperties: false
-    }
-};
-
-const TEXT_PILOTO_SCHEMA = {
-    name: 'piloto_text_audit',
-    strict: true,
-    schema: {
-        type: 'object',
-        properties: {
-            menciona_punto_interes: { type: 'boolean' },
-            mantiene_personaje: { type: 'boolean' },
-            energia_positiva: { type: 'boolean' },
-            fomenta_interaccion: { type: 'boolean' },
-            feedback: { type: ['string', 'null'] }
-        },
-        required: ['menciona_punto_interes', 'mantiene_personaje', 'energia_positiva', 'fomenta_interaccion', 'feedback'],
-        additionalProperties: false
-    }
-};
+IMPORTANTE: Escucha el audio completo. ¿Suena como un capitán emocionado o como alguien leyendo un guión?`;
 
 // ───────── Download audio from URL ─────────
 async function downloadAudio(url) {
@@ -143,6 +96,16 @@ async function downloadAudio(url) {
     const arrayBuffer = await response.arrayBuffer();
     if (arrayBuffer.byteLength > MAX_AUDIO_SIZE_BYTES) throw new Error('Audio too large');
     return Buffer.from(arrayBuffer);
+}
+
+// ───────── Detect MIME type from URL ─────────
+function getAudioMime(url) {
+    const lower = (url || '').toLowerCase();
+    if (lower.includes('.mp3')) return 'audio/mp3';
+    if (lower.includes('.wav')) return 'audio/wav';
+    if (lower.includes('.ogg')) return 'audio/ogg';
+    if (lower.includes('.m4a')) return 'audio/mp4';
+    return 'audio/webm'; // Default for our recordings
 }
 
 // ───────── Calculate score from booleans (25pts each) ─────────
@@ -154,9 +117,9 @@ function calculateScore(analysis, role) {
 }
 
 // ───────── Generate supervisor summary ─────────
-function generateResumen(analysis, role, score, deepAnalysis) {
+function generateResumen(analysis, role, score) {
     const label = role === 'piloto' ? 'Piloto' : 'Docente';
-    const energyNote = deepAnalysis ? ` | Energía vocal: ${deepAnalysis.energia_vocal}` : '';
+    const energyNote = analysis.energia_vocal ? ` | Energía vocal: ${analysis.energia_vocal}` : '';
     if (score === 100) return `${label}: Excelente — todos los criterios cumplidos.${energyNote}`;
     if (score >= 75) return `${label}: Buen desempeño — faltó 1 criterio.${energyNote}`;
     if (score >= 50) return `${label}: Regular — 2 criterios pendientes.${energyNote}`;
@@ -164,39 +127,36 @@ function generateResumen(analysis, role, score, deepAnalysis) {
 }
 
 // ───────── Map to DB columns ─────────
-function mapToDbColumns(textAnalysis, role, score, transcript, deepAnalysis) {
-    const energiaFromDeep = deepAnalysis?.energia_vocal || null;
-    const energiaFromText = textAnalysis.energia_positiva ? 'alta' : 'baja';
-
+function mapToDbColumns(analysis, role, score) {
     if (role === 'piloto') {
         return {
             menciona_nombre_equipo: null,
             nombre_equipo_detectado: null,
-            menciona_destino: textAnalysis.menciona_punto_interes,
+            menciona_destino: analysis.menciona_punto_interes,
             destino_detectado: null,
             dinamica_sube_sube: null,
-            energia_interaccion: energiaFromDeep || energiaFromText,
-            participacion_ninos_audible: deepAnalysis?.participacion_ninos_audible ?? textAnalysis.fomenta_interaccion,
+            energia_interaccion: analysis.energia_vocal || (analysis.energia_positiva ? 'alta' : 'baja'),
+            participacion_ninos_audible: analysis.participacion_ninos_audible ?? null,
             score,
-            feedback_para_isa: textAnalysis.feedback || deepAnalysis?.feedback_energia || null,
-            resumen_supervisor: generateResumen(textAnalysis, role, score, deepAnalysis),
-            raw_response: { textAnalysis, deepAnalysis, role, transcript },
-            model_used: deepAnalysis ? `groq-whisper+${CHAT_MODEL}+${AUDIO_MODEL}` : `groq-whisper+${CHAT_MODEL}`
+            feedback_para_isa: analysis.feedback || null,
+            resumen_supervisor: generateResumen(analysis, role, score),
+            raw_response: { analysis, role },
+            model_used: GEMINI_MODEL
         };
     }
     return {
-        menciona_nombre_equipo: textAnalysis.menciona_nombre_equipo,
+        menciona_nombre_equipo: analysis.menciona_nombre_equipo,
         nombre_equipo_detectado: null,
-        menciona_destino: textAnalysis.menciona_destino,
+        menciona_destino: analysis.menciona_destino,
         destino_detectado: null,
-        dinamica_sube_sube: textAnalysis.dinamica_sube_sube,
-        energia_interaccion: energiaFromDeep || energiaFromText,
-        participacion_ninos_audible: deepAnalysis?.participacion_ninos_audible ?? null,
+        dinamica_sube_sube: analysis.dinamica_sube_sube,
+        energia_interaccion: analysis.energia_vocal || (analysis.energia_positiva ? 'alta' : 'baja'),
+        participacion_ninos_audible: analysis.participacion_ninos_audible ?? null,
         score,
-        feedback_para_isa: textAnalysis.feedback || deepAnalysis?.feedback_energia || null,
-        resumen_supervisor: generateResumen(textAnalysis, role, score, deepAnalysis),
-        raw_response: { textAnalysis, deepAnalysis, role, transcript },
-        model_used: deepAnalysis ? `groq-whisper+${CHAT_MODEL}+${AUDIO_MODEL}` : `groq-whisper+${CHAT_MODEL}`
+        feedback_para_isa: analysis.feedback || null,
+        resumen_supervisor: generateResumen(analysis, role, score),
+        raw_response: { analysis, role },
+        model_used: GEMINI_MODEL
     };
 }
 
@@ -223,24 +183,38 @@ async function updateAuditRecord(supabase, auditId, updates) {
     if (error) console.warn('⚠️ Failed to update audit:', error.message);
 }
 
+// ───────── Parse JSON from Gemini response ─────────
+function parseGeminiJson(text) {
+    // Clean markdown fences if present
+    let cleaned = text.trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    try {
+        return JSON.parse(cleaned);
+    } catch {
+        // Try extracting JSON object from the response
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+        throw new Error('Failed to parse Gemini JSON response');
+    }
+}
+
 
 // ═════════════════════════════════════════════════════
-// POST Handler — Adaptive Dual-Engine
+// POST Handler — Single Engine: Gemini 2.5 Flash
 // ═════════════════════════════════════════════════════
 export async function POST(request) {
     const startTime = Date.now();
 
     try {
         // ── Validate config ──
-        if (!OPENAI_KEY) {
-            return NextResponse.json({ ok: false, error: 'Missing OPENAI_API_KEY.' }, { status: 500 });
+        if (!GEMINI_API_KEY) {
+            return NextResponse.json({ ok: false, error: 'Missing GEMINI_API_KEY.' }, { status: 500 });
         }
         const supabase = getSupabaseAdmin();
         if (!supabase) {
             return NextResponse.json({ ok: false, error: 'Missing Supabase config.' }, { status: 500 });
         }
-
-        const openai = new OpenAI({ apiKey: OPENAI_KEY });
 
         // ── Parse request ──
         let audioUrl, journeyId, flightNumber, source, userId, durationSeconds, existingAuditId;
@@ -299,125 +273,57 @@ export async function POST(request) {
         }
 
         // ══════════════════════════════════════════════
-        // ENGINE 1: Groq Whisper (free) + GPT-4o-mini
+        // GEMINI 2.5 FLASH — Native Audio Analysis
+        // Single call: content + tone + energy + participation
         // ══════════════════════════════════════════════
 
-        // Step 1a: Transcribe with Groq Whisper (FREE)
-        let transcript;
+        let analysis;
         try {
-            const whisperClient = GROQ_KEY
-                ? new OpenAI({ apiKey: GROQ_KEY, baseURL: 'https://api.groq.com/openai/v1' })
-                : openai; // Fallback to OpenAI Whisper if no Groq key
-
-            const audioFilename = (audioUrl || '').toLowerCase().includes('.mp3') ? 'audio.mp3' : 'audio.webm';
-            const audioMime = audioFilename.endsWith('.mp3') ? 'audio/mp3' : 'audio/webm';
-            const file = new File([audioBuffer], audioFilename, { type: audioMime });
-
-            const transcription = await whisperClient.audio.transcriptions.create({
-                file, model: 'whisper-large-v3', language: 'es', response_format: 'text'
+            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({
+                model: GEMINI_MODEL,
+                generationConfig: {
+                    temperature: 0.2,
+                    responseMimeType: 'application/json'
+                }
             });
-            transcript = typeof transcription === 'string' ? transcription : transcription.text || '';
 
-            if (!transcript || transcript.trim().length < 5) {
-                if (auditId) await updateAuditRecord(supabase, auditId, {
-                    status: 'no_speech', error_message: 'No speech detected', raw_response: { transcript: '' }
-                });
-                return NextResponse.json({ ok: true, skipped: true, reason: 'No speech detected.' });
-            }
-        } catch (err) {
-            console.error('❌ Whisper failed:', err.message);
-            if (auditId) await updateAuditRecord(supabase, auditId, {
-                status: 'failed', error_message: `Whisper: ${err.message}`, raw_response: { error: err.message }
-            });
-            return NextResponse.json({ ok: false, error: `Transcription failed: ${err.message}` }, { status: 502 });
-        }
+            const audioMime = getAudioMime(audioUrl);
+            const base64Audio = audioBuffer.toString('base64');
+            const prompt = effectiveRole === 'piloto' ? PILOTO_PROMPT : DOCENTE_PROMPT;
 
-        // Step 1b: Analyze text with GPT-4o-mini (cheap)
-        let textAnalysis;
-        try {
-            const systemPrompt = effectiveRole === 'piloto' ? PILOTO_TEXT_PROMPT : DOCENTE_TEXT_PROMPT;
-            const jsonSchema = effectiveRole === 'piloto' ? TEXT_PILOTO_SCHEMA : TEXT_DOCENTE_SCHEMA;
-
-            const completion = await openai.chat.completions.create({
-                model: CHAT_MODEL,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Transcripción:\n\n"${transcript}"` }
-                ],
-                response_format: { type: 'json_schema', json_schema: jsonSchema },
-                temperature: 0.2
-            });
-            textAnalysis = JSON.parse(completion.choices[0].message.content);
-        } catch (err) {
-            console.error('❌ GPT-4o-mini failed:', err.message);
-            if (auditId) await updateAuditRecord(supabase, auditId, {
-                status: 'failed', error_message: `GPT-4o-mini: ${err.message}`,
-                raw_response: { error: err.message, transcript }
-            });
-            return NextResponse.json({ ok: false, error: `Text analysis failed: ${err.message}` }, { status: 502 });
-        }
-
-        const textScore = calculateScore(textAnalysis, effectiveRole);
-
-        // ══════════════════════════════════════════════
-        // ENGINE 2: gpt-4o-audio-preview (conditional)
-        // Triggers 50% of the time: uno sí, uno no (impares sí, pares no)
-        // ══════════════════════════════════════════════
-
-        let deepAnalysis = null;
-        const isMP3 = (audioUrl || '').toLowerCase().includes('.mp3');
-        const currentFlightNum = flightNumber || 1;
-        const shouldDeepAnalyze = isMP3 && (currentFlightNum % 2 !== 0);
-
-        if (shouldDeepAnalyze) {
-            try {
-                const base64Audio = audioBuffer.toString('base64');
-                const audioPrompt = effectiveRole === 'piloto' ? PILOTO_AUDIO_PROMPT : DOCENTE_AUDIO_PROMPT;
-
-                const audioCompletion = await openai.chat.completions.create({
-                    model: AUDIO_MODEL,
-                    messages: [
-                        { role: 'system', content: audioPrompt },
+            const result = await model.generateContent({
+                contents: [{
+                    role: 'user',
+                    parts: [
                         {
-                            role: 'user',
-                            content: [
-                                { type: 'input_audio', input_audio: { data: base64Audio, format: 'mp3' } }
-                            ]
-                        }
-                    ],
-                    modalities: ['text'],
-                    temperature: 0.2
-                });
+                            inlineData: {
+                                mimeType: audioMime,
+                                data: base64Audio
+                            }
+                        },
+                        { text: prompt }
+                    ]
+                }]
+            });
 
-                const rawDeep = audioCompletion.choices?.[0]?.message?.content || '';
-                // Parse JSON from response (might have markdown fences)
-                const cleaned = rawDeep.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-                try {
-                    deepAnalysis = JSON.parse(cleaned);
-                } catch {
-                    const match = cleaned.match(/\{[\s\S]*\}/);
-                    if (match) deepAnalysis = JSON.parse(match[0]);
-                }
+            const rawText = result.response.text();
+            analysis = parseGeminiJson(rawText);
 
-                console.log(`🎧 Deep audio analysis: energia_vocal=${deepAnalysis?.energia_vocal}`);
+            console.log(`🎧 Gemini audio analysis: energia_vocal=${analysis.energia_vocal}, energia_positiva=${analysis.energia_positiva}`);
 
-                // Override text-based energia with audio-based if available
-                if (deepAnalysis?.energia_vocal) {
-                    if (deepAnalysis.energia_vocal === 'baja' || !deepAnalysis.tono_entusiasta) {
-                        textAnalysis.energia_positiva = false;
-                    } else if (deepAnalysis.energia_vocal === 'alta' && deepAnalysis.tono_entusiasta) {
-                        textAnalysis.energia_positiva = true;
-                    }
-                }
-            } catch (err) {
-                console.warn('⚠️ Deep audio analysis failed (non-blocking):', err.message);
-                // Continue with text-only results — deep analysis is a bonus
-            }
+        } catch (err) {
+            console.error('❌ Gemini analysis failed:', err.message);
+            if (auditId) await updateAuditRecord(supabase, auditId, {
+                status: 'failed', error_message: `Gemini: ${err.message}`,
+                raw_response: { error: err.message }
+            });
+            return NextResponse.json({ ok: false, error: `Analysis failed: ${err.message}` }, { status: 502 });
         }
 
-        // ── Final score (may be adjusted by deep analysis) ──
-        const finalScore = calculateScore(textAnalysis, effectiveRole);
-        const dbColumns = mapToDbColumns(textAnalysis, effectiveRole, finalScore, transcript, deepAnalysis);
+        // ── Calculate score & map to DB ──
+        const finalScore = calculateScore(analysis, effectiveRole);
+        const dbColumns = mapToDbColumns(analysis, effectiveRole, finalScore);
 
         // ── Persist ──
         if (auditId) {
@@ -428,18 +334,15 @@ export async function POST(request) {
 
         // ── Return ──
         const elapsed = Date.now() - startTime;
-        const engines = deepAnalysis ? 'groq-whisper→gpt4o-mini→audio-preview' : 'groq-whisper→gpt4o-mini';
-        console.log(`✅ Audit [${effectiveRole}]: score=${finalScore}, engines=${engines}, time=${elapsed}ms`);
+        console.log(`✅ Audit [${effectiveRole}]: score=${finalScore}, engine=${GEMINI_MODEL}, time=${elapsed}ms`);
 
         return NextResponse.json({
             ok: true,
             auditId,
             role: effectiveRole,
-            analysis: textAnalysis,
-            deepAnalysis,
-            transcript,
-            engines,
+            analysis,
             score: finalScore,
+            engines: GEMINI_MODEL,
             menciona_nombre_equipo: dbColumns.menciona_nombre_equipo,
             nombre_equipo_detectado: dbColumns.nombre_equipo_detectado,
             menciona_destino: dbColumns.menciona_destino,
