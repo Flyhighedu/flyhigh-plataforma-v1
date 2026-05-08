@@ -119,9 +119,9 @@ export async function GET(request) {
                 school_name: j.school_name || (school?.nombre_escuela) || null,
                 colonia: school?.colonia || null,
                 vuelo_count: liveFlights,
-                // SSoT: Use cierre if sealed, otherwise compute live from bitacora_vuelos
-                total_students: cierre?.total_students ?? liveStudents,
-                total_flights: cierre?.total_flights ?? liveFlights,
+                // SSoT: Live bitacora is the strict source of truth. Only use cierre if NO flights exist.
+                total_students: liveFlights > 0 ? liveStudents : (cierre?.total_students ?? liveStudents),
+                total_flights: liveFlights > 0 ? liveFlights : (cierre?.total_flights ?? liveFlights),
                 becados: cierre?.becados || 0,
             };
         });

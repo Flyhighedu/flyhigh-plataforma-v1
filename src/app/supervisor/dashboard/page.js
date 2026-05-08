@@ -1774,6 +1774,8 @@ export default function SupervisorDashboard() {
     const [liveChannelNonce, setLiveChannelNonce] = useState(0);
     const [dashboardTab, setDashboardTab] = useState('live');
     const [historySearch, setHistorySearch] = useState('');
+    const [historySortBy, setHistorySortBy] = useState('date'); // 'date' | 'students'
+    const [historySortDir, setHistorySortDir] = useState('desc'); // 'asc' | 'desc'
     const [selectedHistoryMissionKey, setSelectedHistoryMissionKey] = useState(null);
     const [historyLogsByMission, setHistoryLogsByMission] = useState({});
     const [historyCheckinsByMission, setHistoryCheckinsByMission] = useState({});
@@ -1782,12 +1784,18 @@ export default function SupervisorDashboard() {
     const [historyLogsLoadingMission, setHistoryLogsLoadingMission] = useState(null);
     const [historySchoolLookupMap, setHistorySchoolLookupMap] = useState({});
     const [historyFlightSnapshotLookup, setHistoryFlightSnapshotLookup] = useState({});
+    const [historyFlightCountMap, setHistoryFlightCountMap] = useState({}); // { missionId: { flights, students } }
     const [historyNameLookupLoading, setHistoryNameLookupLoading] = useState(false);
     const [activeEvidence, setActiveEvidence] = useState(null);
     const [deleteMissionTarget, setDeleteMissionTarget] = useState(null);
     const [deleteMissionPassword, setDeleteMissionPassword] = useState('');
     const [deleteMissionError, setDeleteMissionError] = useState('');
     const [deleteMissionSubmitting, setDeleteMissionSubmitting] = useState(false);
+
+    const [forceCloseTarget, setForceCloseTarget] = useState(null);
+    const [forceCloseSubmitting, setForceCloseSubmitting] = useState(false);
+    const [forceCloseError, setForceCloseError] = useState('');
+
     const [pilotAuditsMap, setPilotAuditsMap] = useState({});  // { [flightNumber]: auditData }
     const hadIssue = useRef(false);
     const knownIds = useRef(new Set());
@@ -1881,13 +1889,15 @@ export default function SupervisorDashboard() {
             const monthAgo = new Date(Date.now() - 30 * 86400000).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
             const [sR, jR, cR, pR, prR] = await Promise.all([
                 supabase.from('proximas_escuelas').select('*').gte('fecha_programada', monthAgo).order('fecha_programada', { ascending: false }),
-                supabase.from('staff_journeys').select('*').gte('date', weekAgo).order('updated_at', { ascending: false }),
+                supabase.from('staff_journeys').select('*').order('created_at', { ascending: false }).limit(500),
                 supabase.from('cierres_mision').select('*').order('created_at', { ascending: false }).limit(500),
                 supabase.from('staff_profiles').select('user_id, full_name, role, is_active'),
                 supabase.from('staff_presence').select('*'),
             ]);
             const tJ = (jR.data || []).filter(j => j.date >= today);
+            const allJ = jR.data || []; // Keep ALL journeys for history fallback
             const ids = tJ.map(j => j.id);
+            const allJourneyIds = allJ.map(j => j.id);
             let nP = [], nPh = [], nS = [], nF = [];
             if (ids.length) {
                 const missionIds = [...new Set(tJ.map((j) => String(j.school_id || '')).filter(Boolean))];
@@ -1907,7 +1917,7 @@ export default function SupervisorDashboard() {
 
                 nF = mergeFlightRows(flJourneyR.data || [], flMissionR.data || []);
             }
-            setSchools(sR.data || []); setJourneys(tJ); setClosures(cR.data || []);
+            setSchools(sR.data || []); setJourneys(allJ); setClosures(cR.data || []);
             setStaffProfiles(pR.data || []); setPresence(prR.data || []);
             setPrepEvents(nP); setPrepPhotos(nPh); setStaffEvents(nS); setFlightLogs(nF);
         } catch (e) { console.error('SV fetch:', e); }
@@ -2147,7 +2157,11 @@ export default function SupervisorDashboard() {
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'cierres_mision' }, (p) => {
                 markRealtimePulse();
-                if (p.eventType === 'DELETE') { setClosures(s => rm(s, p.old)); return; }
+                if (p.eventType === 'DELETE') {
+                    console.warn('[SV] cierres_mision DELETED via realtime:', p.old?.id, 'mission_id:', p.old?.mission_id, 'journey_id:', p.old?.journey_id);
+                    setClosures(s => rm(s, p.old));
+                    return;
+                }
                 if (p.new) setClosures(s => upsert(s, p.new));
             })
             .subscribe((status) => {
@@ -2237,17 +2251,18 @@ export default function SupervisorDashboard() {
         let cancelled = false;
 
         const loadHistoryLookups = async () => {
-            if (!closures || closures.length === 0) {
+            // Gather mission IDs from closures AND journeys
+            const closureMissionIds = (closures || []).map((c) => String(c?.mission_id || '').trim()).filter(Boolean);
+            const journeySchoolIds = (journeys || []).map((j) => String(j?.school_id || '').trim()).filter(Boolean);
+            const journeyIds = (journeys || []).map((j) => String(j?.id || '').trim()).filter(Boolean);
+            const allMissionIds = [...new Set([...closureMissionIds, ...journeySchoolIds, ...journeyIds])];
+
+            if (allMissionIds.length === 0 && (!closures || closures.length === 0)) {
                 setHistorySchoolLookupMap({});
                 setHistoryFlightSnapshotLookup({});
+                setHistoryFlightCountMap({});
                 return;
             }
-
-            const missionIds = [...new Set(
-                closures
-                    .map((closure) => String(closure?.mission_id || '').trim())
-                    .filter(Boolean)
-            )];
 
             const schoolCandidates = [];
             closures.forEach((closure) => {
@@ -2264,6 +2279,10 @@ export default function SupervisorDashboard() {
                     schoolCandidates.push(Number(missionIdRaw));
                 }
             });
+            // Also include journey school_ids for name resolution
+            journeySchoolIds.forEach((sid) => {
+                if (/^\d+$/.test(sid)) schoolCandidates.push(Number(sid));
+            });
 
             const schoolIds = [...new Set(schoolCandidates)];
 
@@ -2276,11 +2295,11 @@ export default function SupervisorDashboard() {
                             .select('id, nombre_escuela')
                             .in('id', schoolIds)
                         : Promise.resolve({ data: [], error: null }),
-                    missionIds.length > 0
+                    allMissionIds.length > 0
                         ? supabase
                             .from('bitacora_vuelos')
-                            .select('mission_id, mission_data, created_at')
-                            .in('mission_id', missionIds)
+                            .select('mission_id, mission_data, student_count, created_at')
+                            .in('mission_id', allMissionIds)
                             .order('created_at', { ascending: true })
                         : Promise.resolve({ data: [], error: null }),
                 ]);
@@ -2294,13 +2313,25 @@ export default function SupervisorDashboard() {
 
                 if (cancelled) return;
 
+                // Build flight count map: { missionId: { flights, students } }
+                const countMap = {};
+                (flightsRes.data || []).forEach((row) => {
+                    const mid = String(row?.mission_id || '').trim();
+                    if (!mid) return;
+                    if (!countMap[mid]) countMap[mid] = { flights: 0, students: 0 };
+                    countMap[mid].flights += 1;
+                    countMap[mid].students += Number(row?.student_count || 0);
+                });
+
                 setHistorySchoolLookupMap(buildSchoolMapById(schoolsRes.data || []));
                 setHistoryFlightSnapshotLookup(buildFlightSnapshotMap(flightsRes.data || []));
+                setHistoryFlightCountMap(countMap);
             } catch (error) {
                 if (cancelled) return;
                 console.warn('SV history lookups exception:', error);
                 setHistorySchoolLookupMap({});
                 setHistoryFlightSnapshotLookup({});
+                setHistoryFlightCountMap({});
             } finally {
                 if (!cancelled) {
                     setHistoryNameLookupLoading(false);
@@ -2313,7 +2344,7 @@ export default function SupervisorDashboard() {
         return () => {
             cancelled = true;
         };
-    }, [closures, supabase]);
+    }, [closures, journeys, supabase]);
 
     /* ═══════════ COMPUTED DATA ═══════════ */
     const profileMap = useMemo(() => { const m = {}; staffProfiles.forEach(p => { m[p.user_id] = p; }); return m; }, [staffProfiles]);
@@ -3415,8 +3446,12 @@ export default function SupervisorDashboard() {
                 missionDateTime,
                 endTime: closure?.end_time || null,
                 createdAt: closure?.created_at || null,
-                totalFlights: Number(closure?.total_flights || 0),
-                totalStudents: Number(closure?.total_students || 0),
+                totalFlights: Number(closure?.total_flights || 0) || 
+                    (missionId && historyFlightCountMap[missionId]?.flights) || 
+                    (closure?.journey_id && historyFlightCountMap[String(closure.journey_id)]?.flights) || 0,
+                totalStudents: Number(closure?.total_students || 0) || 
+                    (missionId && historyFlightCountMap[missionId]?.students) || 
+                    (closure?.journey_id && historyFlightCountMap[String(closure.journey_id)]?.students) || 0,
                 checklistVerified: closure?.checklist_verified === true,
                 signatureUrl: closure?.signature_url || null,
                 groupPhotoUrl: closure?.group_photo_url || null,
@@ -3433,89 +3468,57 @@ export default function SupervisorDashboard() {
                 .filter(Boolean)
         );
 
-        (missions || []).forEach((mission) => {
-            if (!mission?.closureLifecycle?.phases?.checkout?.completed) return;
+        // ── Journey fallback: include completed journeys from the week that have no cierre ──
+        // This prevents missions from disappearing when cierre_mision was not created.
+        (journeys || []).forEach((j) => {
+            // ── ALL JOURNEYS INCLUDED (Live History) ──
+            const jMeta = (() => {
+                if (!j?.meta) return null;
+                if (typeof j.meta === 'string') { try { return JSON.parse(j.meta); } catch (_e) { return null; } }
+                return typeof j.meta === 'object' ? j.meta : null;
+            })();
+            const checkoutDone = jMeta?.closure_checkout_done === true
+                || jMeta?.closure?.phases?.checkout?.completed === true
+                || j.mission_state === 'report'
+                || j.mission_state === 'CLOSURE'
+                || j.status === 'closed';
+            // We no longer filter by checkoutDone! Live history includes everything.
 
-            const missionId = String(mission?.journey?.school_id || '').trim();
+            const missionId = String(j?.school_id || '').trim();
             if (!missionId) return;
 
             const missionDateTime =
-                mission.finalCheckoutAt
-                || mission.updatedAt
-                || mission?.journey?.updated_at
-                || mission?.journey?.created_at
+                j.updated_at
+                || j.created_at
                 || null;
             const { date, time } = formatDateAndTime(missionDateTime);
 
-            const journeyMeta = (() => {
-                if (!mission?.journey?.meta) return Object.create(null);
-                if (typeof mission.journey.meta === 'string') {
-                    try {
-                        const parsed = JSON.parse(mission.journey.meta);
-                        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-                            ? parsed
-                            : Object.create(null);
-                    } catch (_e) {
-                        return Object.create(null);
-                    }
-                }
+            const journeyMeta = jMeta && typeof jMeta === 'object' && !Array.isArray(jMeta)
+                ? jMeta
+                : Object.create(null);
 
-                if (typeof mission.journey.meta === 'object' && !Array.isArray(mission.journey.meta)) {
-                    return mission.journey.meta;
-                }
+            const journeyMetaObj = journeyMeta;
 
-                return Object.create(null);
-            })();
+            const checkoutStartedAt = null;
+            const checkoutEndedAt = j.updated_at || null;
 
-            const checkinAt = getEarliestTimestamp(
-                ROLE_ORDER.map((role) => mission?.checkins?.[role]?.at).filter(Boolean)
+            const existingIdx = rows.findIndex((row) => 
+                String(row?.missionId || '').trim() === missionId || 
+                (row?.journeyId && String(row.journeyId) === String(j.id))
             );
-            const operationStartedAt =
-                Number.isFinite(mission?.assistantOperation?.operationStartedAtMs) && mission.assistantOperation.operationStartedAtMs > 0
-                    ? new Date(mission.assistantOperation.operationStartedAtMs).toISOString()
-                    : null;
-            const dismantlingStartedAt =
-                Number.isFinite(mission?.closureLifecycle?.phases?.dismantling?.timer?.startedAtMs) && mission.closureLifecycle.phases.dismantling.timer.startedAtMs > 0
-                    ? new Date(mission.closureLifecycle.phases.dismantling.timer.startedAtMs).toISOString()
-                    : null;
-            const baseClosureStartedAt =
-                Number.isFinite(mission?.closureLifecycle?.phases?.baseClosure?.timer?.startedAtMs) && mission.closureLifecycle.phases.baseClosure.timer.startedAtMs > 0
-                    ? new Date(mission.closureLifecycle.phases.baseClosure.timer.startedAtMs).toISOString()
-                    : null;
-            const checkoutStartedAt = mission?.closureLifecycle?.phases?.checkout?.firstAt || null;
-            const checkoutEndedAt = mission?.closureLifecycle?.phases?.checkout?.endAt || mission.finalCheckoutAt || null;
-
-            const timelineSnapshot = {
-                checkinAt,
-                prepAt: checkinAt,
-                operationAt: operationStartedAt,
-                dismantlingAt: dismantlingStartedAt,
-                baseClosureAt: baseClosureStartedAt,
-                checkoutAt: checkoutStartedAt,
-                checkoutEndAt: checkoutEndedAt
-            };
-
-            const existingIdx = rows.findIndex((row) => String(row?.missionId || '').trim() === missionId);
             if (existingIdx >= 0) {
                 const existingRow = rows[existingIdx] || Object.create(null);
-                const mergedPreloadedLogs = [
-                    ...(Array.isArray(existingRow.preloadedLogs) ? existingRow.preloadedLogs : []),
-                    ...(Array.isArray(mission?.assistantOperation?.flights) ? mission.assistantOperation.flights : [])
-                ];
 
                 rows[existingIdx] = {
                     ...existingRow,
-                    journeyId: existingRow.journeyId || String(mission.id),
-                    preloadedLogs: mergedPreloadedLogs,
-                    checkoutByRole: mission?.closureLifecycle?.phases?.checkout?.byRole || existingRow.checkoutByRole || Object.create(null),
-                    timelineSnapshot,
+                    journeyId: existingRow.journeyId || String(j.id),
                     raw: {
                         ...(existingRow.raw || Object.create(null)),
-                        journey_id: existingRow?.raw?.journey_id || mission.id,
-                        mission_state: mission?.journey?.mission_state || existingRow?.raw?.mission_state || null,
+                        journey_id: existingRow?.raw?.journey_id || j.id,
+                        mission_state: j.mission_state || existingRow?.raw?.mission_state || null,
                         meta: {
                             ...parseObject(existingRow?.raw?.meta),
-                            ...journeyMeta
+                            ...journeyMetaObj
                         }
                     }
                 };
@@ -3524,31 +3527,42 @@ export default function SupervisorDashboard() {
                 return;
             }
 
+            // Resolve school name for journey fallback
+            const schoolNameFromMap = historySchoolMapById?.[missionId] || null;
+            const schoolNameFromMeta = journeyMetaObj?.school_name || journeyMetaObj?.nombre_escuela || null;
+            const journeySchoolName = schoolNameFromMap || schoolNameFromMeta || 'Escuela no vinculada';
+
             rows.push({
-                key: `journey-${mission.id}-v2`,
+                key: `journey-${j.id}-v2`,
                 missionId,
-                journeyId: String(mission.id),
-                schoolName: mission.schoolName || 'Escuela no vinculada',
+                journeyId: String(j.id),
+                schoolName: journeySchoolName,
                 date,
                 time,
                 missionDateTime,
                 endTime: missionDateTime,
-                createdAt: mission?.journey?.created_at || null,
-                totalFlights: Number(mission?.assistantOperation?.totalFlights || mission?.assistantOperation?.flights?.length || 0),
-                totalStudents: Number(mission?.assistantOperation?.totalStudents || 0),
-                checklistVerified: true,
+                createdAt: j.created_at || null,
+                totalFlights: (historyFlightCountMap[missionId]?.flights || 0) + (historyFlightCountMap[String(j.id)]?.flights || 0),
+                totalStudents: (historyFlightCountMap[missionId]?.students || 0) + (historyFlightCountMap[String(j.id)]?.students || 0),
+                checklistVerified: checkoutDone,
                 signatureUrl: null,
                 groupPhotoUrl: null,
-                preloadedLogs: Array.isArray(mission?.assistantOperation?.flights)
-                    ? mission.assistantOperation.flights
-                    : [],
-                checkoutByRole: mission?.closureLifecycle?.phases?.checkout?.byRole || Object.create(null),
-                timelineSnapshot,
+                preloadedLogs: [],
+                checkoutByRole: Object.create(null),
+                timelineSnapshot: {
+                    checkinAt: null,
+                    prepAt: null,
+                    operationAt: null,
+                    dismantlingAt: null,
+                    baseClosureAt: null,
+                    checkoutAt: checkoutStartedAt,
+                    checkoutEndAt: checkoutEndedAt
+                },
                 raw: {
                     source: 'journey_fallback',
-                    journey_id: mission.id,
-                    mission_state: mission?.journey?.mission_state || null,
-                    meta: journeyMeta
+                    journey_id: j.id,
+                    mission_state: j.mission_state || null,
+                    meta: journeyMetaObj
                 }
             });
 
@@ -3562,25 +3576,41 @@ export default function SupervisorDashboard() {
         });
 
         return rows;
-    }, [closures, historySchoolMapById, historyFlightSnapshotMap, missions]);
+    }, [closures, historySchoolMapById, historyFlightSnapshotMap, journeys, historyFlightCountMap]);
 
     const filteredMissionHistory = useMemo(() => {
         const term = String(historySearch || '').trim().toLowerCase();
-        if (!term) return missionHistory;
+        let result = missionHistory;
 
-        return missionHistory.filter((item) => {
-            const school = String(item.schoolName || '').toLowerCase();
-            const date = String(item.date || '').toLowerCase();
-            const time = String(item.time || '').toLowerCase();
-            const missionId = String(item.missionId || '').toLowerCase();
-            return (
-                school.includes(term) ||
-                date.includes(term) ||
-                time.includes(term) ||
-                missionId.includes(term)
-            );
+        if (term) {
+            result = result.filter((item) => {
+                const school = String(item.schoolName || '').toLowerCase();
+                const date = String(item.date || '').toLowerCase();
+                const time = String(item.time || '').toLowerCase();
+                const missionId = String(item.missionId || '').toLowerCase();
+                return (
+                    school.includes(term) ||
+                    date.includes(term) ||
+                    time.includes(term) ||
+                    missionId.includes(term)
+                );
+            });
+        }
+
+        // Apply sorting
+        const dir = historySortDir === 'asc' ? 1 : -1;
+        result = [...result].sort((a, b) => {
+            if (historySortBy === 'students') {
+                return (Number(a.totalStudents || 0) - Number(b.totalStudents || 0)) * dir;
+            }
+            // Default: sort by date
+            const aTime = toMs(a.missionDateTime) || toMs(a.endTime) || toMs(a.createdAt) || 0;
+            const bTime = toMs(b.missionDateTime) || toMs(b.endTime) || toMs(b.createdAt) || 0;
+            return (aTime - bTime) * dir;
         });
-    }, [missionHistory, historySearch]);
+
+        return result;
+    }, [missionHistory, historySearch, historySortBy, historySortDir]);
 
     useEffect(() => {
         if (filteredMissionHistory.length === 0) {
@@ -3909,6 +3939,45 @@ export default function SupervisorDashboard() {
         }
     }, [deleteMissionPassword, deleteMissionTarget, fetchData, supabase]);
 
+    const confirmForceCloseMission = useCallback(async () => {
+        if (!forceCloseTarget) return;
+
+        const journeyId = String(forceCloseTarget.id || '').trim();
+        if (!journeyId) {
+            setForceCloseError('Misión inválida.');
+            return;
+        }
+
+        setForceCloseSubmitting(true);
+        setForceCloseError('');
+
+        try {
+            const res = await fetch('/api/supervisor/force-close', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ journeyId })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Error al forzar el cierre.');
+            }
+
+            // Remove from active list and refresh
+            setJourneys((prev) => prev.filter((journey) => String(journey?.id || '') !== journeyId));
+            setSelectedId(null);
+            setForceCloseTarget(null);
+            
+            // Refresh dashboard data
+            fetchData();
+        } catch (error) {
+            console.error('SV force close error:', error);
+            setForceCloseError(error?.message || 'No se pudo forzar el cierre.');
+        } finally {
+            setForceCloseSubmitting(false);
+        }
+    }, [forceCloseTarget, fetchData]);
+
     const [globalMetrics, setGlobalMetrics] = useState({ totalMissions: 0, totalFlights: 0, totalStudents: 0 });
 
     useEffect(() => {
@@ -4026,20 +4095,7 @@ export default function SupervisorDashboard() {
                 </div>
 
                 <main className="flex-1 flex flex-col gap-4 p-4 pb-20">
-                    <section className="grid grid-cols-3 gap-2">
-                        <div className="rounded-xl border border-slate-800 bg-surface-dark px-3 py-2.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Misiones</p>
-                            <p className="mt-1 text-xl font-black text-white">{historyOverview.totalMissions}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-surface-dark px-3 py-2.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Vuelos</p>
-                            <p className="mt-1 text-xl font-black text-primary">{historyOverview.totalFlights}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-800 bg-surface-dark px-3 py-2.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Alumnos</p>
-                            <p className="mt-1 text-xl font-black text-emerald-400">{historyOverview.totalStudents}</p>
-                        </div>
-                    </section>
+
 
                     <section className="rounded-xl border border-slate-800 bg-surface-dark px-3 py-3">
                         <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Buscar misión</label>
@@ -4055,15 +4111,59 @@ export default function SupervisorDashboard() {
                         </div>
                     </section>
 
-                    <section className="space-y-2">
-                        {historyNameLookupLoading && (
-                            <div className="rounded-xl border border-slate-800 bg-surface-dark px-3 py-2 flex items-center gap-2 text-xs text-slate-400">
-                                <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                Vinculando escuelas históricas...
-                            </div>
-                        )}
+                    <section className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (historySortBy === 'date') {
+                                    setHistorySortDir((prev) => prev === 'desc' ? 'asc' : 'desc');
+                                } else {
+                                    setHistorySortBy('date');
+                                    setHistorySortDir('desc');
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all ${
+                                historySortBy === 'date'
+                                    ? 'bg-primary/15 text-primary border border-primary/40 shadow-[0_0_8px_-3px_rgba(19,146,236,0.5)]'
+                                    : 'bg-slate-900/60 text-slate-400 border border-slate-700 hover:border-slate-600'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+                            Fecha
+                            {historySortBy === 'date' && (
+                                <span className="material-symbols-outlined text-[14px] transition-transform" style={{ transform: historySortDir === 'asc' ? 'rotate(180deg)' : 'none' }}>arrow_downward</span>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (historySortBy === 'students') {
+                                    setHistorySortDir((prev) => prev === 'desc' ? 'asc' : 'desc');
+                                } else {
+                                    setHistorySortBy('students');
+                                    setHistorySortDir('desc');
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all ${
+                                historySortBy === 'students'
+                                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_-3px_rgba(16,185,129,0.5)]'
+                                    : 'bg-slate-900/60 text-slate-400 border border-slate-700 hover:border-slate-600'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[14px]">school</span>
+                            Alumnos
+                            {historySortBy === 'students' && (
+                                <span className="material-symbols-outlined text-[14px] transition-transform" style={{ transform: historySortDir === 'asc' ? 'rotate(180deg)' : 'none' }}>arrow_downward</span>
+                            )}
+                        </button>
+                        
+                        <div className={`ml-auto flex items-center gap-1.5 px-2 py-1 transition-opacity duration-300 ${historyNameLookupLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                            <div className="size-3.5 border-[1.5px] border-primary border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Vinculando</span>
+                        </div>
+                    </section>
 
-                        {filteredMissionHistory.length === 0 ? (
+                    <section className="space-y-2">                        {filteredMissionHistory.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-slate-700 bg-surface-dark p-5 text-center">
                                 <span className="material-symbols-outlined text-3xl text-slate-600">history</span>
                                 <p className="mt-2 text-sm font-bold text-slate-300">No se encontraron misiones</p>
@@ -4590,9 +4690,16 @@ export default function SupervisorDashboard() {
                     <span className="material-symbols-outlined text-white">arrow_back_ios_new</span>
                 </button>
                 <h1 className="text-lg font-bold text-center flex-1 truncate px-2 text-white">{sel.schoolName}</h1>
-                <button className="flex items-center justify-center p-2 rounded-full hover:bg-slate-800 transition-colors">
-                    <span className="material-symbols-outlined text-white">more_vert</span>
-                </button>
+                {canDeleteHistoryMission ? (
+                    <button 
+                        onClick={() => setForceCloseTarget(sel)}
+                        className="flex items-center justify-center px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/50 hover:bg-rose-500/30 transition-colors"
+                    >
+                        <span className="text-[10px] font-black uppercase tracking-wider">Forzar Cierre</span>
+                    </button>
+                ) : (
+                    <div className="size-9" aria-hidden="true" />
+                )}
             </header>
 
             {/* ═══ MISSION SELECTOR (if multiple) ═══ */}
@@ -6506,6 +6613,46 @@ export default function SupervisorDashboard() {
                 evidence={activeEvidence}
                 onClose={closeEvidenceViewer}
             />
+
+            {/* FORCE CLOSE MODAL */}
+            {forceCloseTarget && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background-dark/80 backdrop-blur-sm">
+                    <div className="w-full max-w-sm rounded-2xl bg-surface-dark border border-rose-500/30 p-5 shadow-2xl">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="size-14 rounded-full bg-rose-500/10 flex items-center justify-center mb-4">
+                                <span className="material-symbols-outlined text-3xl text-rose-500">warning</span>
+                            </div>
+                            <h3 className="text-lg font-black text-white mb-1">¿Forzar Cierre de Misión?</h3>
+                            <p className="text-xs text-slate-400 mb-5">
+                                Esta acción cerrará inmediatamente la operación de <span className="text-white font-bold">{forceCloseTarget.schoolName}</span> y forzará a todo el staff a salir de su jornada actual. El sistema intentará generar el reporte de vuelos y firmas en estado "SYSTEM_FORCED_CLOSE".
+                            </p>
+                            
+                            {forceCloseError && (
+                                <p className="text-xs text-rose-400 font-bold mb-4 px-2 py-1 bg-rose-500/10 rounded w-full">
+                                    {forceCloseError}
+                                </p>
+                            )}
+
+                            <div className="flex gap-3 w-full mt-2">
+                                <button
+                                    onClick={() => setForceCloseTarget(null)}
+                                    disabled={forceCloseSubmitting}
+                                    className="flex-1 rounded-xl px-4 py-2.5 text-xs font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmForceCloseMission}
+                                    disabled={forceCloseSubmitting}
+                                    className="flex-1 rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-wider bg-rose-600 text-white shadow-[0_0_15px_-3px_rgba(225,29,72,0.4)] hover:bg-rose-500 disabled:opacity-50"
+                                >
+                                    {forceCloseSubmitting ? 'Cerrando...' : 'FORZAR CIERRE'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

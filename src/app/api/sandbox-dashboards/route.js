@@ -75,39 +75,55 @@ export async function GET(request) {
         const { data: rawJourneys } = await supabase.from('staff_journeys').select('id, school_name');
         const journeyNameMap = (rawJourneys || []).reduce((acc, j) => { acc[j.id] = j.school_name; return acc; }, {});
 
-        // ── SSoT: Unified Missions (Cierres + Vuelos Vivos) ──
-        const unifiedMissions = (cierres || []).map(c => ({
-            id: c.journey_id || `orphan-${c.id}`,
-            date: c.created_at,
-            total_students: c.total_students || 0,
-            total_flights: c.total_flights || 0,
-            becados: c.becados || 0,
-            school_name: c.school_name_snapshot || (c.journey_id ? journeyNameMap[c.journey_id] : 'Sin nombre'),
-        }));
-
-        const closedJourneyIds = new Set((cierres || []).map(c => c.journey_id).filter(Boolean));
-        const liveMissionsMap = {};
+        // ── SSoT: Unified Missions (Vuelos Vivos as Source of Truth) ──
+        const flightMap = {};
         for (const b of (bitacora || [])) {
-            if (b.journey_id && journeyNameMap.hasOwnProperty(b.journey_id) && !closedJourneyIds.has(b.journey_id)) {
-                if (!liveMissionsMap[b.journey_id]) {
-                    liveMissionsMap[b.journey_id] = {
-                        id: b.journey_id,
-                        date: b.created_at,
-                        total_students: 0,
-                        total_flights: 0,
-                        becados: 0,
-                        school_name: journeyNameMap[b.journey_id] || 'Misión Activa'
-                    };
-                }
-                liveMissionsMap[b.journey_id].total_students += (b.student_count || 0);
-                liveMissionsMap[b.journey_id].total_flights += 1;
-                // Use the earliest flight start time as the mission's temporal anchor
-                if (new Date(b.created_at) < new Date(liveMissionsMap[b.journey_id].date)) {
-                    liveMissionsMap[b.journey_id].date = b.created_at;
-                }
+            // Use journey_id as the primary identifier for flights, fallback to mission_id (school id)
+            const id = b.journey_id || b.mission_id; 
+            if (!id) continue;
+            
+            if (!flightMap[id]) {
+                flightMap[id] = {
+                    id,
+                    date: b.created_at, // Will use earliest flight start time
+                    total_students: 0,
+                    total_flights: 0,
+                    becados: 0, // Will be enriched from cierres
+                    school_name: journeyNameMap[id] || 'Misión Activa'
+                };
+            }
+            flightMap[id].total_students += (b.student_count || 0);
+            flightMap[id].total_flights += 1;
+            if (new Date(b.created_at) < new Date(flightMap[id].date)) {
+                flightMap[id].date = b.created_at;
             }
         }
-        unifiedMissions.push(...Object.values(liveMissionsMap));
+
+        // Enrich with cierres_mision metadata and add empty closures
+        for (const c of (cierres || [])) {
+            const id = c.journey_id || c.mission_id;
+            if (id && flightMap[id]) {
+                flightMap[id].becados = c.becados || 0;
+                flightMap[id].school_name = c.school_name_snapshot || flightMap[id].school_name;
+                // If the closure happened earlier, use its date (edge case)
+                if (new Date(c.created_at) < new Date(flightMap[id].date)) {
+                    flightMap[id].date = c.created_at;
+                }
+            } else if (id) {
+                // If there's a closure without ANY flights in bitacora, we include it but trust its counts 
+                // ONLY if we have absolutely zero flights recorded.
+                flightMap[id] = {
+                    id: c.journey_id || `orphan-${c.id}`,
+                    date: c.created_at,
+                    total_students: c.total_students || 0, // Fallback to closure counts ONLY if no flights exist
+                    total_flights: c.total_flights || 0,
+                    becados: c.becados || 0,
+                    school_name: c.school_name_snapshot || (c.journey_id ? journeyNameMap[c.journey_id] : 'Sin nombre'),
+                };
+            }
+        }
+
+        const unifiedMissions = Object.values(flightMap);
 
         const totalStudents = unifiedMissions.reduce((s, c) => s + (c.total_students || 0), 0);
         const totalFlights = unifiedMissions.reduce((s, c) => s + (c.total_flights || 0), 0);
@@ -353,8 +369,8 @@ export async function GET(request) {
 
         // ── PANEL 3: Escuelas ──
         const schoolAgg = {};
-        for (const c of (cierres || [])) {
-            const name = c.school_name_snapshot || 'Sin nombre';
+        for (const c of unifiedMissions) {
+            const name = c.school_name || 'Sin nombre';
             if (!schoolAgg[name]) schoolAgg[name] = { name, students: 0, flights: 0, missions: 0 };
             schoolAgg[name].students += (c.total_students || 0);
             schoolAgg[name].flights += (c.total_flights || 0);
@@ -373,37 +389,16 @@ export async function GET(request) {
         }
         const { data: journeys } = await journeysQuery;
 
-        // Build cierre map
-        const cierreMap = {};
-        for (const c of (cierres || [])) {
-            if (c.school_name_snapshot) {
-                const jid = c.end_time; // use for matching
-                cierreMap[c.school_name_snapshot + c.created_at] = c;
-            }
-        }
-
-        // Full cierres for history
-        let allCierresQuery = supabase.from('cierres_mision')
-            .select('journey_id, total_students, total_flights, becados, school_name_snapshot, created_at, end_time')
-            .order('created_at', { ascending: false });
-            
-        if (startDateParam && endDateParam) {
-            allCierresQuery = allCierresQuery.gte('created_at', startDateParam).lte('created_at', endDateParam);
-        } else if (dateBoundary) {
-            allCierresQuery = allCierresQuery.gte('created_at', dateBoundary);
-        }
-        const { data: allCierres } = await allCierresQuery;
-
-        const historyJourneyMap = {};
-        for (const c of (allCierres || [])) {
-            if (c.journey_id) historyJourneyMap[c.journey_id] = c;
+        const unifiedJourneyMap = {};
+        for (const c of unifiedMissions) {
+            if (c.id) unifiedJourneyMap[c.id] = c;
         }
 
         const history = (journeys || []).map(j => {
-            const c = historyJourneyMap[j.id];
+            const c = unifiedJourneyMap[j.id];
             return {
                 date: j.date,
-                school: j.school_name || c?.school_name_snapshot || 'Sin nombre',
+                school: j.school_name || c?.school_name || 'Sin nombre',
                 students: c?.total_students || 0,
                 flights: c?.total_flights || 0,
                 becados: c?.becados || 0,
