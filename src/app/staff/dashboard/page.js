@@ -842,7 +842,8 @@ export default function StaffDashboard() {
                 // Path 1: Check localStorage flyhigh_staff_mission (survives refresh)
                 // Path 2: Check staff_journeys directly for today's active journeys for this user
                 // Path 3: Check staff_presence as final fallback
-                {
+                /* eslint-disable-next-line no-constant-condition */
+                if (true) {
                     try {
                         let recoveredSchool = null;
                         console.log('🔍 [Recovery] Starting multi-path recovery check...');
