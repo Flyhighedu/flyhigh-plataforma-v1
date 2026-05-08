@@ -2362,7 +2362,10 @@ export default function SupervisorDashboard() {
             const jPhotos = photosByJ[j.id] || [];
             const jStaff = staffByJ[j.id] || [];
             const jPres = presByJ[j.id] || [];
-            const closureMatch = closures.find(c => c.school_id && j.school_id && String(c.school_id) === String(j.school_id));
+            const closureMatch = closures.find(c => 
+                (c.journey_id && String(c.journey_id) === String(j.id)) || 
+                (c.school_id && String(c.school_id) === String(j.school_id) && c.created_at && c.created_at.startsWith(j.date))
+            );
             const isClosed = Boolean(closureMatch || ['CLOSURE', 'closed', 'report'].includes(j.mission_state) || j.status === 'closed');
 
             /* — check-ins — */
@@ -3503,8 +3506,8 @@ export default function SupervisorDashboard() {
             const checkoutEndedAt = j.updated_at || null;
 
             const existingIdx = rows.findIndex((row) => 
-                String(row?.missionId || '').trim() === missionId || 
-                (row?.journeyId && String(row.journeyId) === String(j.id))
+                (row?.journeyId && String(row.journeyId) === String(j.id)) || 
+                (String(row?.missionId || '').trim() === missionId && row?.date === date)
             );
             if (existingIdx >= 0) {
                 const existingRow = rows[existingIdx] || Object.create(null);
