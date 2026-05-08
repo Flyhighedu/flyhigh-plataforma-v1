@@ -77,10 +77,45 @@ export default function StaffError({ error, reset }) {
                 style={{
                     padding: '10px 24px', borderRadius: 12,
                     background: 'transparent', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.3)',
-                    fontWeight: 600, fontSize: 13, cursor: 'pointer'
+                    fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                    marginBottom: 12
                 }}
             >
                 Recargar Aplicación
+            </button>
+
+            <button
+                onClick={() => {
+                    try {
+                        localStorage.removeItem('flyhigh_staff_mission');
+                        localStorage.removeItem('flyhigh_selected_mission_id');
+                        localStorage.removeItem('flyhigh_active_journey_id');
+                        localStorage.removeItem('flyhigh_test_mode');
+                    } catch (e) { /* ignore */ }
+                    window.location.href = '/staff/dashboard';
+                }}
+                style={{
+                    padding: '10px 24px', borderRadius: 12,
+                    background: 'rgba(251,191,36,0.15)', color: '#f59e0b', border: '1px solid rgba(251,191,36,0.3)',
+                    fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                    marginBottom: 12
+                }}
+            >
+                ↩ Volver al Lobby
+            </button>
+
+            <button
+                onClick={() => {
+                    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* ignore */ }
+                    window.location.href = '/staff/login';
+                }}
+                style={{
+                    padding: '10px 24px', borderRadius: 12,
+                    background: 'transparent', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)',
+                    fontWeight: 600, fontSize: 13, cursor: 'pointer'
+                }}
+            >
+                Cerrar Sesión
             </button>
         </div>
     );
