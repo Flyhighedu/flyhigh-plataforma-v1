@@ -96,7 +96,7 @@ export default function FlightLogger({
                 // Auto-dismiss banner after success
                 setTimeout(() => setMicBannerDismissed(true), 1500);
             }
-        } catch (e) {
+        } catch {
             setMicRetryResult('failed');
         } finally {
             setMicRetrying(false);

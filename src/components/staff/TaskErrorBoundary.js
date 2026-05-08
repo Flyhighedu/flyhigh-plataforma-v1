@@ -78,39 +78,6 @@ export default class TaskErrorBoundary extends React.Component {
                                 >
                                     Recargar App
                                 </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        try {
-                                            localStorage.removeItem('flyhigh_staff_mission');
-                                            localStorage.removeItem('flyhigh_selected_mission_id');
-                                            localStorage.removeItem('flyhigh_active_journey_id');
-                                            localStorage.removeItem('flyhigh_test_mode');
-                                        } catch (e) { /* ignore */ }
-                                        window.location.href = '/staff/dashboard';
-                                    }}
-                                    className="w-full rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100"
-                                >
-                                    ↩ Volver al Lobby
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        try {
-                                            localStorage.clear();
-                                            sessionStorage.clear();
-                                            document.cookie.split(';').forEach(c => {
-                                                document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-                                            });
-                                        } catch (e) { /* ignore */ }
-                                        window.location.href = '/staff/login';
-                                    }}
-                                    className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-500 transition hover:bg-red-50"
-                                >
-                                    Cerrar Sesión
-                                </button>
                             </div>
                         </div>
                     </div>
