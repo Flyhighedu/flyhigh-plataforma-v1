@@ -18,7 +18,8 @@
 // =====================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import fixWebmDuration from 'fix-webm-duration';
+// [CRITICAL FIX] Removed fix-webm-duration — it corrupts WebM headers on mobile devices,
+// producing files that show 0:00/0:00 in players. The downstream MP3 conversion handles format properly.
 
 const AUDIO_MIME = 'audio/webm;codecs=opus';
 const TARGET_BITRATE = 16000; // 16 kbps — ~480KB per 4 minutes
@@ -114,19 +115,12 @@ export default function useAudioRecorder() {
             };
 
             recorder.onstop = () => {
+                // [CRITICAL FIX] Use raw blob directly — fixWebmDuration was corrupting
+                // headers on mobile devices. The MP3 conversion downstream handles encoding.
                 const blob = new Blob(chunksRef.current, { type: AUDIO_MIME });
-                if (durationRef.current > 0) {
-                    fixWebmDuration(blob, durationRef.current * 1000, (fixedBlob) => {
-                        if (resolveStopRef.current) {
-                            resolveStopRef.current(fixedBlob);
-                            resolveStopRef.current = null;
-                        }
-                    });
-                } else {
-                    if (resolveStopRef.current) {
-                        resolveStopRef.current(blob);
-                        resolveStopRef.current = null;
-                    }
+                if (resolveStopRef.current) {
+                    resolveStopRef.current(blob);
+                    resolveStopRef.current = null;
                 }
             };
 

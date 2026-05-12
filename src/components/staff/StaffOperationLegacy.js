@@ -301,6 +301,7 @@ export default function StaffOperationLegacy({
     const [flightEditReason, setFlightEditReason] = useState('');
     const [isSavingFlightEdit, setIsSavingFlightEdit] = useState(false);
     const [pilotQaFeedback, setPilotQaFeedback] = useState(null);
+    const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
     // ── Pilot Audio Recording (fire-and-forget, never blocks flight ops) ──
     const {
@@ -513,6 +514,58 @@ export default function StaffOperationLegacy({
         return () => {
             clearInterval(intervalId);
             window.removeEventListener('online', handleOnline);
+        };
+    }, [preview]);
+
+    // ── [CRITICAL FIX] Retry queue: automatically re-sync unsynced flights every 30s ──
+    useEffect(() => {
+        if (preview) return;
+
+        const retrySyncPending = async () => {
+            const rawLogs = safeParseJson(localStorage.getItem('flyhigh_flight_logs'), []);
+            const pending = Array.isArray(rawLogs) ? rawLogs.filter(l => l && !l.synced) : [];
+            setPendingSyncCount(pending.length);
+
+            if (pending.length === 0) return;
+
+            let syncedAny = false;
+            const updatedLogs = [...rawLogs];
+
+            for (const flight of pending) {
+                try {
+                    const success = await syncFlightLog(flight);
+                    if (success) {
+                        const idx = updatedLogs.findIndex(l => l.id === flight.id);
+                        if (idx !== -1) updatedLogs[idx] = { ...updatedLogs[idx], synced: true };
+                        syncedAny = true;
+                    }
+                } catch (_e) { /* retry next cycle */ }
+            }
+
+            if (syncedAny) {
+                localStorage.setItem('flyhigh_flight_logs', JSON.stringify(updatedLogs));
+                setFlightLogs(dedupeFlightLogs(updatedLogs));
+                const newPending = updatedLogs.filter(l => l && !l.synced).length;
+                setPendingSyncCount(newPending);
+                console.log(`✅ Retry sync: ${pending.length - newPending} vuelos sincronizados`);
+            }
+        };
+
+        // Initial check
+        retrySyncPending();
+
+        // Retry every 30 seconds
+        const retryInterval = setInterval(retrySyncPending, 30_000);
+
+        // Also retry immediately when device comes back online
+        const handleOnlineRetry = () => {
+            setTimeout(retrySyncPending, 2000); // Small delay for network stabilization
+        };
+        window.addEventListener('online', handleOnlineRetry);
+
+        return () => {
+            clearInterval(retryInterval);
+            window.removeEventListener('online', handleOnlineRetry);
         };
     }, [preview]);
 
@@ -1267,16 +1320,18 @@ export default function StaffOperationLegacy({
             setFlightLogs(updatedLogs);
             await clearActiveFlight(completedFlightId);
 
-            if (navigator.onLine) {
-                const success = await syncFlightLog(newLog);
-                if (success) {
-                    newLog.synced = true;
-                    const syncedLogs = dedupeFlightLogs(updatedLogs.map(l => l.id === newLog.id ? newLog : l));
-                    localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
-                    setFlightLogs(syncedLogs);
-                } else {
-                    alert("⚠️ AVISO: El vuelo se guardó en tu dispositivo, pero falló la sincronización con la nube.\n\nPor favor, verifica tu conexión o vuelve a iniciar sesión si persiste.");
-                }
+            // [CRITICAL FIX] Always attempt sync — navigator.onLine is unreliable on mobile PWAs
+            // If sync fails, the retry queue (every 30s) will pick it up automatically
+            const success = await syncFlightLog(newLog);
+            if (success) {
+                newLog.synced = true;
+                const syncedLogs = dedupeFlightLogs(updatedLogs.map(l => l.id === newLog.id ? newLog : l));
+                localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
+                setFlightLogs(syncedLogs);
+                setPendingSyncCount(prev => Math.max(0, prev - 1));
+            } else {
+                setPendingSyncCount(prev => prev + 1);
+                console.warn('⚠️ Sync falló — vuelo en cola de retry automático (cada 30s)');
             }
         } finally {
             processingFlightIdsRef.current.delete(completedFlightId);
@@ -1644,6 +1699,23 @@ export default function StaffOperationLegacy({
                         return ok;
                     } : null}
                 />
+
+                {/* ── [CRITICAL FIX] Pending Sync Badge — visible indicator for unsynced flights ── */}
+                {pendingSyncCount > 0 && (
+                    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 flex items-center gap-3 animate-in fade-in duration-300">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                            <RotateCcw size={16} className="text-amber-600 animate-spin" style={{ animationDuration: '3s' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-amber-800 m-0">
+                                {pendingSyncCount} vuelo{pendingSyncCount !== 1 ? 's' : ''} pendiente{pendingSyncCount !== 1 ? 's' : ''} de sincronizar
+                            </p>
+                            <p className="text-[10px] text-amber-600 m-0 mt-0.5">
+                                Reintentando automáticamente cada 30 segundos...
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <div className="pt-4 border-t border-slate-200">
                     <TodayFlightList
