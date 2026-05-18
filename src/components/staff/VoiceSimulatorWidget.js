@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Pencil, Check, X, Volume2, ChevronDown, ChevronUp } from 'lucide-react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
+import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
 
 // ═══════════════════════════════════════════════════════════════
 // VOICE STATES + Peripheral Vision styling
@@ -85,6 +86,16 @@ export default function VoiceSimulatorWidget({
         }
     }, [isEditingWake]);
 
+    const [showCalibrator, setShowCalibrator] = useState(false);
+
+    const handleOrbClick = () => {
+        if (!copilot.isActive && !copilot.tfjsIsCalibrated) {
+            setShowCalibrator(true);
+        } else {
+            copilot.handleToggle();
+        }
+    };
+
     // ── Derived UI ──
     const S = VOICE_STATES[copilot.voiceState] || VOICE_STATES.off;
     const playablePois = copilot.voiceCommands.length;
@@ -110,7 +121,17 @@ export default function VoiceSimulatorWidget({
     }
 
     return (
-        <div className={`rounded-[28px] border-2 overflow-hidden mb-6 transition-all duration-500 ${S.container}`}>
+        <div className={`rounded-[28px] border-2 overflow-hidden mb-6 transition-all duration-500 relative ${S.container}`}>
+            {/* Modal de Calibración TFJS */}
+            <TFCalibratorModal 
+                isOpen={showCalibrator}
+                collectExample={copilot.collectExample}
+                trainModel={copilot.trainModel}
+                onCalibrationComplete={() => {
+                    setShowCalibrator(false);
+                    copilot.handleToggle(); // Activar IA después de calibrar
+                }}
+            />
             {/* ── HEADER ROW ── */}
             <div className="p-5 pb-4">
                 <div className="flex items-center justify-between mb-3">

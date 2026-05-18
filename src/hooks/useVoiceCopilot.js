@@ -20,7 +20,6 @@ export function normalizeCommand(text) {
         .join(' ') || text.toLowerCase().trim().split(/\s+/)[0] || '';
 }
 
-// Normalize a full text blob for comparison (no word filtering)
 function normalizeFull(text) {
     if (!text) return '';
     return text
@@ -30,8 +29,6 @@ function normalizeFull(text) {
         .toLowerCase()
         .trim();
 }
-
-const BUFFER_FLUSH_MS = 8000;
 
 export default function useVoiceCopilot({ 
     pois = [], 
@@ -43,11 +40,9 @@ export default function useVoiceCopilot({
     setIsActive: controlledSetIsActive
 }) {
     const [internalIsActive, setInternalIsActive] = useState(false);
-    
     const isActive = controlledIsActive !== undefined ? controlledIsActive : internalIsActive;
     const setIsActive = controlledSetIsActive || setInternalIsActive;
     
-    // ── Wake Word ──
     const [wakeWord, setWakeWord] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('flyhigh_voice_wake_word') || 'computadora';
@@ -55,14 +50,12 @@ export default function useVoiceCopilot({
         return 'computadora';
     });
     
-    // ── Voice engine ──
-    const [voiceState, setVoiceState] = useState('off');
+    const [voiceState, setVoiceState] = useState('off'); // off, listening, matched, playing
     const [lastTranscript, setLastTranscript] = useState('');
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
 
-    // ── Lifting State Up ──
     useEffect(() => {
         if (typeof onStateChange === 'function') {
             onStateChange(voiceState);
@@ -70,16 +63,12 @@ export default function useVoiceCopilot({
     }, [voiceState, onStateChange]);
 
     const recognitionRef = useRef(null);
-    const isListeningRef = useRef(false);
-    const wakeTimeoutRef = useRef(null);
     const stateRef = useRef('off');
-    const bufferRef = useRef('');          // NLP conversational buffer
-    const bufferTimerRef = useRef(null);   // Auto-flush timer
-    const detectTimeoutRef = useRef(null); // Voice detection timeout
+    const detectTimeoutRef = useRef(null);
+    const micStreamRef = useRef(null);
 
     useEffect(() => { stateRef.current = voiceState; }, [voiceState]);
 
-    // ── Browser support ──
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -88,7 +77,6 @@ export default function useVoiceCopilot({
         }
     }, []);
 
-    // ── Build command dictionary from live POIs ──
     const voiceCommands = useMemo(() => {
         return pois
             .filter(p => p.audio_url)
@@ -101,7 +89,6 @@ export default function useVoiceCopilot({
             }));
     }, [pois]);
 
-    // ── Conversational NLP: find POI match inside a text blob ──
     const findMatchInBuffer = useCallback((blob) => {
         const norm = normalizeFull(blob);
         if (!norm || norm.length < 4) return null;
@@ -122,14 +109,31 @@ export default function useVoiceCopilot({
         return bestScore >= 4 ? best : null;
     }, [voiceCommands]);
 
-    // ── Check if wake word is present in text ──
-    const hasWakeWord = useCallback((text) => {
-        const norm = normalizeFull(text);
-        const wakeNorm = normalizeFull(wakeWord);
-        return norm.includes(wakeNorm);
-    }, [wakeWord]);
+    const stopListening = useCallback(() => {
+        setIsDetectingVoice(false);
+        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+        
+        if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+        }
+        
+        // Liberar el stream dummy
+        if (micStreamRef.current) {
+            micStreamRef.current.getTracks().forEach(t => t.stop());
+            micStreamRef.current = null;
+        }
 
-    // ── Play audio for matched POI ──
+        if (audioRef?.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        if (setPlayingPoiId) setPlayingPoiId(null);
+        setVoiceState('off');
+        stateRef.current = 'off';
+        setLastTranscript('');
+        setMatchedPoi(null);
+    }, [audioRef, setPlayingPoiId]);
+
     const playMatchedAudio = useCallback((poi) => {
         if (!poi?.audio_url) return;
         if (audioRef?.current) {
@@ -139,46 +143,47 @@ export default function useVoiceCopilot({
         const audio = new Audio(poi.audio_url);
         if (audioRef) audioRef.current = audio;
         if (setPlayingPoiId) setPlayingPoiId(poi.id);
+        
         setVoiceState('playing');
+        stateRef.current = 'playing';
+
         audio.play().catch(() => {
-            setVoiceState('idle');
+            setVoiceState('listening');
+            stateRef.current = 'listening';
             if (setPlayingPoiId) setPlayingPoiId(null);
+            if (isActive && recognitionRef.current) {
+                try { recognitionRef.current.start(); } catch(e){}
+            }
         });
+
         audio.onended = () => {
             if (setPlayingPoiId) setPlayingPoiId(null);
-            if (isListeningRef.current) setVoiceState('idle');
+            setVoiceState('listening');
+            stateRef.current = 'listening';
+            if (isActive && recognitionRef.current) {
+                try { recognitionRef.current.start(); } catch(e){}
+            }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
         };
+        
         audio.onerror = () => {
             if (setPlayingPoiId) setPlayingPoiId(null);
-            if (isListeningRef.current) setVoiceState('idle');
+            setVoiceState('listening');
+            stateRef.current = 'listening';
+            if (isActive && recognitionRef.current) {
+                try { recognitionRef.current.start(); } catch(e){}
+            }
         };
-    }, [audioRef, setPlayingPoiId]);
+    }, [audioRef, setPlayingPoiId, isActive]);
 
-    // ── Flush buffer periodically ──
-    const startBufferFlush = useCallback(() => {
-        if (bufferTimerRef.current) clearInterval(bufferTimerRef.current);
-        bufferTimerRef.current = setInterval(() => {
-            bufferRef.current = '';
-        }, BUFFER_FLUSH_MS);
-    }, []);
-
-    const stopBufferFlush = useCallback(() => {
-        if (bufferTimerRef.current) {
-            clearInterval(bufferTimerRef.current);
-            bufferTimerRef.current = null;
-        }
-        bufferRef.current = '';
-    }, []);
-
-    // ── Speech Recognition lifecycle ──
-    const startListening = useCallback(() => {
+    useEffect(() => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) return;
 
         const recognition = new SR();
         recognition.lang = 'es-MX';
-        recognition.continuous = true;
+        // continuous=true para que no se detenga en cada frase y evite pitidos múltiples
+        recognition.continuous = true; 
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
@@ -191,56 +196,42 @@ export default function useVoiceCopilot({
             const transcript = last[0].transcript.trim().toLowerCase();
             setLastTranscript(transcript);
 
-            let currentState = stateRef.current;
-            const tempBuffer = (bufferRef.current + ' ' + transcript).trim();
-
-            if (currentState === 'idle' && hasWakeWord(tempBuffer)) {
-                setVoiceState('wake');
-                stateRef.current = 'wake';
-                currentState = 'wake';
+            // Activar alerta visual ÁMBAR (estado 'wake') si escucha la palabra clave en el ínterin
+            if (transcript.includes(wakeWord.toLowerCase()) || transcript.includes('computadora')) {
+                if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                    setVoiceState('wake');
+                    stateRef.current = 'wake';
+                }
             }
 
             if (!last.isFinal) return;
 
-            bufferRef.current = tempBuffer;
-            const fullBuffer = bufferRef.current;
+            // Revisar si dijo la palabra clave o algo similar
+            if (transcript.includes(wakeWord.toLowerCase()) || transcript.includes('computadora')) {
+                const poiMatch = findMatchInBuffer(transcript);
 
-            if (currentState === 'idle' || currentState === 'wake') {
-                const wakeDetected = hasWakeWord(fullBuffer);
-                const poiMatch = findMatchInBuffer(fullBuffer);
-                const isAwake = currentState === 'wake' || wakeDetected;
-
-                if (isAwake && poiMatch) {
-                    if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
-                    bufferRef.current = ''; 
+                if (poiMatch) {
                     setMatchedPoi(poiMatch);
-                    setVoiceState('matched');
+                    setVoiceState('matched'); // Alerta ESMERALDA
                     stateRef.current = 'matched';
+                    try { recognition.abort(); } catch(e){}
                     setTimeout(() => playMatchedAudio(poiMatch), 800);
-                    return;
-                }
-
-                if (wakeDetected && !poiMatch) {
-                    setVoiceState('wake');
-                    stateRef.current = 'wake';
-                    setLastTranscript(''); 
-                    if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
-                    wakeTimeoutRef.current = setTimeout(() => {
+                } else {
+                    // Falsa alarma o comando incompleto: Regresa a escuchar silenciosamente
+                    setTimeout(() => {
                         if (stateRef.current === 'wake') {
-                            setVoiceState('idle');
-                            stateRef.current = 'idle';
-                            setLastTranscript('');
-                            bufferRef.current = '';
+                            setVoiceState('listening');
+                            stateRef.current = 'listening';
                         }
-                    }, 6000);
-                    return;
+                    }, 1500);
+                    setLastTranscript('');
                 }
             }
         };
 
         recognition.onerror = (event) => {
             if (event.error === 'not-allowed') {
-                setErrorMsg('Permiso de micrófono denegado. Actívalo en la configuración de tu navegador.');
+                setErrorMsg('Permiso de micrófono denegado. Actívalo en la configuración.');
                 stopListening();
                 return;
             }
@@ -249,46 +240,47 @@ export default function useVoiceCopilot({
         };
 
         recognition.onend = () => {
-            if (isListeningRef.current) {
-                try { recognition.start(); } catch (e) { /* already started */ }
+            setIsDetectingVoice(false);
+            // Si seguimos activos y no estamos reproduciendo audio, reiniciar (bucle continuo)
+            if (isActive && stateRef.current === 'listening') {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error("Error restarting recognition loop:", e);
+                }
             }
         };
 
         recognitionRef.current = recognition;
-        isListeningRef.current = true;
 
-        try {
-            recognition.start();
-            setVoiceState('idle');
-            setErrorMsg(null);
-            startBufferFlush();
-        } catch (e) {
-            console.error('[VoiceSim] Failed to start recognition:', e);
-            if (e.name !== 'InvalidStateError') {
-                setErrorMsg('No se pudo iniciar el reconocimiento de voz.');
+        return () => {
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch (e) { /* */ }
             }
-        }
-    }, [wakeWord, hasWakeWord, findMatchInBuffer, playMatchedAudio, startBufferFlush]);
+        };
+    }, [findMatchInBuffer, playMatchedAudio, isActive, wakeWord, stopListening]);
 
-    const stopListening = useCallback(() => {
-        isListeningRef.current = false;
-        setIsDetectingVoice(false);
-        stopBufferFlush();
-        if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
-        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+    const startListening = useCallback(async () => {
+        setErrorMsg(null);
+        setVoiceState('listening');
+        stateRef.current = 'listening';
+
+        // EL TRUCO: Tomamos el control del micrófono con WebRTC.
+        // Al mantener este stream activo, Chrome/Android ya considera el micrófono "en uso".
+        // Esto BURLA el sistema de Android, silenciando o evitando el pitido cuando
+        // recognition.start() se ejecuta dentro del loop continuo.
+        try {
+            if (!micStreamRef.current) {
+                micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+        } catch (e) {
+            console.warn("No se pudo obtener stream silencioso (truco pitido):", e);
+        }
+
         if (recognitionRef.current) {
-            try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
-            recognitionRef.current = null;
+            try { recognitionRef.current.start(); } catch (e) { /* Ya iniciado */ }
         }
-        if (audioRef?.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-        if (setPlayingPoiId) setPlayingPoiId(null);
-        setVoiceState('off');
-        setLastTranscript('');
-        setMatchedPoi(null);
-    }, [audioRef, setPlayingPoiId, stopBufferFlush]);
+    }, []);
 
     const handleToggle = useCallback(() => {
         if (isActive) {
@@ -300,18 +292,6 @@ export default function useVoiceCopilot({
         }
     }, [isActive, startListening, stopListening]);
 
-    useEffect(() => {
-        return () => {
-            isListeningRef.current = false;
-            if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
-            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-            if (bufferTimerRef.current) clearInterval(bufferTimerRef.current);
-            if (recognitionRef.current) {
-                try { recognitionRef.current.abort(); } catch (e) { /* */ }
-            }
-        };
-    }, []);
-
     const saveWakeWord = (val) => {
         const finalVal = (val || '').trim() || 'computadora';
         setWakeWord(finalVal);
@@ -320,7 +300,7 @@ export default function useVoiceCopilot({
 
     return {
         isActive,
-        setIsActive, // Only used when controlled externally
+        setIsActive,
         handleToggle,
         voiceState,
         lastTranscript,
@@ -332,6 +312,12 @@ export default function useVoiceCopilot({
         voiceCommands,
         startListening,
         stopListening,
-        isDetectingVoice
+        isDetectingVoice,
+        
+        // Mantener exports aunque no se usen (por si otras UIs lo esperan)
+        tfjsIsLoaded: true,
+        tfjsIsCalibrated: true,
+        collectExample: async () => {},
+        trainModel: async () => {}
     };
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
 import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff } from 'lucide-react';
+import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
 
 const CopilotOrbUI = forwardRef(({
     pois = [],
@@ -24,6 +25,7 @@ const CopilotOrbUI = forwardRef(({
     }));
 
     const [showDictionary, setShowDictionary] = useState(false);
+    const [showCalibrator, setShowCalibrator] = useState(false);
 
     // Native Tailwind classes used instead of custom injected CSS to prevent shape issues
 
@@ -39,13 +41,30 @@ const CopilotOrbUI = forwardRef(({
 
     const handleOrbClick = () => {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
-        copilot.handleToggle();
+        
+        if (!copilot.isActive && !copilot.tfjsIsCalibrated) {
+            // Requiere calibración antes de activar
+            setShowCalibrator(true);
+        } else {
+            copilot.handleToggle();
+        }
     };
 
     if (!copilot.supported) return null;
 
     return (
         <div className="w-full flex flex-col items-center justify-center pt-0 pb-1 relative z-50">
+            {/* Modal de Calibración TFJS */}
+            <TFCalibratorModal 
+                isOpen={showCalibrator}
+                collectExample={copilot.collectExample}
+                trainModel={copilot.trainModel}
+                onCalibrationComplete={() => {
+                    setShowCalibrator(false);
+                    copilot.handleToggle(); // Activar IA después de calibrar
+                }}
+            />
+
             {/* ── NARRATIONS DICTIONARY (COLLAPSIBLE) - MINIMALIST TOP ── */}
             <div className="w-full flex flex-col items-center justify-center mb-3">
                 <button 
@@ -85,8 +104,6 @@ const CopilotOrbUI = forwardRef(({
                         <div className={`absolute inset-0 rounded-full bg-blue-300 opacity-50 animate-ping ${copilot.isDetectingVoice ? 'duration-[0.8s]' : 'duration-[1.5s]'}`} style={{ animationDelay: '0.2s' }}></div>
                     </>
                 )}
-
-
 
                 {/* Background Halo */}
                 <div className={`absolute inset-0 rounded-full transition-all duration-700 ease-in-out ${haloClass} ${copilot.isDetectingVoice ? 'scale-110 opacity-100 animate-pulse' : ''}`} />
