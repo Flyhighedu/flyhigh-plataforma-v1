@@ -208,82 +208,7 @@ export default function useVoiceCopilot({
         setErrorMsg(null);
         
         try {
-            // 1. Inicializar Worker de Vosk si no existe
-            if (!voskWorkerRef.current) {
-                setVoiceState('booting'); // Estado visual para mostrar carga
-                stateRef.current = 'booting';
-                
-                voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
-                
-                voskWorkerRef.current.onmessage = (e) => {
-                    const { type, status, result, error } = e.data;
-                    
-                    if (type === 'status') {
-                        if (status === 'ready') {
-                            setVoiceState('listening');
-                            stateRef.current = 'listening';
-                        }
-                    } else if (type === 'partial' || type === 'final') {
-                        const transcript = result?.partial || result?.text || '';
-                        if (!transcript) return;
-                        
-                        setLastTranscript(transcript);
-                        setIsDetectingVoice(true);
-                        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-                        detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
-
-                        const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
-
-                        // Activar alerta visual ÁMBAR en resultados parciales
-                        if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
-                            if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
-                                setVoiceState('wake');
-                                stateRef.current = 'wake';
-                            }
-                        }
-
-                        if (type === 'final') {
-                            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
-                                const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
-
-                                if (poiMatch) {
-                                    setMatchedPoi(poiMatch);
-                                    setVoiceState('matched'); // Alerta ESMERALDA
-                                    stateRef.current = 'matched';
-                                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
-                                } else {
-                                    // Falsa alarma: Regresa a escuchar
-                                    setTimeout(() => {
-                                        if (stateRef.current === 'wake') {
-                                            setVoiceState('listening');
-                                            stateRef.current = 'listening';
-                                        }
-                                    }, 1500);
-                                    setLastTranscript('');
-                                }
-                            }
-                        }
-                    } else if (type === 'error') {
-                        setErrorMsg(`Error del motor de voz: ${error}`);
-                        console.error('[Vosk]', error);
-                        callbacksRef.current.stopListening();
-                    }
-                };
-                
-                // Pedirle al worker que cargue el modelo
-                voskWorkerRef.current.postMessage({ 
-                    action: 'init', 
-                    data: { 
-                        modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
-                        sampleRate: 16000 
-                    } 
-                });
-            } else if (stateRef.current !== 'booting') {
-                setVoiceState('listening');
-                stateRef.current = 'listening';
-            }
-
-            // 2. Iniciar Micrófono y AudioContext
+            // 1. Iniciar Micrófono y AudioContext (PRIMERO para conocer el Sample Rate Nativo)
             if (!audioContextRef.current) {
                 // Desactivamos el procesamiento de voz nativo (echoCancellation, etc.) 
                 // para evitar que Android active el "Modo Llamada" (HFP) y desconecte el Bluetooth A2DP de alta calidad.
@@ -292,22 +217,92 @@ export default function useVoiceCopilot({
                         echoCancellation: false,
                         noiseSuppression: false,
                         autoGainControl: false,
-                        channelCount: 1,
-                        sampleRate: 16000
+                        channelCount: 1
+                        // NO forzamos sampleRate: 16000 aquí, dejamos que tome la tasa nativa del dispositivo
                     } 
                 });
                 mediaStreamRef.current = stream;
                 
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const audioCtx = new AudioContext({ sampleRate: 16000 });
+                // NO FORZAMOS SAMPLE RATE. Al omitirlo, Android usa la tasa nativa (ej. 48000),
+                // lo que mantiene la conexión Bluetooth A2DP activa en lugar de cambiar a modo "llamada" (HFP 16000Hz).
+                const audioCtx = new AudioContext(); 
                 audioContextRef.current = audioCtx;
                 
+                // 2. Inicializar Worker de Vosk si no existe, pasándole el sampleRate nativo
+                if (!voskWorkerRef.current) {
+                    setVoiceState('booting');
+                    stateRef.current = 'booting';
+                    
+                    voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
+                    
+                    voskWorkerRef.current.onmessage = (e) => {
+                        const { type, status, result, error } = e.data;
+                        
+                        if (type === 'status') {
+                            if (status === 'ready') {
+                                setVoiceState('listening');
+                                stateRef.current = 'listening';
+                            }
+                        } else if (type === 'partial' || type === 'final') {
+                            const transcript = result?.partial || result?.text || '';
+                            if (!transcript) return;
+                            
+                            setLastTranscript(transcript);
+                            setIsDetectingVoice(true);
+                            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+                            detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
+
+                            const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
+
+                            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                                if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                                    setVoiceState('wake');
+                                    stateRef.current = 'wake';
+                                }
+                            }
+
+                            if (type === 'final') {
+                                if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                                    const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
+
+                                    if (poiMatch) {
+                                        setMatchedPoi(poiMatch);
+                                        setVoiceState('matched'); 
+                                        stateRef.current = 'matched';
+                                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
+                                    } else {
+                                        setTimeout(() => {
+                                            if (stateRef.current === 'wake') {
+                                                setVoiceState('listening');
+                                                stateRef.current = 'listening';
+                                            }
+                                        }, 1500);
+                                        setLastTranscript('');
+                                    }
+                                }
+                            }
+                        } else if (type === 'error') {
+                            setErrorMsg(`Error del motor de voz: ${error}`);
+                            console.error('[Vosk]', error);
+                            callbacksRef.current.stopListening();
+                        }
+                    };
+                    
+                    // Pedirle al worker que cargue el modelo, y procese el audio a la Tasa Nativa de Bluetooth
+                    voskWorkerRef.current.postMessage({ 
+                        action: 'init', 
+                        data: { 
+                            modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
+                            sampleRate: audioCtx.sampleRate 
+                        } 
+                    });
+                }
+
                 const source = audioCtx.createMediaStreamSource(stream);
-                // Usamos 4096 para balancear latencia y uso de CPU
                 const processor = audioCtx.createScriptProcessor(4096, 1, 1);
                 
                 processor.onaudioprocess = (e) => {
-                    // Solo procesamos audio si no estamos reproduciendo una pista
                     if (stateRef.current === 'listening' || stateRef.current === 'wake') {
                         const audioData = e.inputBuffer.getChannelData(0);
                         if (voskWorkerRef.current) {
@@ -319,6 +314,9 @@ export default function useVoiceCopilot({
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
                 scriptProcessorRef.current = processor;
+            } else if (stateRef.current !== 'booting') {
+                setVoiceState('listening');
+                stateRef.current = 'listening';
             }
         } catch (err) {
             setErrorMsg('Permiso de micrófono denegado o no soportado.');

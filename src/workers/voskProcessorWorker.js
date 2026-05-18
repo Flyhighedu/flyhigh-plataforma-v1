@@ -2,12 +2,14 @@ import { createModel } from 'vosk-browser';
 
 let model = null;
 let recognizer = null;
+let currentSampleRate = 16000;
 
 self.onmessage = async (e) => {
     const { action, data } = e.data;
 
     if (action === 'init') {
         const { modelUrl, sampleRate } = data;
+        currentSampleRate = sampleRate; // Guardamos el sampleRate dinámico
         try {
             self.postMessage({ type: 'status', status: 'booting' });
             model = await createModel(modelUrl);
@@ -32,8 +34,7 @@ self.onmessage = async (e) => {
     if (action === 'process' && recognizer) {
         try {
             // data is expected to be a Float32Array containing PCM audio
-            // The sample rate is 16000 as configured in AudioContext
-            recognizer.acceptWaveformFloat(data, 16000);
+            recognizer.acceptWaveformFloat(data, currentSampleRate);
         } catch (err) {
             self.postMessage({ type: 'error', error: err.message });
         }
