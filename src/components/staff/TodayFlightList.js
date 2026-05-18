@@ -44,7 +44,7 @@ function safeCount(value) {
 
 const VISIBLE_WINDOW = 8; // Max items shown before "show all" toggle
 
-export default function TodayFlightList({ flights, pauses = [], activeFlight = null, onRequestEditFlight = null }) {
+export default function TodayFlightList({ flights, pauses = [], activeFlight = null, onRequestEditFlight = null, isPeripheralActive = false }) {
     const [showAll, setShowAll] = useState(true);
     const flightKeyUsage = new Map();
 
@@ -185,7 +185,7 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
 
     return (
         <div className="space-y-3 animate-in slide-in-from-bottom-5 duration-500">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-colors ${isPeripheralActive ? 'text-white/80' : 'text-slate-500'}`}>
                 <CheckCircle2 size={16} /> Actividad del Día ({flightCount} vuelos{pauseCount > 0 ? `, ${pauseCount} pausas` : ''})
             </h3>
 
@@ -204,9 +204,11 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                         return (
                             <div
                                 key={`pause-${safeText(item.pauseId, 'no-id')}-${idx}`}
-                                className={`border rounded-xl p-4 flex items-center justify-between shadow-sm ${isReceso
-                                    ? 'bg-amber-50 border-amber-200'
-                                    : 'bg-red-50 border-red-200'
+                                className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${isPeripheralActive
+                                    ? 'bg-white/10 border-white/20 backdrop-blur-md'
+                                    : isReceso
+                                        ? 'bg-amber-50 border-amber-200'
+                                        : 'bg-red-50 border-red-200'
                                     }`}
                             >
                                 <div className="flex items-center gap-4">
@@ -215,12 +217,12 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                                         {isReceso ? <Coffee size={16} /> : <AlertTriangle size={16} />}
                                     </div>
                                     <div>
-                                        <div className={`font-bold flex items-center gap-2 ${isReceso ? 'text-amber-800' : 'text-red-800'
+                                        <div className={`font-bold flex items-center gap-2 transition-colors ${isPeripheralActive ? 'text-white' : isReceso ? 'text-amber-800' : 'text-red-800'
                                             }`}>
                                             <Pause size={14} />
                                             {isReceso ? 'Receso' : 'Pausa'} • {formatDurationShort(pauseDuration)}
                                         </div>
-                                        <div className="text-xs text-slate-500 flex items-center gap-3 mt-1">
+                                        <div className={`text-xs flex items-center gap-3 mt-1 transition-colors ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>
                                             {!isReceso && item.reason && (
                                                 <span>{reasonLabel}</span>
                                             )}
@@ -238,13 +240,13 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                         return (
                             <div
                                 key={`inter-${safeText(item.key, 'no-key')}-${idx}`}
-                                className="mx-2 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-2 flex items-center justify-between"
+                                className={`mx-2 rounded-lg border px-3 py-2 flex items-center justify-between transition-all ${isPeripheralActive ? 'bg-white/10 border-white/20 backdrop-blur-sm' : 'border-slate-200 bg-slate-50/90'}`}
                             >
                                 <div>
-                                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">Tiempo entre vuelos</p>
-                                    <p className="text-[11px] text-slate-500">Entre vuelo #{item.fromFlightNumber} y vuelo #{item.toFlightNumber}</p>
+                                    <p className={`text-[10px] font-extrabold uppercase tracking-wide transition-colors ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>Tiempo entre vuelos</p>
+                                    <p className={`text-[11px] transition-colors ${isPeripheralActive ? 'text-white/60' : 'text-slate-500'}`}>Entre vuelo #{item.fromFlightNumber} y vuelo #{item.toFlightNumber}</p>
                                 </div>
-                                <p className="text-sm font-black text-slate-700 tabular-nums">{formatDurationShort(item.durationSeconds)}</p>
+                                <p className={`text-sm font-black tabular-nums transition-colors ${isPeripheralActive ? 'text-white' : 'text-slate-700'}`}>{formatDurationShort(item.durationSeconds)}</p>
                             </div>
                         );
                     }
@@ -255,20 +257,20 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                     const studentCount = safeCount(normalizedFlight.studentCount);
 
                     return (
-                        <div key={`flight-${safeText(item.key || item.id, 'no-key')}-${idx}`} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                        <div key={`flight-${safeText(item.key || item.id, 'no-key')}-${idx}`} className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${isPeripheralActive ? 'bg-white/10 border-white/20 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
                             <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${isPeripheralActive ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'}`}>
                                     {flightNumber || '--'}
                                 </div>
                                 <div>
-                                    <div className="text-slate-900 font-bold flex items-center gap-2">
-                                        <Clock size={14} className="text-slate-400" />
+                                    <div className={`font-bold flex items-center gap-2 transition-colors ${isPeripheralActive ? 'text-white' : 'text-slate-900'}`}>
+                                        <Clock size={14} className={isPeripheralActive ? 'text-white/50' : 'text-slate-400'} />
                                         Vuelo #{flightNumber || '--'} • {formatDurationShort(normalizedFlight.durationSeconds)}
-                                        {normalizedFlight.synced && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 rounded-full border border-green-200">Sync</span>}
+                                        {normalizedFlight.synced && <span className={`text-[10px] px-1.5 rounded-full border transition-colors ${isPeripheralActive ? 'bg-white/20 text-white border-white/30' : 'bg-green-100 text-green-700 border-green-200'}`}>Sync</span>}
                                     </div>
-                                    <div className="text-xs text-slate-500 flex items-center gap-3 mt-1">
+                                    <div className={`text-xs flex items-center gap-3 mt-1 transition-colors ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>
                                         <span className="flex items-center gap-1"><Users size={12} /> {studentCount} Niños</span>
-                                        <span className="text-slate-300">|</span>
+                                        <span className={isPeripheralActive ? 'text-white/30' : 'text-slate-300'}>|</span>
                                         <span>{formatClock(normalizedFlight.endTime || normalizedFlight.startTime)}</span>
                                     </div>
                                 </div>

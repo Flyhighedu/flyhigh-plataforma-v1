@@ -106,14 +106,20 @@ const userIcon = L.divIcon({
 
 export default function TacticalMapLeaflet({
     pois = [], suggestedPois = [], userLocation,
-    onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress
+    onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef([]);
     const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
+    const markerClickedRef = useRef(false);
+    const longPressedRef = useRef(false);
+    const onMapTapRef = useRef(onMapTap);
     const [showLabels, setShowLabels] = useState(false);
+
+    // Keep ref in sync so the map.on('click') closure always has the latest callback
+    useEffect(() => { onMapTapRef.current = onMapTap; }, [onMapTap]);
 
     // Initialize map once
     useEffect(() => {
@@ -144,6 +150,7 @@ export default function TacticalMapLeaflet({
             const latlng = e.latlng;
             startPos = e.containerPoint ? { x: e.containerPoint.x, y: e.containerPoint.y } : null;
             pressTimer = setTimeout(() => {
+                longPressedRef.current = true; // Flag: suppress the click that fires on release
                 onLongPress?.(latlng.lat, latlng.lng);
                 pressTimer = null;
             }, 600);
@@ -175,6 +182,19 @@ export default function TacticalMapLeaflet({
         map.on('touchend', endPress);
         map.on('contextmenu', (e) => {
             onLongPress?.(e.latlng.lat, e.latlng.lng);
+        });
+
+        // ═══ TAP-TO-DISCOVER: Detect taps on base map (not on markers) ═══
+        map.on('click', (e) => {
+            if (markerClickedRef.current) {
+                markerClickedRef.current = false;
+                return; // Was a marker click — suppress
+            }
+            if (longPressedRef.current) {
+                longPressedRef.current = false;
+                return; // Was a long-press — suppress (already handled)
+            }
+            onMapTapRef.current?.(e.latlng.lat, e.latlng.lng);
         });
 
         map.on('moveend', () => {
@@ -224,26 +244,44 @@ export default function TacticalMapLeaflet({
         }
     }, [userLocation]);
 
-    // Sync saved POI markers — tap opens modal directly
+    // Sync saved POI markers — optimized: update icons in-place when only labels change
+    const poisKeyRef = useRef('');
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
 
-        markersRef.current.forEach(m => map.removeLayer(m));
-        markersRef.current = [];
+        // Build a key representing the POI data (not label state)
+        const dataKey = pois.filter(p => p.latitude != null && p.longitude != null)
+            .map(p => `${p.id || p.name}:${p.latitude}:${p.longitude}:${p.is_official ? 1 : 0}`)
+            .join('|');
+        
+        const dataChanged = dataKey !== poisKeyRef.current;
+        poisKeyRef.current = dataKey;
 
-        pois.filter(p => p.latitude != null && p.longitude != null).forEach(poi => {
-            const marker = L.marker([poi.latitude, poi.longitude], {
-                icon: makeIcon(poi, showLabels),
-                zIndexOffset: poi.is_official ? 3000 : 0
-            }).addTo(map);
+        if (dataChanged) {
+            // Full rebuild: POI data actually changed
+            markersRef.current.forEach(m => map.removeLayer(m.marker));
+            markersRef.current = [];
 
-            marker.on('click', () => {
-                onMarkerClick?.(poi);
+            pois.filter(p => p.latitude != null && p.longitude != null).forEach(poi => {
+                const marker = L.marker([poi.latitude, poi.longitude], {
+                    icon: makeIcon(poi, showLabels),
+                    zIndexOffset: poi.is_official ? 3000 : 0
+                }).addTo(map);
+
+                marker.on('click', () => {
+                    markerClickedRef.current = true;
+                    onMarkerClick?.(poi);
+                });
+
+                markersRef.current.push({ marker, poi });
             });
-
-            markersRef.current.push(marker);
-        });
+        } else {
+            // Labels-only change: swap icons in-place (no DOM rebuild)
+            markersRef.current.forEach(({ marker, poi }) => {
+                marker.setIcon(makeIcon(poi, showLabels));
+            });
+        }
     }, [pois, onMarkerClick, showLabels]);
 
     // Sync Suggested POI markers — tap opens modal directly
@@ -261,6 +299,7 @@ export default function TacticalMapLeaflet({
             }).addTo(map);
 
             marker.on('click', () => {
+                markerClickedRef.current = true;
                 onSuggestedPoiClick?.(poi);
             });
 

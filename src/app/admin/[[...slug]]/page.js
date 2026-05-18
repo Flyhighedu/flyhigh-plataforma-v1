@@ -28,6 +28,7 @@ import SandboxPatrocinadoresPage from '@/app/sandbox-patrocinadores/page';
 import SandboxCRMPage from '@/app/sandbox-crm/page';
 import CRMEscuelasPage from '@/app/admin/crm/page';
 import ImprimiblesPage from '@/app/admin/imprimibles/page';
+import SoundtrackManager from '@/components/admin/SoundtrackManager';
 import { useRouter, usePathname } from 'next/navigation';
 
 // Dynamic import to prevent hydration mismatch (DashboardPage uses window.location)
@@ -1078,6 +1079,9 @@ export default function AdminPage() {
             )}
             {activeTab === 'hr-rutas' && (
                 <MasterRouteStudio />
+            )}
+            {activeTab === 'soundtracks' && (
+                <SoundtrackManager />
             )}
 
             {/* FOOTER - Hidden for full-canvas tabs */}

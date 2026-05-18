@@ -23,8 +23,8 @@ Tu trabajo es generar exactamente 4 campos para una ficha didáctica que será u
 CAMPOS A GENERAR:
 1. "dato_clave_1": Un dato concreto y sorprendente (una fecha, un número, un hecho poco conocido) que asombre a un niño. Máximo 1 oración corta y directa (10-18 palabras).
 2. "dato_clave_2": Otro dato diferente, enfocado en por qué este lugar importa para su comunidad o para México. Máximo 1 oración corta y directa (10-18 palabras).
-3. "pregunta_estudio_1": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_1. Ejemplo: "¿En qué año fue inaugurado este hospital?".
-4. "pregunta_estudio_2": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_2. Ejemplo: "¿Cuántas especialidades ofrece a la comunidad?".
+3. "pregunta_estudio_1": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_1. Ejemplo: "¿En qué año fue inaugurado este lugar?".
+4. "pregunta_estudio_2": Una pregunta directa de autoevaluación cuya respuesta sea EXACTAMENTE la información de dato_clave_2. Ejemplo: "¿Qué impacto tuvo en su comunidad?".
 5. "pregunta_interaccion": Una pregunta abierta y reflexiva que el piloto le pueda hacer a los niños DURANTE el vuelo para generar conversación y pensamiento crítico. Debe ser diferente a las preguntas de estudio. Una sola pregunta.
 
 REGLAS:

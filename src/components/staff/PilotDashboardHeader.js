@@ -80,22 +80,22 @@ export default function PilotDashboardHeader({
             </div>
 
             {/* ═══ XP PROGRESS BAR ═══ */}
-            <div className="px-5 pt-5 pb-2 relative z-10">
-                <div className="bg-white rounded-[28px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100">
-                    <div className="flex items-center justify-between mb-4">
+            <div className="px-5 pt-4 pb-2 relative z-10">
+                <div className="bg-white rounded-[24px] px-5 py-4 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center">
-                                <Award size={14} className="text-indigo-500" />
+                            <div className="w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center">
+                                <Award size={12} className="text-indigo-500" />
                             </div>
-                            <p className="text-[12px] font-black text-slate-700 uppercase tracking-wider">Próximo Rango</p>
+                            <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Próximo Rango</p>
                         </div>
-                        <div className="bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                            <p className="text-[12px] font-black text-indigo-600">{totalPoints} <span className="text-slate-400">/ {nextLevelTarget}</span></p>
+                        <div className="bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-100">
+                            <p className="text-[11px] font-black text-indigo-600">{totalPoints} <span className="text-slate-400">/ {nextLevelTarget}</span></p>
                         </div>
                     </div>
                     
                     {/* Modern Progress Bar */}
-                    <div className="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden p-[2px]">
+                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden p-[2px]">
                         <div 
                             className="bg-gradient-to-r from-[#2563eb] to-[#4338ca] h-full rounded-full transition-all duration-1000 ease-out relative shadow-sm"
                             style={{ width: `${progressPercent}%` }}

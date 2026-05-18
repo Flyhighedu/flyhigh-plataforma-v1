@@ -46,7 +46,9 @@ export async function POST(request) {
         const { route_id, name, description, image_url, sort_order,
             dato_clave_1, dato_clave_2, dato_clave_3,
             pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3,
-            pregunta_interaccion, ai_context } = body;
+            pregunta_interaccion, ai_context,
+            narrative_script, audio_url, audio_duration_seconds, audio_generated_at,
+            is_general_topic, trigger_keywords } = body;
 
         // Accept both lat/lng and latitude/longitude aliases
         const lat = body.lat ?? body.latitude ?? null;
@@ -85,6 +87,13 @@ export async function POST(request) {
         if (pregunta_estudio_3 !== undefined) insertPayload.pregunta_estudio_3 = pregunta_estudio_3;
         if (pregunta_interaccion !== undefined) insertPayload.pregunta_interaccion = pregunta_interaccion;
         if (ai_context !== undefined) insertPayload.ai_context = ai_context;
+        
+        if (narrative_script !== undefined) insertPayload.narrative_script = narrative_script;
+        if (audio_url !== undefined) insertPayload.audio_url = audio_url;
+        if (audio_duration_seconds !== undefined) insertPayload.audio_duration_seconds = audio_duration_seconds;
+        if (audio_generated_at !== undefined) insertPayload.audio_generated_at = audio_generated_at;
+        if (is_general_topic !== undefined) insertPayload.is_general_topic = is_general_topic;
+        if (trigger_keywords !== undefined) insertPayload.trigger_keywords = trigger_keywords;
 
         const { data, error } = await supabase
             .from('master_route_pois')
@@ -119,7 +128,9 @@ export async function PATCH(request) {
             'name', 'description', 'image_url', 'lat', 'lng',
             'dato_clave_1', 'dato_clave_2', 'dato_clave_3',
             'pregunta_estudio_1', 'pregunta_estudio_2', 'pregunta_estudio_3',
-            'pregunta_interaccion', 'ai_context', 'sort_order'
+            'pregunta_interaccion', 'ai_context', 'sort_order',
+            'narrative_script', 'audio_url', 'audio_duration_seconds', 'audio_generated_at',
+            'is_general_topic', 'trigger_keywords'
         ];
         const safeUpdates = {};
         for (const key of allowed) {

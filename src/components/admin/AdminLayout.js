@@ -5,7 +5,7 @@ import { useTheme } from 'next-themes';
 import { 
     Users, Calendar, Plane, CreditCard, Shield,
     ChevronLeft, ChevronRight, LogOut, Sun, Moon, BarChart2,
-    Globe, Zap, School, Gem, FileText, Database, Heart, Building2, Printer, Map, GraduationCap
+    Globe, Zap, School, Gem, FileText, Database, Heart, Building2, Printer, Map, GraduationCap, Music
 } from 'lucide-react';
 import AdminAlarms from './AdminAlarms';
 
@@ -88,6 +88,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
         { id: 'imprimibles', label: 'Imprimibles', icon: <Printer size={18} />, color: '#f97316' }, // Orange
         { id: 'operativos', label: 'FlyHigh Ops', icon: <Users size={18} />, color: '#2563eb' }, // Blue
         { id: 'hr-rutas', label: 'Puntos Oficiales', icon: <Map size={18} />, color: '#f59e0b' }, // Amber
+        { id: 'soundtracks', label: 'Bandas Sonoras', icon: <Music size={18} />, color: '#a78bfa' }, // Violet
         { 
             id: 'hr', 
             label: 'Recursos Humanos', 

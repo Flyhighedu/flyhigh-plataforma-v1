@@ -1,17 +1,21 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { 
     Compass, Map, ChevronLeft, 
     Flame, BookOpen, X, ArrowRight, ArrowLeft,
     Zap, PartyPopper, RotateCcw,
-    Check, X as XIcon, Pointer, Hand, HelpCircle, Award, Plus
+    Check, X as XIcon, Pointer, Hand, HelpCircle, Award, Plus,
+    Play, Pause, Volume2, Pencil
 } from 'lucide-react';
 import { motion, useAnimation, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import POIDetailModal from '@/components/staff/POIDetailModal';
+import VoiceSimulatorWidget from '@/components/staff/VoiceSimulatorWidget';
+import { normalizeCommand } from '@/hooks/useVoiceCopilot';
 import PilotDashboardHeader from '@/components/staff/PilotDashboardHeader';
+import SimulationContainer from '@/components/staff/SimulationContainer';
 
 // ═══════════════════════════════════════════════════════════════
 // autoCategory — reutilizada de POIDetailModal.js
@@ -34,12 +38,12 @@ function autoCategory(desc) {
     return { emoji: '📍', label: 'Punto de interés', color: '#6366F1' };
 }
 
-// Determina el estado de estudio de un POI
+// Determina el estado de contenido de un POI
 function getStudyStatus(poi) {
-    if (!poi.dato_clave_1 && !poi.dato_clave_2) {
-        return { label: 'Sin ficha', color: 'bg-red-50 text-red-500 border-red-100', dot: '🔴' };
-    }
-    return { label: 'Por repasar', color: 'bg-amber-50 text-amber-600 border-amber-100', dot: '🟡' };
+    if (poi.audio_url) return { label: 'Con narración', icon: '🎙️', accent: 'bg-emerald-500/90 text-white border-emerald-400' };
+    if (poi.narrative_script) return { label: 'Sin audio', icon: '📝', accent: 'bg-amber-500/90 text-white border-amber-400' };
+    if (poi.dato_clave_1) return { label: 'Ficha clásica', icon: '📋', accent: 'bg-blue-500/90 text-white border-blue-400' };
+    return { label: 'Sin contenido', icon: '⚪', accent: 'bg-slate-400/80 text-white border-slate-300' };
 }
 
 // Fisher-Yates shuffle
@@ -77,8 +81,18 @@ export default function AcademiaLobbyPage() {
     const [isFlipped, setIsFlipped] = useState(false);
     const [studyComplete, setStudyComplete] = useState(false);
     
+    // Inline audio playback
+    const [playingPoiId, setPlayingPoiId] = useState(null);
+    const audioRef = useRef(null);
+    
     // Tutorial state
     const [showTutorial, setShowTutorial] = useState(false);
+
+    // Voice simulator shared state
+    const [voiceSimActive, setVoiceSimActive] = useState(false);
+
+    // Operation Simulator state
+    const [simulatorActive, setSimulatorActive] = useState(false);
 
     useEffect(() => {
         const seen = localStorage.getItem('flyhigh_study_tutorial_seen');
@@ -95,7 +109,7 @@ export default function AcademiaLobbyPage() {
     };
 
     // Gamification
-    const fichasWithData = pois.filter(p => p.dato_clave_1).length;
+    const fichasWithData = pois.filter(p => p.narrative_script || p.dato_clave_1).length;
     const studyReadyCount = pois.length; // Total fichas in collection
     const totalPoints = pois.length;
     const nextLevelTarget = Math.max(totalPoints + 3, 5);
@@ -125,41 +139,20 @@ export default function AcademiaLobbyPage() {
                     setUserAvatarConfig(profile?.avatar_config || null);
                 }
 
-                // Todos los roles pueden tener POIs personales — RLS garantiza aislamiento por user_id
-                let personalPois = [];
-                const { data, error: personalError } = await supabase
-                    .from('pilot_pois')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false });
-                if (personalError) throw personalError;
-                personalPois = data || [];
+                // PARALLEL fetch: personal POIs + official POIs + training modules
+                const [personalResult, officialResult, modulesResult] = await Promise.all([
+                    supabase.from('pilot_pois').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                    fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] })),
+                    supabase.from('training_modules').select('*, training_cards(*)').eq('status', 'published').order('created_at', { ascending: false })
+                ]);
 
-                // Fetch official POIs via server-side API (bypasses RLS) — para TODOS los roles
-                let officialPois = [];
-                try {
-                    const officialRes = await fetch('/api/official-pois');
-                    if (officialRes.ok) {
-                        const officialData = await officialRes.json();
-                        officialPois = officialData.pois || [];
-                    }
-                } catch (e) { console.warn('Could not fetch official POIs:', e); }
-
-                const mergedPois = [
-                    ...officialPois,
-                    ...personalPois
-                ];
-
-                // Fetch published training modules and their approved cards
-                const { data: modulesData } = await supabase
-                    .from('training_modules')
-                    .select('*, training_cards(*)')
-                    .eq('status', 'published')
-                    .order('created_at', { ascending: false });
+                const personalPois = personalResult.data || [];
+                if (personalResult.error) throw personalResult.error;
+                const officialPois = officialResult.pois || [];
 
                 if (isMounted) {
-                    setPois(mergedPois);
-                    setTrainingModules(modulesData || []);
+                    setPois([...officialPois, ...personalPois]);
+                    setTrainingModules(modulesResult.data || []);
                 }
             } catch (err) {
                 console.error('Error fetching POIs:', err);
@@ -175,50 +168,23 @@ export default function AcademiaLobbyPage() {
     const startStudy = useCallback(() => {
         let granularDeck = [];
         pois.forEach(poi => {
-            // Memory Challenge 1
-            if (poi.dato_clave_1) {
+            // PRIORITY 1: Narrative-based card (new system)
+            if (poi.narrative_script) {
                 granularDeck.push({
-                    id: `${poi.id}-1`,
+                    id: `${poi.id}-narrative`,
                     poiId: poi.id,
                     name: poi.name,
                     description: poi.description,
                     image_url: poi.image_url,
-                    question: poi.pregunta_estudio_1 || '¿Qué sabes sobre este lugar?',
-                    answer: poi.dato_clave_1,
-                    type: 'memory',
-                    indexLabel: 'DATO CLAVE 1'
+                    question: `¿Qué narración darías sobre "${poi.name}" durante un vuelo?`,
+                    answer: poi.narrative_script,
+                    type: 'narrative',
+                    indexLabel: 'NARRATIVA DE VUELO',
+                    audio_url: poi.audio_url || null
                 });
             }
-            // Memory Challenge 2
-            if (poi.dato_clave_2) {
-                granularDeck.push({
-                    id: `${poi.id}-2`,
-                    poiId: poi.id,
-                    name: poi.name,
-                    description: poi.description,
-                    image_url: poi.image_url,
-                    question: poi.pregunta_estudio_2 || '¿Qué otro dato relevante recuerdas?',
-                    answer: poi.dato_clave_2,
-                    type: 'memory',
-                    indexLabel: 'DATO CLAVE 2'
-                });
-            }
-            // Memory Challenge 3
-            if (poi.dato_clave_3) {
-                granularDeck.push({
-                    id: `${poi.id}-3`,
-                    poiId: poi.id,
-                    name: poi.name,
-                    description: poi.description,
-                    image_url: poi.image_url,
-                    question: poi.pregunta_estudio_3 || '¿Qué más recuerdas sobre este lugar?',
-                    answer: poi.dato_clave_3,
-                    type: 'memory',
-                    indexLabel: 'DATO CLAVE 3'
-                });
-            }
-            
-            // Kids Question
+
+            // PRIORITY 2: Kids interaction question (valid for both systems)
             if (poi.pregunta_interaccion) {
                 granularDeck.push({
                     id: `${poi.id}-kids`,
@@ -232,6 +198,34 @@ export default function AcademiaLobbyPage() {
                     indexLabel: 'PREGUNTA OPERATIVA'
                 });
             }
+
+            // FALLBACK: Legacy dato_clave cards (backward compat)
+            if (!poi.narrative_script) {
+                if (poi.dato_clave_1) {
+                    granularDeck.push({
+                        id: `${poi.id}-1`, poiId: poi.id, name: poi.name,
+                        description: poi.description, image_url: poi.image_url,
+                        question: poi.pregunta_estudio_1 || '¿Qué sabes sobre este lugar?',
+                        answer: poi.dato_clave_1, type: 'memory', indexLabel: 'DATO CLAVE 1'
+                    });
+                }
+                if (poi.dato_clave_2) {
+                    granularDeck.push({
+                        id: `${poi.id}-2`, poiId: poi.id, name: poi.name,
+                        description: poi.description, image_url: poi.image_url,
+                        question: poi.pregunta_estudio_2 || '¿Qué otro dato relevante recuerdas?',
+                        answer: poi.dato_clave_2, type: 'memory', indexLabel: 'DATO CLAVE 2'
+                    });
+                }
+                if (poi.dato_clave_3) {
+                    granularDeck.push({
+                        id: `${poi.id}-3`, poiId: poi.id, name: poi.name,
+                        description: poi.description, image_url: poi.image_url,
+                        question: poi.pregunta_estudio_3 || '¿Qué más recuerdas sobre este lugar?',
+                        answer: poi.dato_clave_3, type: 'memory', indexLabel: 'DATO CLAVE 3'
+                    });
+                }
+            }
         });
 
         const deck = shuffle(granularDeck);
@@ -242,8 +236,6 @@ export default function AcademiaLobbyPage() {
         setIsFlipped(false);
         setStudyComplete(false);
         setStudyMode(true);
-        // Reset score
-        // We could track a score state if desired, but for now we'll just track completion
     }, [pois]);
 
     const startModuleStudy = useCallback((mod) => {
@@ -595,6 +587,13 @@ export default function AcademiaLobbyPage() {
     }
 
     // ═══════════════════════════════════════════════════════════
+    // RENDER: SIMULATOR MODE (full-screen takeover)
+    // ═══════════════════════════════════════════════════════════
+    if (simulatorActive) {
+        return <SimulationContainer onExit={() => setSimulatorActive(false)} />;
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // RENDER: BITÁCORA (Main Lobby)
     // ═══════════════════════════════════════════════════════════
     return (
@@ -612,7 +611,11 @@ export default function AcademiaLobbyPage() {
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto px-4 pt-5 pb-12">
 
-                {/* CTA: EMPEZAR A ESTUDIAR (El "Play" del Juego) */}
+                {/* ══════════════════════════════════════════════════════════
+                    CTA: REPASAR FICHAS — Temporalmente desactivado.
+                    Para re-activar, cambia false → true en la línea de abajo.
+                   ══════════════════════════════════════════════════════════ */}
+                {false && (
                 <button
                     onClick={startStudy}
                     disabled={fichasWithData === 0}
@@ -642,23 +645,122 @@ export default function AcademiaLobbyPage() {
                         </span>
                     )}
                 </button>
+                )}
 
-                {/* ═══ CTA: EXPLORAR MAPA (Todos los roles) ═══ */}
+                {/* ═══ NEW CTAS: MAPA Y TEMA GENERAL ═══ */}
+                <div className="flex flex-col gap-3 mb-8">
+                    <button
+                        onClick={() => router.push('/staff/mapeo')}
+                        className={`w-full rounded-[24px] p-4 flex items-center gap-4 transition-all relative overflow-hidden group bg-gradient-to-br from-slate-800 to-slate-950 text-white shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)] active:scale-[0.98] border border-slate-700/50 text-left`}
+                    >
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay"></div>
+                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+                        
+                        <div className="relative z-10 w-12 h-12 shrink-0 rounded-[16px] bg-indigo-900/50 border border-indigo-500/30 flex items-center justify-center shadow-inner">
+                            <Compass size={22} className="text-indigo-400 drop-shadow-lg group-hover:rotate-45 transition-transform duration-700" strokeWidth={2.5} />
+                        </div>
+                        
+                        <div className="relative z-10 flex-1">
+                            <h3 className="font-black text-[15px] tracking-tight text-white mb-0.5">AGREGAR PUNTO DE INTERÉS</h3>
+                            <p className="text-[11px] font-bold text-indigo-300/80 uppercase tracking-widest">
+                                Lugares geolocalizados
+                            </p>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setSelectedPoi({ is_general_topic: true, name: '', description: '' });
+                            setIsPoiModalOpen(true);
+                        }}
+                        className={`w-full rounded-[24px] p-4 flex items-center gap-4 transition-all relative overflow-hidden group bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-[0_8px_30px_rgba(245,158,11,0.2)] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(245,158,11,0.3)] active:scale-[0.98] border border-amber-400/50 text-left`}
+                    >
+                        <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        
+                        <div className="relative z-10 w-12 h-12 shrink-0 rounded-[16px] bg-white/20 border border-white/30 flex items-center justify-center shadow-inner">
+                            <Flame size={22} className="text-white drop-shadow-lg group-hover:scale-110 transition-transform duration-300" strokeWidth={2.5} />
+                        </div>
+                        
+                        <div className="relative z-10 flex-1">
+                            <h3 className="font-black text-[15px] tracking-tight text-white mb-0.5">AGREGAR TEMA GENERAL</h3>
+                            <p className="text-[11px] font-bold text-white/80 uppercase tracking-widest">
+                                Narrativa libre (sin mapa)
+                            </p>
+                        </div>
+                    </button>
+                </div>
+
+                {/* ═══ SIMULADOR DE OPERACIÓN ═══ */}
                 <button
-                    onClick={() => router.push('/staff/mapeo')}
-                    className={`w-full rounded-[32px] py-6 px-6 flex flex-col items-center justify-center gap-2 transition-all mb-8 relative overflow-hidden group bg-gradient-to-br from-slate-800 to-slate-950 text-white shadow-[0_12px_40px_rgba(0,0,0,0.25)] hover:-translate-y-1 hover:shadow-[0_16px_50px_rgba(0,0,0,0.35)] active:scale-[0.98] border border-slate-700/50`}
+                    onClick={() => setSimulatorActive(true)}
+                    className="w-full rounded-[24px] p-4 flex items-center gap-4 transition-all relative overflow-hidden group text-left mb-8"
+                    style={{
+                        background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+                        border: '1.5px solid rgba(99, 102, 241, 0.25)',
+                        boxShadow: '0 8px 32px rgba(99, 102, 241, 0.15)',
+                    }}
                 >
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay"></div>
-                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-                    
-                    <div className="relative z-10 flex items-center justify-center gap-3">
-                        <Compass size={28} className="text-indigo-400 drop-shadow-lg group-hover:rotate-45 transition-transform duration-700" strokeWidth={2.5} />
-                        <span className="font-black text-[20px] tracking-tight text-white">EXPLORAR MAPA</span>
+                    <div style={{
+                        position: 'absolute', inset: 0,
+                        background: 'radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.08) 0%, transparent 60%)',
+                        pointerEvents: 'none',
+                    }} />
+                    <div style={{
+                        position: 'relative', zIndex: 1,
+                        width: 48, height: 48, flexShrink: 0,
+                        borderRadius: 16,
+                        background: 'rgba(99, 102, 241, 0.15)',
+                        border: '1px solid rgba(129, 140, 248, 0.3)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                        <span style={{ fontSize: 22 }}>✈️</span>
                     </div>
-                    <span className="relative z-10 text-[11px] font-bold text-indigo-300 bg-indigo-900/40 px-4 py-1.5 rounded-full uppercase tracking-widest backdrop-blur-md shadow-sm border border-indigo-500/20">
-                        Descubre y añade fichas
-                    </span>
+                    <div style={{ position: 'relative', zIndex: 1, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <h3 style={{
+                                margin: 0, fontSize: 15, fontWeight: 900,
+                                letterSpacing: '-0.01em', color: '#F8FAFC',
+                            }}>
+                                MODO SIMULADOR
+                            </h3>
+                            <span style={{
+                                fontSize: 9, fontWeight: 800, color: '#A5B4FC',
+                                textTransform: 'uppercase', letterSpacing: '0.1em',
+                                background: 'rgba(129, 140, 248, 0.15)',
+                                border: '1px solid rgba(129, 140, 248, 0.25)',
+                                borderRadius: 6, padding: '2px 6px',
+                            }}>
+                                Entrenamiento
+                            </span>
+                        </div>
+                        <p style={{
+                            margin: '2px 0 0', fontSize: 11, fontWeight: 700,
+                            color: '#94A3B8', letterSpacing: '0.02em',
+                        }}>
+                            Practica el registro de vuelos sin afectar datos
+                        </p>
+                    </div>
+                    <div style={{
+                        position: 'relative', zIndex: 1,
+                        color: '#818CF8', flexShrink: 0,
+                    }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 18l6-6-6-6" />
+                        </svg>
+                    </div>
                 </button>
+
+                {/* ═══ VOICE SIMULATOR WIDGET ═══ */}
+                <VoiceSimulatorWidget
+                    pois={pois}
+                    audioRef={audioRef}
+                    playingPoiId={playingPoiId}
+                    setPlayingPoiId={setPlayingPoiId}
+                    isActive={voiceSimActive}
+                    setIsActive={setVoiceSimActive}
+                />
+
                 {loading ? (
                     <div className="grid grid-cols-2 gap-4">
                         {[1, 2, 3, 4].map(i => (
@@ -686,7 +788,25 @@ export default function AcademiaLobbyPage() {
                             {pois.map(poi => {
                                 const cat = autoCategory(poi.description);
                                 const status = getStudyStatus(poi);
-                                const needsStudy = status.label.includes('Repasar');
+                                const isPlaying = playingPoiId === poi.id;
+                                
+                                const handlePlayPause = (e) => {
+                                    e.stopPropagation();
+                                    if (isPlaying) {
+                                        audioRef.current?.pause();
+                                        setPlayingPoiId(null);
+                                    } else {
+                                        if (audioRef.current) {
+                                            audioRef.current.pause();
+                                        }
+                                        const audio = new Audio(poi.audio_url);
+                                        audioRef.current = audio;
+                                        audio.play();
+                                        setPlayingPoiId(poi.id);
+                                        audio.onended = () => setPlayingPoiId(null);
+                                        audio.onerror = () => setPlayingPoiId(null);
+                                    }
+                                };
                                 
                                 return (
                                     <div 
@@ -696,33 +816,69 @@ export default function AcademiaLobbyPage() {
                                     >
                                         {/* Status Badge */}
                                         <div className="absolute top-3 right-3 z-10">
-                                            <div className={`px-2.5 py-1.5 rounded-full backdrop-blur-md text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1 ${
-                                                needsStudy 
-                                                ? 'bg-amber-500/90 text-white border-amber-400' 
-                                                : 'bg-emerald-500/90 text-white border-emerald-400'
-                                            }`}>
-                                                {needsStudy ? <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> : <Award size={10} />}
-                                                {needsStudy ? 'Entrenando' : 'Dominado'}
+                                            <div className={`px-2.5 py-1.5 rounded-full backdrop-blur-md text-[9px] font-black uppercase tracking-widest border shadow-sm flex items-center gap-1 ${status.accent}`}>
+                                                <span>{status.icon}</span>
+                                                {status.label}
                                             </div>
                                         </div>
 
-                                        {/* Top Image / Pattern Area */}
+                                        {/* Official seal OR Personal edit icon */}
+                                        {poi.is_official ? (
+                                            <div className="absolute top-3 left-3 z-10">
+                                                <div className="w-7 h-7 rounded-full bg-blue-600/90 backdrop-blur-md flex items-center justify-center shadow-sm border border-blue-400">
+                                                    <span className="text-[11px]">👑</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="absolute top-3 left-3 z-10">
+                                                <div className="w-7 h-7 rounded-full bg-slate-800/90 backdrop-blur-md flex items-center justify-center shadow-sm border border-slate-600">
+                                                    <span className="text-[11px]">👤</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Top Image / Pattern Area — NO play button here (prevents zoom inheritance) */}
                                         <div 
-                                            className="h-[130px] shrink-0 w-full relative flex flex-col items-center justify-center transition-transform duration-500 group-hover:scale-105"
+                                            className="h-[130px] shrink-0 w-full relative flex flex-col items-center justify-center overflow-hidden"
                                             style={!poi.image_url ? { background: `linear-gradient(135deg, ${cat.color}20, ${cat.color}40)` } : {}}
                                         >
-                                            {poi.image_url ? (
-                                                <>
-                                                    <img src={poi.image_url} alt={poi.name} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-slate-900/30" />
-                                                </>
-                                            ) : (
-                                                <span className="text-5xl drop-shadow-md">{cat.emoji}</span>
+                                            <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
+                                                {poi.image_url ? (
+                                                    <>
+                                                        <img src={poi.image_url} alt={poi.name} className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-slate-900/30" />
+                                                    </>
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <span className="text-5xl drop-shadow-md">{cat.emoji}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Play Button — Reubicado en la esquina inferior derecha */}
+                                            {poi.audio_url && (
+                                                <button
+                                                    onClick={handlePlayPause}
+                                                    className="absolute bottom-3 right-3 z-20 transition-all active:scale-[0.97]"
+                                                    style={{
+                                                        width: 44, height: 44, borderRadius: 22,
+                                                        background: isPlaying 
+                                                            ? 'linear-gradient(135deg, #EF4444, #DC2626)' 
+                                                            : 'linear-gradient(135deg, #10B981, #059669)',
+                                                        border: 'none',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        boxShadow: isPlaying 
+                                                            ? '0 6px 20px rgba(239,68,68,0.4)' 
+                                                            : '0 6px 20px rgba(16,185,129,0.4)',
+                                                        cursor: 'pointer', color: '#fff', padding: 0,
+                                                    }}
+                                                >
+                                                    {isPlaying ? <Pause size={20} fill="#fff" /> : <Play size={20} fill="#fff" style={{ marginLeft: 3 }} />}
+                                                </button>
                                             )}
                                         </div>
                                         
                                         <div className="flex-1 p-4 flex flex-col bg-white relative z-10 border-t border-slate-100/50">
-                                            <div className="flex items-center gap-2 mb-1">
+                                            <div className="flex items-center justify-between mb-1">
                                                 <p className="text-[9px] font-bold uppercase tracking-widest truncate" style={{ color: cat.color }}>
                                                     {cat.label}
                                                 </p>
@@ -732,29 +888,25 @@ export default function AcademiaLobbyPage() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <h3 className="font-black text-slate-800 text-[14px] leading-tight mb-3 line-clamp-2">
+                                            <h3 className="font-black text-slate-800 text-[14px] leading-tight mb-2 line-clamp-2">
                                                 {poi.name}
                                             </h3>
+                                            {voiceSimActive && poi.audio_url && (
+                                                <span className="text-[10px] font-bold text-indigo-500/70 bg-indigo-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-1">
+                                                    🗣️ {normalizeCommand(poi.name).split(' ').join(', ')}
+                                                </span>
+                                            )}
                                             
-                                            {/* Datos Clave Preview */}
-                                            <div className="space-y-1.5 mt-auto">
-                                                {poi.dato_clave_1 && (
-                                                    <div className="text-[10px] text-slate-500 flex gap-1.5 items-center">
-                                                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: cat.color }}/> 
-                                                        <span className="truncate">{poi.dato_clave_1}</span>
-                                                    </div>
-                                                )}
-                                                {poi.dato_clave_2 && (
-                                                    <div className="text-[10px] text-slate-500 flex gap-1.5 items-center">
-                                                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: cat.color }}/> 
-                                                        <span className="truncate">{poi.dato_clave_2}</span>
-                                                    </div>
-                                                )}
-                                                {poi.dato_clave_3 && (
-                                                    <div className="text-[10px] text-slate-500 flex gap-1.5 items-center">
-                                                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: cat.color }}/> 
-                                                        <span className="truncate">{poi.dato_clave_3}</span>
-                                                    </div>
+                                            {/* Narrative Preview OR Upgrade Badge */}
+                                            <div className="space-y-1.5 mt-auto mb-1">
+                                                {poi.narrative_script ? (
+                                                    <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
+                                                        {poi.narrative_script}
+                                                    </p>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                                                        ⚠️ Requiere Narrativa IA
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
@@ -842,40 +994,58 @@ export default function AcademiaLobbyPage() {
                 isOpen={isPoiModalOpen}
                 onClose={() => setIsPoiModalOpen(false)}
                 poi={selectedPoi}
-                isNewPin={false}
+                isNewPin={!selectedPoi?.id}
                 readOnly={!!selectedPoi?.is_official}
                 onSave={async (poiData) => {
-                    // Bloquear guardado solo para POIs oficiales
-                    if (poiData.is_official) {
-                        setIsPoiModalOpen(false);
-                        return;
-                    }
+                    if (poiData.is_official) { setIsPoiModalOpen(false); return; }
                     try {
                         const supabase = createClient();
-                        const { error } = await supabase
-                            .from('pilot_pois')
-                            .update({
-                                name: poiData.name,
-                                description: poiData.description,
-                                dato_clave_1: poiData.dato_clave_1,
-                                dato_clave_2: poiData.dato_clave_2,
-                                dato_clave_3: poiData.dato_clave_3,
-                                pregunta_estudio_1: poiData.pregunta_estudio_1,
-                                pregunta_estudio_2: poiData.pregunta_estudio_2,
-                                pregunta_estudio_3: poiData.pregunta_estudio_3,
-                                pregunta_interaccion: poiData.pregunta_interaccion,
-                                image_url: poiData.image_url
-                            })
-                            .eq('id', poiData.id);
-                        
-                        if (error) throw error;
-                        
-                        // Update local state
-                        setPois(prev => prev.map(p => p.id === poiData.id ? { ...p, ...poiData } : p));
+                        const updatePayload = {
+                            name: poiData.name,
+                            description: poiData.description,
+                            image_url: poiData.image_url,
+                            narrative_script: poiData.narrative_script || null,
+                            audio_url: poiData.audio_url || null,
+                            audio_duration_seconds: poiData.audio_duration_seconds || null,
+                            audio_generated_at: poiData.audio_generated_at || null,
+                            research_article: poiData.research_article || null,
+                        };
+
+                        if (!poiData.id) {
+                            // Insert
+                            const { data: newPoi, error } = await supabase
+                                .from('pilot_pois')
+                                .insert([{ ...updatePayload, user_id: userId, is_general_topic: true }])
+                                .select()
+                                .single();
+                            if (error) throw error;
+                            setPois(prev => [newPoi, ...prev]);
+                        } else {
+                            // Update
+                            const { error } = await supabase
+                                .from('pilot_pois')
+                                .update(updatePayload)
+                                .eq('id', poiData.id);
+                            if (error) throw error;
+                            setPois(prev => prev.map(p => p.id === poiData.id ? { ...p, ...updatePayload } : p));
+                        }
                         setIsPoiModalOpen(false);
                     } catch (error) {
-                        console.error('Error updating POI:', error);
-                        alert('Error guardando los datos. Por favor, intenta de nuevo.');
+                        console.error('Error saving POI:', error);
+                        alert('Error guardando los datos. Intenta de nuevo.');
+                    }
+                }}
+                onDelete={selectedPoi?.is_official ? undefined : async (poiId) => {
+                    if (!confirm('¿Eliminar este punto de interés permanentemente?')) return;
+                    try {
+                        const supabase = createClient();
+                        const { error } = await supabase.from('pilot_pois').delete().eq('id', poiId);
+                        if (error) throw error;
+                        setPois(prev => prev.filter(p => p.id !== poiId));
+                        setIsPoiModalOpen(false);
+                    } catch (error) {
+                        console.error('Error deleting POI:', error);
+                        alert('Error eliminando el punto. Intenta de nuevo.');
                     }
                 }}
             />

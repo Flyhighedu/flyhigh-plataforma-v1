@@ -1,11 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Copy, ClipboardCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIDetailModal from './POIDetailModal';
+import useNativePOITap from '@/hooks/useNativePOITap';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -43,6 +44,7 @@ export default function TacticalMapScreen({ userId, profile }) {
     const [pois, setPois] = useState([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('map'); // 'map' | 'list'
+    const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
     const [isSaving, setIsSaving] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
 
@@ -79,29 +81,51 @@ export default function TacticalMapScreen({ userId, profile }) {
         return () => clearInterval(interval);
     }, [isSearchingCulturalPois]);
 
-    // Load POIs
+    // Load POIs — Cache-first + parallel fetch for instant pin rendering
     useEffect(() => {
         if (!userId) return;
+
+        // Phase 4: Serve from localStorage cache INSTANTLY while fetching fresh data
+        try {
+            const cached = localStorage.getItem('flyhigh_pois_cache');
+            if (cached) {
+                const { data: cachedPois, ts } = JSON.parse(cached);
+                if (cachedPois?.length > 0 && Date.now() - ts < 300000) { // 5 min TTL
+                    setPois(cachedPois);
+                    setLoading(false); // Render map immediately with cached data
+                }
+            }
+        } catch (_) { /* corrupt cache, ignore */ }
+
         const load = async () => {
             try {
                 const supabase = createClient();
-                const { data: personalPois } = await supabase.from('pilot_pois').select('*').eq('user_id', userId).order('created_at', { ascending: false });
                 
-                // Fetch official POIs via server-side API (bypasses RLS)
-                let officialPois = [];
+                // Phase 3: Slim select — only fields needed for map pins + modal basics
+                const [personalResult, officialResult] = await Promise.all([
+                    supabase.from('pilot_pois')
+                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
+                        .eq('user_id', userId).order('created_at', { ascending: false }),
+                    fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] }))
+                ]);
+
+                const personalPois = personalResult.data || [];
+                const officialPois = officialResult.pois || [];
+                const allPois = [...officialPois, ...personalPois];
+
+                setPois(allPois);
+
+                // Phase 4: Cache slim version for next visit (only map-essential fields)
                 try {
-                    const officialRes = await fetch('/api/official-pois');
-                    if (officialRes.ok) {
-                        const officialData = await officialRes.json();
-                        officialPois = officialData.pois || [];
-                    }
-                } catch (e) { console.warn('Could not fetch official POIs:', e); }
-                
-                const mergedPois = [
-                    ...officialPois,
-                    ...(personalPois || [])
-                ];
-                setPois(mergedPois);
+                    const slimForCache = allPois.map(p => ({
+                        id: p.id, name: p.name, latitude: p.latitude, longitude: p.longitude,
+                        category: p.category, description: p.description, is_favorite: p.is_favorite,
+                        is_official: p.is_official, dato_clave_1: p.dato_clave_1 || null,
+                        narrative_script: p.narrative_script ? '1' : null, // Just a flag, not the full text
+                        audio_url: p.audio_url ? '1' : null
+                    }));
+                    localStorage.setItem('flyhigh_pois_cache', JSON.stringify({ data: slimForCache, ts: Date.now() }));
+                } catch (_) { /* quota exceeded, ignore */ }
             } catch (err) { console.warn('POI load error:', err); }
             finally { setLoading(false); }
         };
@@ -214,6 +238,20 @@ export default function TacticalMapScreen({ userId, profile }) {
         }
     }, []);
 
+    // ═══ TRIGGER: Tap on base map (Tap-to-Discover native OSM POIs) ═══
+    const { handleMapTap, isDiscovering } = useNativePOITap({
+        onPOIFound: useCallback((poi) => {
+            setModalPoi({
+                latitude: poi.latitude,
+                longitude: poi.longitude,
+                name: poi.name,
+                description: poi.description
+            });
+            setIsNewPin(true);
+        }, []),
+        enabled: true
+    });
+
     // ═══ Overpass Cultural POI Search (unchanged) ═══
     const handleSearchCulturalPois = async () => {
         // Toggle: Si ya hay puntos, los borramos (apagar radar)
@@ -240,8 +278,8 @@ export default function TacticalMapScreen({ userId, profile }) {
                   way["historic"](${bbox});
                   node["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
                   way["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  node["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
-                  way["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
+                  node["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
+                  way["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
                   node["aeroway"="aerodrome"](${bbox});
                   way["aeroway"="aerodrome"](${bbox});
                   node["waterway"~"dam|river|waterfall"](${bbox});
@@ -378,59 +416,66 @@ export default function TacticalMapScreen({ userId, profile }) {
                 return;
             }
 
-            // Obtener contexto geográfico general (Ciudad, Estado)
-            let geoContext = '';
-            try {
-                const centerLat = (mapBounds._southWest.lat + mapBounds._northEast.lat) / 2;
-                const centerLng = (mapBounds._southWest.lng + mapBounds._northEast.lng) / 2;
-                const nomRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${centerLat}&lon=${centerLng}&format=json`);
-                if (nomRes.ok) {
-                    const nomData = await nomRes.json();
-                    if (nomData.address) {
-                        const city = nomData.address.city || nomData.address.town || nomData.address.village || nomData.address.county || '';
-                        const state = nomData.address.state || '';
-                        geoContext = `${city} ${state}`.trim();
-                        setLastGeoContext(geoContext);
-                    }
-                }
-            } catch (e) {
-                console.warn('Nominatim reverse geocode failed');
-            }
-
-            // Enriquecer con IA (Groq) + caché Supabase
-            try {
-                const infoRes = await fetch('/api/poi-batch-info', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        pois: newPois.map(p => ({
-                            name: p.name,
-                            lat: p.latitude,
-                            lon: p.longitude,
-                            type: p.description
-                        })),
-                        context: geoContext
-                    })
-                });
-                
-                if (infoRes.ok) {
-                    const data = await infoRes.json();
-                    const infoMap = data.results || data;
-                    if (data.quota) setGroqQuota(data.quota);
-                    
-                    newPois = newPois.map(poi => {
-                        const aiInfo = infoMap[poi.name];
-                        if (aiInfo && typeof aiInfo === 'string' && aiInfo.length > 10) {
-                            poi.description = aiInfo;
-                        }
-                        return poi;
-                    });
-                }
-            } catch (e) {
-                console.warn('POI info enrichment failed', e);
-            }
-
+            // ═══ PHASE 1: PIN-FIRST RENDERING ═══
+            // Show pins IMMEDIATELY after Overpass parse — user sees results in ~3s
             setSuggestedPois(newPois);
+            setIsSearchingCulturalPois(false); // Stop spinner NOW
+
+            // ═══ BACKGROUND ENRICHMENT (non-blocking) ═══
+            // Nominatim + Groq run silently; descriptions update when ready
+            (async () => {
+                let geoContext = '';
+                try {
+                    const centerLat = (mapBounds._southWest.lat + mapBounds._northEast.lat) / 2;
+                    const centerLng = (mapBounds._southWest.lng + mapBounds._northEast.lng) / 2;
+                    const nomRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${centerLat}&lon=${centerLng}&format=json`);
+                    if (nomRes.ok) {
+                        const nomData = await nomRes.json();
+                        if (nomData.address) {
+                            const city = nomData.address.city || nomData.address.town || nomData.address.village || nomData.address.county || '';
+                            const state = nomData.address.state || '';
+                            geoContext = `${city} ${state}`.trim();
+                            setLastGeoContext(geoContext);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Nominatim reverse geocode failed');
+                }
+
+                // Enrich with AI (Groq) — results merge silently into existing pins
+                try {
+                    const infoRes = await fetch('/api/poi-batch-info', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pois: newPois.map(p => ({
+                                name: p.name,
+                                lat: p.latitude,
+                                lon: p.longitude,
+                                type: p.description
+                            })),
+                            context: geoContext
+                        })
+                    });
+                    
+                    if (infoRes.ok) {
+                        const data = await infoRes.json();
+                        const infoMap = data.results || data;
+                        if (data.quota) setGroqQuota(data.quota);
+                        
+                        // Silent merge: update descriptions without re-creating pins
+                        setSuggestedPois(prev => prev.map(poi => {
+                            const aiInfo = infoMap[poi.name];
+                            if (aiInfo && typeof aiInfo === 'string' && aiInfo.length > 10) {
+                                return { ...poi, description: aiInfo };
+                            }
+                            return poi;
+                        }));
+                    }
+                } catch (e) {
+                    console.warn('POI info enrichment failed (background)', e);
+                }
+            })();
         } catch (err) {
             console.error('Overpass error:', err);
             alert('Error al buscar sitios culturales. Por favor, intenta de nuevo.');
@@ -641,7 +686,12 @@ ${poiList}`;
                 pregunta_estudio_1: poiData.pregunta_estudio_1,
                 pregunta_estudio_2: poiData.pregunta_estudio_2,
                 pregunta_interaccion: poiData.pregunta_interaccion,
-                image_url: poiData.image_url
+                image_url: poiData.image_url,
+                // Narrative Factory fields
+                narrative_script: poiData.narrative_script,
+                audio_url: poiData.audio_url,
+                audio_duration_seconds: poiData.audio_duration_seconds,
+                audio_generated_at: poiData.audio_generated_at
             };
             const safeDescription = (poiData.description && poiData.description.trim().length > 0) 
                 ? poiData.description.trim().slice(0, 300) 
@@ -650,7 +700,15 @@ ${poiList}`;
                 name: poiData.name,
                 description: safeDescription,
                 category: poiData.category,
-                is_favorite: poiData.is_favorite
+                is_favorite: poiData.is_favorite,
+                is_general_topic: poiData.is_general_topic || false,
+                trigger_keywords: poiData.trigger_keywords || null,
+                research_article: poiData.research_article || null,
+                narrative_script: poiData.narrative_script || null,
+                audio_url: poiData.audio_url || null,
+                audio_duration_seconds: poiData.audio_duration_seconds || null,
+                audio_generated_at: poiData.audio_generated_at || null,
+                image_url: poiData.image_url || null
             };
 
             if (poiData.id) {
@@ -772,6 +830,26 @@ ${poiList}`;
                 </div>
             </div>
 
+            {/* Filter Chips (visible in list view) */}
+            {view === 'list' && (
+                <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', background: '#F8FAFC' }}>
+                    {[{ key: 'all', label: '🏷️ Todos', count: pois.length },
+                      { key: 'map', label: '📍 En Mapa', count: pois.filter(p => p.latitude != null).length },
+                      { key: 'general', label: '💡 Temas', count: pois.filter(p => p.is_general_topic || p.latitude == null).length }
+                    ].map(f => (
+                        <button key={f.key} onClick={() => setPoiFilter(f.key)} style={{
+                            padding: '6px 14px', borderRadius: 20, border: poiFilter === f.key ? '1.5px solid #0F172A' : '1px solid #E2E8F0',
+                            background: poiFilter === f.key ? '#0F172A' : '#FFFFFF',
+                            color: poiFilter === f.key ? '#FFFFFF' : '#64748B',
+                            fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {f.label} ({f.count})
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Content */}
             {view === 'map' ? (
                 <div style={{ flex: 1, position: 'relative' }}>
@@ -783,10 +861,11 @@ ${poiList}`;
                         onBoundsChange={setMapBounds}
                         onSuggestedPoiClick={handleSuggestedPoiClick}
                         onLongPress={handleLongPress}
+                        onMapTap={handleMapTap}
                     />
                     
                     {/* Reverse Geocoding Loading Toast */}
-                    {isReverseGeocoding && (
+                    {(isReverseGeocoding || isDiscovering) && (
                         <div style={{
                             position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
                             background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', color: '#334155', padding: '10px 20px', borderRadius: 20,
@@ -905,7 +984,13 @@ ${poiList}`;
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {pois.map(poi => (
+                            {pois.filter(poi => {
+                                if (poiFilter === 'map') return poi.latitude != null && !poi.is_general_topic;
+                                if (poiFilter === 'general') return poi.is_general_topic || poi.latitude == null;
+                                return true;
+                            }).map(poi => {
+                                const isGeneral = poi.is_general_topic || poi.latitude == null;
+                                return (
                                 <button
                                     key={poi.id}
                                     onClick={() => handleMarkerClick(poi)}
@@ -920,11 +1005,11 @@ ${poiList}`;
                                 >
                                     <div style={{
                                         width: 44, height: 44, borderRadius: 14,
-                                        background: '#F1F5F9', border: 'none',
+                                        background: isGeneral ? '#FEF3C7' : '#F1F5F9', border: 'none',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontSize: 20, flexShrink: 0
                                     }}>
-                                        📍
+                                        {isGeneral ? '💡' : '📍'}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -933,20 +1018,29 @@ ${poiList}`;
                                             </p>
                                             {poi.is_favorite && <Star size={14} fill="#F59E0B" style={{ color: '#F59E0B', flexShrink: 0 }} />}
                                         </div>
-                                        <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0', fontFamily: 'monospace' }}>
-                                            {poi.latitude.toFixed(4)}, {poi.longitude.toFixed(4)}
+                                        <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0', fontFamily: isGeneral ? 'inherit' : 'monospace' }}>
+                                            {isGeneral ? 'Tema General' : `${poi.latitude?.toFixed(4) ?? '—'}, ${poi.longitude?.toFixed(4) ?? '—'}`}
                                         </p>
-                                        {poi.dato_clave_1 && (
+                                        {poi.audio_url && (
+                                            <p style={{ fontSize: 12, fontWeight: 600, color: '#7C3AED', margin: '4px 0 0' }}>
+                                                🎶 Narrativa disponible
+                                            </p>
+                                        )}
+                                        {!poi.audio_url && poi.dato_clave_1 && (
                                             <p style={{ fontSize: 12, fontWeight: 600, color: '#F59E0B', margin: '4px 0 0' }}>
                                                 ⭐ Ficha completada
                                             </p>
                                         )}
                                     </div>
-                                    <div style={{ width: 32, height: 32, borderRadius: 10, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <Edit3 size={16} strokeWidth={2.5} style={{ color: '#06B6D4' }} />
-                                    </div>
+                                    {/* Show edit icon only for personal (non-official) POIs */}
+                                    {!poi.is_official && (
+                                        <div style={{ width: 32, height: 32, borderRadius: 10, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            <Edit3 size={16} strokeWidth={2.5} style={{ color: '#06B6D4' }} />
+                                        </div>
+                                    )}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

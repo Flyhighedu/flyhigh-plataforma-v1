@@ -173,39 +173,54 @@ export async function POST(request) {
             console.warn('Cache read skipped:', e.message);
         }
 
-        // Paso 2: Para cada POI, servir de caché o investigar con Groq
+        // Paso 2: Parallel batch processing — 5 concurrent Groq calls
         const toInsert = [];
         let fromCache = 0;
         let fromGroq = 0;
         let noInfo = 0;
 
+        // Separate cached vs uncached
+        const uncachedPois = [];
         for (const poi of pois) {
             const key = makeCacheKey(poi.name, context);
-
             if (cacheMap[key]) {
                 results[poi.name] = cacheMap[key];
                 fromCache++;
-                continue;
-            }
-
-            // Investigar con IA
-            console.log(`🔍 "${poi.name}" → investigando...`);
-            const description = await deepResearch(poi.name, poi.type, context, poi.lat, poi.lon);
-
-            if (description) {
-                results[poi.name] = description;
-                fromGroq++;
-                toInsert.push({
-                    poi_key: key,
-                    poi_name: poi.name,
-                    lat: poi.lat || null,
-                    lon: poi.lon || null,
-                    description: description,
-                    city_context: context || null
-                });
             } else {
-                results[poi.name] = null;
-                noInfo++;
+                uncachedPois.push(poi);
+            }
+        }
+
+        // Process uncached in parallel batches of 5 (respects Groq rate limits)
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < uncachedPois.length; i += BATCH_SIZE) {
+            const batch = uncachedPois.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.allSettled(
+                batch.map(async (poi) => {
+                    console.log(`🔍 "${poi.name}" → investigando...`);
+                    const description = await deepResearch(poi.name, poi.type, context, poi.lat, poi.lon);
+                    return { poi, description };
+                })
+            );
+
+            for (const result of batchResults) {
+                if (result.status === 'fulfilled' && result.value.description) {
+                    const { poi, description } = result.value;
+                    results[poi.name] = description;
+                    fromGroq++;
+                    toInsert.push({
+                        poi_key: makeCacheKey(poi.name, context),
+                        poi_name: poi.name,
+                        lat: poi.lat || null,
+                        lon: poi.lon || null,
+                        description: description,
+                        city_context: context || null
+                    });
+                } else {
+                    const poi = result.status === 'fulfilled' ? result.value.poi : batch[0];
+                    results[poi?.name] = null;
+                    noInfo++;
+                }
             }
         }
 

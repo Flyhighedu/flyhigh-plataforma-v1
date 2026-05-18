@@ -67,7 +67,8 @@ export default function FlightLogger({
     pilotRecording = false,
     pilotMicPermission = null,
     pilotMicSupported = false,
-    onRetryMicPermission = null
+    onRetryMicPermission = null,
+    isPeripheralActive = false
 }) {
     const [micBannerDismissed, setMicBannerDismissed] = useState(false);
     const [micRetrying, setMicRetrying] = useState(false);
@@ -171,6 +172,12 @@ export default function FlightLogger({
             alert("Por favor ingresa al menos un alumno o staff antes de despegar.");
             return;
         }
+
+        // Haptic feedback (Takeoff)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]); // Strong double pulse
+        }
+
         const takeOffMs = Date.now();
         const nextFlightId = `flight-${takeOffMs}-${Math.random().toString(36).slice(2, 8)}`;
         const takeOffFlightNumber = safeNextFlightNumber;
@@ -204,6 +211,12 @@ export default function FlightLogger({
         if (lastCompletedFlightIdRef.current && String(lastCompletedFlightIdRef.current) === String(currentFlightId)) {
             return;
         }
+
+        // Haptic feedback (Landing button tap)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(50); // Light pulse
+        }
+
         setShowLandConfirm(true);
     };
 
@@ -215,6 +228,11 @@ export default function FlightLogger({
         if (isLandingRef.current) return;
         if (lastCompletedFlightIdRef.current && String(lastCompletedFlightIdRef.current) === String(currentFlightId)) {
             return;
+        }
+
+        // Haptic feedback (Confirm landing)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([80, 40, 80]); // Confirm double pulse
         }
 
         setShowLandConfirm(false);
@@ -265,6 +283,11 @@ export default function FlightLogger({
         if (isLandingRef.current) return;
 
         if (confirm("¿Cancelar este vuelo? No se guardará nada.")) {
+            // Haptic feedback (Cancel)
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(200); // Long single pulse for destructive action
+            }
+
             // Immediately stop the timer to prevent any lingering ticks
             clearInterval(timerRef.current);
 
@@ -310,61 +333,61 @@ export default function FlightLogger({
     }
 
     return (
-        <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-10 duration-500">
-            {/* Timer Display */}
-            <div className={`transition-all duration-500 rounded-2xl p-6 flex flex-col items-center justify-center shadow-lg relative overflow-hidden ${isIdle ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 text-white'}`}>
-                {!isIdle && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-blue-500 animate-pulse"></div>}
-                <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${isIdle
-                    ? 'bg-white border-slate-200 text-slate-600'
-                    : 'bg-white/10 border-white/20 text-blue-100'
-                    }`}>
-                    {isIdle ? `Siguiente vuelo #${safeNextFlightNumber}` : `Vuelo #${safeActiveFlightNumber} en curso`}
-                </div>
+        <div className="space-y-2 pb-1 animate-in slide-in-from-bottom-10 duration-500 flex flex-col justify-center">
+            {/* Timer Display (No Container) */}
+            <div className={`transition-all duration-500 flex flex-col items-center justify-center relative ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}>
 
-                <div className="flex items-center gap-3 mb-1">
-                    <Clock size={20} className={isIdle ? "text-slate-400" : "text-blue-400"} />
-                    <span className={`uppercase tracking-widest text-xs font-bold ${isIdle ? 'text-slate-500' : 'text-blue-200'}`}>
-                        {isIdle ? 'Tiempo en Tierra' : 'Tiempo de Vuelo'}
+                {/* Flight Number Pill */}
+                <div className="flex justify-center mb-1">
+                    <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${isPeripheralActive ? 'bg-white/20 text-white' : isIdle ? 'bg-slate-200/50 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>
+                        {isIdle ? `SIGUIENTE VUELO #${safeNextFlightNumber}` : `VUELO #${safeActiveFlightNumber} (EN AIRE)`}
                     </span>
                 </div>
-                <div className="text-6xl font-mono font-bold tracking-tighter tabular-nums">
+
+                {/* The Timer */}
+                <div className={`text-[64px] sm:text-[72px] font-mono font-black tracking-tighter tabular-nums leading-none mb-1 transition-colors ${!isIdle && !isPeripheralActive ? 'text-blue-600' : ''}`}>
                     {formatTime(elapsed)}
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide ${isIdle ? 'bg-white border border-slate-200 text-slate-600' : 'bg-sky-500/15 border border-sky-400/30 text-sky-100'}`}>
-                        Niños volados: {safeTotalStudentsFlown}
-                    </span>
-                    {shouldShowOperationTimer && (
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide tabular-nums ${isIdle ? 'bg-white border border-emerald-200 text-emerald-700' : 'bg-emerald-500/15 border border-emerald-400/30 text-emerald-100'}`}>
-                            Operación total: {formatTime(safeOperationElapsedSeconds)}
-                        </span>
+                {/* ── SECONDARY METRICS ROW ── */}
+                <div className="flex items-center justify-center gap-8 mb-2">
+                    {shouldShowInterFlightTimer && (
+                        <div className="text-center">
+                            <p className={`text-[9px] font-bold uppercase tracking-[0.2em] opacity-40`}>
+                                Entre vuelos
+                            </p>
+                            <p className={`text-sm font-bold tabular-nums tracking-wider opacity-60`}>
+                                {formatTime(Math.max(0, Math.floor(interFlightElapsedSeconds || 0)))}
+                            </p>
+                        </div>
                     )}
+                    <div className="text-center">
+                        <p className={`text-[9px] font-bold uppercase tracking-[0.2em] opacity-40`}>
+                            Niños volados
+                        </p>
+                        <p className={`text-sm font-bold tabular-nums tracking-wider opacity-60`}>
+                            {safeTotalStudentsFlown}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-center">
                     {!isIdle && pilotRecording && (
-                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-400/30 text-[10px] font-black uppercase tracking-wide text-red-200">
-                            <span className="size-1.5 bg-red-400 rounded-full animate-pulse" />
-                            Grabando narración
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/15 border border-red-400/30 text-[10px] font-black uppercase tracking-widest text-red-200">
+                            <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                            Grabando
                         </span>
                     )}
                     {!isIdle && !pilotRecording && micIsDenied && (
-                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-[10px] font-black uppercase tracking-wide text-amber-200">
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-[10px] font-black uppercase tracking-widest text-amber-200">
                             <MicOff size={10} />
-                            Sin grabación
+                            Sin audio
                         </span>
                     )}
                 </div>
             </div>
 
-            {shouldShowInterFlightTimer && (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 flex items-center justify-between shadow-sm">
-                    <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tiempo entre vuelos</p>
-                        <p className="text-[11px] text-slate-500">Se detiene al iniciar el siguiente despegue.</p>
-                    </div>
-                    <p className="text-lg font-black text-slate-700 tabular-nums">{formatTime(Math.max(0, Math.floor(interFlightElapsedSeconds || 0)))}</p>
-                </div>
-            )}
-
+            {/* Inter-flight timer moved to pill above */}
             {/* Counters - Always visible but maybe disabled during flight? User didn't specify, best to keep editable often but let's assume locked during flight to prevent accidents?
                User requested logic: "The staff must FIRST input... Once entered.. enable button".
                It implies input is a pre-requisite step. Let's leave them editable during flight just in case of correction, but emphasize PRE-flight input.
@@ -475,24 +498,26 @@ export default function FlightLogger({
                     </div>
                 </div>
             )}
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity ${!isIdle ? 'opacity-80' : ''}`}>
+            <div className={`grid grid-cols-2 gap-4 w-full max-w-md mx-auto px-4 mt-2 transition-opacity ${!isIdle ? 'opacity-90' : ''}`}>
                 <CounterData
                     label="Alumnos"
                     value={students}
                     onChange={setStudents}
                     color="blue"
+                    isPeripheralActive={isPeripheralActive}
                 />
                 <CounterData
-                    label="Personal / Maestros"
+                    label="Maestros"
                     value={staff}
                     onChange={setStaff}
                     color="indigo"
+                    isPeripheralActive={isPeripheralActive}
                 />
             </div>
 
             {/* Incidents Preview (Only Show in Active or if happened) */}
             {incidents.length > 0 && (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2">
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-2 mb-20">
                     <h4 className="text-sm font-bold text-red-800 flex items-center gap-2">
                         <AlertTriangle size={16} /> Incidencias ({incidents.length})
                     </h4>
@@ -506,52 +531,50 @@ export default function FlightLogger({
                 </div>
             )}
 
-            {/* Primary Action Button */}
-            <div className="pt-4">
-                {isIdle ? (
-                    <button
-                        onClick={handleTakeOff}
-                        disabled={isLanding || (students === 0 && staff === 0)}
-                        className="w-full h-24 rounded-2xl bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed disabled:text-slate-500 text-white font-black text-2xl shadow-xl shadow-green-500/30 flex items-center justify-center gap-4 transition-all active:scale-95"
-                    >
-                        <Plane size={32} className={!isLanding && (students > 0 || staff > 0) ? "animate-pulse" : ""} />
-                        {isLanding ? 'GUARDANDO...' : '¡DESPEGAR!'}
-                    </button>
-                ) : (
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-4 gap-3">
-                            {/* Incident Button (Small) */}
-                            <button
-                                onClick={() => setShowIncidentModal(true)}
-                                disabled={isLanding}
-                                className="col-span-1 rounded-2xl bg-red-100 text-red-600 border-2 border-red-200 flex flex-col items-center justify-center active:bg-red-200"
-                            >
-                                <AlertTriangle size={24} />
-                                <span className="text-[10px] font-bold mt-1">FALLA</span>
-                            </button>
+            {/* Action Buttons (Inline Flow) */}
+            <div className="mt-4 flex justify-center w-full px-4">
+                <div className="w-full max-w-sm">
+                    {isIdle ? (
+                        <button
+                            onClick={handleTakeOff}
+                            disabled={isLanding || (students === 0 && staff === 0)}
+                            className="w-full py-4 rounded-[20px] bg-slate-900 hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-black text-xl flex items-center justify-center gap-3 transition-transform active:scale-95 shadow-[0_8px_30px_rgb(15,23,42,0.2)]"
+                        >
+                            <Plane size={24} className={!isLanding && (students > 0 || staff > 0) ? "animate-pulse" : ""} />
+                            {isLanding ? 'GUARDANDO...' : '¡DESPEGAR!'}
+                        </button>
+                    ) : (
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="flex items-center gap-3 w-full">
+                                <button
+                                    onClick={() => setShowIncidentModal(true)}
+                                    disabled={isLanding}
+                                    className="px-6 py-4 rounded-[20px] bg-red-100 text-red-600 flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-sm"
+                                >
+                                    <AlertTriangle size={20} />
+                                    <span className="text-[12px] font-black tracking-widest">FALLA</span>
+                                </button>
 
-                            {/* Land Button (Large) */}
+                                <button
+                                    onClick={handleLandRequest}
+                                    disabled={isLanding}
+                                    className="flex-1 py-4 rounded-[20px] bg-slate-900 hover:bg-slate-800 text-white font-black text-xl flex items-center justify-center gap-3 transition-transform active:scale-95 shadow-[0_8px_30px_rgb(15,23,42,0.3)]"
+                                >
+                                    <StopCircle size={24} className="text-red-500" />
+                                    {isLanding ? 'GUARDANDO...' : 'ATERRIZAR'}
+                                </button>
+                            </div>
+                            
                             <button
-                                onClick={handleLandRequest}
+                                onClick={handleCancelFlight}
                                 disabled={isLanding}
-                                className="col-span-3 h-24 rounded-2xl bg-slate-900 text-white font-bold text-xl shadow-xl shadow-slate-900/40 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                                className="px-6 py-2 rounded-full bg-red-50/70 text-red-500 text-xs font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <StopCircle size={32} className="text-red-500" />
-                                {isLanding ? 'GUARDANDO...' : 'ATERRIZAR Y GUARDAR'}
+                                <XCircle size={14} /> Abortar Vuelo
                             </button>
                         </div>
-
-                        {/* Cancel Flight Button */}
-                        <button
-                            onClick={handleCancelFlight}
-                            disabled={isLanding}
-                            className="w-full h-11 rounded-xl border border-red-200 bg-red-50/70 text-red-600 text-sm font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            <XCircle size={16} /> ABORTAR VUELO ACTUAL
-                        </button>
-                        <p className="text-[11px] text-center text-slate-400">Cancela sin guardar y conserva el número de vuelo actual.</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* Incident Modal */}

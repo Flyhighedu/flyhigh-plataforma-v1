@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import useNativePOITap from '@/hooks/useNativePOITap';
 import {
     MapPin, Plus, Loader2, Trash2, Save, ChevronDown, ChevronUp,
-    Sparkles, Crown, Search, Edit3, X, Globe, CheckCircle, Archive, Radar, Star
+    Sparkles, Crown, Search, Edit3, X, Globe, CheckCircle, Archive, Radar, Star, Mic, Play, Pause, Volume2, FileText
 } from 'lucide-react';
 
 // Leaflet map (SSR disabled) — reuses the pilot's tactical map component
@@ -54,6 +55,7 @@ export default function MasterRouteStudio() {
     const [creating, setCreating] = useState(false);
     const [expandedContext, setExpandedContext] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
 
     // ═══ MAP STATE ═══
     const [mapBounds, setMapBounds] = useState(null);
@@ -204,6 +206,14 @@ export default function MasterRouteStudio() {
         }
     }, [activeRoute]);
 
+    // ═══ MAP: TAP-TO-DISCOVER (Native OSM POIs) ═══
+    const { handleMapTap, isDiscovering } = useNativePOITap({
+        onPOIFound: useCallback((poi) => {
+            addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description);
+        }, []),
+        enabled: !!activeRoute
+    });
+
     // ═══ MAP: RADAR SEARCH (Overpass Cultural POIs) ═══
     const handleSearchCulturalPois = async () => {
         if (suggestedPois.length > 0) { setSuggestedPois([]); return; }
@@ -219,8 +229,8 @@ export default function MasterRouteStudio() {
                   way["historic"](${bbox});
                   node["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
                   way["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  node["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
-                  way["amenity"~"place_of_worship|university|college|library|theatre|townhall|public_building"](${bbox});
+                  node["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
+                  way["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
                   node["aeroway"="aerodrome"](${bbox});
                   way["aeroway"="aerodrome"](${bbox});
                   node["waterway"~"dam|river|waterfall"](${bbox});
@@ -377,9 +387,9 @@ export default function MasterRouteStudio() {
             {/* ── MAIN SPLIT LAYOUT ── */}
             {activeRoute && (
                 <>
-                <div className="flex flex-col lg:flex-row gap-6">
+                <div className="flex flex-col lg:flex-row gap-6 overflow-hidden">
                     {/* ═══ LEFT: Map Info ═══ */}
-                    <div className="flex-1 min-w-0 flex flex-col">
+                    <div className={`relative flex flex-col transition-all duration-500 ease-in-out ${editingPoi?.is_general_topic ? 'w-0 opacity-0 overflow-hidden' : 'flex-1 opacity-100'}`}>
                         {/* ═══ INTERACTIVE MAP ═══ */}
                         <div className="neu-card overflow-hidden mb-4" style={{ height: 'calc(100vh - 140px)', minHeight: 500, position: 'relative' }}>
                             <MapWithNoSSR
@@ -390,9 +400,8 @@ export default function MasterRouteStudio() {
                                 onBoundsChange={setMapBounds}
                                 onSuggestedPoiClick={handleSuggestedPoiClick}
                                 onLongPress={handleLongPress}
+                                onMapTap={handleMapTap}
                             />
-
-                            {/* Reverse geocoding toast moved to sidebar */}
 
                             {/* Floating Controls FABs */}
                             <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -431,7 +440,7 @@ export default function MasterRouteStudio() {
                     </div>
 
                     {/* ═══ RIGHT: GAMIFIED SIDEBAR FORM ═══ */}
-                    <div className="w-full lg:w-[450px] shrink-0 flex flex-col bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+                    <div className={`transition-all duration-500 ease-in-out flex flex-col bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden ${editingPoi?.is_general_topic ? 'w-full max-w-5xl mx-auto' : 'w-full lg:w-[450px] shrink-0'}`} style={{ height: 'calc(100vh - 140px)' }}>
                         {editingPoi ? (
                             <AdminPOIModal
                                 poi={editingPoi}
@@ -468,6 +477,7 @@ export default function MasterRouteStudio() {
                                 }}
                                 isNewPin={!editingPoi.dato_clave_1}
                                 geoContext={activeRoute.name}
+                                isGeneralTopic={editingPoi?.is_general_topic || false}
                             />
                         ) : isReverseGeocoding ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative overflow-hidden animate-in fade-in duration-300">
@@ -529,7 +539,19 @@ export default function MasterRouteStudio() {
                                     Inicia el proceso para descubrir y registrar ubicaciones estratégicas en el mapa.
                                 </p>
                                 <button onClick={addPoi} disabled={saving} className="mt-8 group relative flex items-center gap-2 px-8 py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black shadow-xl hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-600/30 active:scale-95 transition-all">
-                                    <Plus size={20} className="group-hover:rotate-90 transition-transform" /> Crear
+                                    <Plus size={20} className="group-hover:rotate-90 transition-transform" /> Punto en Mapa
+                                </button>
+                                <button onClick={() => {
+                                    setEditingPoi({
+                                        id: `temp-${Date.now()}`,
+                                        name: '',
+                                        description: 'Tema General',
+                                        latitude: null,
+                                        longitude: null,
+                                        is_general_topic: true
+                                    });
+                                }} disabled={saving} className="mt-3 group relative flex items-center gap-2 px-8 py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black shadow-xl hover:-translate-y-1 hover:shadow-2xl hover:shadow-amber-500/30 active:scale-95 transition-all">
+                                    💡 Tema General
                                 </button>
                             </div>
                         )}
@@ -538,10 +560,27 @@ export default function MasterRouteStudio() {
 
                 {/* ═══ BOTTOM: GRID DE PUNTOS OFICIALES GUARDADOS ═══ */}
                 <div className="mt-8 w-full">
-                    <div className="flex items-center gap-2 mb-6 px-2">
+                    <div className="flex items-center gap-2 mb-4 px-2 flex-wrap">
                         <Crown size={24} className="text-blue-600" />
-                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Puntos Oficiales Guardados</h3>
+                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Directorio de Narrativas</h3>
                         <span className="bg-slate-200 text-slate-600 text-sm font-bold px-3 py-1 rounded-full">{pois.length}</span>
+                    </div>
+                    {/* Filter Chips */}
+                    <div className="flex gap-2 mb-6 px-2">
+                        {[{ key: 'all', label: '🏷️ Todos', count: pois.length },
+                          { key: 'map', label: '📍 En Mapa', count: pois.filter(p => p.lat != null || p.latitude != null).length },
+                          { key: 'general', label: '💡 Temas', count: pois.filter(p => p.is_general_topic || (p.lat == null && p.latitude == null)).length }
+                        ].map(f => (
+                            <button key={f.key} onClick={() => setPoiFilter(f.key)}
+                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+                                    poiFilter === f.key
+                                        ? 'bg-slate-800 text-white border-slate-800 shadow-md'
+                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                                }`}
+                            >
+                                {f.label} ({f.count})
+                            </button>
+                        ))}
                     </div>
 
                     {pois.length === 0 ? (
@@ -553,19 +592,24 @@ export default function MasterRouteStudio() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-2">
-                            {pois.map((poi) => {
-                                const hasDatos = poi.dato_clave_1 || poi.dato_clave_2;
+                            {pois.filter(poi => {
+                                if (poiFilter === 'map') return (poi.lat != null || poi.latitude != null) && !poi.is_general_topic;
+                                if (poiFilter === 'general') return poi.is_general_topic || (poi.lat == null && poi.latitude == null);
+                                return true;
+                            }).map((poi) => {
+                                const hasNarrative = poi.narrative_script && poi.audio_url;
+                                const isGeneral = poi.is_general_topic || (poi.lat == null && poi.latitude == null);
                                 return (
                                     <div key={poi.id} onClick={() => { setEditingPoi(poi); window.scrollTo({top: 0, behavior: 'smooth'}); }} className="neu-card cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl group flex flex-col" style={{ overflow: 'hidden', padding: 0 }}>
                                         {/* Header / Cover */}
-                                        <div style={{ height: 140, background: poi.image_url ? `url(${poi.image_url}) center/cover` : 'linear-gradient(135deg, #2563EB, #1D4ED8)', position: 'relative' }}>
+                                        <div style={{ height: 140, background: poi.image_url ? `url(${poi.image_url}) center/cover` : (isGeneral ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #2563EB, #1D4ED8)'), position: 'relative' }}>
                                             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.1) 100%)' }} />
                                             <div style={{ position: 'absolute', bottom: 12, left: 16, right: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <span className="text-4xl drop-shadow-lg group-hover:scale-110 transition-transform">{autoEmoji(poi.name)}</span>
+                                                <span className="text-4xl drop-shadow-lg group-hover:scale-110 transition-transform">{isGeneral ? '💡' : autoEmoji(poi.name)}</span>
                                                 <div className="min-w-0 flex-1">
                                                     <h4 className="text-white font-black text-lg truncate drop-shadow-md leading-tight">{poi.name}</h4>
-                                                    <div className="inline-block mt-1 bg-blue-600 rounded-md px-2 py-0.5 text-[9px] font-black text-white tracking-widest uppercase shadow-md border border-blue-500/50">
-                                                        Oficial
+                                                    <div className={`inline-block mt-1 rounded-md px-2 py-0.5 text-[9px] font-black text-white tracking-widest uppercase shadow-md border ${isGeneral ? 'bg-amber-600 border-amber-500/50' : 'bg-blue-600 border-blue-500/50'}`}>
+                                                        {isGeneral ? 'Tema General' : 'Oficial'}
                                                     </div>
                                                 </div>
                                             </div>
@@ -577,27 +621,28 @@ export default function MasterRouteStudio() {
                                         {/* Content */}
                                         <div className="p-5 bg-white flex-1 flex flex-col">
                                             <div className="flex items-center justify-between mb-3">
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${hasDatos ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {hasDatos ? 'Ficha Completa' : 'Ficha Pendiente'}
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${hasNarrative ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {hasNarrative ? 'Narrativa Lista' : 'Sin Guion'}
                                                 </span>
                                                 <span className="text-[10px] font-medium text-slate-400 font-mono">
-                                                    {poi.latitude?.toFixed(4)}, {poi.longitude?.toFixed(4)}
+                                                    {isGeneral ? 'Sin ubicación' : `${poi.latitude?.toFixed(4) ?? poi.lat?.toFixed(4) ?? '—'}, ${poi.longitude?.toFixed(4) ?? poi.lng?.toFixed(4) ?? '—'}`}
                                                 </span>
                                             </div>
                                             
-                                            {hasDatos ? (
-                                                <ul className="space-y-2 mt-2 flex-1">
-                                                    {poi.dato_clave_1 && (
-                                                        <li className="flex gap-2 items-start">
-                                                            <span className="text-blue-500 text-[10px] mt-0.5">▪</span>
-                                                            <span className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed">{poi.dato_clave_1}</span>
-                                                        </li>
-                                                    )}
-                                                </ul>
+                                            {hasNarrative ? (
+                                                <div className="flex-1 flex flex-col gap-3 mt-1">
+                                                    <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed italic border-l-2 border-purple-200 pl-2">
+                                                        "{poi.narrative_script}"
+                                                    </p>
+                                                    <div className="mt-auto bg-slate-50 rounded-lg p-2 flex items-center gap-2 border border-slate-100" onClick={e => e.stopPropagation()}>
+                                                        <Volume2 size={14} className="text-slate-400" />
+                                                        <audio controls src={poi.audio_url} style={{ height: 24, width: '100%' }} className="opacity-80 hover:opacity-100 transition-opacity" />
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="flex-1 flex items-center justify-center">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
-                                                        <Sparkles size={14} /> Requiere IA
+                                                        <Mic size={14} /> Requiere Narrativa
                                                     </div>
                                                 </div>
                                             )}

@@ -96,36 +96,67 @@ REGLAS ABSOLUTAS (CERO ALUCINACIÓN):
 1. Foco Estricto: Se te pregunta por un lugar ESPECÍFICO ("${name}"). NUNCA respondas con la historia general de la ciudad o municipio ("${context}") si no tienes datos del lugar en sí.
 2. Si no tienes información real sobre este punto ESPECÍFICO, di exactamente: "No se encontró información verificada para esta instalación/punto específico."
 3. NUNCA INVENTES DATOS. Si no estás 100% seguro de un dato numérico, omítelo.
+4. ESTRATEGIA DE BÚSQUEDA AVANZADA: Si recibes Coordenadas GPS, úsalas INMEDIATAMENTE para triangular la ciudad, estado y colonia exacta. Si el lugar es una calle, avenida, parque o monumento local, NO te rindas rápido; busca su "historia urbana", a quién o qué debe su nombre, año de construcción y su relevancia local en la ciudad que detectaste.
 
 ESTRUCTURA OBLIGATORIA DE LA RESPUESTA:
-Debes estructurar tu respuesta en dos partes claras:
+Debes estructurar tu respuesta en formato de "Visión General" Ejecutiva:
 
-PARTE 1: RESUMEN HISTÓRICO Y OPERATIVO ENVOLVENTE (Narrativa Profunda)
-Redacta un artículo enciclopédico muy detallado, rico y extenso (sin límite de palabras, puede extenderse hasta 1600 o 2000 palabras si hay mucha historia). Cuenta la historia profunda del lugar, quién lo fundó, por qué, qué pasaba en esa época, su evolución, significado cultural para la comunidad, anécdotas, personajes históricos involucrados y su estado o uso actual. Queremos una narrativa extensa, rica y apasionante, no un simple párrafo.
+1. INTRODUCCIÓN CORTA:
+Un párrafo inicial muy breve (máximo 3 o 4 líneas) que resuma qué es el lugar y su importancia principal.
 
-PARTE 2: DATOS TÉCNICOS Y MÉTRICAS (Lista de KPIs)
-A continuación del artículo, añade un título "Datos Técnicos y Métricas:" y luego una lista con al menos 4 a 6 "Datos Duros" o métricas verificables sobre el lugar. Ejemplos de datos requeridos según el tipo de lugar:
-- Años de fundación, inauguración, clausura o remodelación.
-- Dimensiones: Altitudes (msnm), hectáreas, metros cuadrados, kilómetros de longitud, profundidad.
-- Capacidades: Aforo máximo, número de camas, capacidad de producción, volumen de captación de agua.
-- Cantidades: Número de visitantes anuales, número de trabajadores, piezas de exhibición, especies.
+2. DETALLES CLAVE (Viñetas / Bullet Points):
+A continuación, añade el título "Detalles Clave:" y crea una lista usando viñetas (guiones). Cada viñeta debe resaltar un dato duro de forma estructurada. 
+Ejemplos de viñetas que DEBES buscar e incluir (si aplican):
+- **Estado/Año:** Cuándo se inauguró o fundó.
+- **Capacidad/Dimensiones:** Metros, hectáreas, litros, capacidad de aforo.
+- **Inversión/Costo:** Dinero invertido en su creación o remodelación.
+- **Beneficios/Uso:** Para qué sirve actualmente, o en honor a quién está nombrado.
+- **Historia Curiosa:** Algún acrónimo o anécdota concreta y rápida.
 
-FORMATO DE LA RESPUESTA:
-Escribe todo el artículo narrativo, luego un salto de línea, y presenta los datos técnicos como una lista simple (usando guiones).
-Nota: NO uses formato Markdown avanzado (como negritas con asteriscos o encabezados con #), usa solo texto plano limpio.`;
+REGLA DE FORMATO (Markdown Permitido):
+- SÍ debes usar negritas (**texto**) para resaltar los títulos de cada viñeta (Ej. "**Inversión:** 200 millones...").
+- Ve directo al grano en cada punto. PROHIBIDO escribir párrafos densos dentro de la lista.`;
 
     let userMsg = `Investiga este lugar específico:\n`;
     userMsg += `Nombre: "${name}"\n`;
-    userMsg += `Ciudad/Estado/Zona: ${context || 'México'}\n`;
-    if (lat && lon) userMsg += `Coordenadas GPS: ${lat}, ${lon}\n`;
+    userMsg += `Ciudad/Estado/Zona (Referencia): ${context || 'México'}\n`;
+    if (lat && lon) userMsg += `Coordenadas GPS (Úsalas como primer paso para geolocalizar la ciudad y estado exactos antes de buscar la historia): ${lat}, ${lon}\n`;
     if (type) userMsg += `Categoría referencial: ${type}\n`;
-    userMsg += `\nGenera la investigación PROFUNDA Y EXTENSA asegurándote de incluir TODO el contexto histórico posible y, al final, la lista de Datos Técnicos y Métricas solicitada.`;
+    userMsg += `\nGenera la investigación PROFUNDA Y EXTENSA asegurándote de incluir TODO el contexto histórico posible (incluyendo en honor a quién está nombrado, si aplica) y, al final, la lista de Etiquetas Clave solicitada.`;
+    userMsg += `\n\nAdemás, en la ÚLTIMA línea de tu respuesta, incluye exactamente este formato:\nKEYWORDS: palabra1, palabra2, palabra3, palabra4, palabra5\nDeben ser las 3 a 5 palabras clave MÁS relevantes y únicas para identificar este lugar/tema en un sistema de búsqueda por voz. Usa sustantivos concretos, NO adjetivos genéricos.`;
 
     return { systemPrompt, userMsg };
 }
 
+// ───────── Extractor de keywords del artículo ─────────
+function extractKeywords(articleText) {
+    const match = articleText.match(/KEYWORDS:\s*(.+)/i);
+    if (!match) return { cleanArticle: articleText, keywords: [] };
+    const keywords = match[1].split(',').map(k => k.trim().toLowerCase()).filter(Boolean).slice(0, 5);
+    const cleanArticle = articleText.replace(/\n?KEYWORDS:.+/i, '').trim();
+    return { cleanArticle, keywords };
+}
+
 // ═══════════════════════════════════════════════════════════════
-// MOTOR 1: Gemini 2.5 Flash-Lite (con Google Search Grounding)
+// Frases centinela — detectan "falsos éxitos" de la IA
+// ═══════════════════════════════════════════════════════════════
+const FAILURE_PHRASES = [
+    'no se encontró información', 'no tengo datos específicos',
+    'no pude encontrar', 'no fue posible investigar',
+    'no dispongo de información', 'no cuento con datos',
+    'información no disponible', 'no hay información verificada',
+    'no encontré información', 'no tengo información'
+];
+
+function validateResponse(text) {
+    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
+    const lower = text.toLowerCase();
+    const isFailure = FAILURE_PHRASES.some(p => lower.includes(p));
+    if (isFailure) throw new Error('EMPTY_RESPONSE');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOTOR 1: Gemini 2.5 Flash (con Google Search Grounding)
 // ═══════════════════════════════════════════════════════════════
 async function researchWithGemini(name, type, context, lat, lon) {
     if (!GEMINI_API_KEY) throw new Error('NO_KEY');
@@ -133,7 +164,7 @@ async function researchWithGemini(name, type, context, lat, lon) {
     const { systemPrompt, userMsg } = buildPrompt(name, type, context, lat, lon);
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-2.5-flash",
         tools: [{ googleSearch: {} }]
     });
 
@@ -143,9 +174,9 @@ async function researchWithGemini(name, type, context, lat, lon) {
     });
 
     let text = result.response.text().trim();
-    text = text.replace(/^["']+|["']+$/g, '').replace(/\*\*/g, '').trim();
+    text = text.replace(/^["']+|["']+$/g, '').trim();
 
-    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
+    validateResponse(text);
     return { text, images: [] };
 }
 
@@ -252,9 +283,9 @@ async function researchWithRAG(name, type, context, lat, lon) {
 
     const groqData = await groqRes.json();
     let text = groqData.choices?.[0]?.message?.content?.trim() || '';
-    text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
+    text = text.replace(/^["']+|["']+$/g, '').trim();
 
-    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
+    validateResponse(text);
     
     // Map Tavily images to standard format
     const images = (tavilyData.images || []).map(url => ({
@@ -302,14 +333,14 @@ async function researchWithCohere(name, type, context, lat, lon) {
     let text = data.message?.content?.[0]?.text
             || data.text
             || '';
-    text = text.replace(/\*\*/g, '').replace(/^["']+|["']+$/g, '').trim();
+    text = text.replace(/^["']+|["']+$/g, '').trim();
 
-    if (!text || text.length < 30) throw new Error('EMPTY_RESPONSE');
+    validateResponse(text);
     return { text, images: [] };
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ORQUESTADOR — Intenta cada motor en orden, salta al siguiente
+// ORQUESTADOR — Reintenta SOLO el motor seleccionado (sin fallback)
 // ═══════════════════════════════════════════════════════════════
 const ENGINE_FNS = {
     gemini: researchWithGemini,
@@ -317,75 +348,80 @@ const ENGINE_FNS = {
     cohere: researchWithCohere
 };
 
+const MAX_RETRIES = 5;
+
 export async function POST(request) {
     try {
         const { name, type, context, lat, lon, preferredEngine } = await request.json();
         if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
 
-        // Build engine order: preferred first, then the rest in default order
-        let order = [...ENGINE_ORDER];
-        if (preferredEngine && ENGINE_FNS[preferredEngine]) {
-            order = [preferredEngine, ...ENGINE_ORDER.filter(e => e !== preferredEngine)];
-        }
+        // Usar SOLO el motor seleccionado — sin fallback automático
+        const engineId = (preferredEngine && ENGINE_FNS[preferredEngine]) ? preferredEngine : 'gemini';
+        const fn = ENGINE_FNS[engineId];
 
         // Leer odómetro Tavily para incluirlo en la respuesta
         let tavilyUsage = null;
         try { tavilyUsage = await getTavilyUsage(); } catch (e) { /* ignore */ }
 
-        let lastError = null;
         const engineLog = [];
 
-        for (const engineId of order) {
-            const fn = ENGINE_FNS[engineId];
-            console.log(`🔬 [${ENGINE_LABELS[engineId]}] Investigando: "${name}"`);
+        // Reintentar el motor seleccionado hasta MAX_RETRIES veces
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            console.log(`🔬 [${ENGINE_LABELS[engineId]}] Intento ${attempt}/${MAX_RETRIES} — Investigando: "${name}"`);
 
             try {
                 const result = await fn(name, type, context, lat, lon);
-                const articleText = typeof result === 'string' ? result : result.text;
+                const rawArticle = typeof result === 'string' ? result : result.text;
                 const images = result.images || [];
-                console.log(`  ✓ [${ENGINE_LABELS[engineId]}] → ${articleText.length} chars`);
+
+                // Extract keywords from article text
+                const { cleanArticle, keywords } = extractKeywords(rawArticle);
 
                 // Releer odómetro si se usó Tavily
                 if (engineId === 'rag') {
                     try { tavilyUsage = await getTavilyUsage(); } catch (e) { /* ignore */ }
                 }
 
+                console.log(`  ✓ [${ENGINE_LABELS[engineId]}] Éxito en intento ${attempt}${keywords.length > 0 ? ` (${keywords.length} keywords)` : ''}`);
                 return NextResponse.json({
-                    article: articleText,
+                    article: cleanArticle,
                     images: images,
+                    keywords: keywords,
                     engine: engineId,
                     engineLabel: ENGINE_LABELS[engineId],
+                    attempt: attempt,
                     tavilyUsage: tavilyUsage ? {
                         count: tavilyUsage.usage_count,
                         limit: tavilyUsage.monthly_limit
                     } : null,
-                    failedEngines: engineLog.length > 0 ? engineLog : undefined
+                    failedAttempts: engineLog.length > 0 ? engineLog : undefined
                 });
             } catch (err) {
                 const msg = err.message;
-                const reason = msg === 'GROQ_429' ? 'Groq: cuota agotada'
-                             : msg === '429' ? 'cuota agotada'
+                const reason = msg === 'EMPTY_RESPONSE' ? 'sin información'
                              : msg === 'NO_KEY' ? 'sin API key'
-                             : msg === 'EMPTY_RESPONSE' ? 'sin información'
-                             : msg === 'TAVILY_LIMIT_REACHED' ? 'límite mensual alcanzado'
-                             : msg.startsWith('TAVILY_') ? `Tavily error: ${msg}`
-                             : msg.startsWith('GROQ_') ? `Groq error: ${msg}`
-                             : msg.startsWith('COHERE_') ? `Cohere error: ${msg}`
+                             : msg === '429' ? 'cuota agotada'
                              : `error: ${msg.substring(0, 80)}`;
-                console.warn(`  ✗ [${ENGINE_LABELS[engineId]}] falló: ${reason}`);
-                engineLog.push({ engine: engineId, label: ENGINE_LABELS[engineId], reason });
-                lastError = err;
+                console.warn(`  ✗ [${ENGINE_LABELS[engineId]}] Intento ${attempt} falló: ${reason}`);
+                engineLog.push({ attempt, reason });
+
+                // Exponential backoff: 1s → 2s → 4s → 8s
+                if (attempt < MAX_RETRIES) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+                    console.log(`  ⏳ Esperando ${delay}ms antes del intento ${attempt + 1}...`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
             }
         }
 
         // Todos fallaron
-        console.error('❌ Los 3 motores fallaron:', engineLog);
+        console.error(`❌ [${ENGINE_LABELS[engineId]}] Todos los ${MAX_RETRIES} intentos fallaron:`, engineLog);
         return NextResponse.json({
-            article: 'No fue posible investigar este punto en este momento. Todos los motores de investigación están temporalmente agotados. Por favor, intenta más tarde.',
-            engine: 'none',
-            engineLabel: 'Sin motor disponible',
+            article: `No fue posible investigar este punto con ${ENGINE_LABELS[engineId]} después de ${MAX_RETRIES} intentos. Intenta de nuevo o cambia el motor de búsqueda.`,
+            engine: engineId,
+            engineLabel: ENGINE_LABELS[engineId],
             tavilyUsage: tavilyUsage ? { count: tavilyUsage.usage_count, limit: tavilyUsage.monthly_limit } : null,
-            failedEngines: engineLog,
+            failedAttempts: engineLog,
             allFailed: true
         }, { status: 503 });
 

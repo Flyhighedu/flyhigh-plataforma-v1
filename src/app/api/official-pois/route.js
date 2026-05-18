@@ -49,6 +49,7 @@ export async function GET() {
         const routeMap = Object.fromEntries(routes.map(r => [r.id, r.title]));
         const enrichedPois = (pois || []).map(p => ({
             ...p,
+            id: `official_${p.id}`,
             is_official: true,
             route_name: routeMap[p.route_id] || '',
             // Normalize lat/lng → latitude/longitude (pilot_pois uses latitude/longitude)
@@ -62,6 +63,15 @@ export async function GET() {
             pregunta_estudio_2: p.pregunta_estudio_2 || null,
             pregunta_estudio_3: p.pregunta_estudio_3 || null,
             pregunta_interaccion: p.pregunta_interaccion || null,
+            // Narrative Factory fields — SOLO datos reales, CERO placeholders
+            narrative_script: p.narrative_script || null,
+            audio_url: p.audio_url || null,
+            audio_duration_seconds: p.audio_duration_seconds || null,
+            audio_generated_at: p.audio_generated_at || null,
+            research_article: p.research_article || null,
+            // General Topics fields
+            is_general_topic: p.is_general_topic || false,
+            trigger_keywords: p.trigger_keywords || [],
         }));
 
         return NextResponse.json({ pois: enrichedPois });

@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import TodayFlightList from '@/components/staff/TodayFlightList';
 import FlightLogger from '@/components/staff/FlightLogger';
+import OperationUI from '@/components/staff/OperationUI';
 import { syncFlightLog, syncPauseStart, syncPauseEnd, syncAllPendingFlights } from '@/utils/staff/sync';
 import { LogOut, MoreVertical, RotateCcw, Clock, Pause } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
@@ -30,6 +31,8 @@ import { ROLE_TO_ESCUADRON, LOCAL_KEYS, META_KEYS } from '@/config/escuadronConf
 // ── Pilot Audio Recording ──
 import useAudioRecorder from '@/hooks/useAudioRecorder';
 import { triggerAudioAudit } from '@/utils/triggerAudioAudit';
+// ── Flight Audio Ecosystem ──
+import useFlightAudio from '@/hooks/useFlightAudio';
 
 const ACTIVE_FLIGHT_KEY = 'flyhigh_active_flight';
 const CLOSED_FLIGHTS_KEY = 'flyhigh_recently_closed_flights';
@@ -303,6 +306,16 @@ export default function StaffOperationLegacy({
     const [pilotQaFeedback, setPilotQaFeedback] = useState(null);
     const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
+    // ── Voice AI (Computadora de Vuelo) ──
+    const [voicePois, setVoicePois] = useState([]);
+    const [voiceIsActive, setVoiceIsActive] = useState(false);
+    const [voicePlayingPoiId, setVoicePlayingPoiId] = useState(null);
+    // Copilot voice state for audio ducking (tracks the AI narration state)
+    const [copilotVoiceState, setCopilotVoiceState] = useState('off');
+
+    // ── Flight Audio Ecosystem ──
+    const flightAudio = useFlightAudio({ copilotVoiceState });
+
     // ── Pilot Audio Recording (fire-and-forget, never blocks flight ops) ──
     const {
         isSupported: pilotMicSupported,
@@ -315,6 +328,96 @@ export default function StaffOperationLegacy({
     } = useAudioRecorder();
     const pilotRecDurationRef = useRef(0);
     useEffect(() => { pilotRecDurationRef.current = pilotRecDuration; }, [pilotRecDuration]);
+
+    // ── Fetch + Realtime POIs for Sistema de Narración ──
+    // Official POIs: fetched immediately (no auth needed — API uses service role)
+    // Personal POIs: fetched when userId is available (client-side auth)
+    const [voicePoisOfficial, setVoicePoisOfficial] = useState([]);
+    const [voicePoisPersonal, setVoicePoisPersonal] = useState([]);
+
+    // Merge official + personal into the final voicePois array
+    useEffect(() => {
+        setVoicePois([...voicePoisOfficial, ...voicePoisPersonal]);
+    }, [voicePoisOfficial, voicePoisPersonal]);
+
+    // Effect 1: Official POIs — runs immediately on mount
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchOfficial = async () => {
+            try {
+                const result = await fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] }));
+                if (!cancelled) {
+                    const official = result.pois || [];
+                    console.log(`[SistemaNarración] Official POIs loaded: ${official.length}, with audio: ${official.filter(p => p.audio_url).length}`);
+                    setVoicePoisOfficial(official);
+                }
+            } catch (err) {
+                console.warn('⚠️ Official POI fetch failed (non-blocking):', err);
+            }
+        };
+
+        fetchOfficial();
+
+        // Realtime: official POIs (master_route_pois) — e.g. admin generates new audio
+        const supabase = createClient();
+        const officialChannel = supabase
+            .channel('voice-official-pois')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'master_route_pois',
+            }, () => { if (!cancelled) fetchOfficial(); })
+            .subscribe();
+
+        return () => {
+            cancelled = true;
+            supabase.removeChannel(officialChannel);
+        };
+    }, []);
+
+    // Effect 2: Personal POIs — runs when userId is available
+    useEffect(() => {
+        if (!userId) return;
+        let cancelled = false;
+        const supabase = createClient();
+
+        const fetchPersonal = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('pilot_pois')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                if (!cancelled) {
+                    const personal = data || [];
+                    if (error) console.warn('⚠️ pilot_pois query error:', error.message);
+                    console.log(`[SistemaNarración] Personal POIs loaded: ${personal.length}, with audio: ${personal.filter(p => p.audio_url).length}`);
+                    setVoicePoisPersonal(personal);
+                }
+            } catch (err) {
+                console.warn('⚠️ Personal POI fetch failed (non-blocking):', err);
+            }
+        };
+
+        fetchPersonal();
+
+        // Realtime: personal POIs (pilot_pois)
+        const personalChannel = supabase
+            .channel('voice-personal-pois')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'pilot_pois',
+                filter: `user_id=eq.${userId}`,
+            }, () => { if (!cancelled) fetchPersonal(); })
+            .subscribe();
+
+        return () => {
+            cancelled = true;
+            supabase.removeChannel(personalChannel);
+        };
+    }, [userId]);
 
     // ── Notify supervisor of mic permission status via journey meta ──
     const lastReportedMicStateRef = useRef(null);
@@ -1157,6 +1260,12 @@ export default function StaffOperationLegacy({
                 : undefined
         );
 
+        // ── Flight Audio: Crossfade boarding→in_flight on takeoff ──
+        flightAudio.transitionToFlight();
+
+        // ── Copilot AI: Auto-activate on takeoff ──
+        setVoiceIsActive(true);
+
         // ── Pilot Audio: Start recording on takeoff (fire-and-forget) ──
         if (currentRole === 'pilot' && pilotMicSupported && !pilotRecording) {
             startPilotRecording().catch(err => console.warn('⚠️ Pilot mic auto-start failed:', err));
@@ -1266,6 +1375,12 @@ export default function StaffOperationLegacy({
 
         // Preview: solo actualizar UI local, no guardar en localStorage ni sincronizar
         try {
+            // ── Flight Audio: Crossfade in_flight→boarding on landing ──
+            flightAudio.transitionToBoarding();
+
+            // ── Copilot AI: Auto-deactivate on landing ──
+            setVoiceIsActive(false);
+
             // ── Pilot Audio: Stop recording on landing (fire-and-forget) ──
             if (currentRole === 'pilot' && pilotRecording) {
                 try {
@@ -1579,500 +1694,293 @@ export default function StaffOperationLegacy({
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20">
-            {shouldUseSyncHeader && (
-                <ContingencyBypassMenu
-                    journeyId={journeyId}
-                    userId={userId}
-                    profile={profile}
-                    missionState={missionState}
-                    missionInfo={currentMission}
-                    onRefresh={onRefresh}
-                >
-                    <SyncHeader
-                        avatarConfig={profile?.avatar_config}
-                        firstName={firstName}
-                        roleName={roleName}
-                        role={currentRole}
-                        journeyId={journeyId}
-                        userId={userId}
-                        missionInfo={currentMission}
-                        missionState={missionState}
-                        onDemoStart={onRefresh}
-                        onCloseMission={handleCloseDay}
-                    />
-                </ContingencyBypassMenu>
-            )}
-
-            {/* Sticky Header (legacy fallback) */}
-            {!hideMenu && !shouldUseSyncHeader && (
-                <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 shadow-sm border-b border-slate-100 transition-all">
-                    <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex-1 min-w-0 pr-2">
-                            <h1 className="text-base font-bold text-slate-900 leading-tight truncate">{currentMission.school_name}</h1>
-                            <p className="text-[10px] text-green-600 font-bold tracking-wide uppercase flex items-center gap-1 mt-0.5">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                                En Operación
-                            </p>
-                        </div>
-
-                        <button
-                            onClick={() => setShowMenu(!showMenu)}
-                            className="p-2 -mr-2 text-slate-600 hover:bg-slate-100 rounded-full active:bg-slate-200"
-                        >
-                            <MoreVertical size={24} />
-                        </button>
-                    </div>
-
-                    {showMenu && (
-                        <div className="absolute top-full right-4 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                            <div className="p-2 space-y-1">
-                                <button
-                                    onClick={handleOpenPauseMenu}
-                                    className="w-full text-left px-4 py-3 hover:bg-amber-50 rounded-lg flex items-center gap-3 text-amber-600 text-sm font-medium"
-                                >
-                                    <Pause size={18} /> Iniciar Pausa
-                                </button>
-                                <button
-                                    onClick={handleChangeSchool}
-                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium"
-                                >
-                                    <RotateCcw size={18} /> Cambiar Escuela
-                                </button>
-                                <button
-                                    onClick={() => router.push('/staff/history')}
-                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-lg flex items-center gap-3 text-slate-600 text-sm font-medium border-t border-slate-100"
-                                >
-                                    <Clock size={18} /> Historial de Misiones
-                                </button>
-                                <button
-                                    onClick={() => { setShowMenu(false); router.push('/staff/poi'); }}
-                                    className="w-full text-left px-4 py-3 hover:bg-blue-50 rounded-lg flex items-center gap-3 text-blue-600 text-sm font-medium border-t border-slate-100"
-                                >
-                                    <span style={{ fontSize: 16 }}>📍</span> Puntos de Interés
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            <div className="px-4 py-6 space-y-8 max-w-lg mx-auto">
-                {/* ── Escuadrón: Bitácora Banner for Pilot (read-only) ── */}
-                {/* In contingency mode, the assistant flies the drone and needs the squadron info */}
-                {(currentRole === 'pilot' || (isContingencyNoPilot && (currentRole === 'assistant' || currentRole === 'auxiliar'))) && (
-                    <BitacoraPilotBanner 
-                        missionInfo={currentMission} 
-                        activeFlight={activeFlight}
-                        nextFlightNumber={nextFlightNumber}
-                    />
-                )}
-
-                <FlightLogger
-                    key={activeFlight?.flightId ? `active-${activeFlight.flightId}` : 'idle-flight-logger'}
-                    onFlightComplete={(data) => {
-                        // ── Escuadrón: Intercept for Auxiliar Emocionómetro ──
-                        if (currentRole === 'assistant' || currentRole === 'auxiliar') {
-                            setPendingFlightForEmotion(data);
-                            setShowEmotionModal(true);
-                            return;
-                        }
-                        return handleFlightComplete(data);
-                    }}
-                    onFlightStart={handleFlightStart}
-                    onFlightCancel={handleFlightCancel}
-                    initialActiveFlight={activeFlight}
-                    nextFlightNumber={nextFlightNumber}
-                    activeFlightNumber={activeFlightNumber}
-                    showInterFlightTimer={showInterFlightTimer}
-                    interFlightElapsedSeconds={interFlightElapsedSeconds}
-                    totalStudentsFlown={totalStudentsFlown}
-                    totalOperationElapsedSeconds={operationElapsedSeconds}
-                    showTotalOperationTimer={operationStartedAtMs > 0}
-                    disabled={!!activePause}
-                    pilotRecording={currentRole === 'pilot' && pilotRecording}
-                    pilotMicPermission={currentRole === 'pilot' ? pilotMicPermission : null}
-                    pilotMicSupported={currentRole === 'pilot' ? pilotMicSupported : false}
-                    onRetryMicPermission={currentRole === 'pilot' ? async () => {
-                        const ok = await startPilotRecording();
-                        if (ok) cancelPilotRecording();
-                        return ok;
-                    } : null}
-                />
-
-                {/* ── [CRITICAL FIX] Pending Sync Badge — visible indicator for unsynced flights ── */}
-                {pendingSyncCount > 0 && (
-                    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 flex items-center gap-3 animate-in fade-in duration-300">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                            <RotateCcw size={16} className="text-amber-600 animate-spin" style={{ animationDuration: '3s' }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-amber-800 m-0">
-                                {pendingSyncCount} vuelo{pendingSyncCount !== 1 ? 's' : ''} pendiente{pendingSyncCount !== 1 ? 's' : ''} de sincronizar
-                            </p>
-                            <p className="text-[10px] text-amber-600 m-0 mt-0.5">
-                                Reintentando automáticamente cada 30 segundos...
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                <div className="pt-4 border-t border-slate-200">
-                    <TodayFlightList
-                        flights={missionFlights}
-                        pauses={completedPauses.filter(p => p.mission_id === currentMission?.id)}
-                        activeFlight={activeFlight}
-                        onRequestEditFlight={canEditCompletedFlights ? handleRequestEditFlight : null}
-                    />
-                </div>
-
-                {/* ── Escuadrón: Bitácora FAB for Supervisor (Teacher) ── */}
-                {(currentRole === 'teacher') && (
-                    <button
-                        onClick={() => setShowBitacoraModal(true)}
-                        style={{
-                            position: 'fixed', bottom: 100, right: 20, zIndex: 45,
-                            width: 56, height: 56, borderRadius: 18,
-                            background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
-                            border: 'none', color: 'white',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 12px 28px -6px rgba(124,58,237,0.5)',
-                            cursor: 'pointer'
-                        }}
-                        title="Bitácora Digital"
-                    >
-                        <span className="material-symbols-outlined" style={{ fontSize: 24, fontVariationSettings: "'FILL' 1" }}>edit_note</span>
-                    </button>
-                )}
-
-                <section className="rounded-2xl border border-blue-200 bg-white px-4 py-4 shadow-[0_18px_36px_-24px_rgba(30,64,175,0.35)]">
-                    <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                        Cierre operativo
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">
-                        Cuando todo el registro de vuelos esté completo, cierra la operación de hoy.
-                    </p>
-                    <button
-                        type="button"
-                        onClick={openCloseConfirmModal}
-                        className="mt-3 w-full rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-extrabold tracking-wide text-white shadow-[0_16px_28px_-18px_rgba(37,99,235,0.6)] transition hover:bg-blue-700 active:scale-[0.99]"
-                    >
-                        Operación finalizada
-                    </button>
-                </section>
-            </div>
-
-            {/* Overlay to close menu */}
-            {!shouldUseSyncHeader && showMenu && (
-                <div className="fixed inset-0 z-30" onClick={() => setShowMenu(false)}></div>
-            )}
-
-            {showCloseConfirmModal && (
-                <div className="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-[2px] px-4 py-6 flex items-end justify-center sm:items-center">
-                    <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_36px_72px_-34px_rgba(15,23,42,0.65)]">
-                        <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                            Confirmar cierre
-                        </p>
-                        <h3 className="mt-1 text-xl font-black text-slate-900">
-                            ¿Seguro que deseas finalizar la operación?
-                        </h3>
-                        <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-                            Esta acción te llevará al flujo de cierre. Para evitar cierres accidentales, mantén presionado 2 segundos.
-                        </p>
-
-                        {closeOperationError && (
-                            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
-                                <p className="text-xs font-bold text-red-700 m-0">Error de conexión</p>
-                                <p className="text-xs text-red-600 m-0 mt-0.5">{closeOperationError}</p>
-                            </div>
-                        )}
-
-                        <div className="mt-5 grid grid-cols-1 gap-2.5">
-                            {isClosingOperation ? (
-                                <div className="relative overflow-hidden rounded-2xl bg-blue-700 px-4 py-4 text-center text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)]">
-                                    <span className="inline-flex items-center gap-2 text-sm font-extrabold tracking-wide">
-                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Procesando...
-                                    </span>
-                                    <span className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
-                                        <span className="block h-full w-full rounded-full bg-white" />
-                                    </span>
-                                </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onMouseDown={handleCloseHoldStart}
-                                    onMouseUp={handleCloseHoldCancel}
-                                    onMouseLeave={handleCloseHoldCancel}
-                                    onTouchStart={handleCloseHoldStart}
-                                    onTouchEnd={handleCloseHoldCancel}
-                                    onTouchCancel={handleCloseHoldCancel}
-                                    onTouchMove={(e) => e.preventDefault()}
-                                    style={{ touchAction: 'none' }}
-                                    className="relative overflow-hidden rounded-2xl bg-blue-600 px-4 py-3.5 text-left text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)] transition active:scale-[0.99]"
-                                >
-                                    <span className="block text-sm font-extrabold tracking-wide">
-                                        {closeOperationError ? 'Reintentar' : 'Operación finalizada'}
-                                    </span>
-                                    <span className="mt-0.5 block text-xs font-semibold text-blue-100">
-                                        Mantén presionado por 2s para confirmar
-                                    </span>
-                                    <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-white/30">
-                                        <span
-                                            className="block h-full rounded-full bg-white transition-[width] duration-75"
-                                            style={{ width: `${closeHoldProgress}%` }}
-                                        />
-                                    </span>
-                                </button>
-                            )}
-
-                            <button
-                                type="button"
-                                onClick={closeCloseConfirmModal}
-                                disabled={isClosingOperation}
-                                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {flightEditModal && (
-                <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-[1px] px-4 py-6 flex items-center justify-center">
-                    <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-[0_30px_60px_-28px_rgba(15,23,42,0.6)] p-5">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ajuste operativo</p>
-                        <h3 className="text-lg font-black text-slate-900 mt-1">Editar alumnos del Vuelo #{flightEditModal.flightNumber || '--'}</h3>
-                        <p className="text-xs text-slate-500 mt-1">Este ajuste se sincroniza con el centro de control en tiempo real.</p>
-
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual</p>
-                                <p className="text-xl font-black text-slate-800 tabular-nums">{flightEditModal.currentStudents}</p>
-                            </div>
-
-                            <label className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2">
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Nuevo</p>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    step={1}
-                                    value={editedStudentCount}
-                                    onChange={(event) => setEditedStudentCount(event.target.value)}
-                                    className="w-full bg-transparent text-xl font-black text-slate-900 outline-none tabular-nums"
-                                    disabled={isSavingFlightEdit}
-                                />
-                            </label>
-                        </div>
-
-                        <label className="block mt-3">
-                            <p className="text-[11px] font-bold text-slate-700 mb-1">Motivo del ajuste</p>
-                            <textarea
-                                value={flightEditReason}
-                                onChange={(event) => setFlightEditReason(event.target.value)}
-                                placeholder="Ej. Se repite alumno por falla de gafa en vuelo anterior"
-                                rows={3}
-                                maxLength={220}
-                                disabled={isSavingFlightEdit}
-                                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500"
-                                style={{ resize: 'none' }}
-                            />
-                        </label>
-
-                        <p className="text-[10px] text-slate-500 mt-2">Este cambio solo ajusta el conteo de alumnos del vuelo seleccionado.</p>
-
-                        <div className="mt-4 flex items-center justify-end gap-2">
-                            <button
-                                onClick={closeFlightEditModal}
-                                disabled={isSavingFlightEdit}
-                                className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-bold bg-white hover:bg-slate-50 disabled:opacity-60"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleConfirmFlightStudentEdit}
-                                disabled={isSavingFlightEdit}
-                                className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-60"
-                            >
-                                {isSavingFlightEdit ? 'Guardando...' : 'Guardar ajuste'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Pause Menu Modal */}
-            <PauseMenu
-                isOpen={showPauseMenu}
-                onClose={() => setShowPauseMenu(false)}
-                onStartPause={handleStartPause}
-            />
-
-            {/* Pause Active Overlay */}
-            {activePause && (
-                <PauseActiveOverlay
-                    pauseData={activePause}
-                    onRequestResume={handleRequestResume}
-                />
-            )}
-
-            {/* Resume Protocol Modal */}
-            <ResumeProtocolModal
-                isOpen={showResumeModal}
-                onClose={() => setShowResumeModal(false)}
-                onConfirmResume={handleConfirmResume}
-            />
-
-            {/* ── Escuadrón de Vuelo: Briefing Overlay ── */}
-            {!escuadronBriefingDone && !preview && currentMission && (
-                <EscuadronBriefingOverlay
-                    journeyId={journeyId}
-                    profile={profile}
-                    onComplete={() => setEscuadronBriefingDone(true)}
-                />
-            )}
-
-            {/* ── Escuadrón de Vuelo: Bitácora Modal (Supervisor) ── */}
-            <SquadronBitacoraModal
-                isOpen={showBitacoraModal}
-                onClose={() => setShowBitacoraModal(false)}
-                journeyId={journeyId}
-                flightNumber={nextFlightNumber}
+        <>
+            <OperationUI
                 missionInfo={currentMission}
-            />
-
-            {/* ── Escuadrón de Vuelo: Emocionómetro Modal (Auxiliar) ── */}
-            <EmotionRatingModal
-                isOpen={showEmotionModal}
-                flightNumber={missionFlights.length + 1}
-                flightStudentCount={pendingFlightForEmotion?.studentCount || 0}
-                onSubmit={async (scoreData) => {
-                    setShowEmotionModal(false);
-                    // Process the original flight after scoring
-                    if (pendingFlightForEmotion) {
-                        try {
-                            await handleFlightComplete({
-                                ...pendingFlightForEmotion,
-                                _escuadronEmotionScore: scoreData.score,
-                                _escuadronCompliance: scoreData.compliance
-                            });
-                        } catch (err) {
-                            console.warn('⚠️ Flight complete after emotion failed:', err);
-                        }
-                        setPendingFlightForEmotion(null);
+                activeFlight={activeFlight}
+                missionFlights={missionFlights}
+                nextFlightNumber={nextFlightNumber}
+                activeFlightNumber={activeFlightNumber}
+                activePause={activePause}
+                completedPauses={completedPauses}
+                operationElapsedSeconds={operationElapsedSeconds}
+                showOperationTimer={operationStartedAtMs > 0}
+                interFlightElapsedSeconds={interFlightElapsedSeconds}
+                showInterFlightTimer={showInterFlightTimer}
+                totalStudentsFlown={totalStudentsFlown}
+                pendingSyncCount={pendingSyncCount}
+                onFlightStart={handleFlightStart}
+                onFlightComplete={(data) => {
+                    // ── Escuadrón: Intercept for Auxiliar Emocionómetro ──
+                    if (currentRole === 'assistant' || currentRole === 'auxiliar') {
+                        setPendingFlightForEmotion(data);
+                        setShowEmotionModal(true);
+                        return;
                     }
+                    return handleFlightComplete(data);
                 }}
-                onSkip={() => {
-                    setShowEmotionModal(false);
-                    // Process flight without emotion score
-                    if (pendingFlightForEmotion) {
-                        handleFlightComplete(pendingFlightForEmotion).catch(() => {});
-                        setPendingFlightForEmotion(null);
-                    }
-                }}
-            />
+                onFlightCancel={handleFlightCancel}
+                onStartPause={handleStartPause}
+                onRequestResume={() => setShowResumeModal(true)}
+                onConfirmResume={handleConfirmResume}
+                onCloseOperation={handleCloseDay}
+                onRequestEditFlight={handleRequestEditFlight}
+                onChangeSchool={handleChangeSchool}
+                onViewHistory={() => router.push('/staff/history')}
+                onViewPOI={() => router.push('/staff/poi')}
+                onLogout={handleLogout}
+                hideMenu={hideMenu}
+                isSimulation={false}
+                canEditCompletedFlights={canEditCompletedFlights}
+                pilotRecording={pilotRecording}
+                pilotMicPermission={pilotMicPermission}
+                pilotMicSupported={pilotMicSupported}
+                onRetryMicPermission={currentRole === 'pilot' ? async () => {
+                    const ok = await startPilotRecording();
+                    if (ok) cancelPilotRecording();
+                    return ok;
+                } : null}
+                currentRole={currentRole}
+                pois={voicePois}
+                voiceIsActive={voiceIsActive}
+                voiceSetIsActive={setVoiceIsActive}
+                voicePlayingPoiId={voicePlayingPoiId}
+                voiceSetPlayingPoiId={setVoicePlayingPoiId}
+                // ── Flight Audio Ecosystem Props ──
+                flightPhase={flightAudio.flightPhase}
+                onPrepareCabin={flightAudio.prepareCabin}
+                flightAudioCurrentTrack={flightAudio.currentTrack}
+                flightAudioIsPlaying={flightAudio.isPlaying}
+                flightAudioIsLoading={flightAudio.isLoading}
+                flightAudioHasError={flightAudio.hasError}
+                flightAudioHasSoundtracks={flightAudio.hasSoundtracks}
+                onFlightAudioTogglePlayPause={flightAudio.togglePlayPause}
+                onFlightAudioSkipTrack={flightAudio.skipTrack}
+                onCopilotVoiceStateChange={setCopilotVoiceState}
+                headerSlot={
+                    shouldUseSyncHeader ? (
+                        <ContingencyBypassMenu
+                            journeyId={journeyId}
+                            userId={userId}
+                            profile={profile}
+                            missionState={missionState}
+                            missionInfo={currentMission}
+                            onRefresh={onRefresh}
+                        >
+                            <SyncHeader
+                                avatarConfig={profile?.avatar_config}
+                                firstName={firstName}
+                                roleName={roleName}
+                                role={currentRole}
+                                journeyId={journeyId}
+                                userId={userId}
+                                missionInfo={currentMission}
+                                missionState={missionState}
+                                onDemoStart={onRefresh}
+                                onCloseMission={handleCloseDay}
+                            />
+                        </ContingencyBypassMenu>
+                    ) : null
+                }
+                escuadronSlot={
+                    <>
+                        {/* ── Escuadrón: Bitácora Banner for Pilot ── */}
+                        {(currentRole === 'pilot' || (isContingencyNoPilot && (currentRole === 'assistant' || currentRole === 'auxiliar'))) && (
+                            <BitacoraPilotBanner
+                                missionInfo={currentMission}
+                                activeFlight={activeFlight}
+                                nextFlightNumber={nextFlightNumber}
+                            />
+                        )}
 
-            {/* ── Escuadrón de Vuelo: Debrief Modal ── */}
-            <EscuadronDebriefModal
-                isOpen={showDebriefModal}
-                journeyId={journeyId}
-                profile={profile}
-                onComplete={() => {
-                    setShowDebriefModal(false);
-                    // After debrief, proceed to the actual close confirmation
-                    setShowCloseConfirmModal(true);
-                    resetCloseDayHold();
-                }}
-                onSkip={() => {
-                    setShowDebriefModal(false);
-                    // Skip debrief and go directly to close confirmation
-                    setShowCloseConfirmModal(true);
-                    resetCloseDayHold();
-                }}
-            />
+                        {/* ── Escuadrón: Bitácora FAB for Supervisor ── */}
+                        {(currentRole === 'teacher') && (
+                            <button
+                                onClick={() => setShowBitacoraModal(true)}
+                                style={{
+                                    position: 'fixed', bottom: 100, right: 20, zIndex: 45,
+                                    width: 56, height: 56, borderRadius: 18,
+                                    background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                                    border: 'none', color: 'white',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    boxShadow: '0 12px 28px -6px rgba(124,58,237,0.5)',
+                                    cursor: 'pointer'
+                                }}
+                                title="Bitácora Digital"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: 24, fontVariationSettings: "'FILL' 1" }}>edit_note</span>
+                            </button>
+                        )}
 
-            {/* 🧠 AI Quality Modal (Pilot Feedback) */}
-            {pilotQaFeedback && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
-                    zIndex: 99999,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 20,
-                    animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}>
-                    <div style={{
-                        background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: 32,
-                        width: '100%',
-                        maxWidth: 400,
-                        padding: 32,
-                        boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center'
-                    }}>
-                        <div style={{
-                            width: 80, height: 80, borderRadius: '50%',
-                            background: pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.1)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            border: `2px solid ${pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171'}`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginBottom: 20,
-                            boxShadow: `0 0 30px ${pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.3)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                        }}>
-                            <span style={{ fontSize: 32, fontWeight: 900, color: pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171' }}>
-                                {pilotQaFeedback.score}
-                            </span>
-                        </div>
-                        
-                        <h3 style={{ color: '#F8FAFC', fontSize: 24, fontWeight: 900, margin: '0 0 8px', textAlign: 'center' }}>
-                            Reporte de IA
-                        </h3>
-                        <p style={{ color: '#94A3B8', fontSize: 15, margin: '0 0 24px', textAlign: 'center', lineHeight: 1.5 }}>
-                            {pilotQaFeedback.feedback}
-                        </p>
+                        {/* ── Escuadrón: Briefing Overlay ── */}
+                        {!escuadronBriefingDone && !preview && currentMission && (
+                            <EscuadronBriefingOverlay
+                                journeyId={journeyId}
+                                profile={profile}
+                                onComplete={() => setEscuadronBriefingDone(true)}
+                            />
+                        )}
 
-                        {pilotQaFeedback.strikes && pilotQaFeedback.strikes.length > 0 && (
-                            <div style={{ width: '100%', background: 'rgba(0,0,0,0.2)', borderRadius: 16, padding: 16, marginBottom: 24 }}>
-                                <p style={{ color: '#F87171', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
-                                    Áreas de oportunidad ({pilotQaFeedback.strikes.length})
-                                </p>
-                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {pilotQaFeedback.strikes.map((strike, i) => (
-                                        <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                                            <span style={{ color: '#F87171', fontSize: 16, lineHeight: 1 }}>✖</span>
-                                            <span style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{strike}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                        {/* ── Escuadrón: Bitácora Modal (Supervisor) ── */}
+                        <SquadronBitacoraModal
+                            isOpen={showBitacoraModal}
+                            onClose={() => setShowBitacoraModal(false)}
+                            journeyId={journeyId}
+                            flightNumber={nextFlightNumber}
+                            missionInfo={currentMission}
+                        />
+
+                        {/* ── Escuadrón: Emocionómetro Modal (Auxiliar) ── */}
+                        <EmotionRatingModal
+                            isOpen={showEmotionModal}
+                            flightNumber={missionFlights.length + 1}
+                            flightStudentCount={pendingFlightForEmotion?.studentCount || 0}
+                            onSubmit={async (scoreData) => {
+                                setShowEmotionModal(false);
+                                if (pendingFlightForEmotion) {
+                                    try {
+                                        await handleFlightComplete({
+                                            ...pendingFlightForEmotion,
+                                            _escuadronEmotionScore: scoreData.score,
+                                            _escuadronCompliance: scoreData.compliance
+                                        });
+                                    } catch (err) {
+                                        console.warn('⚠️ Flight complete after emotion failed:', err);
+                                    }
+                                    setPendingFlightForEmotion(null);
+                                }
+                            }}
+                            onSkip={() => {
+                                setShowEmotionModal(false);
+                                if (pendingFlightForEmotion) {
+                                    handleFlightComplete(pendingFlightForEmotion).catch(() => {});
+                                    setPendingFlightForEmotion(null);
+                                }
+                            }}
+                        />
+
+                        {/* ── Escuadrón: Debrief Modal ── */}
+                        <EscuadronDebriefModal
+                            isOpen={showDebriefModal}
+                            journeyId={journeyId}
+                            profile={profile}
+                            onComplete={() => {
+                                setShowDebriefModal(false);
+                                // After debrief, proceed to close — handled by OperationUI
+                            }}
+                            onSkip={() => {
+                                setShowDebriefModal(false);
+                            }}
+                        />
+
+                        {/* ── Flight Edit Modal ── */}
+                        {flightEditModal && (
+                            <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-[1px] px-4 py-6 flex items-center justify-center">
+                                <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-[0_30px_60px_-28px_rgba(15,23,42,0.6)] p-5">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ajuste operativo</p>
+                                    <h3 className="text-lg font-black text-slate-900 mt-1">Editar alumnos del Vuelo #{flightEditModal.flightNumber || '--'}</h3>
+                                    <p className="text-xs text-slate-500 mt-1">Este ajuste se sincroniza con el centro de control en tiempo real.</p>
+                                    <div className="mt-4 grid grid-cols-2 gap-3">
+                                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual</p>
+                                            <p className="text-xl font-black text-slate-800 tabular-nums">{flightEditModal.currentStudents}</p>
+                                        </div>
+                                        <label className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Nuevo</p>
+                                            <input
+                                                type="number" min={0} step={1}
+                                                value={editedStudentCount}
+                                                onChange={(e) => setEditedStudentCount(e.target.value)}
+                                                className="w-full bg-transparent text-xl font-black text-slate-900 outline-none tabular-nums"
+                                                disabled={isSavingFlightEdit}
+                                            />
+                                        </label>
+                                    </div>
+                                    <label className="block mt-3">
+                                        <p className="text-[11px] font-bold text-slate-700 mb-1">Motivo del ajuste</p>
+                                        <textarea
+                                            value={flightEditReason}
+                                            onChange={(e) => setFlightEditReason(e.target.value)}
+                                            placeholder="Ej. Se repite alumno por falla de gafa en vuelo anterior"
+                                            rows={3} maxLength={220} disabled={isSavingFlightEdit}
+                                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-500"
+                                            style={{ resize: 'none' }}
+                                        />
+                                    </label>
+                                    <p className="text-[10px] text-slate-500 mt-2">Este cambio solo ajusta el conteo de alumnos del vuelo seleccionado.</p>
+                                    <div className="mt-4 flex items-center justify-end gap-2">
+                                        <button onClick={closeFlightEditModal} disabled={isSavingFlightEdit} className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-bold bg-white hover:bg-slate-50 disabled:opacity-60">Cancelar</button>
+                                        <button onClick={handleConfirmFlightStudentEdit} disabled={isSavingFlightEdit} className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 disabled:opacity-60">
+                                            {isSavingFlightEdit ? 'Guardando...' : 'Guardar ajuste'}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
-                        <button 
-                            onClick={() => setPilotQaFeedback(null)}
-                            style={{
-                                width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-                                background: 'linear-gradient(90deg, #4F46E5, #7C3AED)',
-                                color: 'white', fontSize: 16, fontWeight: 800, textTransform: 'uppercase',
-                                cursor: 'pointer', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.4)'
-                            }}
-                        >
-                            Entendido
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
+                        {/* 🧠 AI Quality Modal (Pilot Feedback) */}
+                        {pilotQaFeedback && (
+                            <div style={{
+                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                                backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                                zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                padding: 20, animation: 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}>
+                                <div style={{
+                                    background: 'linear-gradient(180deg, #1E293B 0%, #0F172A 100%)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: 32, width: '100%', maxWidth: 400, padding: 32,
+                                    boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+                                    position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center'
+                                }}>
+                                    <div style={{
+                                        width: 80, height: 80, borderRadius: '50%',
+                                        background: pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.1)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                        border: `2px solid ${pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        marginBottom: 20,
+                                        boxShadow: `0 0 30px ${pilotQaFeedback.score >= 80 ? 'rgba(16, 185, 129, 0.3)' : pilotQaFeedback.score >= 60 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                                    }}>
+                                        <span style={{ fontSize: 32, fontWeight: 900, color: pilotQaFeedback.score >= 80 ? '#10B981' : pilotQaFeedback.score >= 60 ? '#FBBF24' : '#F87171' }}>
+                                            {pilotQaFeedback.score}
+                                        </span>
+                                    </div>
+                                    <h3 style={{ color: '#F8FAFC', fontSize: 24, fontWeight: 900, margin: '0 0 8px', textAlign: 'center' }}>Reporte de IA</h3>
+                                    <p style={{ color: '#94A3B8', fontSize: 15, margin: '0 0 24px', textAlign: 'center', lineHeight: 1.5 }}>{pilotQaFeedback.feedback}</p>
+                                    {pilotQaFeedback.strikes && pilotQaFeedback.strikes.length > 0 && (
+                                        <div style={{ width: '100%', background: 'rgba(0,0,0,0.2)', borderRadius: 16, padding: 16, marginBottom: 24 }}>
+                                            <p style={{ color: '#F87171', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
+                                                Áreas de oportunidad ({pilotQaFeedback.strikes.length})
+                                            </p>
+                                            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                {pilotQaFeedback.strikes.map((strike, i) => (
+                                                    <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                        <span style={{ color: '#F87171', fontSize: 16, lineHeight: 1 }}>✖</span>
+                                                        <span style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{strike}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => setPilotQaFeedback(null)}
+                                        style={{
+                                            width: '100%', padding: '16px', borderRadius: 16, border: 'none',
+                                            background: 'linear-gradient(90deg, #4F46E5, #7C3AED)',
+                                            color: 'white', fontSize: 16, fontWeight: 800, textTransform: 'uppercase',
+                                            cursor: 'pointer', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.4)'
+                                        }}
+                                    >
+                                        Entendido
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                }
+            />
+        </>
     );
 }
+

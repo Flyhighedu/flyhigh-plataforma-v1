@@ -3,20 +3,27 @@
 import { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 
-export default function CounterData({ label, value, onChange, color = "blue" }) {
+export default function CounterData({ label, value, onChange, color = "blue", isPeripheralActive = false }) {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState(value);
 
     // Color maps
     const colors = {
-        blue: "bg-blue-600 active:bg-blue-700 text-white",
-        indigo: "bg-indigo-600 active:bg-indigo-700 text-white",
-        emerald: "bg-emerald-600 active:bg-emerald-700 text-white",
+        blue: "bg-blue-500 border-blue-600 text-white",
+        indigo: "bg-indigo-500 border-indigo-600 text-white",
+        emerald: "bg-emerald-500 border-emerald-600 text-white",
     };
     const btnColor = colors[color] || colors.blue;
 
-    const handleIncrement = () => onChange(value + 1);
-    const handleDecrement = () => onChange(Math.max(0, value - 1));
+    const handleIncrement = () => {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+        onChange(value + 1);
+    };
+    
+    const handleDecrement = () => {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+        onChange(Math.max(0, value - 1));
+    };
 
     const handleManualEdit = () => {
         setTempValue(value);
@@ -30,18 +37,12 @@ export default function CounterData({ label, value, onChange, color = "blue" }) 
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-            <h3 className="text-sm font-medium text-slate-500 mb-3 text-center uppercase tracking-wider">{label}</h3>
-
-            <div className="flex items-center justify-between gap-4">
-                <button
-                    onClick={handleDecrement}
-                    className={`h-14 w-14 rounded-full flex items-center justify-center shadow-md transition-transform active:scale-95 ${value === 0 ? 'bg-slate-100 text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}
-                    disabled={value === 0}
-                >
-                    <Minus size={28} strokeWidth={3} />
-                </button>
-
+        <div className="flex flex-col items-center justify-center p-2 bg-white/5 rounded-3xl border border-slate-200/50 backdrop-blur-sm">
+            <span className={`text-[12px] font-black uppercase tracking-widest mb-1 ${isPeripheralActive ? 'text-white/60' : 'text-slate-400'}`}>
+                {label}
+            </span>
+            
+            <div className="flex items-center justify-center relative my-0.5">
                 {isEditing ? (
                     <input
                         type="number"
@@ -49,19 +50,30 @@ export default function CounterData({ label, value, onChange, color = "blue" }) 
                         onChange={(e) => setTempValue(e.target.value)}
                         onBlur={handleManualSave}
                         autoFocus
-                        className="w-20 text-center text-4xl font-bold text-slate-800 border-b-2 border-blue-500 focus:outline-none bg-transparent"
+                        className={`w-20 text-center text-4xl font-black focus:outline-none bg-transparent transition-colors ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}
                     />
                 ) : (
-                    <div onClick={handleManualEdit} className="flex-1 text-center cursor-pointer">
-                        <span className="text-5xl font-extrabold text-slate-800 tracking-tight leading-none">{value}</span>
+                    <div onClick={handleManualEdit} className="cursor-pointer select-none">
+                        <span className={`text-[48px] font-black tracking-tighter leading-none transition-colors ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}>
+                            {value}
+                        </span>
                     </div>
                 )}
+            </div>
 
+            <div className="flex items-center gap-3 mt-1">
+                <button
+                    onClick={handleDecrement}
+                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${value === 0 ? 'bg-slate-100 text-slate-300' : isPeripheralActive ? 'bg-white/10 text-white' : 'bg-white shadow-sm border border-slate-200 text-slate-600'}`}
+                    disabled={value === 0}
+                >
+                    <Minus size={24} strokeWidth={3} />
+                </button>
                 <button
                     onClick={handleIncrement}
-                    className={`h-14 w-14 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30 transition-transform active:scale-90 ${btnColor}`}
+                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${isPeripheralActive ? 'bg-white/20 text-white' : 'bg-blue-50 border border-blue-100 text-blue-600'}`}
                 >
-                    <Plus size={28} strokeWidth={3} />
+                    <Plus size={24} strokeWidth={3} />
                 </button>
             </div>
         </div>
