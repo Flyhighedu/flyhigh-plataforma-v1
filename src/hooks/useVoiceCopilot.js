@@ -297,6 +297,11 @@ export default function useVoiceCopilot({
                             sampleRate: audioCtx.sampleRate 
                         } 
                     });
+                } else {
+                    // Si el worker ya estaba vivo (toggle mic off -> on), hay que resetear la línea de tiempo de Kaldi
+                    voskWorkerRef.current.postMessage({ action: 'reset' });
+                    setVoiceState('listening');
+                    stateRef.current = 'listening';
                 }
 
                 const source = audioCtx.createMediaStreamSource(stream);
@@ -314,9 +319,6 @@ export default function useVoiceCopilot({
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
                 scriptProcessorRef.current = processor;
-            } else if (stateRef.current !== 'booting') {
-                setVoiceState('listening');
-                stateRef.current = 'listening';
             }
         } catch (err) {
             setErrorMsg('Permiso de micrófono denegado o no soportado.');
