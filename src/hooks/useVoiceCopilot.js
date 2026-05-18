@@ -109,25 +109,6 @@ export default function useVoiceCopilot({
         return bestScore >= 4 ? best : null;
     }, [voiceCommands]);
 
-    const stopListening = useCallback(() => {
-        setIsDetectingVoice(false);
-        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-        
-        if (recognitionRef.current) {
-            try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
-        }
-
-        if (audioRef?.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-        if (setPlayingPoiId) setPlayingPoiId(null);
-        setVoiceState('off');
-        stateRef.current = 'off';
-        setLastTranscript('');
-        setMatchedPoi(null);
-    }, [audioRef, setPlayingPoiId]);
-
     const playMatchedAudio = useCallback((poi) => {
         if (!poi?.audio_url) return;
         if (audioRef?.current) {
@@ -145,18 +126,12 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             if (setPlayingPoiId) setPlayingPoiId(null);
-            if (isActive && recognitionRef.current) {
-                try { recognitionRef.current.start(); } catch(e){}
-            }
         });
 
         audio.onended = () => {
             if (setPlayingPoiId) setPlayingPoiId(null);
             setVoiceState('listening');
             stateRef.current = 'listening';
-            if (isActive && recognitionRef.current) {
-                try { recognitionRef.current.start(); } catch(e){}
-            }
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
         };
         
@@ -164,11 +139,62 @@ export default function useVoiceCopilot({
             if (setPlayingPoiId) setPlayingPoiId(null);
             setVoiceState('listening');
             stateRef.current = 'listening';
-            if (isActive && recognitionRef.current) {
-                try { recognitionRef.current.start(); } catch(e){}
+        };
+    }, [audioRef, setPlayingPoiId]);
+
+    // References moved below stopListening
+
+    const voskWorkerRef = useRef(null);
+    const audioContextRef = useRef(null);
+    const mediaStreamRef = useRef(null);
+    const scriptProcessorRef = useRef(null);
+
+    useEffect(() => {
+        setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
+        
+        return () => {
+            if (voskWorkerRef.current) {
+                voskWorkerRef.current.postMessage({ action: 'destroy' });
+                voskWorkerRef.current.terminate();
+                voskWorkerRef.current = null;
+            }
+            if (scriptProcessorRef.current) scriptProcessorRef.current.disconnect();
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                try { audioContextRef.current.close(); } catch(e){}
+            }
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach(t => t.stop());
             }
         };
-    }, [audioRef, setPlayingPoiId, isActive]);
+    }, []);
+
+    const stopListening = useCallback(() => {
+        setIsDetectingVoice(false);
+        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+        
+        if (scriptProcessorRef.current) {
+            scriptProcessorRef.current.disconnect();
+            scriptProcessorRef.current = null;
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            try { audioContextRef.current.close(); } catch(e){}
+            audioContextRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach(t => t.stop());
+            mediaStreamRef.current = null;
+        }
+
+        if (audioRef?.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        if (setPlayingPoiId) setPlayingPoiId(null);
+        setVoiceState('off');
+        stateRef.current = 'off';
+        setLastTranscript('');
+        setMatchedPoi(null);
+    }, [audioRef, setPlayingPoiId]);
 
     const isActiveRef = useRef(isActive);
     useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
@@ -178,103 +204,118 @@ export default function useVoiceCopilot({
         callbacksRef.current = { findMatchInBuffer, playMatchedAudio, wakeWord, stopListening };
     });
 
-    useEffect(() => {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) return;
-
-        const recognition = new SR();
-        recognition.lang = 'es-MX';
-        // continuous=true para que no se detenga en cada frase y evite pitidos múltiples
-        recognition.continuous = true; 
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-
-        recognition.onresult = (event) => {
-            setIsDetectingVoice(true);
-            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-            detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
-
-            const last = event.results[event.results.length - 1];
-            const transcript = last[0].transcript.trim().toLowerCase();
-            setLastTranscript(transcript);
-
-            const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
-
-            // Activar alerta visual ÁMBAR (estado 'wake') si escucha la palabra clave en el ínterin
-            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
-                if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
-                    setVoiceState('wake');
-                    stateRef.current = 'wake';
-                }
-            }
-
-            if (!last.isFinal) return;
-
-            // Revisar si dijo la palabra clave o algo similar
-            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
-                const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
-
-                if (poiMatch) {
-                    setMatchedPoi(poiMatch);
-                    setVoiceState('matched'); // Alerta ESMERALDA
-                    stateRef.current = 'matched';
-                    try { recognition.abort(); } catch(e){}
-                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
-                } else {
-                    // Falsa alarma o comando incompleto: Regresa a escuchar silenciosamente
-                    setTimeout(() => {
-                        if (stateRef.current === 'wake') {
+    const startListening = useCallback(async () => {
+        setErrorMsg(null);
+        
+        try {
+            // 1. Inicializar Worker de Vosk si no existe
+            if (!voskWorkerRef.current) {
+                setVoiceState('booting'); // Estado visual para mostrar carga
+                stateRef.current = 'booting';
+                
+                voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
+                
+                voskWorkerRef.current.onmessage = (e) => {
+                    const { type, status, result, error } = e.data;
+                    
+                    if (type === 'status') {
+                        if (status === 'ready') {
                             setVoiceState('listening');
                             stateRef.current = 'listening';
                         }
-                    }, 1500);
-                    setLastTranscript('');
-                }
-            }
-        };
+                    } else if (type === 'partial' || type === 'final') {
+                        const transcript = result?.partial || result?.text || '';
+                        if (!transcript) return;
+                        
+                        setLastTranscript(transcript);
+                        setIsDetectingVoice(true);
+                        if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+                        detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
-        recognition.onerror = (event) => {
-            if (event.error === 'not-allowed') {
-                setErrorMsg('Permiso de micrófono denegado. Actívalo en la configuración.');
-                callbacksRef.current.stopListening();
-                return;
-            }
-            if (event.error === 'aborted' || event.error === 'no-speech') return;
-            console.warn('[VoiceSim] SpeechRecognition error:', event.error);
-        };
+                        const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
 
-        recognition.onend = () => {
-            setIsDetectingVoice(false);
-            // Si seguimos activos y no estamos reproduciendo audio, reiniciar (bucle continuo)
-            if (isActiveRef.current && stateRef.current === 'listening') {
-                setTimeout(() => {
-                    try {
-                        if (recognitionRef.current) recognitionRef.current.start();
-                    } catch (e) {
-                        console.error("Error restarting recognition loop:", e);
+                        // Activar alerta visual ÁMBAR en resultados parciales
+                        if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                            if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                                setVoiceState('wake');
+                                stateRef.current = 'wake';
+                            }
+                        }
+
+                        if (type === 'final') {
+                            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                                const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
+
+                                if (poiMatch) {
+                                    setMatchedPoi(poiMatch);
+                                    setVoiceState('matched'); // Alerta ESMERALDA
+                                    stateRef.current = 'matched';
+                                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
+                                } else {
+                                    // Falsa alarma: Regresa a escuchar
+                                    setTimeout(() => {
+                                        if (stateRef.current === 'wake') {
+                                            setVoiceState('listening');
+                                            stateRef.current = 'listening';
+                                        }
+                                    }, 1500);
+                                    setLastTranscript('');
+                                }
+                            }
+                        }
+                    } else if (type === 'error') {
+                        setErrorMsg(`Error del motor de voz: ${error}`);
+                        console.error('[Vosk]', error);
+                        callbacksRef.current.stopListening();
                     }
-                }, 200); // Pequeño delay para evitar loop infinito síncrono si el mic está bloqueado
+                };
+                
+                // Pedirle al worker que cargue el modelo
+                voskWorkerRef.current.postMessage({ 
+                    action: 'init', 
+                    data: { 
+                        modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
+                        sampleRate: 16000 
+                    } 
+                });
+            } else if (stateRef.current !== 'booting') {
+                setVoiceState('listening');
+                stateRef.current = 'listening';
             }
-        };
 
-        recognitionRef.current = recognition;
-
-        return () => {
-            if (recognitionRef.current) {
-                try { recognitionRef.current.abort(); } catch (e) { /* */ }
+            // 2. Iniciar Micrófono y AudioContext
+            if (!audioContextRef.current) {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaStreamRef.current = stream;
+                
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioContext({ sampleRate: 16000 });
+                audioContextRef.current = audioCtx;
+                
+                const source = audioCtx.createMediaStreamSource(stream);
+                // Usamos 4096 para balancear latencia y uso de CPU
+                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                
+                processor.onaudioprocess = (e) => {
+                    // Solo procesamos audio si no estamos reproduciendo una pista
+                    if (stateRef.current === 'listening' || stateRef.current === 'wake') {
+                        const audioData = e.inputBuffer.getChannelData(0);
+                        if (voskWorkerRef.current) {
+                            voskWorkerRef.current.postMessage({ action: 'process', data: audioData });
+                        }
+                    }
+                };
+                
+                source.connect(processor);
+                processor.connect(audioCtx.destination);
+                scriptProcessorRef.current = processor;
             }
-        };
-    }, []); // <-- Array vacío: la instancia no se recrea, evitando el abort() prematuro
-
-    const startListening = useCallback(() => {
-        setErrorMsg(null);
-        setVoiceState('listening');
-        stateRef.current = 'listening';
-
-        if (recognitionRef.current) {
-            try { recognitionRef.current.start(); } catch (e) { /* Ya iniciado */ }
+        } catch (err) {
+            setErrorMsg('Permiso de micrófono denegado o no soportado.');
+            console.error(err);
+            stopListening();
         }
-    }, []);
+    }, [stopListening]);
 
     const handleToggle = useCallback(() => {
         if (isActive) {
@@ -308,7 +349,7 @@ export default function useVoiceCopilot({
         stopListening,
         isDetectingVoice,
         
-        // Mantener exports aunque no se usen (por si otras UIs lo esperan)
+        // Mantener exports aunque no se usen
         tfjsIsLoaded: true,
         tfjsIsCalibrated: true,
         collectExample: async () => {},

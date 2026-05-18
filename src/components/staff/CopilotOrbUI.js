@@ -30,6 +30,7 @@ const CopilotOrbUI = forwardRef(({
     // Native Tailwind classes used instead of custom injected CSS to prevent shape issues
 
     let haloClass = 'bg-gradient-to-tr from-purple-500 via-blue-500 to-cyan-500 animate-[spin_12s_linear_infinite]';
+    if (copilot.voiceState === 'booting') haloClass = 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-indigo-500 animate-[spin_2s_linear_infinite] opacity-80';
     if (copilot.voiceState === 'wake') haloClass = 'bg-gradient-to-tr from-purple-500 via-blue-500 to-cyan-500 animate-[spin_2s_linear_infinite] opacity-100 scale-110';
     if (copilot.voiceState === 'matched') haloClass = 'bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500 animate-[spin_3s_linear_infinite]';
     if (copilot.voiceState === 'playing') haloClass = 'bg-gradient-to-tr from-purple-500 via-blue-500 to-cyan-500 animate-[spin_8s_linear_infinite] opacity-70';
@@ -41,30 +42,13 @@ const CopilotOrbUI = forwardRef(({
 
     const handleOrbClick = () => {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
-        
-        if (!copilot.isActive && !copilot.tfjsIsCalibrated) {
-            // Requiere calibración antes de activar
-            setShowCalibrator(true);
-        } else {
-            copilot.handleToggle();
-        }
+        copilot.handleToggle();
     };
 
     if (!copilot.supported) return null;
 
     return (
         <div className="w-full flex flex-col items-center justify-center pt-0 pb-1 relative z-50">
-            {/* Modal de Calibración TFJS */}
-            <TFCalibratorModal 
-                isOpen={showCalibrator}
-                collectExample={copilot.collectExample}
-                trainModel={copilot.trainModel}
-                onCalibrationComplete={() => {
-                    setShowCalibrator(false);
-                    copilot.handleToggle(); // Activar IA después de calibrar
-                }}
-            />
-
             {/* ── NARRATIONS DICTIONARY (COLLAPSIBLE) - MINIMALIST TOP ── */}
             <div className="w-full flex flex-col items-center justify-center mb-3">
                 <button 
@@ -125,13 +109,14 @@ const CopilotOrbUI = forwardRef(({
             <div className="mt-2 h-6 flex items-center justify-center min-w-[200px]">
                 {copilot.isActive ? (
                     <div className="text-center px-4">
-                        {copilot.lastTranscript ? (
+                        {copilot.lastTranscript && copilot.voiceState !== 'booting' ? (
                             <p className={`text-[13px] font-medium italic animate-fade-in truncate max-w-[280px] transition-colors duration-300 ${isPeripheralActive ? 'text-white' : 'text-slate-700'}`}>
                                 &ldquo;{copilot.lastTranscript}&rdquo;
                             </p>
                         ) : (
                             <p className={`text-[11px] font-bold uppercase tracking-widest opacity-60 transition-colors duration-300 ${isPeripheralActive ? 'text-white/80' : 'text-slate-400'}`}>
-                                {copilot.voiceState === 'idle' ? `Di "${copilot.wakeWord}"...` : 
+                                {copilot.voiceState === 'booting' ? 'Cargando Modelo (40MB)...' : 
+                                 copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
                                  copilot.voiceState === 'wake' ? 'Escuchando...' : 
                                  copilot.voiceState === 'matched' ? 'Comando detectado' :
                                  copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}

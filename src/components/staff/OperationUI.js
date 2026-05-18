@@ -253,7 +253,7 @@ export default function OperationUI({
     // ═══════════════════════════════════════════════════
     // PERIPHERAL VISION CLASSES
     // ═══════════════════════════════════════════════════
-    const isPeripheralActive = peripheralState === 'wake' || peripheralState === 'matched' || peripheralState === 'success' || peripheralState === 'playing';
+    const isPeripheralActive = peripheralState === 'wake' || peripheralState === 'matched' || peripheralState === 'success' || peripheralState === 'playing' || peripheralState === 'booting';
     
     let peripheralClass = "bg-slate-50"; // default
     let headerBgClass = "bg-white/95 border-slate-100";
@@ -261,6 +261,13 @@ export default function OperationUI({
     let textSecondaryClass = "text-green-600";
     let iconClass = "text-slate-600 hover:bg-slate-100 active:bg-slate-200";
 
+    if (peripheralState === 'booting') {
+        peripheralClass = "bg-indigo-500 text-white transition-colors duration-500";
+        headerBgClass = "bg-transparent border-transparent";
+        textPrimaryClass = "text-white";
+        textSecondaryClass = "text-indigo-100";
+        iconClass = "text-white hover:bg-white/10 active:bg-white/20";
+    }
     if (peripheralState === 'wake') {
         peripheralClass = "bg-amber-500 text-white transition-colors duration-500";
         headerBgClass = "bg-transparent border-transparent";
