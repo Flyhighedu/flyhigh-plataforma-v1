@@ -55,6 +55,7 @@ export default function useVoiceCopilot({
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
+    const [isMegaphoneActive, setIsMegaphoneActive] = useState(false); // Estado para Megáfono
 
     useEffect(() => {
         if (typeof onStateChange === 'function') {
@@ -148,7 +149,23 @@ export default function useVoiceCopilot({
     const audioContextRef = useRef(null);
     const mediaStreamRef = useRef(null);
     const scriptProcessorRef = useRef(null);
+    const micSourceRef = useRef(null); // Ref para conectar/desconectar el megáfono
     const attentionTimeoutRef = useRef(null); // Ref para la bomba de tiempo de la ventana de atención
+
+    // Efecto para aplicar/quitar el megáfono cuando cambia el estado
+    useEffect(() => {
+        if (!micSourceRef.current || !audioContextRef.current) return;
+        
+        try {
+            if (isMegaphoneActive) {
+                micSourceRef.current.connect(audioContextRef.current.destination);
+            } else {
+                micSourceRef.current.disconnect(audioContextRef.current.destination);
+            }
+        } catch (err) {
+            console.warn('Error toggling megaphone:', err);
+        }
+    }, [isMegaphoneActive]);
 
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -176,6 +193,10 @@ export default function useVoiceCopilot({
         if (scriptProcessorRef.current) {
             scriptProcessorRef.current.disconnect();
             scriptProcessorRef.current = null;
+        }
+        if (micSourceRef.current) {
+            micSourceRef.current.disconnect();
+            micSourceRef.current = null;
         }
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             try { audioContextRef.current.close(); } catch(e){}
@@ -313,6 +334,13 @@ export default function useVoiceCopilot({
                 }
 
                 const source = audioCtx.createMediaStreamSource(stream);
+                micSourceRef.current = source; // Guardar referencia para el megáfono
+                
+                // Si el megáfono estaba activo antes de iniciar el micro, reconectarlo
+                if (isMegaphoneActive) {
+                    source.connect(audioCtx.destination);
+                }
+
                 const processor = audioCtx.createScriptProcessor(4096, 1, 1);
                 
                 processor.onaudioprocess = (e) => {
@@ -366,6 +394,8 @@ export default function useVoiceCopilot({
         startListening,
         stopListening,
         isDetectingVoice,
+        isMegaphoneActive, // Exportar estado del megáfono
+        setIsMegaphoneActive, // Exportar función para toggle
         
         // Mantener exports aunque no se usen
         tfjsIsLoaded: true,

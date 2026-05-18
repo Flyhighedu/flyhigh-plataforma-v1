@@ -2,7 +2,7 @@
 
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
-import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff, Volume2 } from 'lucide-react';
 import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
 
 const CopilotOrbUI = forwardRef(({
@@ -51,14 +51,26 @@ const CopilotOrbUI = forwardRef(({
         <div className="w-full flex flex-col items-center justify-center pt-0 pb-1 relative z-50">
             {/* ── NARRATIONS DICTIONARY (COLLAPSIBLE) - MINIMALIST TOP ── */}
             <div className="w-full flex flex-col items-center justify-center mb-3">
-                <button 
-                    onClick={() => setShowDictionary(!showDictionary)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors active:scale-95 ${showDictionary ? (isPeripheralActive ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700') : (isPeripheralActive ? 'text-white/60 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-50')}`}
-                >
-                    <BookOpen size={12} />
-                    <span className="text-[9px] font-bold uppercase tracking-widest">Diccionario de Narraciones</span>
-                    {showDictionary ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowDictionary(!showDictionary)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors active:scale-95 ${showDictionary ? (isPeripheralActive ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700') : (isPeripheralActive ? 'text-white/60 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-50')}`}
+                    >
+                        <BookOpen size={12} />
+                        <span className="text-[9px] font-bold uppercase tracking-widest">Diccionario de Narraciones</span>
+                        {showDictionary ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                    
+                    {/* Botón Experimental de Megáfono */}
+                    <button
+                        onClick={() => copilot.setIsMegaphoneActive(!copilot.isMegaphoneActive)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors active:scale-95 border ${copilot.isMegaphoneActive ? 'bg-red-500 border-red-400 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' : (isPeripheralActive ? 'bg-white/10 border-white/20 text-white/80' : 'bg-white border-slate-200 text-slate-500')}`}
+                        title="Megáfono Experimental (Retorno de voz a bocina)"
+                    >
+                        <Volume2 size={12} />
+                        <span className="text-[9px] font-bold uppercase tracking-widest">{copilot.isMegaphoneActive ? 'Megáfono ON' : 'Megáfono OFF'}</span>
+                    </button>
+                </div>
 
                 {showDictionary && (
                     <div className="mt-2 flex flex-wrap justify-center gap-1.5 max-w-[280px] max-h-[80px] overflow-y-auto custom-scrollbar">
