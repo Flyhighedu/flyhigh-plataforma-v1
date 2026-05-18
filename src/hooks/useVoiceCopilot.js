@@ -285,7 +285,17 @@ export default function useVoiceCopilot({
 
             // 2. Iniciar Micrófono y AudioContext
             if (!audioContextRef.current) {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Desactivamos el procesamiento de voz nativo (echoCancellation, etc.) 
+                // para evitar que Android active el "Modo Llamada" (HFP) y desconecte el Bluetooth A2DP de alta calidad.
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        channelCount: 1,
+                        sampleRate: 16000
+                    } 
+                });
                 mediaStreamRef.current = stream;
                 
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
