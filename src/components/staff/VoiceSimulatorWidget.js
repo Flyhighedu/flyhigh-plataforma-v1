@@ -222,27 +222,6 @@ export default function VoiceSimulatorWidget({
                         )}
                     </div>
 
-                    {/* ── MEGÁFONO EXPERIMENTAL ── */}
-                    <div className={`rounded-2xl border p-4 transition-colors duration-300 ${S.pillBg}`}>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 transition-colors duration-300 ${S.textMuted}`}>
-                                    Megáfono
-                                </p>
-                                <p className={`text-[10px] leading-tight opacity-80 ${S.textSecondary}`}>
-                                    Retorno a bocina
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => copilot.setIsMegaphoneActive(!copilot.isMegaphoneActive)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase transition-all active:scale-95 border ${copilot.isMegaphoneActive ? 'bg-red-500 border-red-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-white border-slate-200 text-slate-500'}`}
-                            >
-                                <Volume2 size={14} />
-                                {copilot.isMegaphoneActive ? 'Activado' : 'Apagado'}
-                            </button>
-                        </div>
-                    </div>
-
                     {/* ── WAKE WORD CONFIGURATOR ── */}
                     <div className={`rounded-2xl border p-4 transition-colors duration-300 ${S.pillBg}`}>
                         <p className={`text-[10px] font-black uppercase tracking-widest mb-2 transition-colors duration-300 ${S.textMuted}`}>
