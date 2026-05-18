@@ -170,6 +170,14 @@ export default function useVoiceCopilot({
         };
     }, [audioRef, setPlayingPoiId, isActive]);
 
+    const isActiveRef = useRef(isActive);
+    useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
+
+    const callbacksRef = useRef({ findMatchInBuffer, playMatchedAudio, wakeWord, stopListening });
+    useEffect(() => {
+        callbacksRef.current = { findMatchInBuffer, playMatchedAudio, wakeWord, stopListening };
+    });
+
     useEffect(() => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) return;
@@ -190,8 +198,10 @@ export default function useVoiceCopilot({
             const transcript = last[0].transcript.trim().toLowerCase();
             setLastTranscript(transcript);
 
+            const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
+
             // Activar alerta visual ÁMBAR (estado 'wake') si escucha la palabra clave en el ínterin
-            if (transcript.includes(wakeWord.toLowerCase()) || transcript.includes('computadora')) {
+            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
                 if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
                     setVoiceState('wake');
                     stateRef.current = 'wake';
@@ -201,15 +211,15 @@ export default function useVoiceCopilot({
             if (!last.isFinal) return;
 
             // Revisar si dijo la palabra clave o algo similar
-            if (transcript.includes(wakeWord.toLowerCase()) || transcript.includes('computadora')) {
-                const poiMatch = findMatchInBuffer(transcript);
+            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
 
                 if (poiMatch) {
                     setMatchedPoi(poiMatch);
                     setVoiceState('matched'); // Alerta ESMERALDA
                     stateRef.current = 'matched';
                     try { recognition.abort(); } catch(e){}
-                    setTimeout(() => playMatchedAudio(poiMatch), 800);
+                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
                 } else {
                     // Falsa alarma o comando incompleto: Regresa a escuchar silenciosamente
                     setTimeout(() => {
@@ -226,7 +236,7 @@ export default function useVoiceCopilot({
         recognition.onerror = (event) => {
             if (event.error === 'not-allowed') {
                 setErrorMsg('Permiso de micrófono denegado. Actívalo en la configuración.');
-                stopListening();
+                callbacksRef.current.stopListening();
                 return;
             }
             if (event.error === 'aborted' || event.error === 'no-speech') return;
@@ -236,7 +246,7 @@ export default function useVoiceCopilot({
         recognition.onend = () => {
             setIsDetectingVoice(false);
             // Si seguimos activos y no estamos reproduciendo audio, reiniciar (bucle continuo)
-            if (isActive && stateRef.current === 'listening') {
+            if (isActiveRef.current && stateRef.current === 'listening') {
                 setTimeout(() => {
                     try {
                         if (recognitionRef.current) recognitionRef.current.start();
@@ -254,7 +264,7 @@ export default function useVoiceCopilot({
                 try { recognitionRef.current.abort(); } catch (e) { /* */ }
             }
         };
-    }, [findMatchInBuffer, playMatchedAudio, isActive, wakeWord, stopListening]);
+    }, []); // <-- Array vacío: la instancia no se recrea, evitando el abort() prematuro
 
     const startListening = useCallback(() => {
         setErrorMsg(null);
