@@ -382,7 +382,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         const activeAudio = flightAudioRef.current;
         if (!activeAudio) return;
 
-        if (copilotVoiceState === 'playing' || copilotVoiceState === 'wake' || copilotVoiceState === 'matched') {
+        if (copilotVoiceState === 'playing') {
             // Duck: lower volume to 20%
             if (!isDuckedRef.current) {
                 isDuckedRef.current = true;

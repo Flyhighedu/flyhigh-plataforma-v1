@@ -69,6 +69,7 @@ export default function useVoiceCopilot({
         }
     }, [voiceState, onStateChange]);
 
+    const recognitionRef = useRef(null);
     const isListeningRef = useRef(false);
     const wakeTimeoutRef = useRef(null);
     const stateRef = useRef('off');
@@ -82,9 +83,8 @@ export default function useVoiceCopilot({
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-            const hasAudioContext = !!(window.AudioContext || window.webkitAudioContext);
-            if (!hasMediaDevices || !hasAudioContext) setSupported(false);
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) setSupported(false);
         }
     }, []);
 
@@ -171,250 +171,124 @@ export default function useVoiceCopilot({
         bufferRef.current = '';
     }, []);
 
-    // ── Web Audio API & MediaRecorder references ──
-    const streamRef = useRef(null);
-    const audioContextRef = useRef(null);
-    const analyserRef = useRef(null);
-    const recorderRef = useRef(null);
-    const animationFrameRef = useRef(null);
-    
-    const chunksRef = useRef([]);
-    const speakingChunksRef = useRef([]);
-    const isSpeakingRef = useRef(false);
-    const silenceStartRef = useRef(null);
+    // ── Speech Recognition lifecycle ──
+    const startListening = useCallback(() => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return;
 
-    const processTranscribedText = useCallback((text) => {
-        if (!text) return;
-        setLastTranscript(text);
-        
-        let currentState = stateRef.current;
-        const tempBuffer = (bufferRef.current + ' ' + text).trim();
-        bufferRef.current = tempBuffer;
-        const fullBuffer = bufferRef.current;
+        const recognition = new SR();
+        recognition.lang = 'es-MX';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
 
-        const wakeDetected = hasWakeWord(fullBuffer);
-        const poiMatch = findMatchInBuffer(fullBuffer);
-        
-        if (wakeDetected && poiMatch) {
-            bufferRef.current = ''; 
-            setMatchedPoi(poiMatch);
-            setVoiceState('matched');
-            stateRef.current = 'matched';
-            setTimeout(() => playMatchedAudio(poiMatch), 800);
-            return;
-        }
+        recognition.onresult = (event) => {
+            setIsDetectingVoice(true);
+            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+            detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
-        if (wakeDetected && !poiMatch) {
-            setVoiceState('wake');
-            stateRef.current = 'wake';
-            setLastTranscript(''); 
-            if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
-            wakeTimeoutRef.current = setTimeout(() => {
-                if (stateRef.current === 'wake') {
-                    setVoiceState('idle');
-                    stateRef.current = 'idle';
-                    setLastTranscript('');
-                    bufferRef.current = '';
+            const last = event.results[event.results.length - 1];
+            const transcript = last[0].transcript.trim().toLowerCase();
+            setLastTranscript(transcript);
+
+            let currentState = stateRef.current;
+            const tempBuffer = (bufferRef.current + ' ' + transcript).trim();
+
+            if (currentState === 'idle' && hasWakeWord(tempBuffer)) {
+                setVoiceState('wake');
+                stateRef.current = 'wake';
+                currentState = 'wake';
+            }
+
+            if (!last.isFinal) return;
+
+            bufferRef.current = tempBuffer;
+            const fullBuffer = bufferRef.current;
+
+            if (currentState === 'idle' || currentState === 'wake') {
+                const wakeDetected = hasWakeWord(fullBuffer);
+                const poiMatch = findMatchInBuffer(fullBuffer);
+                const isAwake = currentState === 'wake' || wakeDetected;
+
+                if (isAwake && poiMatch) {
+                    if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
+                    bufferRef.current = ''; 
+                    setMatchedPoi(poiMatch);
+                    setVoiceState('matched');
+                    stateRef.current = 'matched';
+                    setTimeout(() => playMatchedAudio(poiMatch), 800);
+                    return;
                 }
-            }, 6000);
-            return;
-        }
-        
-        // If it was waking from VAD but no wake word found, return to idle
-        if (currentState === 'wake' && !wakeDetected) {
-             setVoiceState('idle');
-             stateRef.current = 'idle';
-        }
-    }, [hasWakeWord, findMatchInBuffer, playMatchedAudio]);
 
-    const transcribeAudio = useCallback(async (blob) => {
+                if (wakeDetected && !poiMatch) {
+                    setVoiceState('wake');
+                    stateRef.current = 'wake';
+                    setLastTranscript(''); 
+                    if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
+                    wakeTimeoutRef.current = setTimeout(() => {
+                        if (stateRef.current === 'wake') {
+                            setVoiceState('idle');
+                            stateRef.current = 'idle';
+                            setLastTranscript('');
+                            bufferRef.current = '';
+                        }
+                    }, 6000);
+                    return;
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            if (event.error === 'not-allowed') {
+                setErrorMsg('Permiso de micrófono denegado. Actívalo en la configuración de tu navegador.');
+                stopListening();
+                return;
+            }
+            if (event.error === 'aborted' || event.error === 'no-speech') return;
+            console.warn('[VoiceSim] SpeechRecognition error:', event.error);
+        };
+
+        recognition.onend = () => {
+            if (isListeningRef.current) {
+                try { recognition.start(); } catch (e) { /* already started */ }
+            }
+        };
+
+        recognitionRef.current = recognition;
+        isListeningRef.current = true;
+
         try {
-            const formData = new FormData();
-            formData.append('audio', blob, 'audio.webm');
-            
-            const res = await fetch('/api/transcribe-voice', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!res.ok) throw new Error('Transcription failed');
-            const data = await res.json();
-            
-            if (data.text && isListeningRef.current) {
-                processTranscribedText(data.text.trim().toLowerCase());
-            } else if (isListeningRef.current) {
-                if (stateRef.current === 'wake') {
-                    setVoiceState('idle');
-                    stateRef.current = 'idle';
-                }
-            }
-        } catch (err) {
-            console.error('[VoiceSim] Transcribe error:', err);
-            if (stateRef.current === 'wake' && isListeningRef.current) {
-                setVoiceState('idle');
-                stateRef.current = 'idle';
+            recognition.start();
+            setVoiceState('idle');
+            setErrorMsg(null);
+            startBufferFlush();
+        } catch (e) {
+            console.error('[VoiceSim] Failed to start recognition:', e);
+            if (e.name !== 'InvalidStateError') {
+                setErrorMsg('No se pudo iniciar el reconocimiento de voz.');
             }
         }
-    }, [processTranscribedText]);
+    }, [wakeWord, hasWakeWord, findMatchInBuffer, playMatchedAudio, startBufferFlush]);
 
     const stopListening = useCallback(() => {
         isListeningRef.current = false;
         setIsDetectingVoice(false);
         stopBufferFlush();
-        
         if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
         if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-        
-        if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-            try { recorderRef.current.stop(); } catch(e){}
+        if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+            recognitionRef.current = null;
         }
-        recorderRef.current = null;
-        
-        if (audioContextRef.current) {
-            audioContextRef.current.close().catch(() => {});
-            audioContextRef.current = null;
-        }
-        
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-
         if (audioRef?.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
         }
         if (setPlayingPoiId) setPlayingPoiId(null);
-        
         setVoiceState('off');
         setLastTranscript('');
         setMatchedPoi(null);
     }, [audioRef, setPlayingPoiId, stopBufferFlush]);
-
-    const startListening = useCallback(async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            streamRef.current = stream;
-            
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            audioContextRef.current = audioCtx;
-            
-            const source = audioCtx.createMediaStreamSource(stream);
-            
-            // Bandpass filter for human voice frequencies (approx 300Hz to 3000Hz)
-            const filter = audioCtx.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.value = 1000;
-            filter.Q.value = 0.5;
-            
-            const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4;
-            analyserRef.current = analyser;
-            
-            source.connect(filter);
-            filter.connect(analyser);
-            
-            // Setup MediaRecorder
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-            const recorder = new MediaRecorder(stream, { mimeType });
-            recorderRef.current = recorder;
-            
-            chunksRef.current = [];
-            speakingChunksRef.current = [];
-            isSpeakingRef.current = false;
-            
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    if (isSpeakingRef.current) {
-                        speakingChunksRef.current.push(e.data);
-                    } else {
-                        // Keep a pre-roll buffer of 1 chunk (500ms)
-                        chunksRef.current = [e.data];
-                    }
-                }
-            };
-            
-            recorder.start(500); // 500ms chunks
-            
-            isListeningRef.current = true;
-            setVoiceState('idle');
-            setErrorMsg(null);
-            startBufferFlush();
-            
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            const vadLoop = () => {
-                if (!isListeningRef.current) return;
-                
-                analyser.getByteFrequencyData(dataArray);
-                
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    sum += dataArray[i];
-                }
-                const avg = sum / dataArray.length;
-                const normalizedEnergy = avg / 255;
-                
-                const THRESHOLD = 0.12; // VAD sensitivity
-                
-                if (normalizedEnergy > THRESHOLD) {
-                    setIsDetectingVoice(true);
-                    if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-                    detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
-
-                    // Trigger WAKE state natively if not already playing/waking
-                    if (!isSpeakingRef.current && stateRef.current !== 'playing') {
-                        isSpeakingRef.current = true;
-                        setVoiceState('wake');
-                        stateRef.current = 'wake';
-                        speakingChunksRef.current = [...chunksRef.current];
-                    }
-                    silenceStartRef.current = null;
-                } else {
-                    if (isSpeakingRef.current) {
-                        if (!silenceStartRef.current) {
-                            silenceStartRef.current = performance.now();
-                        } else if (performance.now() - silenceStartRef.current > 1500) {
-                            // Silence for 1.5s -> Stop speaking, flush and transcribe
-                            isSpeakingRef.current = false;
-                            silenceStartRef.current = null;
-                            
-                            if (recorderRef.current && recorderRef.current.state === 'recording') {
-                                recorderRef.current.requestData();
-                                
-                                setTimeout(() => {
-                                    if (speakingChunksRef.current.length > 0) {
-                                        const blob = new Blob(speakingChunksRef.current, { type: recorderRef.current.mimeType });
-                                        transcribeAudio(blob);
-                                    } else if (stateRef.current === 'wake') {
-                                        setVoiceState('idle');
-                                        stateRef.current = 'idle';
-                                    }
-                                    speakingChunksRef.current = [];
-                                    chunksRef.current = [];
-                                }, 100);
-                            }
-                        }
-                    }
-                }
-                
-                animationFrameRef.current = requestAnimationFrame(vadLoop);
-            };
-            
-            vadLoop();
-            
-        } catch (err) {
-            console.error('[VoiceSim] Mic error:', err);
-            if (err.name === 'NotAllowedError') {
-                setErrorMsg('Permiso de micrófono denegado. Actívalo en tu navegador.');
-            } else {
-                setErrorMsg('No se pudo acceder al micrófono.');
-            }
-            stopListening();
-        }
-    }, [startBufferFlush, stopListening, transcribeAudio]);
 
     const handleToggle = useCallback(() => {
         if (isActive) {
@@ -424,7 +298,7 @@ export default function useVoiceCopilot({
             setIsActive(true);
             startListening();
         }
-    }, [isActive, setIsActive, startListening, stopListening]);
+    }, [isActive, startListening, stopListening]);
 
     useEffect(() => {
         return () => {
@@ -432,15 +306,8 @@ export default function useVoiceCopilot({
             if (wakeTimeoutRef.current) clearTimeout(wakeTimeoutRef.current);
             if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
             if (bufferTimerRef.current) clearInterval(bufferTimerRef.current);
-            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-            if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-                try { recorderRef.current.stop(); } catch(e){}
-            }
-            if (audioContextRef.current) {
-                try { audioContextRef.current.close(); } catch(e){}
-            }
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach(t => t.stop());
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch (e) { /* */ }
             }
         };
     }, []);
