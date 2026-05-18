@@ -116,12 +116,6 @@ export default function useVoiceCopilot({
         if (recognitionRef.current) {
             try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
         }
-        
-        // Liberar el stream dummy
-        if (micStreamRef.current) {
-            micStreamRef.current.getTracks().forEach(t => t.stop());
-            micStreamRef.current = null;
-        }
 
         if (audioRef?.current) {
             audioRef.current.pause();
@@ -243,11 +237,13 @@ export default function useVoiceCopilot({
             setIsDetectingVoice(false);
             // Si seguimos activos y no estamos reproduciendo audio, reiniciar (bucle continuo)
             if (isActive && stateRef.current === 'listening') {
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.error("Error restarting recognition loop:", e);
-                }
+                setTimeout(() => {
+                    try {
+                        if (recognitionRef.current) recognitionRef.current.start();
+                    } catch (e) {
+                        console.error("Error restarting recognition loop:", e);
+                    }
+                }, 200); // Pequeño delay para evitar loop infinito síncrono si el mic está bloqueado
             }
         };
 
@@ -260,22 +256,10 @@ export default function useVoiceCopilot({
         };
     }, [findMatchInBuffer, playMatchedAudio, isActive, wakeWord, stopListening]);
 
-    const startListening = useCallback(async () => {
+    const startListening = useCallback(() => {
         setErrorMsg(null);
         setVoiceState('listening');
         stateRef.current = 'listening';
-
-        // EL TRUCO: Tomamos el control del micrófono con WebRTC.
-        // Al mantener este stream activo, Chrome/Android ya considera el micrófono "en uso".
-        // Esto BURLA el sistema de Android, silenciando o evitando el pitido cuando
-        // recognition.start() se ejecuta dentro del loop continuo.
-        try {
-            if (!micStreamRef.current) {
-                micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-            }
-        } catch (e) {
-            console.warn("No se pudo obtener stream silencioso (truco pitido):", e);
-        }
 
         if (recognitionRef.current) {
             try { recognitionRef.current.start(); } catch (e) { /* Ya iniciado */ }
