@@ -148,6 +148,7 @@ export default function useVoiceCopilot({
     const audioContextRef = useRef(null);
     const mediaStreamRef = useRef(null);
     const scriptProcessorRef = useRef(null);
+    const attentionTimeoutRef = useRef(null); // Ref para la bomba de tiempo de la ventana de atención
 
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -254,32 +255,39 @@ export default function useVoiceCopilot({
                             detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
                             const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
+                            const hasWakeWord = transcript.includes(currentWakeWord) || transcript.includes('computadora');
 
-                            if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
-                                if (stateRef.current !== 'wake' && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
-                                    setVoiceState('wake');
-                                    stateRef.current = 'wake';
-                                }
+                            // 1. Activar Alerta Visual y Ventana de Atención
+                            if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                                setVoiceState('wake');
+                                stateRef.current = 'wake';
+                                
+                                // Iniciar/Reiniciar la Ventana de Atención de 5 segundos
+                                if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                attentionTimeoutRef.current = setTimeout(() => {
+                                    if (stateRef.current === 'wake') {
+                                        setVoiceState('listening');
+                                        stateRef.current = 'listening';
+                                        setLastTranscript(''); // Limpiar si expiró la ventana
+                                    }
+                                }, 5000);
                             }
 
+                            // 2. Evaluación de Resultados Finales
                             if (type === 'final') {
-                                if (transcript.includes(currentWakeWord) || transcript.includes('computadora')) {
+                                // Si estamos en la ventana de atención ('wake'), cualquier frase final puede detonar el comando
+                                if (stateRef.current === 'wake') {
                                     const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
 
                                     if (poiMatch) {
+                                        // Comando detectado exitosamente
+                                        if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current); // Cancelar bomba de tiempo
                                         setMatchedPoi(poiMatch);
                                         setVoiceState('matched'); 
                                         stateRef.current = 'matched';
                                         setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
-                                    } else {
-                                        setTimeout(() => {
-                                            if (stateRef.current === 'wake') {
-                                                setVoiceState('listening');
-                                                stateRef.current = 'listening';
-                                            }
-                                        }, 1500);
-                                        setLastTranscript('');
                                     }
+                                    // Si no hay match, no hacemos nada, la Ventana de 5s sigue corriendo
                                 }
                             }
                         } else if (type === 'error') {
