@@ -62,7 +62,7 @@ function isWakeWordDetected(transcript, targetWakeWord) {
     
     // 1. Matriz de Alias para "computadora" (Fallback crítico)
     if (normTarget === 'computadora') {
-        const aliases = ['computadora', 'computador', 'conputadora', 'conmutadora', 'comutadora', 'como tadora', 'con putadora', 'compu tadora', 'computura', 'con dictadora', 'computa dora'];
+        const aliases = ['computadora', 'computador', 'compu', 'conputadora', 'conmutadora', 'comutadora', 'como tadora', 'con putadora', 'compu tadora', 'computura', 'con dictadora', 'computa dora'];
         for (const alias of aliases) {
             if (normTranscript.includes(alias) || noSpaceTranscript.includes(alias.replace(/\s+/g, ''))) return true;
         }
@@ -492,19 +492,56 @@ export default function useVoiceCopilot({
                 scriptProcessorRef.current = processor;
 
                 // ═══════════════════════════════════════════════════════════════
-                // FLUSH AGRESIVO — Cada 1.5s forzamos a Vosk a emitir lo que tenga
-                // y resetear. SOLO se aplica en modo 'listening' (buscando wake word).
-                // En modo 'wake' (escuchando POI) NO hacemos flush para que Vosk
-                // pueda acumular la frase completa del punto de interés.
-                // Esto reduce la latencia de detección del wake word de ~5s a <2s
-                // y evita la acumulación de audio corrupto en dispositivos lentos.
+                // FLUSH AGRESIVO v2 — Con Guardia de Prefijo
+                // 
+                // Mejoras sobre v1:
+                // 1. Ventana de 3s (antes 1.5s) — "computadora" (~1s) cabe completa
+                // 2. Guardia de Prefijo: Si el texto actual parece que el piloto
+                //    ESTÁ EN MEDIO de decir "computadora" (ej: "compu..."), NO
+                //    hacemos flush. Esperamos al siguiente ciclo para no cortar
+                //    la palabra a la mitad.
                 // ═══════════════════════════════════════════════════════════════
-                const FLUSH_INTERVAL_MS = 1500;
+                const FLUSH_INTERVAL_MS = 3000;
+                // Ref para guardar el último partial result (accesible desde el interval)
+                let lastPartialText = '';
+                
+                // Guardar cada partial result para la Guardia de Prefijo
+                const originalOnMessage = voskWorkerRef.current.onmessage;
+                voskWorkerRef.current.onmessage = (e) => {
+                    // Capturar el último partial para la guardia
+                    if (e.data.type === 'partial') {
+                        const p = e.data.result?.partial || '';
+                        if (p) lastPartialText = p;
+                    }
+                    // Delegar al handler original
+                    originalOnMessage(e);
+                };
+
                 if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
                 flushIntervalRef.current = setInterval(() => {
                     if (stateRef.current === 'listening' && voskWorkerRef.current) {
+                        // ── GUARDIA DE PREFIJO ──
+                        // Si el texto actual termina con algo que parece el inicio de "computadora",
+                        // el piloto puede estar en medio de decirlo. NO hacemos flush.
+                        const wakeTarget = normalizeFull(callbacksRef.current.wakeWord);
+                        const currentText = normalizeFull(lastPartialText);
+                        
+                        if (currentText && wakeTarget.length >= 4) {
+                            // Checamos si algún sufijo del texto actual es un prefijo del wake word
+                            // Ej: texto="hola compu", wake="computadora" → "compu" es prefijo de "computadora" → SKIP
+                            const words = currentText.split(/\s+/);
+                            const lastWord = words[words.length - 1] || '';
+                            
+                            if (lastWord.length >= 3 && wakeTarget.startsWith(lastWord)) {
+                                // El piloto parece estar diciendo el wake word, NO flush
+                                return;
+                            }
+                        }
+
+                        // No hay riesgo de cortar la palabra → flush seguro
                         voskWorkerRef.current.postMessage({ action: 'flush' });
                         setLastTranscript(''); // Borrar el texto de la pantalla (descarte visual)
+                        lastPartialText = '';  // Resetear la guardia
                     }
                     // En 'wake', 'matched', 'playing' o 'booting': NO hacemos flush.
                     // Esto permite que Vosk acumule la frase del POI sin interrupción.
