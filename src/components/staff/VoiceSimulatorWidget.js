@@ -33,6 +33,21 @@ export default function VoiceSimulatorWidget({
     const wakeInputRef = useRef(null);
     const [showCommands, setShowCommands] = useState(false);
 
+    // ── CONTAINER WIDTH RE-MEASUREMENT PARA 60FPS ──
+    const containerRef = useRef(null);
+    const [containerWidth, setContainerWidth] = useState(0);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            if (entries[0]) {
+                setContainerWidth(entries[0].contentRect.width);
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     // ── ANIMATION STATE MACHINE ──
     // 'off' -> 'sliding_on' -> 'flying_on' -> 'on'
     // 'on' -> 'flying_off' -> 'sliding_off' -> 'off'
@@ -88,21 +103,31 @@ export default function VoiceSimulatorWidget({
     if (copilot.voiceState === 'playing') haloClass = 'bg-gradient-to-tr from-blue-500 via-indigo-500 to-cyan-500 animate-[spin_8s_linear_infinite] opacity-70';
 
     const getOrbStyles = () => {
-        const base = { pointerEvents: 'auto' }; // Always clickable to prevent touch block
+        const W = containerWidth || 360; // Fallback previniendo NaN en render inicial SSR
+        const base = { 
+            pointerEvents: 'auto',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: '72px',
+            height: '72px',
+            willChange: 'transform, opacity',
+            transformOrigin: 'center center'
+        };
         switch (animPhase) {
             case 'off':
-                return { ...base, top: '24px', right: '53px', width: '28px', height: '28px', transition: 'all 250ms ease-out' };
+                return { ...base, transform: `translate3d(${W - 103}px, 5px, 0) scale(0.388889)`, transition: 'transform 250ms ease-out' };
             case 'sliding_on':
-                return { ...base, top: '24px', right: '23px', width: '28px', height: '28px', transition: 'all 250ms cubic-bezier(0.4, 0, 0.2, 1)' };
+                return { ...base, transform: `translate3d(${W - 73}px, 5px, 0) scale(0.388889)`, transition: 'transform 250ms cubic-bezier(0.4, 0, 0.2, 1)' };
             case 'flying_on':
             case 'on':
-                return { ...base, top: '130px', right: 'calc(50% - 36px)', width: '72px', height: '72px', transition: 'all 700ms cubic-bezier(0.25, 1, 0.4, 1)' };
+                return { ...base, transform: `translate3d(${W / 2 - 36}px, 130px, 0) scale(1)`, transition: 'transform 700ms cubic-bezier(0.25, 1, 0.4, 1)' };
             case 'flying_off':
-                return { ...base, top: '24px', right: '23px', width: '28px', height: '28px', transition: 'all 450ms cubic-bezier(0.25, 1, 0.4, 1)' };
+                return { ...base, transform: `translate3d(${W - 73}px, 5px, 0) scale(0.388889)`, transition: 'transform 450ms cubic-bezier(0.25, 1, 0.4, 1)' };
             case 'sliding_off':
-                return { ...base, top: '24px', right: '53px', width: '28px', height: '28px', transition: 'all 250ms ease-out' };
+                return { ...base, transform: `translate3d(${W - 103}px, 5px, 0) scale(0.388889)`, transition: 'transform 250ms ease-out' };
             default:
-                return { ...base, top: '24px', right: '53px', width: '28px', height: '28px' };
+                return { ...base, transform: `translate3d(${W - 103}px, 5px, 0) scale(0.388889)` };
         }
     };
 
@@ -123,13 +148,13 @@ export default function VoiceSimulatorWidget({
     }
 
     return (
-        <div className={`rounded-[28px] border-2 overflow-hidden mb-6 transition-colors duration-700 relative ${S.container} ${isExpandedPhase ? 'ring-4 ring-white/10' : ''}`}>
+        <div ref={containerRef} className={`rounded-[28px] border-2 overflow-hidden mb-6 transition-colors duration-700 relative ${S.container} ${isExpandedPhase ? 'ring-4 ring-white/10' : ''}`}>
             
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* THE MORPHING ORBI (Shared Element Illusion) */}
             {/* ═══════════════════════════════════════════════════════════════ */}
             <div 
-                className={`absolute z-[60] rounded-full`}
+                className={`z-[60] rounded-full`}
                 style={getOrbStyles()}
                 onClick={handleToggleClick}
             >
@@ -137,14 +162,14 @@ export default function VoiceSimulatorWidget({
                 <div className={`absolute inset-0 rounded-full bg-white transition-all duration-500 ${isExpandedPhase && (copilot.voiceState === 'wake' || copilot.isDetectingVoice) ? 'opacity-40 animate-ping' : 'opacity-0 scale-50'}`}></div>
 
                 {/* Colorful Spinning Halo (Behind the solid circle) */}
-                <div className={`absolute inset-[-20%] rounded-full transition-all duration-[800ms] ease-in-out ${haloClass} ${isExpandedPhase ? 'opacity-100 scale-100' : 'opacity-0 scale-50 blur-md'}`} />
+                <div className={`absolute inset-[-20%] rounded-full transition-all duration-[800ms] ease-in-out ${haloClass} ${isExpandedPhase ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`} />
                 
                 {/* Solid White Center & Icons */}
                 <div className={`relative w-full h-full bg-white rounded-full flex items-center justify-center transition-all duration-700 ${isExpandedPhase ? 'shadow-[0_10px_40px_rgba(0,0,0,0.3)] ring-4 ring-white/50 cursor-pointer active:scale-95' : 'shadow-sm'}`}>
                     
                     {/* Icon OFF */}
                     <MicOff 
-                        size={14} 
+                        size={36} 
                         className={`absolute text-slate-400 transition-all duration-[400ms] ${isExpandedPhase ? 'opacity-0 scale-50 rotate-[-45deg]' : 'opacity-100 scale-100 rotate-0'}`} 
                     />
                     

@@ -403,61 +403,115 @@ export default function OperationUI({
                     isPeripheralActive={isPeripheralActive}
                 />
 
-                {/* ── Preparar Cabina Button (First Touch — unlocks AudioContext) ── */}
-                {flightPhase === 'cold' && flightAudioHasSoundtracks && !activeFlight && (
-                    <div className="w-full max-w-[280px] mx-auto mb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                        <button
-                            type="button"
-                            onClick={onPrepareCabin}
-                            className={`w-full py-3.5 rounded-2xl text-sm font-extrabold tracking-wide flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.97] ${
-                                isPeripheralActive
-                                    ? 'bg-white/15 hover:bg-white/25 text-white/90 border border-white/20 backdrop-blur-md'
-                                    : 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50'
-                            }`}
-                        >
-                            <span style={{ fontSize: '16px' }}>🎧</span>
-                            Preparar Cabina
-                        </button>
-                    </div>
-                )}
+                {/* ── LÓGICA DE PREPARACIÓN OBLIGATORIA ── */}
+                {/* Solo mostramos la cabina si el audio no se ha iniciado Y hay pistas de audio */}
+                {(() => {
+                    const needsCabinPrep = flightPhase === 'cold' && flightAudioHasSoundtracks && !activeFlight;
 
-                {/* ── Flight Logger (core instrument) ── */}
-                <div className="pt-4">
-                    <MemoizedFlightLogger
-                        key={activeFlight?.flightId ? `active-${activeFlight.flightId}` : 'idle-flight-logger'}
-                        onFlightComplete={(data) => {
-                            if (voiceSetIsActive && copilotRef.current) {
-                                copilotRef.current.stopListening();
-                            }
-                            if (typeof onFlightComplete === 'function') {
-                                return onFlightComplete(data);
-                            }
-                        }}
-                        onFlightStart={(payload) => {
-                            if (voiceSetIsActive && copilotRef.current) {
-                                copilotRef.current.startListening();
-                            }
-                            if (typeof onFlightStart === 'function') {
-                                return onFlightStart(payload);
-                            }
-                        }}
-                        onFlightCancel={onFlightCancel}
-                        initialActiveFlight={activeFlight}
-                        nextFlightNumber={nextFlightNumber}
-                        activeFlightNumber={activeFlightNumber}
-                        showInterFlightTimer={showInterFlightTimer}
-                        interFlightElapsedSeconds={interFlightElapsedSeconds}
-                        totalStudentsFlown={totalStudentsFlown}
-                        totalOperationElapsedSeconds={operationElapsedSeconds}
-                        showTotalOperationTimer={showOperationTimer}
-                        disabled={!!activePause}
-                        pilotRecording={currentRole === 'pilot' && pilotRecording}
-                        pilotMicPermission={currentRole === 'pilot' ? pilotMicPermission : null}
-                        pilotMicSupported={currentRole === 'pilot' ? pilotMicSupported : false}
-                        onRetryMicPermission={currentRole === 'pilot' ? onRetryMicPermission : null}
-                        isPeripheralActive={isPeripheralActive}
-                    />
-                </div>
+                    return (
+                        <>
+                            {/* ── Paso 1: Preparar Cabina (First Touch Obligatorio) ── */}
+                            {needsCabinPrep && (
+                                <div className="w-full px-4 py-6 flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-700">
+                                    <div className={`w-full max-w-[340px] rounded-[32px] p-8 flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 ${
+                                        isPeripheralActive 
+                                            ? 'bg-white/10 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl' 
+                                            : 'bg-white border border-slate-200/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]'
+                                    }`}>
+                                        
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 shadow-sm ${
+                                            isPeripheralActive ? 'bg-white/20 text-white' : 'bg-violet-50 border border-violet-100 text-violet-600'
+                                        }`}>
+                                            <svg xmlns="http://www.w3.org/-2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                                                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                                            </svg>
+                                        </div>
+                                        
+                                        <h3 className={`text-[22px] font-black mb-2 tracking-tight ${isPeripheralActive ? 'text-white' : 'text-slate-900'}`}>
+                                            Sistema de Audio
+                                        </h3>
+                                        
+                                        <p className={`text-[13.5px] leading-relaxed mb-5 px-2 ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>
+                                            Presiona para inicializar y permitir el audio durante el vuelo.
+                                        </p>
+
+                                        {/* ── Recordatorio de Setup (Gafas + Micrófono) ── */}
+                                        <div className={`w-full mb-6 p-3.5 rounded-[16px] text-left flex gap-3 items-start transition-all ${
+                                            isPeripheralActive 
+                                                ? 'bg-white/10 border border-white/10' 
+                                                : 'bg-slate-50 border border-slate-200/80'
+                                        }`}>
+                                            <div className={`mt-0.5 flex-shrink-0 ${isPeripheralActive ? 'text-white/60' : 'text-slate-400'}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="10"></circle>
+                                                    <path d="M12 16v-4"></path>
+                                                    <path d="M12 8h.01"></path>
+                                                </svg>
+                                            </div>
+                                            <p className={`text-[11.5px] leading-relaxed ${isPeripheralActive ? 'text-white/80' : 'text-slate-600'}`}>
+                                                <strong className={`font-bold ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}>Setup de Cabina: </strong> 
+                                                Recuerda conectar tu dispositivo mediante Bluetooth al sistema de audio para que el sonido salga directamente a las gafas.
+                                            </p>
+                                        </div>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={onPrepareCabin}
+                                            className={`w-full py-4 rounded-[20px] font-black text-[15px] tracking-wide flex items-center justify-center transition-all duration-300 active:scale-[0.96] ${
+                                                isPeripheralActive
+                                                    ? 'bg-white hover:bg-slate-100 text-slate-900 shadow-[0_0_20px_rgba(255,255,255,0.2)]'
+                                                    : 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-[0_8px_30px_rgba(139,92,246,0.35)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.5)]'
+                                            }`}
+                                        >
+                                            Permitir Audio
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Paso 2: Flight Logger (Instrumento Principal) ── */}
+                            {!needsCabinPrep && (
+                                <div className="pt-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                    <MemoizedFlightLogger
+                                        key={activeFlight?.flightId ? `active-${activeFlight.flightId}` : 'idle-flight-logger'}
+                                        onFlightComplete={(data) => {
+                                            if (voiceSetIsActive && copilotRef.current) {
+                                                copilotRef.current.stopListening();
+                                            }
+                                            if (typeof onFlightComplete === 'function') {
+                                                return onFlightComplete(data);
+                                            }
+                                        }}
+                                        onFlightStart={(payload) => {
+                                            if (voiceSetIsActive && copilotRef.current) {
+                                                copilotRef.current.startListening();
+                                            }
+                                            if (typeof onFlightStart === 'function') {
+                                                return onFlightStart(payload);
+                                            }
+                                        }}
+                                        onFlightCancel={onFlightCancel}
+                                        initialActiveFlight={activeFlight}
+                                        nextFlightNumber={nextFlightNumber}
+                                        activeFlightNumber={activeFlightNumber}
+                                        showInterFlightTimer={showInterFlightTimer}
+                                        interFlightElapsedSeconds={interFlightElapsedSeconds}
+                                        totalStudentsFlown={totalStudentsFlown}
+                                        totalOperationElapsedSeconds={operationElapsedSeconds}
+                                        showTotalOperationTimer={showOperationTimer}
+                                        disabled={!!activePause}
+                                        pilotRecording={currentRole === 'pilot' && pilotRecording}
+                                        pilotMicPermission={currentRole === 'pilot' ? pilotMicPermission : null}
+                                        pilotMicSupported={currentRole === 'pilot' ? pilotMicSupported : false}
+                                        onRetryMicPermission={currentRole === 'pilot' ? onRetryMicPermission : null}
+                                        isPeripheralActive={isPeripheralActive}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    );
+                })()}
 
 
                 {/* ── Pending Sync Badge ── */}
