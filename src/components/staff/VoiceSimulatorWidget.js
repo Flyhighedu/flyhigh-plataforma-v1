@@ -48,6 +48,19 @@ export default function VoiceSimulatorWidget({
         return () => observer.disconnect();
     }, []);
 
+    // ── HIGH-PERFORMANCE ACCORDION HEIGHT (60FPS) ──
+    const contentRef = useRef(null);
+    const [contentHeight, setContentHeight] = useState(0);
+
+    useEffect(() => {
+        if (contentRef.current) {
+            const h = contentRef.current.scrollHeight;
+            if (h !== contentHeight) {
+                setContentHeight(h);
+            }
+        }
+    });
+
     // ── ANIMATION STATE MACHINE ──
     // 'off' -> 'sliding_on' -> 'flying_on' -> 'on'
     // 'on' -> 'flying_off' -> 'sliding_off' -> 'off'
@@ -225,15 +238,13 @@ export default function VoiceSimulatorWidget({
                 </div>
 
                 {/* Error Banner */}
-                <div className={`grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${copilot.errorMsg ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                    <div className="overflow-hidden">
-                        <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 mt-2 flex items-start gap-2 shadow-sm">
-                            <span className="text-red-500 text-sm mt-0.5">⚠️</span>
-                            <p className="text-[11px] text-red-600 font-medium leading-relaxed">{copilot.errorMsg}</p>
-                            <button onClick={() => copilot.setErrorMsg(null)} className="ml-auto text-red-300 hover:text-red-500 transition-colors">
-                                <X size={14} />
-                            </button>
-                        </div>
+                <div className={`transition-[max-height] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden`} style={{ maxHeight: copilot.errorMsg ? '100px' : '0px', willChange: 'max-height' }}>
+                    <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 mt-2 flex items-start gap-2 shadow-sm">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-[11px] text-red-600 font-medium leading-relaxed">{copilot.errorMsg}</p>
+                        <button onClick={() => copilot.setErrorMsg(null)} className="ml-auto text-red-300 hover:text-red-500 transition-colors">
+                            <X size={14} />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -241,39 +252,43 @@ export default function VoiceSimulatorWidget({
             {/* ═══════════════════════════════════════════════════════════════ */}
             {/* ACCORDION EXPANDED CONTENT (Staggered Fade-ins) */}
             {/* ═══════════════════════════════════════════════════════════════ */}
-            <div className={`grid transition-[grid-template-rows] ease-[cubic-bezier(0.25,1,0.3,1)] ${isExpandedPhase ? 'grid-rows-[1fr] duration-[800ms]' : 'grid-rows-[0fr] duration-[500ms] delay-[150ms]'}`}>
-                <div className="overflow-hidden">
-                    <div className="px-5 pb-6 flex flex-col items-center">
-                        
-                        {/* SPACER FOR THE MORPHING ORBI */}
-                        <div className="h-[140px] w-full shrink-0"></div>
+            <div 
+                className={`transition-[height] ease-[cubic-bezier(0.25,1,0.3,1)] overflow-hidden ${isExpandedPhase ? 'duration-[800ms]' : 'duration-[500ms] delay-[150ms]'}`}
+                style={{ height: isExpandedPhase ? `${contentHeight}px` : '0px', willChange: 'height' }}
+            >
+                <div ref={contentRef} className="px-5 pb-6 flex flex-col items-center">
+                    
+                    {/* SPACER FOR THE MORPHING ORBI */}
+                    <div className="h-[140px] w-full shrink-0"></div>
 
-                        {/* ── LIVE TRANSCRIPT ── */}
-                        <div className={`mt-2 h-8 flex items-center justify-center min-w-[200px] transition-all duration-[600ms] delay-[150ms] ${isExpandedPhase ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
-                            {copilot.lastTranscript && copilot.voiceState !== 'booting' ? (
-                                <p className={`text-[15px] font-black italic truncate max-w-[300px] transition-all duration-300 animate-[fadeInUp_0.4s_ease-out] ${S.textPrimary}`}>
-                                    &ldquo;{copilot.lastTranscript}&rdquo;
-                                </p>
-                            ) : (
-                                <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
-                                    {copilot.voiceState === 'booting' ? 'Cargando Motor IA...' : 
-                                     copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
-                                     copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
-                                     copilot.voiceState === 'matched' ? '¡Comando detectado!' :
-                                     copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
-                                </p>
-                            )}
-                        </div>
-                        
-                        {/* Matched POI Name Display */}
-                        <div className={`mt-2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/20 text-white shadow-sm transition-all duration-[600ms] ease-out ${copilot.matchedPoi && (copilot.voiceState === 'matched' || copilot.voiceState === 'playing') ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none absolute'}`}>
+                    {/* ── LIVE TRANSCRIPT ── */}
+                    <div className={`mt-2 h-8 flex items-center justify-center min-w-[200px] transition-[transform,opacity] duration-[600ms] delay-[150ms] ${isExpandedPhase ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
+                        {copilot.lastTranscript && copilot.voiceState !== 'booting' ? (
+                            <p className={`text-[15px] font-black italic truncate max-w-[300px] transition-[opacity,color] duration-300 animate-[fadeInUp_0.4s_ease-out] ${S.textPrimary}`}>
+                                &ldquo;{copilot.lastTranscript}&rdquo;
+                            </p>
+                        ) : (
+                            <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
+                                {copilot.voiceState === 'booting' ? 'Cargando Motor IA...' : 
+                                 copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
+                                 copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
+                                 copilot.voiceState === 'matched' ? '¡Comando detectado!' :
+                                 copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
+                            </p>
+                        )}
+                    </div>
+                    
+                    {/* Matched POI Name Display Container */}
+                    <div className="mt-2 h-[32px] w-full relative flex justify-center">
+                        <div className={`absolute flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/20 text-white shadow-sm transition-[transform,opacity] duration-[600ms] ease-out ${copilot.matchedPoi && (copilot.voiceState === 'matched' || copilot.voiceState === 'playing') ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none'}`}>
                             <span className="text-sm">{copilot.voiceState === 'matched' ? '✅' : '🔊'}</span>
                             <p className="text-[12px] font-bold truncate max-w-[200px]">{copilot.matchedPoi?.name || ''}</p>
                         </div>
+                    </div>
 
-                        {/* ── WAKE WORD CONFIGURATOR ── */}
-                        <div className={`w-full mt-4 transition-all duration-[700ms] delay-[250ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                            <div className={`rounded-2xl border p-3.5 flex items-center justify-between transition-colors duration-500 shadow-sm ${S.pillBg}`}>
+                    {/* ── WAKE WORD CONFIGURATOR ── */}
+                    <div className={`w-full mt-4 transition-[transform,opacity] duration-[700ms] delay-[250ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                        <div className={`rounded-2xl border p-3.5 flex items-center justify-between transition-colors duration-500 shadow-sm ${S.pillBg}`}>
                                 <div className="flex-1">
                                     <p className={`text-[9px] font-black uppercase tracking-widest opacity-60 mb-1 transition-colors duration-300`}>
                                         Palabra Mágica
@@ -311,7 +326,7 @@ export default function VoiceSimulatorWidget({
                         </div>
 
                         {/* ── COMMANDS DICTIONARY ── */}
-                        <div className={`w-full mt-3 transition-all duration-[800ms] delay-[350ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                        <div className={`w-full mt-3 transition-[transform,opacity] duration-[800ms] delay-[350ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                             <div className={`rounded-2xl border transition-colors duration-500 overflow-hidden shadow-sm ${S.pillBg}`}>
                                 <button onClick={() => setShowCommands(!showCommands)} className="flex items-center justify-between w-full p-3.5 group outline-none active:bg-black/5 transition-colors">
                                     <div className="flex items-center gap-2">
@@ -325,31 +340,31 @@ export default function VoiceSimulatorWidget({
                                     </div>
                                 </button>
 
-                                <div className={`grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${showCommands ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-                                    <div className="overflow-hidden">
-                                        <div className="px-3 pb-3 space-y-1.5 max-h-[180px] overflow-y-auto custom-scrollbar">
-                                            {copilot.voiceCommands.length === 0 ? (
-                                                <p className="text-[11px] italic opacity-60 text-center py-2">No hay narrativas con audio.</p>
-                                            ) : (
-                                                copilot.voiceCommands.map((cmd, i) => (
-                                                    <div key={cmd.id} className="flex flex-col rounded-xl px-3 py-2 bg-white/40 border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)] transition-colors hover:bg-white/60 animate-[fadeInUp_0.4s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: 'both' }}>
-                                                        <span className="text-[11px] font-bold opacity-90 truncate text-slate-800">
-                                                            &ldquo;{cmd.keywords.join(', ')}&rdquo;
-                                                        </span>
-                                                        <span className="text-[9px] truncate opacity-70 text-slate-600 mt-0.5">
-                                                            Responde: {cmd.name}
-                                                        </span>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
+                                <div 
+                                    className={`transition-[max-height] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden`} 
+                                    style={{ maxHeight: showCommands ? '300px' : '0px', willChange: 'max-height' }}
+                                >
+                                    <div className="px-3 pb-3 space-y-1.5 max-h-[180px] overflow-y-auto custom-scrollbar">
+                                        {copilot.voiceCommands.length === 0 ? (
+                                            <p className="text-[11px] italic opacity-60 text-center py-2">No hay narrativas con audio.</p>
+                                        ) : (
+                                            copilot.voiceCommands.map((cmd, i) => (
+                                                <div key={cmd.id} className="flex flex-col rounded-xl px-3 py-2 bg-white/40 border border-white/20 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)] transition-colors hover:bg-white/60 animate-[fadeInUp_0.4s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: 'both' }}>
+                                                    <span className="text-[11px] font-bold opacity-90 truncate text-slate-800">
+                                                        &ldquo;{cmd.keywords.join(', ')}&rdquo;
+                                                    </span>
+                                                    <span className="text-[9px] truncate opacity-70 text-slate-600 mt-0.5">
+                                                        Responde: {cmd.name}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
             
             <style jsx>{`
                 @keyframes fadeInUp {
