@@ -85,6 +85,34 @@ function isWakeWordDetected(transcript, targetWakeWord) {
     return false;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AUDIO DOWNSAMPLER (Math)
+// ═══════════════════════════════════════════════════════════════
+function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
+    if (inputSampleRate === outputSampleRate) return buffer;
+    if (inputSampleRate < outputSampleRate) return buffer; // Only downsample
+
+    const sampleRateRatio = inputSampleRate / outputSampleRate;
+    const newLength = Math.round(buffer.length / sampleRateRatio);
+    const result = new Float32Array(newLength);
+    let offsetResult = 0;
+    let offsetBuffer = 0;
+
+    while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        let accum = 0;
+        let count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+            accum += buffer[i];
+            count++;
+        }
+        result[offsetResult] = count > 0 ? accum / count : 0;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+    }
+    return result;
+}
+
 export default function useVoiceCopilot({ 
     pois = [], 
     audioRef, 
@@ -322,15 +350,14 @@ export default function useVoiceCopilot({
         try {
             // 1. Iniciar Micrófono y AudioContext (PRIMERO para conocer el Sample Rate Nativo)
             if (!audioContextRef.current) {
-                // Desactivamos el procesamiento de voz nativo (echoCancellation, etc.) 
-                // para evitar que Android active el "Modo Llamada" (HFP) y desconecte el Bluetooth A2DP de alta calidad.
+                // Desactivamos echoCancellation para evitar el "Modo Llamada" (HFP) y desconexión de A2DP
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
                         echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false,
+                        noiseSuppression: true, // Reactivado: Limpia viento y ruido ambiental por hardware
+                        autoGainControl: true,  // Reactivado: Amplifica la voz automáticamente
                         channelCount: 1
-                        // NO forzamos sampleRate: 16000 aquí, dejamos que tome la tasa nativa del dispositivo
+                        // NO forzamos sampleRate aquí para evitar HFP, dejamos que tome la tasa nativa del dispositivo
                     } 
                 });
                 mediaStreamRef.current = stream;
@@ -408,12 +435,12 @@ export default function useVoiceCopilot({
                         }
                     };
                     
-                    // Pedirle al worker que cargue el modelo, y procese el audio a la Tasa Nativa de Bluetooth
+                    // Pedirle al worker que cargue el modelo, y procese el audio a 16000Hz fijos
                     voskWorkerRef.current.postMessage({ 
                         action: 'init', 
                         data: { 
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
-                            sampleRate: audioCtx.sampleRate 
+                            sampleRate: 16000 
                         } 
                     });
                 } else {
@@ -423,14 +450,17 @@ export default function useVoiceCopilot({
                     stateRef.current = 'listening';
                 }
 
+                // Aumentamos el buffer de 4096 a 8192 para darle respiro al CPU móvil (menos tirones)
                 const source = audioCtx.createMediaStreamSource(stream);
-                const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                const processor = audioCtx.createScriptProcessor(8192, 1, 1);
                 
                 processor.onaudioprocess = (e) => {
                     if (stateRef.current === 'listening' || stateRef.current === 'wake') {
                         const audioData = e.inputBuffer.getChannelData(0);
                         if (voskWorkerRef.current) {
-                            voskWorkerRef.current.postMessage({ action: 'process', data: audioData });
+                            // Downsample matemático de la tasa nativa (ej. 48k) a 16k
+                            const downsampledData = downsampleBuffer(audioData, audioCtx.sampleRate, 16000);
+                            voskWorkerRef.current.postMessage({ action: 'process', data: downsampledData });
                         }
                     }
                 };
