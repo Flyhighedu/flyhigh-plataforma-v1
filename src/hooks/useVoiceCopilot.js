@@ -251,6 +251,7 @@ export default function useVoiceCopilot({
     const mediaStreamRef = useRef(null);
     const scriptProcessorRef = useRef(null);
     const attentionTimeoutRef = useRef(null); // Ref para la bomba de tiempo de la ventana de atención
+    const flushIntervalRef = useRef(null);    // Ref para el timer de Flush Agresivo
 
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -281,6 +282,10 @@ export default function useVoiceCopilot({
             if (typeof document !== 'undefined') {
                 document.removeEventListener('visibilitychange', handleVisibilityChange);
             }
+            if (flushIntervalRef.current) {
+                clearInterval(flushIntervalRef.current);
+                flushIntervalRef.current = null;
+            }
             if (voskWorkerRef.current) {
                 voskWorkerRef.current.postMessage({ action: 'destroy' });
                 voskWorkerRef.current.terminate();
@@ -300,6 +305,12 @@ export default function useVoiceCopilot({
         setIsDetectingVoice(false);
         if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
         
+        // Detener el Flush Agresivo
+        if (flushIntervalRef.current) {
+            clearInterval(flushIntervalRef.current);
+            flushIntervalRef.current = null;
+        }
+
         if (scriptProcessorRef.current) {
             scriptProcessorRef.current.disconnect();
             scriptProcessorRef.current = null;
@@ -374,14 +385,17 @@ export default function useVoiceCopilot({
                         } else if (type === 'partial' || type === 'final') {
                             const transcript = result?.partial || result?.text || '';
                             if (!transcript) return;
-                            
-                            setLastTranscript(transcript);
-                            setIsDetectingVoice(true);
-                            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
-                            detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
                             const currentWakeWord = callbacksRef.current.wakeWord;
                             const hasWakeWord = isWakeWordDetected(transcript, currentWakeWord);
+                            
+                            // DEBUG: Mostrar SIEMPRE el transcript para verificar que el flush funciona.
+                            // Se debería ver el texto aparecer y desaparecer cada 1.5s.
+                            setLastTranscript(transcript);
+
+                            setIsDetectingVoice(true);
+                            if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
+                            detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
                             // 1. Activar Alerta Visual y Ventana de Atención
                             if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
@@ -413,7 +427,14 @@ export default function useVoiceCopilot({
                                         stateRef.current = 'matched';
                                         setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
                                     }
-                                    // Si no hay match, no hacemos nada, la Ventana de 5s sigue corriendo
+                                    // Si no hay match, no hacemos nada, la Ventana de 10s sigue corriendo
+                                }
+
+                                // 3. FLUSH CLEANUP: Si es un resultado final en modo 'listening'
+                                // y NO contiene el wake word, desechamos el texto de la pantalla.
+                                // Esto es el "descarte visual" del Flush Agresivo.
+                                if (stateRef.current === 'listening' && !hasWakeWord) {
+                                    setLastTranscript('');
                                 }
                             }
                         } else if (type === 'error') {
@@ -469,6 +490,25 @@ export default function useVoiceCopilot({
                 source.connect(processor);
                 processor.connect(audioCtx.destination);
                 scriptProcessorRef.current = processor;
+
+                // ═══════════════════════════════════════════════════════════════
+                // FLUSH AGRESIVO — Cada 1.5s forzamos a Vosk a emitir lo que tenga
+                // y resetear. SOLO se aplica en modo 'listening' (buscando wake word).
+                // En modo 'wake' (escuchando POI) NO hacemos flush para que Vosk
+                // pueda acumular la frase completa del punto de interés.
+                // Esto reduce la latencia de detección del wake word de ~5s a <2s
+                // y evita la acumulación de audio corrupto en dispositivos lentos.
+                // ═══════════════════════════════════════════════════════════════
+                const FLUSH_INTERVAL_MS = 1500;
+                if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
+                flushIntervalRef.current = setInterval(() => {
+                    if (stateRef.current === 'listening' && voskWorkerRef.current) {
+                        voskWorkerRef.current.postMessage({ action: 'flush' });
+                        setLastTranscript(''); // Borrar el texto de la pantalla (descarte visual)
+                    }
+                    // En 'wake', 'matched', 'playing' o 'booting': NO hacemos flush.
+                    // Esto permite que Vosk acumule la frase del POI sin interrupción.
+                }, FLUSH_INTERVAL_MS);
             }
         } catch (err) {
             setErrorMsg('Permiso de micrófono denegado o no soportado.');

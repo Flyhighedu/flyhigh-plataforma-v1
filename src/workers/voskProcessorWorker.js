@@ -76,6 +76,36 @@ self.onmessage = async (e) => {
     if (action === 'reset' && recognizer) {
         recognizer.reset();
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FLUSH AGRESIVO — Destruye el reconocedor y crea uno nuevo.
+    // vosk-browser NO limpia correctamente el buffer interno con reset(),
+    // así que la única forma garantizada de borrar todo el audio acumulado
+    // es destruir el reconocedor viejo y crear uno fresco desde el modelo.
+    // El modelo (50MB) se queda en memoria — crear un recognizer es barato (~5ms).
+    // ═══════════════════════════════════════════════════════════════
+    if (action === 'flush' && model) {
+        try {
+            // 1. Destruir el reconocedor viejo (libera su buffer de audio)
+            if (recognizer) {
+                try { recognizer.free(); } catch(_) {}
+            }
+
+            // 2. Crear uno nuevo desde cero (hoja en blanco)
+            recognizer = new model.KaldiRecognizer(currentSampleRate);
+            recognizer.setWords(true);
+
+            recognizer.on("result", (message) => {
+                self.postMessage({ type: 'final', result: message.result });
+            });
+
+            recognizer.on("partialresult", (message) => {
+                self.postMessage({ type: 'partial', result: message.result });
+            });
+        } catch (err) {
+            console.warn('[VoskWorker] flush recreate failed:', err);
+        }
+    }
     
     if (action === 'destroy' && recognizer) {
         recognizer.free();
