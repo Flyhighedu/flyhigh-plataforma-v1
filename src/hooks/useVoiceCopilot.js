@@ -30,6 +30,61 @@ function normalizeFull(text) {
         .trim();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FUZZY MATCHING (Levenshtein Distance)
+// ═══════════════════════════════════════════════════════════════
+function levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+    for (let i = 0; i <= a.length; i += 1) matrix[i][0] = i;
+    for (let j = 0; j <= b.length; j += 1) matrix[0][j] = j;
+    for (let i = 1; i <= a.length; i += 1) {
+        for (let j = 1; j <= b.length; j += 1) {
+            const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1, // deletion
+                matrix[i][j - 1] + 1, // insertion
+                matrix[i - 1][j - 1] + indicator // substitution
+            );
+        }
+    }
+    return matrix[a.length][b.length];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WAKE WORD FUZZY DETECTION
+// ═══════════════════════════════════════════════════════════════
+function isWakeWordDetected(transcript, targetWakeWord) {
+    const normTranscript = normalizeFull(transcript);
+    const noSpaceTranscript = normTranscript.replace(/\s+/g, '');
+    const normTarget = normalizeFull(targetWakeWord);
+    
+    // 1. Matriz de Alias para "computadora" (Fallback crítico)
+    if (normTarget === 'computadora') {
+        const aliases = ['computadora', 'computador', 'conputadora', 'conmutadora', 'comutadora', 'como tadora', 'con putadora', 'compu tadora', 'computura', 'con dictadora', 'computa dora'];
+        for (const alias of aliases) {
+            if (normTranscript.includes(alias) || noSpaceTranscript.includes(alias.replace(/\s+/g, ''))) return true;
+        }
+    }
+
+    // 2. Coincidencia estricta y sin espacios
+    if (normTranscript.includes(normTarget)) return true;
+    if (noSpaceTranscript.includes(normTarget.replace(/\s+/g, ''))) return true;
+
+    // 3. Tolerancia Levenshtein en la última/única palabra si es suficientemente larga
+    const transcriptWords = normTranscript.split(/\s+/);
+    for (const tw of transcriptWords) {
+        if (tw.length >= 5 && normTarget.length >= 5) {
+            // Tolerancia de 1 letra (ej. "pantion" vs "panteon") o 2 letras si es muy larga
+            const tolerance = normTarget.length > 7 ? 2 : 1;
+            if (levenshteinDistance(tw, normTarget) <= tolerance) return true;
+        }
+    }
+    
+    return false;
+}
+
 export default function useVoiceCopilot({ 
     pois = [], 
     audioRef, 
@@ -93,19 +148,50 @@ export default function useVoiceCopilot({
         const norm = normalizeFull(blob);
         if (!norm || norm.length < 4) return null;
 
+        const noSpaceNorm = norm.replace(/\s+/g, '');
         let best = null;
         let bestScore = 0;
+
         for (const cmd of voiceCommands) {
             if (!cmd.keywords.length) continue;
             let score = 0;
+            
             for (const kw of cmd.keywords) {
-                if (norm.includes(kw)) score += kw.length;
+                // 1. Coincidencia estricta
+                if (norm.includes(kw)) {
+                    score += kw.length;
+                    continue;
+                }
+                
+                // 2. Coincidencia sin espacios (Desfragmentación)
+                if (noSpaceNorm.includes(kw)) {
+                    score += kw.length;
+                    continue;
+                }
+                
+                // 3. Levenshtein difuso (solo para keywords de más de 4 letras)
+                if (kw.length >= 5) {
+                    const transcriptWords = norm.split(/\s+/);
+                    let matched = false;
+                    for (const tw of transcriptWords) {
+                        const tolerance = kw.length > 7 ? 2 : 1;
+                        if (levenshteinDistance(tw, kw) <= tolerance) {
+                            score += kw.length - 1; // Puntuación ligeramente menor por ser fuzzy
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (matched) continue;
+                }
             }
+
             if (score > bestScore) {
                 bestScore = score;
                 best = cmd;
             }
         }
+        
+        // Puntuación mínima requerida: 4
         return bestScore >= 4 ? best : null;
     }, [voiceCommands]);
 
@@ -153,7 +239,32 @@ export default function useVoiceCopilot({
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
         
+        const handleVisibilityChange = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+                // El usuario minimizó la app o bloqueó la pantalla.
+                // Apagamos el micrófono y destruimos el worker para evitar que el OS lo corrompa en segundo plano.
+                if (callbacksRef.current.setIsActive) {
+                    callbacksRef.current.setIsActive(false);
+                }
+                if (callbacksRef.current.stopListening) {
+                    callbacksRef.current.stopListening();
+                }
+                if (voskWorkerRef.current) {
+                    voskWorkerRef.current.postMessage({ action: 'destroy' });
+                    voskWorkerRef.current.terminate();
+                    voskWorkerRef.current = null;
+                }
+            }
+        };
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+        
         return () => {
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
             if (voskWorkerRef.current) {
                 voskWorkerRef.current.postMessage({ action: 'destroy' });
                 voskWorkerRef.current.terminate();
@@ -200,9 +311,9 @@ export default function useVoiceCopilot({
     const isActiveRef = useRef(isActive);
     useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
 
-    const callbacksRef = useRef({ findMatchInBuffer, playMatchedAudio, wakeWord, stopListening });
+    const callbacksRef = useRef({ findMatchInBuffer, playMatchedAudio, wakeWord, stopListening, setIsActive });
     useEffect(() => {
-        callbacksRef.current = { findMatchInBuffer, playMatchedAudio, wakeWord, stopListening };
+        callbacksRef.current = { findMatchInBuffer, playMatchedAudio, wakeWord, stopListening, setIsActive };
     });
 
     const startListening = useCallback(async () => {
@@ -254,8 +365,8 @@ export default function useVoiceCopilot({
                             if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
                             detectTimeoutRef.current = setTimeout(() => setIsDetectingVoice(false), 800);
 
-                            const currentWakeWord = callbacksRef.current.wakeWord.toLowerCase();
-                            const hasWakeWord = transcript.includes(currentWakeWord) || transcript.includes('computadora');
+                            const currentWakeWord = callbacksRef.current.wakeWord;
+                            const hasWakeWord = isWakeWordDetected(transcript, currentWakeWord);
 
                             // 1. Activar Alerta Visual y Ventana de Atención
                             if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
