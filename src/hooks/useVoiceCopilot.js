@@ -388,7 +388,7 @@ export default function useVoiceCopilot({
                                 setVoiceState('wake');
                                 stateRef.current = 'wake';
                                 
-                                // Iniciar/Reiniciar la Ventana de Atención de 5 segundos
+                                // Iniciar/Reiniciar la Ventana de Atención de 10 segundos
                                 if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                 attentionTimeoutRef.current = setTimeout(() => {
                                     if (stateRef.current === 'wake') {
@@ -396,7 +396,7 @@ export default function useVoiceCopilot({
                                         stateRef.current = 'listening';
                                         setLastTranscript(''); // Limpiar si expiró la ventana
                                     }
-                                }, 5000);
+                                }, 10000);
                             }
 
                             // 2. Evaluación de Resultados Finales

@@ -20,7 +20,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 const CROSSFADE_DURATION_MS = 1500;
 const DUCK_FADE_MS = 500;
-const DUCK_VOLUME = 0.2;
+const DUCK_VOLUME = 0.05;
 const FULL_VOLUME = 1.0;
 
 // ── Volume fade utility using requestAnimationFrame ──
