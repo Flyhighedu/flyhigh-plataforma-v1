@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import useNativePOITap from '@/hooks/useNativePOITap';
 import {
@@ -16,6 +16,7 @@ const MapWithNoSSR = dynamic(() => import('../staff/TacticalMapLeaflet'), { ssr:
 )});
 
 import AdminPOIModal from './AdminPOIModal';
+import VoiceSimulatorWidget from '../staff/VoiceSimulatorWidget';
 
 
 // ═══ Auto-emoji by name ═══
@@ -56,6 +57,11 @@ export default function MasterRouteStudio() {
     const [expandedContext, setExpandedContext] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
+
+    // ═══ VOICE SIMULATOR STATE ═══
+    const [isCopilotActive, setIsCopilotActive] = useState(false);
+    const [playingPoiId, setPlayingPoiId] = useState(null);
+    const audioRef = useRef(null);
 
     // ═══ MAP STATE ═══
     const [mapBounds, setMapBounds] = useState(null);
@@ -708,6 +714,31 @@ export default function MasterRouteStudio() {
                 </div>
             )}
 
+            {/* ═══ VOICE SIMULATOR WIDGET ═══ */}
+            <div className={`fixed bottom-6 right-6 z-[10000] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                editingPoi
+                    ? 'opacity-0 translate-y-8 scale-90 pointer-events-none'
+                    : 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+            }`}>
+                <div className="relative animate-[orbiEntrance_0.8s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+                    {/* Attention pulse rings */}
+                    <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_0.8s_1_both] pointer-events-none" />
+                    <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_10.8s_1_both] pointer-events-none" />
+                    
+                    <VoiceSimulatorWidget
+                        pois={pois}
+                        audioRef={audioRef}
+                        playingPoiId={playingPoiId}
+                        setPlayingPoiId={setPlayingPoiId}
+                        isActive={isCopilotActive}
+                        setIsActive={setIsCopilotActive}
+                    />
+                </div>
+            </div>
+
+            {/* Reproductor de Audio Oculto para Testing */}
+            <audio ref={audioRef} className="hidden" onEnded={() => setPlayingPoiId(null)} />
+
             {/* Radar pulse & slide animation */}
             <style>{`
                 @keyframes slideUp {
@@ -717,6 +748,17 @@ export default function MasterRouteStudio() {
                 @keyframes radarPulse {
                     0% { transform: scale(1); opacity: 0.6; }
                     100% { transform: scale(2.5); opacity: 0; }
+                }
+                @keyframes orbiEntrance {
+                    0% { opacity: 0; transform: translateY(80px) scale(0.3); }
+                    60% { opacity: 1; transform: translateY(-8px) scale(1.04); }
+                    80% { transform: translateY(3px) scale(0.98); }
+                    100% { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes orbiPulseRing {
+                    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
+                    70% { box-shadow: 0 0 0 20px rgba(139, 92, 246, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
                 }
             `}</style>
         </div>
