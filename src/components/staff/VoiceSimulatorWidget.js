@@ -339,20 +339,26 @@ export default function VoiceSimulatorWidget({
 
                     {/* ── LIVE TRANSCRIPT ── */}
                     <div className={`mt-2 h-8 flex items-center justify-center min-w-[200px] transition-[transform,opacity] duration-[600ms] delay-[150ms] ${isExpandedPhase ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
-                        {(copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' ? (
-                            <p className={`text-[15px] font-black italic truncate max-w-[300px] transition-[opacity,color] duration-300 animate-[fadeInUp_0.4s_ease-out] ${S.textPrimary}`}>
+                        <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
+                            {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
+                             copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
+                             copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
+                             copilot.voiceState === 'matched' ? '¡Comando detectado!' :
+                             copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
+                        </p>
+                    </div>
+
+                    {/* Live Transcript Display Card */}
+                    {copilot.isActive && (copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' && copilot.voiceState !== 'matched' && copilot.voiceState !== 'playing' && (
+                        <div className={`mt-1.5 px-4 py-2 border rounded-xl w-full max-w-[285px] text-center backdrop-blur-sm shadow-sm transition-all duration-300 animate-fade-in ${S.pillBg}`}>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-0.5">
+                                Transcripción en Vivo
+                            </span>
+                            <p className={`text-xs font-semibold italic ${S.textPrimary}`}>
                                 &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
                             </p>
-                        ) : (
-                            <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
-                                {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
-                                 copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
-                                 copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
-                                 copilot.voiceState === 'matched' ? '¡Comando detectado!' :
-                                 copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
-                            </p>
-                        )}
-                    </div>
+                        </div>
+                    )}
                     
                     {/* Matched POI Name Display Container */}
                     <div className="mt-2 h-[32px] w-full relative flex justify-center">

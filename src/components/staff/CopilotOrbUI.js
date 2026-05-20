@@ -180,22 +180,32 @@ const CopilotOrbUI = forwardRef(({
             <div className="mt-2 h-6 flex items-center justify-center min-w-[200px]">
                 {copilot.isActive ? (
                     <div className="text-center px-4">
-                        {(copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' ? (
-                            <p className={`text-[13px] font-medium italic animate-fade-in truncate max-w-[280px] transition-colors duration-300 ${isPeripheralActive ? 'text-white' : 'text-slate-700'}`}>
-                                &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
-                            </p>
-                        ) : (
-                            <p className={`text-[11px] font-bold uppercase tracking-widest opacity-60 transition-colors duration-300 ${isPeripheralActive ? 'text-white/80' : 'text-slate-400'}`}>
-                                {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
-                                 copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
-                                 copilot.voiceState === 'wake' ? 'Escuchando...' : 
-                                 copilot.voiceState === 'matched' ? 'Comando detectado' :
-                                 copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
-                            </p>
-                        )}
+                        <p className={`text-[11px] font-bold uppercase tracking-widest opacity-60 transition-colors duration-300 ${isPeripheralActive ? 'text-white/80' : 'text-slate-400'}`}>
+                            {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
+                             copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
+                             copilot.voiceState === 'wake' ? 'Escuchando...' : 
+                             copilot.voiceState === 'matched' ? 'Comando detectado' :
+                             copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
+                        </p>
                     </div>
                 ) : null}
             </div>
+
+            {/* Live Transcript Display Card */}
+            {copilot.isActive && (copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' && copilot.voiceState !== 'matched' && copilot.voiceState !== 'playing' && (
+                <div className={`mt-2.5 px-4 py-2 border rounded-xl max-w-[280px] text-center backdrop-blur-sm shadow-sm transition-all duration-300 animate-fade-in ${
+                    isPeripheralActive 
+                    ? 'bg-white/10 border-white/20 text-white' 
+                    : 'bg-blue-500/5 border-blue-500/10 text-slate-700'
+                }`}>
+                    <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${isPeripheralActive ? 'text-white/70' : 'text-blue-600'}`}>
+                        Transcripción en Vivo
+                    </span>
+                    <p className="text-xs font-semibold italic">
+                        &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
+                    </p>
+                </div>
+            )}
             
             {/* Matched POI Name Display below transcript when playing */}
             {copilot.isActive && copilot.matchedPoi && (copilot.voiceState === 'matched' || copilot.voiceState === 'playing') && (

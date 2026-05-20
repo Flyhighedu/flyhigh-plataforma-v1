@@ -772,6 +772,7 @@ export default function useVoiceCopilot({
         rec.lang = 'es-MX';
 
         const cleanUpAndRestart = () => {
+            if (!recognitionActiveRef.current) return;
             recognitionActiveRef.current = false;
             if (isActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
                 setVoiceState('listening');
@@ -964,7 +965,15 @@ export default function useVoiceCopilot({
         } else if (engineModeRef.current === 'native-vad') {
             recognitionActiveRef.current = false;
         } else if (engineModeRef.current === 'tfjs-go') {
-            restartTfjsIfNeeded();
+            if (initMicrophoneRef.current) {
+                initMicrophoneRef.current().then(() => {
+                    restartTfjsIfNeeded();
+                }).catch(err => {
+                    console.error('[VoiceCopilot] Error al reactivar micrófono en restartNativeIfNeeded:', err);
+                });
+            } else {
+                restartTfjsIfNeeded();
+            }
         }
     };
 
