@@ -185,6 +185,14 @@ export default function useVoiceCopilot({
     const recognitionActiveRef = useRef(false);
     const vadTimeoutRef = useRef(null);
 
+    // Referencias para modo local-vad-api (Architecture B)
+    const mediaRecorderRef = useRef(null);
+    const recordedChunksRef = useRef([]);
+    const silenceStartRef = useRef(null);
+    const isRecordingBufferRef = useRef(false);
+    const processRecordedAudioBlobRef = useRef(null);
+    const resetToListeningStateRef = useRef(null);
+
     // Estado y referencias para TensorFlow.js (Speech Commands)
     const tfjsRecognizerRef = useRef(null);
     const tfjsListeningRef = useRef(false);
@@ -303,6 +311,18 @@ export default function useVoiceCopilot({
         reconnectTimeoutRef.current = null;
         apiKeyRef.current = null;
         recognitionActiveRef.current = false;
+
+        // Limpiar grabación del búfer local
+        if (mediaRecorderRef.current) {
+            try {
+                if (mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                }
+            } catch(e){}
+            mediaRecorderRef.current = null;
+        }
+        isRecordingBufferRef.current = false;
+        silenceStartRef.current = null;
         
         // Detener TensorFlow.js si estuviera activo
         if (tfjsRecognizerRef.current) {
@@ -698,6 +718,72 @@ export default function useVoiceCopilot({
                 return;
             }
 
+            if (engineModeRef.current === 'local-vad-api') {
+                if (stateRef.current === 'playing' || stateRef.current === 'matched' || stateRef.current === 'processing') return;
+
+                const isVoicePresent = maxVal > 0.035;
+
+                if (isVoicePresent) {
+                    silenceStartRef.current = null;
+
+                    if (!isRecordingBufferRef.current && stateRef.current === 'listening') {
+                        isRecordingBufferRef.current = true;
+                        recordedChunksRef.current = [];
+                        setVoiceState('wake');
+                        stateRef.current = 'wake';
+
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
+
+                        if (mediaStreamRef.current) {
+                            try {
+                                const recorder = new MediaRecorder(mediaStreamRef.current, { mimeType: 'audio/webm' });
+                                recorder.ondataavailable = (e) => {
+                                    if (e.data && e.data.size > 0) {
+                                        recordedChunksRef.current.push(e.data);
+                                    }
+                                };
+                                recorder.onstop = () => {
+                                    const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+                                    if (processRecordedAudioBlobRef.current) {
+                                        processRecordedAudioBlobRef.current(blob);
+                                    }
+                                };
+                                recorder.start(100);
+                                mediaRecorderRef.current = recorder;
+                            } catch(err) {
+                                console.error('[VAD Local] Error al iniciar MediaRecorder:', err);
+                                if (resetToListeningStateRef.current) {
+                                    resetToListeningStateRef.current();
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    if (isRecordingBufferRef.current) {
+                        if (!silenceStartRef.current) {
+                            silenceStartRef.current = Date.now();
+                        } else if (Date.now() - silenceStartRef.current > 800) {
+                            isRecordingBufferRef.current = false;
+                            silenceStartRef.current = null;
+
+                            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                                try {
+                                    mediaRecorderRef.current.stop();
+                                } catch(e) {
+                                    console.error('[VAD Local] Error al detener MediaRecorder:', e);
+                                    if (resetToListeningStateRef.current) {
+                                        resetToListeningStateRef.current();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
             if (engineModeRef.current === 'native') {
                 return;
             }
@@ -910,6 +996,59 @@ export default function useVoiceCopilot({
         }
     };
 
+    const resetToListeningState = () => {
+        isRecordingBufferRef.current = false;
+        silenceStartRef.current = null;
+        setVoiceState('listening');
+        stateRef.current = 'listening';
+        setDictatedText('');
+    };
+
+    const processRecordedAudioBlob = async (blob) => {
+        setVoiceState('processing');
+        stateRef.current = 'processing';
+        try {
+            const formData = new FormData();
+            formData.append('audio', blob, 'audio.webm');
+            formData.append('mimeType', 'audio/webm');
+            
+            const res = await fetch('/api/transcribe-voice', {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) throw new Error('API transcription error');
+            const data = await res.json();
+            const transcript = (data.transcript || '').trim();
+            console.log('[VAD Local] Transcripción recibida:', transcript);
+            setLastTranscript(transcript);
+            setDictatedText(transcript);
+            
+            const matched = callbacksRef.current.findMatchInBuffer(transcript);
+            if (matched) {
+                setMatchedPoi(matched);
+                setVoiceState('matched');
+                stateRef.current = 'matched';
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                    navigator.vibrate(80);
+                }
+                setTimeout(() => callbacksRef.current.playMatchedAudio(matched), 200);
+            } else {
+                resetToListeningState();
+            }
+        } catch(e) {
+            console.error('[VAD Local] Error al transcribir:', e);
+            resetToListeningState();
+        }
+    };
+
+    useEffect(() => {
+        processRecordedAudioBlobRef.current = processRecordedAudioBlob;
+    }, [processRecordedAudioBlob]);
+
+    useEffect(() => {
+        resetToListeningStateRef.current = resetToListeningState;
+    }, []);
+
     const restartTfjsIfNeeded = async () => {
         if (engineModeRef.current === 'tfjs-go' && tfjsRecognizerRef.current && !tfjsListeningRef.current && isActiveRef.current) {
             try {
@@ -995,6 +1134,9 @@ export default function useVoiceCopilot({
                 startNativeListening();
             } else if (engineMode === 'native-vad') {
                 // En modo VAD, iniciamos silenciosamente en estado de escucha (monitoreando energía)
+                setVoiceState('listening');
+                stateRef.current = 'listening';
+            } else if (engineMode === 'local-vad-api') {
                 setVoiceState('listening');
                 stateRef.current = 'listening';
             } else if (engineMode === 'tfjs-go') {

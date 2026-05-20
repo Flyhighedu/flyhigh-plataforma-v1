@@ -341,8 +341,9 @@ export default function VoiceSimulatorWidget({
                     <div className={`mt-2 h-8 flex items-center justify-center min-w-[200px] transition-[transform,opacity] duration-[600ms] delay-[150ms] ${isExpandedPhase ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
                         <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
                             {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
-                             copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
+                             copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? (copilot.engineMode === 'local-vad-api' ? 'Habla para activar...' : `Di "${copilot.wakeWord}"...`) : 
                              copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
+                             copilot.voiceState === 'processing' ? 'Procesando Voz...' :
                              copilot.voiceState === 'matched' ? '¡Comando detectado!' :
                              copilot.voiceState === 'playing' ? 'Reproduciendo...' : ''}
                         </p>
@@ -376,7 +377,7 @@ export default function VoiceSimulatorWidget({
                                     Motor de Voz
                                 </p>
                                 <span className="text-[9px] font-bold opacity-45">
-                                    {copilot.engineMode === 'native-vad' ? '🔋 Modo Ahorro Activo' : copilot.engineMode === 'tfjs-go' ? '🤖 Offline "Go" Activo' : copilot.engineMode === 'gemini' ? '⚡ Premium WebSocket' : '🎤 Continuo Nativo'}
+                                    {copilot.engineMode === 'native-vad' ? '🔋 Modo Ahorro Activo' : copilot.engineMode === 'tfjs-go' ? '🤖 Offline "Go" Activo' : copilot.engineMode === 'local-vad-api' ? '🎙️ VAD + API REST' : copilot.engineMode === 'gemini' ? '⚡ Premium WebSocket' : '🎤 Continuo Nativo'}
                                 </span>
                             </div>
                             <div className="flex bg-slate-100/40 p-1 rounded-xl border border-slate-200/50 shadow-inner w-full justify-between gap-1">
@@ -409,6 +410,16 @@ export default function VoiceSimulatorWidget({
                                     }`}
                                 >
                                     Ahorro
+                                </button>
+                                <button
+                                    onClick={() => copilot.changeEngineMode('local-vad-api')}
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                                        copilot.engineMode === 'local-vad-api' 
+                                            ? 'bg-indigo-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    VAD+API
                                 </button>
                                 <button
                                     onClick={() => copilot.changeEngineMode('tfjs-go')}
@@ -445,19 +456,22 @@ export default function VoiceSimulatorWidget({
                                     ) : (
                                         <button 
                                             onClick={() => { 
-                                                if (copilot.engineMode === 'tfjs-go') return;
+                                                if (copilot.engineMode === 'tfjs-go' || copilot.engineMode === 'local-vad-api') return;
                                                 setWakeWordDraft(copilot.wakeWord); 
                                                 setIsEditingWake(true); 
                                             }} 
-                                            disabled={copilot.engineMode === 'tfjs-go'}
-                                            className={`flex items-center gap-2 group outline-none ${copilot.engineMode === 'tfjs-go' ? 'cursor-not-allowed' : ''}`}
+                                            disabled={copilot.engineMode === 'tfjs-go' || copilot.engineMode === 'local-vad-api'}
+                                            className={`flex items-center gap-2 group outline-none ${copilot.engineMode === 'tfjs-go' || copilot.engineMode === 'local-vad-api' ? 'cursor-not-allowed' : ''}`}
                                         >
                                             <span className={`text-[14px] font-black tracking-tight`}>&ldquo;{copilot.wakeWord}&rdquo;</span>
-                                            {copilot.engineMode !== 'tfjs-go' && (
+                                            {copilot.engineMode !== 'tfjs-go' && copilot.engineMode !== 'local-vad-api' && (
                                                 <Pencil size={12} className={`opacity-40 group-hover:opacity-100 transition-opacity`} />
                                             )}
                                             {copilot.engineMode === 'tfjs-go' && (
                                                 <span className="text-[9px] font-bold opacity-45 italic">(Fijo en Offline)</span>
+                                            )}
+                                            {copilot.engineMode === 'local-vad-api' && (
+                                                <span className="text-[9px] font-bold opacity-45 italic">(Automático por Voz)</span>
                                             )}
                                         </button>
                                     )}
