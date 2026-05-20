@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import * as tf from '@tensorflow/tfjs';
+import * as speechCommands from '@tensorflow-models/speech-commands';
 
 // ═══════════════════════════════════════════════════════════════
 // normalizeCommand — Extrae palabras clave significativas.
@@ -178,6 +180,15 @@ export default function useVoiceCopilot({
     const analyserRef = useRef(null);
     const recognitionRef = useRef(null);
     const transcriptBufferRef = useRef('');
+    
+    // Estado de la SpeechRecognition activa en modo VAD
+    const recognitionActiveRef = useRef(false);
+    const vadTimeoutRef = useRef(null);
+
+    // Estado y referencias para TensorFlow.js (Speech Commands)
+    const tfjsRecognizerRef = useRef(null);
+    const tfjsListeningRef = useRef(false);
+    const restartTfjsRef = useRef(null);
 
     const [supported, setSupported] = useState(true);
     useEffect(() => {
@@ -279,24 +290,32 @@ export default function useVoiceCopilot({
         };
     }, [audioRef, setPlayingPoiId]);
 
-    const restartNativeIfNeeded = () => {
-        if (engineModeRef.current === 'native' && recognitionRef.current) {
-            try {
-                recognitionRef.current.start();
-            } catch(e) {
-                console.warn('[VoiceCopilot Native] Re-intentando iniciar reconocimiento nativo:', e);
-            }
-        }
-    };
 
     const stopListening = useCallback(() => {
         setIsDetectingVoice(false);
         if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
         if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
         reconnectTimeoutRef.current = null;
         apiKeyRef.current = null;
+        recognitionActiveRef.current = false;
         
+        // Detener TensorFlow.js si estuviera activo
+        if (tfjsRecognizerRef.current) {
+            try {
+                if (tfjsRecognizerRef.current.audioDataExtractor) {
+                    const stream = tfjsRecognizerRef.current.audioDataExtractor.stream;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                }
+                tfjsRecognizerRef.current.stopListening();
+            } catch(e){}
+            tfjsRecognizerRef.current = null;
+        }
+        tfjsListeningRef.current = false;
+
         // Detener API nativa
         if (recognitionRef.current) {
             try {
@@ -607,6 +626,169 @@ export default function useVoiceCopilot({
         }
     }, []);
 
+    // ── INICIAR ESCUCHA POR VENTANA NATIVA (VAD - AHORRO) ──
+    const triggerSpeechRecognitionWindow = useCallback(() => {
+        if (recognitionActiveRef.current || stateRef.current === 'playing' || stateRef.current === 'matched') return;
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return;
+
+        const isOfflineMode = engineModeRef.current === 'tfjs-go';
+
+        console.log(`[VoiceCopilot VAD] Disparando ventana de voz de 6s en modo ${isOfflineMode ? 'Offline (Woke)' : 'VAD (Listening)'}`);
+        recognitionActiveRef.current = true;
+        
+        if (isOfflineMode) {
+            setVoiceState('wake');
+            stateRef.current = 'wake';
+        } else {
+            setVoiceState('listening');
+            stateRef.current = 'listening';
+        }
+
+        const rec = new SpeechRecognition();
+        recognitionRef.current = rec;
+        rec.continuous = false; // Detener automáticamente cuando termine de hablar
+        rec.interimResults = true;
+        rec.lang = 'es-MX';
+
+        const cleanUpAndRestart = () => {
+            recognitionActiveRef.current = false;
+            if (isActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
+                setVoiceState('listening');
+                stateRef.current = 'listening';
+                setDictatedText('');
+                setLastTranscript('');
+                if (isOfflineMode && restartTfjsRef.current) {
+                    restartTfjsRef.current();
+                }
+            }
+        };
+
+        // Temporizador de expiración de la ventana (para evitar que quede enganchada)
+        if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
+        vadTimeoutRef.current = setTimeout(() => {
+            if (recognitionActiveRef.current) {
+                console.log('[VoiceCopilot VAD] Expiró la ventana de 6s.');
+                try { rec.stop(); } catch(e){}
+                cleanUpAndRestart();
+            }
+        }, 6000);
+
+        rec.onerror = (e) => {
+            console.error('[VoiceCopilot VAD] Error de reconocimiento:', e);
+            cleanUpAndRestart();
+        };
+
+        rec.onend = () => {
+            console.log('[VoiceCopilot VAD] Fin de ventana de voz.');
+            cleanUpAndRestart();
+        };
+
+        rec.onresult = (event) => {
+            if (stateRef.current === 'playing' || stateRef.current === 'matched') return;
+
+            let interim = '';
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    final += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+
+            const cleanText = (final || interim).trim();
+            if (cleanText) {
+                console.log('[VoiceCopilot VAD] Texto detectado:', cleanText);
+                setLastTranscript(cleanText);
+                setDictatedText(cleanText);
+
+                if (!isOfflineMode) {
+                    // Comprobar wake word en modo online/ahorro
+                    const currentWakeWord = callbacksRef.current.wakeWord;
+                    const hasWakeWord = isWakeWordDetected(cleanText, currentWakeWord);
+
+                    if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                        if (stateRef.current !== 'wake') {
+                            setVoiceState('wake');
+                            stateRef.current = 'wake';
+                            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+                        }
+                    }
+                }
+
+                if (stateRef.current === 'wake') {
+                    const poiMatch = callbacksRef.current.findMatchInBuffer(cleanText);
+                    if (poiMatch) {
+                        if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
+                        setMatchedPoi(poiMatch);
+                        setVoiceState('matched');
+                        stateRef.current = 'matched';
+                        recognitionActiveRef.current = false;
+                        
+                        try { rec.stop(); } catch(e){}
+                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 200);
+                    }
+                }
+            }
+        };
+
+        try {
+            rec.start();
+        } catch(err) {
+            console.error('[VoiceCopilot VAD] Error al arrancar la Speech API:', err);
+            cleanUpAndRestart();
+        }
+    }, []);
+
+    const restartTfjsIfNeeded = async () => {
+        if (engineModeRef.current === 'tfjs-go' && tfjsRecognizerRef.current && !tfjsListeningRef.current && isActiveRef.current) {
+            try {
+                const recognizer = tfjsRecognizerRef.current;
+                const words = recognizer.wordLabels();
+                const goIndex = words.indexOf('go');
+                
+                tfjsListeningRef.current = true;
+                setVoiceState('listening');
+                stateRef.current = 'listening';
+                
+                await recognizer.listen(result => {
+                    if (stateRef.current !== 'listening') return;
+                    const score = result.scores[goIndex];
+                    if (score > 0.65) {
+                        console.log('[TFJS Go] Word "go" detected on restart with score:', score);
+                        try { recognizer.stopListening(); } catch(e){}
+                        tfjsListeningRef.current = false;
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+                        triggerSpeechRecognitionWindow();
+                    }
+                }, {
+                    probabilityThreshold: 0.60,
+                    overlapFactor: 0.50,
+                    invokeCallbackOnNoiseAndUnknown: true
+                });
+            } catch (err) {
+                console.error('[TFJS Go] Error al re-iniciar escucha:', err);
+            }
+        }
+    };
+    restartTfjsRef.current = restartTfjsIfNeeded;
+
+    const restartNativeIfNeeded = () => {
+        if (engineModeRef.current === 'native' && recognitionRef.current) {
+            try {
+                recognitionRef.current.start();
+            } catch(e) {
+                console.warn('[VoiceCopilot Native] Re-intentando iniciar reconocimiento nativo:', e);
+            }
+        } else if (engineModeRef.current === 'native-vad') {
+            recognitionActiveRef.current = false;
+        } else if (engineModeRef.current === 'tfjs-go') {
+            restartTfjsIfNeeded();
+        }
+    };
+
     const startListening = useCallback(async () => {
         setErrorMsg(null);
         setVoiceState('booting');
@@ -647,43 +829,46 @@ export default function useVoiceCopilot({
 
                 source.connect(analyser);
 
-                // Configurar procesador local de audio (Solo para el canal de Gemini WS)
+                // Configurar procesador local de audio
                 const processor = audioCtx.createScriptProcessor(2048, 1, 1);
                 processorNodeRef.current = processor;
                 analyser.connect(processor);
                 processor.connect(audioCtx.destination);
 
                 processor.onaudioprocess = (e) => {
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    let maxVal = 0;
+                    for (let i = 0; i < inputData.length; i++) {
+                        const absVal = Math.abs(inputData[i]);
+                        if (absVal > maxVal) maxVal = absVal;
+                    }
+
+                    setIsDetectingVoice(maxVal > 0.01);
+
+                    // Si estamos en modo de ahorro VAD nativo o TFJS-Go
+                    if (engineModeRef.current === 'native-vad' || engineModeRef.current === 'tfjs-go') {
+                        // Si se detecta un pico de energía vocal (>0.035) y estamos en native-vad
+                        if (engineModeRef.current === 'native-vad' && maxVal > 0.035 && !recognitionActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
+                            triggerSpeechRecognitionWindow();
+                        }
+                        return;
+                    }
+
                     // Si el motor nativo está activo, omitimos enviar fragmentos al WebSocket
                     if (engineModeRef.current === 'native') {
-                        // Pero seguimos calculando la energía para visualización local de voz
-                        const inputData = e.inputBuffer.getChannelData(0);
-                        let maxVal = 0;
-                        for (let i = 0; i < inputData.length; i++) {
-                            const absVal = Math.abs(inputData[i]);
-                            if (absVal > maxVal) maxVal = absVal;
-                        }
-                        setIsDetectingVoice(maxVal > 0.01);
                         return;
                     }
 
                     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
                     if (stateRef.current === 'playing' || stateRef.current === 'matched') return;
 
-                    const inputData = e.inputBuffer.getChannelData(0);
                     const downsampled = downsampleBuffer(inputData, e.inputBuffer.sampleRate, 16000);
-
                     const pcmBuffer = new Int16Array(downsampled.length);
-                    let maxVal = 0;
 
                     for (let i = 0; i < downsampled.length; i++) {
                         const s = Math.max(-1, Math.min(1, downsampled[i]));
                         pcmBuffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                        const absVal = Math.abs(s);
-                        if (absVal > maxVal) maxVal = absVal;
                     }
-
-                    setIsDetectingVoice(maxVal > 0.01);
 
                     if (maxVal > 0.002) {
                         const base64Data = arrayBufferToBase64(pcmBuffer.buffer);
@@ -701,7 +886,6 @@ export default function useVoiceCopilot({
                     }
                 };
             } else {
-                // Si el AudioContext ya existía pero estaba suspendido por algún motivo
                 if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
                     await audioContextRef.current.resume();
                 }
@@ -710,6 +894,45 @@ export default function useVoiceCopilot({
             // Arrancar el motor seleccionado
             if (engineMode === 'native') {
                 startNativeListening();
+            } else if (engineMode === 'native-vad') {
+                // En modo VAD, iniciamos silenciosamente en estado de escucha (monitoreando energía)
+                setVoiceState('listening');
+                stateRef.current = 'listening';
+            } else if (engineMode === 'tfjs-go') {
+                console.log('[TFJS Go] Inicializando TensorFlow.js Speech Commands...');
+                try {
+                    await tf.setBackend('webgl');
+                    await tf.ready();
+                } catch(e) {
+                    console.warn('[TFJS Go] No se pudo configurar backend WebGL, usando default:', e);
+                }
+                
+                const recognizer = speechCommands.create('BROWSER_FFT');
+                await recognizer.ensureModelLoaded();
+                tfjsRecognizerRef.current = recognizer;
+                
+                const words = recognizer.wordLabels();
+                const goIndex = words.indexOf('go');
+                
+                tfjsListeningRef.current = true;
+                setVoiceState('listening');
+                stateRef.current = 'listening';
+                
+                await recognizer.listen(result => {
+                    if (stateRef.current !== 'listening') return;
+                    const score = result.scores[goIndex];
+                    if (score > 0.65) {
+                        console.log('[TFJS Go] Palabra "go" detectada con score:', score);
+                        try { recognizer.stopListening(); } catch(e){}
+                        tfjsListeningRef.current = false;
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+                        triggerSpeechRecognitionWindow();
+                    }
+                }, {
+                    probabilityThreshold: 0.60,
+                    overlapFactor: 0.50,
+                    invokeCallbackOnNoiseAndUnknown: true
+                });
             } else {
                 // Obtener llave API
                 const tokenRes = await fetch('/api/voice-session');
@@ -730,7 +953,7 @@ export default function useVoiceCopilot({
             console.error('[VoiceCopilot] Error iniciando micrófono:', err);
             stopListening();
         }
-    }, [stopListening, connectWS, startNativeListening, engineMode]);
+    }, [stopListening, connectWS, startNativeListening, triggerSpeechRecognitionWindow, engineMode]);
 
     // Limpieza de visibilidad en segundo plano (importante para PWA)
     useEffect(() => {
@@ -778,9 +1001,7 @@ export default function useVoiceCopilot({
         if (isActive) {
             stopListening();
             setTimeout(() => {
-                // Simular un pequeño click/gesture trigger
                 setInternalIsActive(true);
-                // Si controlledIsActive está en uso, dependemos de él, si no usamos internal
                 if (controlledSetIsActive) {
                     controlledSetIsActive(true);
                 }
@@ -805,7 +1026,7 @@ export default function useVoiceCopilot({
         matchedPoi,
         errorMsg,
         supported,
-        wakeWord,
+        wakeWord: engineMode === 'tfjs-go' ? 'go' : wakeWord,
         saveWakeWord,
         voiceCommands,
         startListening,

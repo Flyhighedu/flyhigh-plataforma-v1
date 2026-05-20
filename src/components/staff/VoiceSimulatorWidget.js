@@ -28,6 +28,9 @@ export default function VoiceSimulatorWidget({
         pois, audioRef, playingPoiId, setPlayingPoiId, onStateChange, isActive, setIsActive
     });
 
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     const [isEditingWake, setIsEditingWake] = useState(false);
     const [wakeWordDraft, setWakeWordDraft] = useState(copilot.wakeWord);
     const wakeInputRef = useRef(null);
@@ -205,6 +208,8 @@ export default function VoiceSimulatorWidget({
         }
     };
 
+    if (!mounted) return null;
+
     if (!copilot.supported) {
         return (
             <div className="bg-white rounded-[28px] border border-slate-100 shadow-[0_8px_20px_rgba(0,0,0,0.03)] p-5 mb-6">
@@ -359,14 +364,19 @@ export default function VoiceSimulatorWidget({
 
                     {/* ── MOTOR DE VOZ SELECTOR ── */}
                     <div className={`w-full mt-3 transition-[transform,opacity] duration-[700ms] delay-[200ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                        <div className={`rounded-2xl border p-2 flex items-center justify-between transition-colors duration-500 shadow-sm ${S.pillBg}`}>
-                            <p className="text-[9px] font-black uppercase tracking-widest opacity-60 ml-2 transition-colors duration-300">
-                                Motor de Voz
-                            </p>
-                            <div className="flex bg-slate-100/40 p-1 rounded-xl border border-slate-200/50 shadow-inner">
+                        <div className={`rounded-2xl border p-2 flex flex-col gap-2 transition-colors duration-500 shadow-sm ${S.pillBg}`}>
+                            <div className="flex items-center justify-between px-1">
+                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60 transition-colors duration-300">
+                                    Motor de Voz
+                                </p>
+                                <span className="text-[9px] font-bold opacity-45">
+                                    {copilot.engineMode === 'native-vad' ? '🔋 Modo Ahorro Activo' : copilot.engineMode === 'tfjs-go' ? '🤖 Offline "Go" Activo' : copilot.engineMode === 'gemini' ? '⚡ Premium WebSocket' : '🎤 Continuo Nativo'}
+                                </span>
+                            </div>
+                            <div className="flex bg-slate-100/40 p-1 rounded-xl border border-slate-200/50 shadow-inner w-full justify-between gap-1">
                                 <button
                                     onClick={() => copilot.changeEngineMode('gemini')}
-                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
                                         copilot.engineMode === 'gemini' 
                                             ? 'bg-blue-600 text-white shadow-sm' 
                                             : 'text-slate-600 hover:text-slate-900'
@@ -376,13 +386,33 @@ export default function VoiceSimulatorWidget({
                                 </button>
                                 <button
                                     onClick={() => copilot.changeEngineMode('native')}
-                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
                                         copilot.engineMode === 'native' 
-                                            ? 'bg-emerald-600 text-white shadow-sm' 
+                                            ? 'bg-amber-600 text-white shadow-sm' 
                                             : 'text-slate-600 hover:text-slate-900'
                                     }`}
                                 >
                                     Nativo
+                                </button>
+                                <button
+                                    onClick={() => copilot.changeEngineMode('native-vad')}
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                                        copilot.engineMode === 'native-vad' 
+                                            ? 'bg-emerald-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    Ahorro
+                                </button>
+                                <button
+                                    onClick={() => copilot.changeEngineMode('tfjs-go')}
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                                        copilot.engineMode === 'tfjs-go' 
+                                            ? 'bg-purple-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    Offline
                                 </button>
                             </div>
                         </div>
@@ -407,9 +437,22 @@ export default function VoiceSimulatorWidget({
                                             placeholder="ej. Computadora"
                                         />
                                     ) : (
-                                        <button onClick={() => { setWakeWordDraft(copilot.wakeWord); setIsEditingWake(true); }} className="flex items-center gap-2 group outline-none">
+                                        <button 
+                                            onClick={() => { 
+                                                if (copilot.engineMode === 'tfjs-go') return;
+                                                setWakeWordDraft(copilot.wakeWord); 
+                                                setIsEditingWake(true); 
+                                            }} 
+                                            disabled={copilot.engineMode === 'tfjs-go'}
+                                            className={`flex items-center gap-2 group outline-none ${copilot.engineMode === 'tfjs-go' ? 'cursor-not-allowed' : ''}`}
+                                        >
                                             <span className={`text-[14px] font-black tracking-tight`}>&ldquo;{copilot.wakeWord}&rdquo;</span>
-                                            <Pencil size={12} className={`opacity-40 group-hover:opacity-100 transition-opacity`} />
+                                            {copilot.engineMode !== 'tfjs-go' && (
+                                                <Pencil size={12} className={`opacity-40 group-hover:opacity-100 transition-opacity`} />
+                                            )}
+                                            {copilot.engineMode === 'tfjs-go' && (
+                                                <span className="text-[9px] font-bold opacity-45 italic">(Fijo en Offline)</span>
+                                            )}
                                         </button>
                                     )}
                                 </div>
