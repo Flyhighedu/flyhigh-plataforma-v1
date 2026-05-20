@@ -608,7 +608,7 @@ export default function useVoiceCopilot({
         }
     }, []);
 
-    const closeMicrophone = () => {
+    const closeMicrophone = async () => {
         console.log('[VoiceCopilot] Cerrando y liberando micrófono local...');
         if (processorNodeRef.current) {
             try { processorNodeRef.current.disconnect(); } catch(e){}
@@ -624,8 +624,11 @@ export default function useVoiceCopilot({
             analyserRef.current = null;
         }
         if (audioContextRef.current) {
-            try { audioContextRef.current.close(); } catch(e){}
-            audioContextRef.current = null;
+            try {
+                if (audioContextRef.current.state !== 'closed') {
+                    await audioContextRef.current.suspend();
+                }
+            } catch(e){}
         }
         if (mediaStreamRef.current) {
             try {
@@ -650,9 +653,12 @@ export default function useVoiceCopilot({
         });
         mediaStreamRef.current = stream;
 
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioContextClass(); 
-        audioContextRef.current = audioCtx;
+        let audioCtx = audioContextRef.current;
+        if (!audioCtx || audioCtx.state === 'closed') {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContextClass(); 
+            audioContextRef.current = audioCtx;
+        }
 
         if (audioCtx.state === 'suspended') {
             await audioCtx.resume();
@@ -876,6 +882,33 @@ export default function useVoiceCopilot({
         triggerSpeechRecognitionWindowRef.current = triggerSpeechRecognitionWindow;
     }, [triggerSpeechRecognitionWindow]);
 
+    const playFeedbackSound = () => {
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            const ctx = audioContextRef.current || new AudioContextClass();
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.15);
+            
+            gainNode.gain.setValueAtTime(0.05, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+            
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.15);
+        } catch(e) {
+            console.warn('[VoiceCopilot] No se pudo reproducir tono sintético:', e);
+        }
+    };
+
     const restartTfjsIfNeeded = async () => {
         if (engineModeRef.current === 'tfjs-go' && tfjsRecognizerRef.current && !tfjsListeningRef.current && isActiveRef.current) {
             try {
@@ -892,10 +925,22 @@ export default function useVoiceCopilot({
                     const score = result.scores[goIndex];
                     if (score > 0.30) {
                         console.log('[TFJS Go] Word "go" detected on restart with score:', score);
-                        try { recognizer.stopListening(); } catch(e){}
-                        tfjsListeningRef.current = false;
-                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
-                        triggerSpeechRecognitionWindow();
+                        
+                        // FASE 2: Retroalimentación instantánea
+                        playFeedbackSound();
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate([120, 80, 120]);
+                        }
+                        
+                        setVoiceState('wake');
+                        stateRef.current = 'wake';
+                        
+                        // Retrasar levemente el inicio del motor nativo para permitir reproducir el tono
+                        setTimeout(() => {
+                            try { recognizer.stopListening(); } catch(e){}
+                            tfjsListeningRef.current = false;
+                            triggerSpeechRecognitionWindow();
+                        }, 150);
                     }
                 }, {
                     probabilityThreshold: 0.25,
@@ -968,10 +1013,22 @@ export default function useVoiceCopilot({
                     const score = result.scores[goIndex];
                     if (score > 0.30) {
                         console.log('[TFJS Go] Palabra "go" detectada con score:', score);
-                        try { recognizer.stopListening(); } catch(e){}
-                        tfjsListeningRef.current = false;
-                        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
-                        triggerSpeechRecognitionWindow();
+                        
+                        // FASE 2: Retroalimentación instantánea
+                        playFeedbackSound();
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate([120, 80, 120]);
+                        }
+                        
+                        setVoiceState('wake');
+                        stateRef.current = 'wake';
+                        
+                        // Retrasar levemente el inicio del motor nativo para permitir reproducir el tono
+                        setTimeout(() => {
+                            try { recognizer.stopListening(); } catch(e){}
+                            tfjsListeningRef.current = false;
+                            triggerSpeechRecognitionWindow();
+                        }, 150);
                     }
                 }, {
                     probabilityThreshold: 0.25,
