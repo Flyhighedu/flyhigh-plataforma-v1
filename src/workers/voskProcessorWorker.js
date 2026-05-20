@@ -1,13 +1,11 @@
-import { createModel } from 'vosk-browser';
+// ═══════════════════════════════════════════════════════════════
+// AUDIO PROCESSOR WORKER PARA GEMINI LIVE API
+// ═══════════════════════════════════════════════════════════════
 
-let model = null;
-let recognizer = null;
-let currentSampleRate = 16000;
 let nativeSampleRate = 48000;
+const targetSampleRate = 16000;
 
-// ═══════════════════════════════════════════════════════════════
-// AUDIO DOWNSAMPLER (ejecutado en el Worker thread para liberar el hilo principal)
-// ═══════════════════════════════════════════════════════════════
+// Downsampling de tasa nativa a 16000Hz
 function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
     if (inputSampleRate === outputSampleRate) return buffer;
     if (inputSampleRate < outputSampleRate) return buffer;
@@ -26,91 +24,62 @@ function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
             accum += buffer[i];
             count++;
         }
-        result[offsetResult] = count > 0 ? accum / count : 0;
+        result[offsetResult] = count > 0 ? Math.max(-1, Math.min(1, accum / count)) : 0;
         offsetResult++;
         offsetBuffer = nextOffsetBuffer;
     }
     return result;
 }
 
-self.onmessage = async (e) => {
+// Convertir Float32Array (-1.0 a 1.0) a Int16Array (16-bit PCM Little Endian)
+function floatToInt16PCM(float32Array) {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < float32Array.length; i++) {
+        let s = Math.max(-1, Math.min(1, float32Array[i]));
+        // Escalar a 16-bit int signed
+        const sample = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        view.setInt16(i * 2, sample, true); // true = Little Endian
+    }
+    return buffer;
+}
+
+// Convertir ArrayBuffer a cadena Base64
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return self.btoa(binary);
+}
+
+self.onmessage = (e) => {
     const { action, data } = e.data;
 
     if (action === 'init') {
-        const { modelUrl, sampleRate, deviceSampleRate } = data;
-        currentSampleRate = sampleRate; // 16000 (Vosk target)
-        nativeSampleRate = deviceSampleRate || 48000; // Tasa nativa del micrófono
-        try {
-            self.postMessage({ type: 'status', status: 'booting' });
-            model = await createModel(modelUrl);
-            
-            recognizer = new model.KaldiRecognizer(sampleRate);
-            recognizer.setWords(true);
-            
-            recognizer.on("result", (message) => {
-                self.postMessage({ type: 'final', result: message.result });
-            });
-            
-            recognizer.on("partialresult", (message) => {
-                self.postMessage({ type: 'partial', result: message.result });
-            });
-            
-            self.postMessage({ type: 'status', status: 'ready' });
-        } catch (err) {
-            self.postMessage({ type: 'error', error: err.message });
-        }
+        nativeSampleRate = data.deviceSampleRate || 48000;
+        self.postMessage({ type: 'status', status: 'ready' });
     }
 
-    if (action === 'process' && recognizer) {
+    if (action === 'process') {
         try {
-            // Recibimos audio crudo a la tasa nativa del dispositivo.
-            // Downsampling se hace AQUÍ en el Worker thread, liberando el hilo principal de la UI.
             const rawData = data instanceof Float32Array ? data : new Float32Array(data);
-            const downsampled = downsampleBuffer(rawData, nativeSampleRate, currentSampleRate);
-            recognizer.acceptWaveformFloat(downsampled, currentSampleRate);
+            
+            // 1. Downsampling a 16kHz
+            const downsampled = downsampleBuffer(rawData, nativeSampleRate, targetSampleRate);
+            
+            // 2. Convertir a PCM 16 bits
+            const pcmBuffer = floatToInt16PCM(downsampled);
+            
+            // 3. Convertir a Base64
+            const base64Data = arrayBufferToBase64(pcmBuffer);
+            
+            // Enviar de vuelta el bloque listo para el WebSocket
+            self.postMessage({ type: 'audioBlock', base64: base64Data });
         } catch (err) {
             self.postMessage({ type: 'error', error: err.message });
         }
-    }
-
-    if (action === 'reset' && recognizer) {
-        recognizer.reset();
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // FLUSH AGRESIVO — Destruye el reconocedor y crea uno nuevo.
-    // vosk-browser NO limpia correctamente el buffer interno con reset(),
-    // así que la única forma garantizada de borrar todo el audio acumulado
-    // es destruir el reconocedor viejo y crear uno fresco desde el modelo.
-    // El modelo (50MB) se queda en memoria — crear un recognizer es barato (~5ms).
-    // ═══════════════════════════════════════════════════════════════
-    if (action === 'flush' && model) {
-        try {
-            // 1. Destruir el reconocedor viejo (libera su buffer de audio)
-            if (recognizer) {
-                try { recognizer.free(); } catch(_) {}
-            }
-
-            // 2. Crear uno nuevo desde cero (hoja en blanco)
-            recognizer = new model.KaldiRecognizer(currentSampleRate);
-            recognizer.setWords(true);
-
-            recognizer.on("result", (message) => {
-                self.postMessage({ type: 'final', result: message.result });
-            });
-
-            recognizer.on("partialresult", (message) => {
-                self.postMessage({ type: 'partial', result: message.result });
-            });
-        } catch (err) {
-            console.warn('[VoskWorker] flush recreate failed:', err);
-        }
-    }
-    
-    if (action === 'destroy' && recognizer) {
-        recognizer.free();
-        model.free();
-        recognizer = null;
-        model = null;
     }
 };

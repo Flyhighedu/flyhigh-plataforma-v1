@@ -32,6 +32,67 @@ export default function VoiceSimulatorWidget({
     const [wakeWordDraft, setWakeWordDraft] = useState(copilot.wakeWord);
     const wakeInputRef = useRef(null);
     const [showCommands, setShowCommands] = useState(false);
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        let animationFrameId;
+
+        const drawRadialWave = () => {
+            if (!copilot.analyserRef?.current || !canvasRef.current) return;
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext("2d");
+            const analyser = copilot.analyserRef.current;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const draw = () => {
+                if (!canvas || !analyser) return;
+                animationFrameId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const baseRadius = 36; // matches active 72px center circle (r = 36px)
+
+                ctx.lineWidth = 2.5;
+                const barCount = 36;
+                const angleStep = (Math.PI * 2) / barCount;
+
+                for (let i = 0; i < barCount; i++) {
+                    const dataIdx = Math.floor((i / barCount) * (bufferLength / 2));
+                    const val = dataArray[dataIdx] || 0;
+                    const amplitude = val / 255.0;
+                    const barHeight = amplitude * 12; // max height of 12px radiating out
+
+                    const angle = i * angleStep + (Date.now() * 0.0008); // slow rotation
+                    const xStart = cx + Math.cos(angle) * baseRadius;
+                    const yStart = cy + Math.sin(angle) * baseRadius;
+                    const xEnd = cx + Math.cos(angle) * (baseRadius + barHeight);
+                    const yEnd = cy + Math.sin(angle) * (baseRadius + barHeight);
+
+                    const hue = 220 - (amplitude * 40);
+                    ctx.strokeStyle = `hsla(${hue}, 90%, 65%, ${0.5 + amplitude * 0.5})`;
+                    ctx.beginPath();
+                    ctx.moveTo(xStart, yStart);
+                    ctx.lineTo(xEnd, yEnd);
+                    ctx.stroke();
+                }
+            };
+            draw();
+        };
+
+        if (copilot.isActive) {
+            const timer = setTimeout(() => {
+                drawRadialWave();
+            }, 300);
+            return () => {
+                clearTimeout(timer);
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            };
+        }
+    }, [copilot.isActive, copilot.analyserRef]);
 
     // ── CONTAINER WIDTH RE-MEASUREMENT PARA 60FPS ──
     const containerRef = useRef(null);
@@ -177,6 +238,16 @@ export default function VoiceSimulatorWidget({
                 {/* Colorful Spinning Halo (Behind the solid circle) */}
                 <div className={`absolute inset-[-20%] rounded-full transition-all duration-[800ms] ease-in-out ${haloClass} ${isExpandedPhase ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`} />
                 
+                {/* Radial Visualizer Canvas */}
+                {copilot.isActive && isExpandedPhase && (
+                    <canvas
+                        ref={canvasRef}
+                        width={96}
+                        height={96}
+                        className="absolute inset-[-12px] w-[96px] h-[96px] z-10 pointer-events-none"
+                    />
+                )}
+
                 {/* Solid White Center & Icons */}
                 <div className={`relative w-full h-full bg-white rounded-full flex items-center justify-center transition-all duration-700 ${isExpandedPhase ? 'shadow-[0_10px_40px_rgba(0,0,0,0.3)] ring-4 ring-white/50 cursor-pointer active:scale-95' : 'shadow-sm'}`}>
                     
@@ -263,13 +334,13 @@ export default function VoiceSimulatorWidget({
 
                     {/* ── LIVE TRANSCRIPT ── */}
                     <div className={`mt-2 h-8 flex items-center justify-center min-w-[200px] transition-[transform,opacity] duration-[600ms] delay-[150ms] ${isExpandedPhase ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95'}`}>
-                        {copilot.lastTranscript && copilot.voiceState !== 'booting' ? (
+                        {(copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' ? (
                             <p className={`text-[15px] font-black italic truncate max-w-[300px] transition-[opacity,color] duration-300 animate-[fadeInUp_0.4s_ease-out] ${S.textPrimary}`}>
-                                &ldquo;{copilot.lastTranscript}&rdquo;
+                                &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
                             </p>
                         ) : (
                             <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-500 ${S.textSecondary}`}>
-                                {copilot.voiceState === 'booting' ? 'Cargando Motor IA...' : 
+                                {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
                                  copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
                                  copilot.voiceState === 'wake' ? 'Escuchando Comando...' : 
                                  copilot.voiceState === 'matched' ? '¡Comando detectado!' :
@@ -283,6 +354,37 @@ export default function VoiceSimulatorWidget({
                         <div className={`absolute flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/20 text-white shadow-sm transition-[transform,opacity] duration-[600ms] ease-out ${copilot.matchedPoi && (copilot.voiceState === 'matched' || copilot.voiceState === 'playing') ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none'}`}>
                             <span className="text-sm">{copilot.voiceState === 'matched' ? '✅' : '🔊'}</span>
                             <p className="text-[12px] font-bold truncate max-w-[200px]">{copilot.matchedPoi?.name || ''}</p>
+                        </div>
+                    </div>
+
+                    {/* ── MOTOR DE VOZ SELECTOR ── */}
+                    <div className={`w-full mt-3 transition-[transform,opacity] duration-[700ms] delay-[200ms] ${isExpandedPhase ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+                        <div className={`rounded-2xl border p-2 flex items-center justify-between transition-colors duration-500 shadow-sm ${S.pillBg}`}>
+                            <p className="text-[9px] font-black uppercase tracking-widest opacity-60 ml-2 transition-colors duration-300">
+                                Motor de Voz
+                            </p>
+                            <div className="flex bg-slate-100/40 p-1 rounded-xl border border-slate-200/50 shadow-inner">
+                                <button
+                                    onClick={() => copilot.changeEngineMode('gemini')}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                        copilot.engineMode === 'gemini' 
+                                            ? 'bg-blue-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    Gemini Live
+                                </button>
+                                <button
+                                    onClick={() => copilot.changeEngineMode('native')}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                        copilot.engineMode === 'native' 
+                                            ? 'bg-emerald-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    Nativo
+                                </button>
+                            </div>
                         </div>
                     </div>
 

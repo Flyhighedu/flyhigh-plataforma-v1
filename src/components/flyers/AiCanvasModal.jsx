@@ -10,49 +10,189 @@ export default function AiCanvasModal({ initialHtml, flyerId, onClose, onSave })
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(0.85);
   
   const previewRef = useRef(null);
-  const recognitionRef = useRef(null);
   const originalPromptRef = useRef("");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "es-MX";
+  // Refs for custom silent media recording + web audio visualization
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const streamRef = useRef(null);
+  const canvasRef = useRef(null);
 
-        recognition.onresult = (event) => {
-          let newTranscript = "";
-          for (let i = 0; i < event.results.length; i++) {
-            newTranscript += event.results[i][0].transcript;
-          }
-          setPrompt(originalPromptRef.current + (originalPromptRef.current && newTranscript ? " " : "") + newTranscript);
-        };
-        
-        recognition.onerror = () => setIsRecording(false);
-        recognition.onend = () => setIsRecording(false);
-        
-        recognitionRef.current = recognition;
-      }
-    }
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") audioContextRef.current.close();
+    };
   }, []);
+
+  const drawWaveform = () => {
+    if (!analyserRef.current || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      if (!canvas || !analyser) return;
+      animationFrameRef.current = requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 3;
+
+      // Glow gradients for a premium Siri/Gemini voice-like effect
+      const gradients = [
+        "rgba(99, 102, 241, 0.8)",  // indigo
+        "rgba(139, 92, 246, 0.6)",  // violet
+        "rgba(6, 182, 212, 0.4)",   // cyan
+      ];
+
+      if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+      }
+
+      const width = canvas.width;
+      const height = canvas.height;
+
+      gradients.forEach((color, idx) => {
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        
+        const sliceWidth = width / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const offset = Math.sin(i * 0.05 + Date.now() * 0.003 * (idx + 1)) * 3;
+          const y = (v * height) / 2 + offset * (v - 1.0);
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+      });
+    };
+
+    draw();
+  };
+
+  const startRecording = async () => {
+    try {
+      audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+      audioContextRef.current = audioCtx;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // Wait 100ms for browser to mount the canvas overlay
+      setTimeout(() => {
+        drawWaveform();
+      }, 100);
+
+      const options = { mimeType: "audio/webm" };
+      let mediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        setIsTranscribing(true);
+        const mimeType = mediaRecorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "recording.webm");
+          formData.append("mimeType", mimeType);
+
+          const res = await fetch("/api/transcribe-voice", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || "Error de transcripción");
+          }
+
+          const data = await res.json();
+          if (data.transcript) {
+            setPrompt(prev => {
+              const cleanedPrev = prev.trim();
+              return cleanedPrev ? `${cleanedPrev} ${data.transcript}` : data.transcript;
+            });
+          }
+        } catch (err) {
+          console.error("Error transcribiendo audio:", err);
+          alert("No se pudo transcribir el audio: " + err.message);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      mediaRecorder.start(200);
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Error al iniciar grabación:", err);
+      alert("No se pudo acceder al micrófono: " + err.message);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close();
+    }
+    setIsRecording(false);
+  };
 
   const toggleRecording = () => {
     if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
+      stopRecording();
     } else {
-      if (!recognitionRef.current) {
-        alert("Tu navegador no soporta reconocimiento de voz (Usa Chrome o Edge).");
-        return;
-      }
-      originalPromptRef.current = prompt;
-      recognitionRef.current.start();
-      setIsRecording(true);
+      startRecording();
     }
   };
 
@@ -301,6 +441,19 @@ export default function AiCanvasModal({ initialHtml, flyerId, onClose, onSave })
           {/* Chat Input Area */}
           <div className="p-4 bg-slate-850 border-t border-white/5">
             <div className="relative">
+              {isRecording && (
+                <div className="absolute inset-0 bg-slate-950/85 rounded-xl flex flex-col items-center justify-center p-4 z-20 backdrop-blur-sm animate-in fade-in duration-200">
+                  <canvas ref={canvasRef} className="w-full h-12 max-w-[280px]" />
+                  <p className="text-slate-300 text-xs mt-2 font-bold animate-pulse">Escuchando... habla de manera continua.</p>
+                  <p className="text-slate-500 text-[10px] mt-0.5">Presiona el botón rojo para finalizar y transcribir</p>
+                </div>
+              )}
+              {isTranscribing && (
+                <div className="absolute inset-0 bg-slate-950/85 rounded-xl flex flex-col items-center justify-center p-4 z-20 backdrop-blur-sm animate-in fade-in duration-200">
+                  <Loader2 className="animate-spin text-indigo-400 mb-2" size={24} />
+                  <p className="text-indigo-300 text-xs font-bold animate-pulse">Transcribiendo audio...</p>
+                </div>
+              )}
               <textarea
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}

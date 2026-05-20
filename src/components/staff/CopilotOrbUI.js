@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
 import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff } from 'lucide-react';
 import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
@@ -26,6 +26,67 @@ const CopilotOrbUI = forwardRef(({
 
     const [showDictionary, setShowDictionary] = useState(false);
     const [showCalibrator, setShowCalibrator] = useState(false);
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        let animationFrameId;
+
+        const drawRadialWave = () => {
+            if (!copilot.analyserRef?.current || !canvasRef.current) return;
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext("2d");
+            const analyser = copilot.analyserRef.current;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const draw = () => {
+                if (!canvas || !analyser) return;
+                animationFrameId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const baseRadius = 40; // matches the w-20 center circle (r = 40px)
+
+                ctx.lineWidth = 3;
+                const barCount = 48;
+                const angleStep = (Math.PI * 2) / barCount;
+
+                for (let i = 0; i < barCount; i++) {
+                    const dataIdx = Math.floor((i / barCount) * (bufferLength / 2));
+                    const val = dataArray[dataIdx] || 0;
+                    const amplitude = val / 255.0;
+                    const barHeight = amplitude * 22; // max height of 22px radiating out
+
+                    const angle = i * angleStep + (Date.now() * 0.0008); // slow rotation
+                    const xStart = cx + Math.cos(angle) * baseRadius;
+                    const yStart = cy + Math.sin(angle) * baseRadius;
+                    const xEnd = cx + Math.cos(angle) * (baseRadius + barHeight);
+                    const yEnd = cy + Math.sin(angle) * (baseRadius + barHeight);
+
+                    const hue = 220 - (amplitude * 40);
+                    ctx.strokeStyle = `hsla(${hue}, 90%, 65%, ${0.5 + amplitude * 0.5})`;
+                    ctx.beginPath();
+                    ctx.moveTo(xStart, yStart);
+                    ctx.lineTo(xEnd, yEnd);
+                    ctx.stroke();
+                }
+            };
+            draw();
+        };
+
+        if (copilot.isActive) {
+            const timer = setTimeout(() => {
+                drawRadialWave();
+            }, 300);
+            return () => {
+                clearTimeout(timer);
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            };
+        }
+    }, [copilot.isActive, copilot.analyserRef]);
 
     // Native Tailwind classes used instead of custom injected CSS to prevent shape issues
 
@@ -92,6 +153,16 @@ const CopilotOrbUI = forwardRef(({
                 {/* Background Halo */}
                 <div className={`absolute inset-0 rounded-full transition-all duration-700 ease-in-out ${haloClass} ${copilot.isDetectingVoice ? 'scale-110 opacity-100 animate-pulse' : ''}`} />
                 
+                {/* Radial Visualizer Canvas */}
+                {copilot.isActive && (
+                    <canvas
+                        ref={canvasRef}
+                        width={128}
+                        height={128}
+                        className="absolute inset-0 w-full h-full z-10 pointer-events-none"
+                    />
+                )}
+
                 {/* Solid Center Circle */}
                 <div 
                     className={`relative w-20 h-20 bg-white shadow-xl flex items-center justify-center z-10 transition-all duration-300 rounded-full group-hover:scale-105 ${copilot.voiceState === 'wake' ? 'scale-90 ring-4 ring-blue-400/50 shadow-[0_0_30px_rgba(59,130,246,0.8)]' : copilot.isActive ? 'shadow-[0_0_15px_rgba(59,130,246,0.2)]' : ''} ${copilot.isDetectingVoice ? 'scale-95 ring-2 ring-blue-300 shadow-[0_0_20px_rgba(59,130,246,0.6)]' : ''}`}
@@ -109,13 +180,13 @@ const CopilotOrbUI = forwardRef(({
             <div className="mt-2 h-6 flex items-center justify-center min-w-[200px]">
                 {copilot.isActive ? (
                     <div className="text-center px-4">
-                        {copilot.lastTranscript && copilot.voiceState !== 'booting' ? (
+                        {(copilot.dictatedText || copilot.lastTranscript) && copilot.voiceState !== 'booting' ? (
                             <p className={`text-[13px] font-medium italic animate-fade-in truncate max-w-[280px] transition-colors duration-300 ${isPeripheralActive ? 'text-white' : 'text-slate-700'}`}>
-                                &ldquo;{copilot.lastTranscript}&rdquo;
+                                &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
                             </p>
                         ) : (
                             <p className={`text-[11px] font-bold uppercase tracking-widest opacity-60 transition-colors duration-300 ${isPeripheralActive ? 'text-white/80' : 'text-slate-400'}`}>
-                                {copilot.voiceState === 'booting' ? 'Cargando Modelo (40MB)...' : 
+                                {copilot.voiceState === 'booting' ? 'Conectando Copiloto...' : 
                                  copilot.voiceState === 'idle' || copilot.voiceState === 'listening' ? `Di "${copilot.wakeWord}"...` : 
                                  copilot.voiceState === 'wake' ? 'Escuchando...' : 
                                  copilot.voiceState === 'matched' ? 'Comando detectado' :

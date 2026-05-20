@@ -35,9 +35,18 @@ export default function StaffLayout({ children }) {
     // Register Service Worker (staff routes only)
     useEffect(() => {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js', { scope: '/staff/' }).catch((err) => {
-                console.warn('[PWA] SW registration failed:', err);
-            });
+            if (process.env.NODE_ENV !== 'production') {
+                navigator.serviceWorker.getRegistrations().then((registrations) => {
+                    for (const registration of registrations) {
+                        registration.unregister();
+                        console.log('[PWA] Unregistered old SW during development');
+                    }
+                });
+            } else {
+                navigator.serviceWorker.register('/sw.js', { scope: '/staff/' }).catch((err) => {
+                    console.warn('[PWA] SW registration failed:', err);
+                });
+            }
         }
     }, []);
 
