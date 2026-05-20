@@ -1,11 +1,13 @@
-// ═══════════════════════════════════════════════════════════════
-// AUDIO PROCESSOR WORKER PARA GEMINI LIVE API
-// ═══════════════════════════════════════════════════════════════
+import { createModel } from 'vosk-browser';
 
+let model = null;
+let recognizer = null;
+let currentSampleRate = 16000;
 let nativeSampleRate = 48000;
-const targetSampleRate = 16000;
 
-// Downsampling de tasa nativa a 16000Hz
+// ═══════════════════════════════════════════════════════════════
+// AUDIO DOWNSAMPLER (ejecutado en el Worker thread para liberar el hilo principal)
+// ═══════════════════════════════════════════════════════════════
 function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
     if (inputSampleRate === outputSampleRate) return buffer;
     if (inputSampleRate < outputSampleRate) return buffer;
@@ -24,62 +26,61 @@ function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
             accum += buffer[i];
             count++;
         }
-        result[offsetResult] = count > 0 ? Math.max(-1, Math.min(1, accum / count)) : 0;
+        result[offsetResult] = count > 0 ? accum / count : 0;
         offsetResult++;
         offsetBuffer = nextOffsetBuffer;
     }
     return result;
 }
 
-// Convertir Float32Array (-1.0 a 1.0) a Int16Array (16-bit PCM Little Endian)
-function floatToInt16PCM(float32Array) {
-    const buffer = new ArrayBuffer(float32Array.length * 2);
-    const view = new DataView(buffer);
-    for (let i = 0; i < float32Array.length; i++) {
-        let s = Math.max(-1, Math.min(1, float32Array[i]));
-        // Escalar a 16-bit int signed
-        const sample = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        view.setInt16(i * 2, sample, true); // true = Little Endian
-    }
-    return buffer;
-}
-
-// Convertir ArrayBuffer a cadena Base64
-function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return self.btoa(binary);
-}
-
-self.onmessage = (e) => {
+self.onmessage = async (e) => {
     const { action, data } = e.data;
 
     if (action === 'init') {
-        nativeSampleRate = data.deviceSampleRate || 48000;
-        self.postMessage({ type: 'status', status: 'ready' });
-    }
-
-    if (action === 'process') {
+        const { modelUrl, sampleRate, deviceSampleRate } = data;
+        currentSampleRate = sampleRate; // 16000 (Vosk target)
+        nativeSampleRate = deviceSampleRate || 48000; // Tasa nativa del micrófono
         try {
-            const rawData = data instanceof Float32Array ? data : new Float32Array(data);
+            self.postMessage({ type: 'status', status: 'booting' });
+            model = await createModel(modelUrl);
             
-            // 1. Downsampling a 16kHz
-            const downsampled = downsampleBuffer(rawData, nativeSampleRate, targetSampleRate);
+            recognizer = new model.KaldiRecognizer(sampleRate);
+            recognizer.setWords(true);
             
-            // 2. Convertir a PCM 16 bits
-            const pcmBuffer = floatToInt16PCM(downsampled);
+            recognizer.on("result", (message) => {
+                self.postMessage({ type: 'final', result: message.result });
+            });
             
-            // 3. Convertir a Base64
-            const base64Data = arrayBufferToBase64(pcmBuffer);
+            recognizer.on("partialresult", (message) => {
+                self.postMessage({ type: 'partial', result: message.result });
+            });
             
-            // Enviar de vuelta el bloque listo para el WebSocket
-            self.postMessage({ type: 'audioBlock', base64: base64Data });
+            self.postMessage({ type: 'status', status: 'ready' });
         } catch (err) {
             self.postMessage({ type: 'error', error: err.message });
         }
+    }
+
+    if (action === 'process' && recognizer) {
+        try {
+            // Recibimos audio crudo a la tasa nativa del dispositivo.
+            // Downsampling se hace AQUÍ en el Worker thread, liberando el hilo principal de la UI.
+            const rawData = data instanceof Float32Array ? data : new Float32Array(data);
+            const downsampled = downsampleBuffer(rawData, nativeSampleRate, currentSampleRate);
+            recognizer.acceptWaveformFloat(downsampled, currentSampleRate);
+        } catch (err) {
+            self.postMessage({ type: 'error', error: err.message });
+        }
+    }
+
+    if (action === 'reset' && recognizer) {
+        recognizer.reset();
+    }
+    
+    if (action === 'destroy' && recognizer) {
+        recognizer.free();
+        model.free();
+        recognizer = null;
+        model = null;
     }
 };
