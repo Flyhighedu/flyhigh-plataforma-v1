@@ -189,6 +189,9 @@ export default function useVoiceCopilot({
     const tfjsRecognizerRef = useRef(null);
     const tfjsListeningRef = useRef(false);
     const restartTfjsRef = useRef(null);
+    const initMicrophoneRef = useRef(null);
+    const closeMicrophoneRef = useRef(null);
+    const triggerSpeechRecognitionWindowRef = useRef(null);
 
     const [supported, setSupported] = useState(true);
     useEffect(() => {
@@ -332,29 +335,8 @@ export default function useVoiceCopilot({
             wsRef.current = null;
         }
 
-        if (processorNodeRef.current) {
-            try { processorNodeRef.current.disconnect(); } catch(e){}
-            processorNodeRef.current = null;
-        }
-
-        if (sourceNodeRef.current) {
-            try { sourceNodeRef.current.disconnect(); } catch(e){}
-            sourceNodeRef.current = null;
-        }
-
-        if (analyserRef.current) {
-            try { analyserRef.current.disconnect(); } catch(e){}
-            analyserRef.current = null;
-        }
-
-        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-            try { audioContextRef.current.close(); } catch(e){}
-            audioContextRef.current = null;
-        }
-
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(t => t.stop());
-            mediaStreamRef.current = null;
+        if (closeMicrophoneRef.current) {
+            closeMicrophoneRef.current();
         }
 
         if (audioRef?.current) {
@@ -626,6 +608,127 @@ export default function useVoiceCopilot({
         }
     }, []);
 
+    const closeMicrophone = () => {
+        console.log('[VoiceCopilot] Cerrando y liberando micrófono local...');
+        if (processorNodeRef.current) {
+            try { processorNodeRef.current.disconnect(); } catch(e){}
+            processorNodeRef.current.onaudioprocess = null;
+            processorNodeRef.current = null;
+        }
+        if (sourceNodeRef.current) {
+            try { sourceNodeRef.current.disconnect(); } catch(e){}
+            sourceNodeRef.current = null;
+        }
+        if (analyserRef.current) {
+            try { analyserRef.current.disconnect(); } catch(e){}
+            analyserRef.current = null;
+        }
+        if (audioContextRef.current) {
+            try { audioContextRef.current.close(); } catch(e){}
+            audioContextRef.current = null;
+        }
+        if (mediaStreamRef.current) {
+            try {
+                mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            } catch(e){}
+            mediaStreamRef.current = null;
+        }
+        setIsDetectingVoice(false);
+    };
+
+    const initMicrophone = async () => {
+        if (mediaStreamRef.current) return mediaStreamRef.current;
+        
+        console.log('[VoiceCopilot] Inicializando micrófono...');
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1
+            } 
+        });
+        mediaStreamRef.current = stream;
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContextClass(); 
+        audioContextRef.current = audioCtx;
+
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+
+        const source = audioCtx.createMediaStreamSource(stream);
+        sourceNodeRef.current = source;
+
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+
+        source.connect(analyser);
+
+        const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+        processorNodeRef.current = processor;
+        analyser.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        processor.onaudioprocess = (e) => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            let maxVal = 0;
+            for (let i = 0; i < inputData.length; i++) {
+                const absVal = Math.abs(inputData[i]);
+                if (absVal > maxVal) maxVal = absVal;
+            }
+
+            setIsDetectingVoice(maxVal > 0.01);
+
+            // Si estamos en modo de ahorro VAD nativo o TFJS-Go
+            if (engineModeRef.current === 'native-vad' || engineModeRef.current === 'tfjs-go') {
+                if (engineModeRef.current === 'native-vad' && maxVal > 0.035 && !recognitionActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
+                    if (triggerSpeechRecognitionWindowRef.current) {
+                        triggerSpeechRecognitionWindowRef.current();
+                    }
+                }
+                return;
+            }
+
+            if (engineModeRef.current === 'native') {
+                return;
+            }
+
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+            if (stateRef.current === 'playing' || stateRef.current === 'matched') return;
+
+            const downsampled = downsampleBuffer(inputData, e.inputBuffer.sampleRate, 16000);
+            const pcmBuffer = new Int16Array(downsampled.length);
+
+            for (let i = 0; i < downsampled.length; i++) {
+                const s = Math.max(-1, Math.min(1, downsampled[i]));
+                pcmBuffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+
+            if (maxVal > 0.002) {
+                const base64Data = arrayBufferToBase64(pcmBuffer.buffer);
+                const mediaMessage = {
+                    realtimeInput: {
+                        mediaChunks: [
+                            {
+                                mimeType: "audio/pcm;rate=16000",
+                                data: base64Data
+                            }
+                        ]
+                    }
+                };
+                wsRef.current.send(JSON.stringify(mediaMessage));
+            }
+        };
+
+        return stream;
+    };
+
+    initMicrophoneRef.current = initMicrophone;
+    closeMicrophoneRef.current = closeMicrophone;
+
     // ── INICIAR ESCUCHA POR VENTANA NATIVA (VAD - AHORRO) ──
     const triggerSpeechRecognitionWindow = useCallback(() => {
         if (recognitionActiveRef.current || stateRef.current === 'playing' || stateRef.current === 'matched') return;
@@ -643,6 +746,11 @@ export default function useVoiceCopilot({
         setLastTranscript('');
         setErrorMsg(null);
         
+        // Cerrar micrófono local temporalmente para cederlo a la Speech API nativa (Crucial para Android)
+        if (closeMicrophoneRef.current) {
+            closeMicrophoneRef.current();
+        }
+
         if (isOfflineMode) {
             setVoiceState('wake');
             stateRef.current = 'wake';
@@ -662,8 +770,17 @@ export default function useVoiceCopilot({
             if (isActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
                 setVoiceState('listening');
                 stateRef.current = 'listening';
-                if (isOfflineMode && restartTfjsRef.current) {
-                    restartTfjsRef.current();
+                
+                // Re-inicializar micrófono local y después reiniciar TFJS
+                if (initMicrophoneRef.current) {
+                    initMicrophoneRef.current().then(() => {
+                        if (isOfflineMode && restartTfjsRef.current) {
+                            restartTfjsRef.current();
+                        }
+                    }).catch(err => {
+                        console.error('[VoiceCopilot] Error al restablecer el micrófono local:', err);
+                        setErrorMsg('Error al reactivar el micrófono local.');
+                    });
                 }
             }
         };
@@ -755,6 +872,10 @@ export default function useVoiceCopilot({
         }
     }, []);
 
+    useEffect(() => {
+        triggerSpeechRecognitionWindowRef.current = triggerSpeechRecognitionWindow;
+    }, [triggerSpeechRecognitionWindow]);
+
     const restartTfjsIfNeeded = async () => {
         if (engineModeRef.current === 'tfjs-go' && tfjsRecognizerRef.current && !tfjsListeningRef.current && isActiveRef.current) {
             try {
@@ -769,7 +890,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.50) {
+                    if (score > 0.30) {
                         console.log('[TFJS Go] Word "go" detected on restart with score:', score);
                         try { recognizer.stopListening(); } catch(e){}
                         tfjsListeningRef.current = false;
@@ -777,7 +898,7 @@ export default function useVoiceCopilot({
                         triggerSpeechRecognitionWindow();
                     }
                 }, {
-                    probabilityThreshold: 0.45,
+                    probabilityThreshold: 0.25,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
@@ -811,97 +932,8 @@ export default function useVoiceCopilot({
 
         try {
             // ── PASO CRÍTICO: Inicialización y Resumen del AudioContext (Resuelve Autoplay Policy de Chrome) ──
-            if (!mediaStreamRef.current) {
-                console.log('[VoiceCopilot] Solicitando micrófono...');
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        channelCount: 1
-                    } 
-                });
-                mediaStreamRef.current = stream;
-
-                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                const audioCtx = new AudioContextClass(); 
-                audioContextRef.current = audioCtx;
-
-                // Forzar el resume inmediato para habilitar los flujos de audio bloqueados por el navegador
-                if (audioCtx.state === 'suspended') {
-                    await audioCtx.resume();
-                    console.log('[VoiceCopilot] AudioContext activado exitosamente desde estado suspendido.');
-                }
-
-                const source = audioCtx.createMediaStreamSource(stream);
-                sourceNodeRef.current = source;
-
-                const analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-                analyserRef.current = analyser;
-
-                source.connect(analyser);
-
-                // Configurar procesador local de audio
-                const processor = audioCtx.createScriptProcessor(2048, 1, 1);
-                processorNodeRef.current = processor;
-                analyser.connect(processor);
-                processor.connect(audioCtx.destination);
-
-                processor.onaudioprocess = (e) => {
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    let maxVal = 0;
-                    for (let i = 0; i < inputData.length; i++) {
-                        const absVal = Math.abs(inputData[i]);
-                        if (absVal > maxVal) maxVal = absVal;
-                    }
-
-                    setIsDetectingVoice(maxVal > 0.01);
-
-                    // Si estamos en modo de ahorro VAD nativo o TFJS-Go
-                    if (engineModeRef.current === 'native-vad' || engineModeRef.current === 'tfjs-go') {
-                        // Si se detecta un pico de energía vocal (>0.035) y estamos en native-vad
-                        if (engineModeRef.current === 'native-vad' && maxVal > 0.035 && !recognitionActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
-                            triggerSpeechRecognitionWindow();
-                        }
-                        return;
-                    }
-
-                    // Si el motor nativo está activo, omitimos enviar fragmentos al WebSocket
-                    if (engineModeRef.current === 'native') {
-                        return;
-                    }
-
-                    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-                    if (stateRef.current === 'playing' || stateRef.current === 'matched') return;
-
-                    const downsampled = downsampleBuffer(inputData, e.inputBuffer.sampleRate, 16000);
-                    const pcmBuffer = new Int16Array(downsampled.length);
-
-                    for (let i = 0; i < downsampled.length; i++) {
-                        const s = Math.max(-1, Math.min(1, downsampled[i]));
-                        pcmBuffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                    }
-
-                    if (maxVal > 0.002) {
-                        const base64Data = arrayBufferToBase64(pcmBuffer.buffer);
-                        const mediaMessage = {
-                            realtimeInput: {
-                                mediaChunks: [
-                                    {
-                                        mimeType: "audio/pcm;rate=16000",
-                                        data: base64Data
-                                    }
-                                ]
-                            }
-                        };
-                        wsRef.current.send(JSON.stringify(mediaMessage));
-                    }
-                };
-            } else {
-                if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-                    await audioContextRef.current.resume();
-                }
+            if (initMicrophoneRef.current) {
+                await initMicrophoneRef.current();
             }
 
             // Arrancar el motor seleccionado
@@ -934,7 +966,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.50) {
+                    if (score > 0.30) {
                         console.log('[TFJS Go] Palabra "go" detectada con score:', score);
                         try { recognizer.stopListening(); } catch(e){}
                         tfjsListeningRef.current = false;
@@ -942,7 +974,7 @@ export default function useVoiceCopilot({
                         triggerSpeechRecognitionWindow();
                     }
                 }, {
-                    probabilityThreshold: 0.45,
+                    probabilityThreshold: 0.25,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
