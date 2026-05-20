@@ -638,6 +638,11 @@ export default function useVoiceCopilot({
         console.log(`[VoiceCopilot VAD] Disparando ventana de voz de 6s en modo ${isOfflineMode ? 'Offline (Woke)' : 'VAD (Listening)'}`);
         recognitionActiveRef.current = true;
         
+        // Limpiar la transcripción y errores anteriores al iniciar una nueva ventana
+        setDictatedText('');
+        setLastTranscript('');
+        setErrorMsg(null);
+        
         if (isOfflineMode) {
             setVoiceState('wake');
             stateRef.current = 'wake';
@@ -657,8 +662,6 @@ export default function useVoiceCopilot({
             if (isActiveRef.current && stateRef.current !== 'playing' && stateRef.current !== 'matched') {
                 setVoiceState('listening');
                 stateRef.current = 'listening';
-                setDictatedText('');
-                setLastTranscript('');
                 if (isOfflineMode && restartTfjsRef.current) {
                     restartTfjsRef.current();
                 }
@@ -677,6 +680,15 @@ export default function useVoiceCopilot({
 
         rec.onerror = (e) => {
             console.error('[VoiceCopilot VAD] Error de reconocimiento:', e);
+            if (e.error === 'network') {
+                setErrorMsg('Error de red en Google Speech API. Se requiere internet para transcripción.');
+            } else if (e.error === 'not-allowed') {
+                setErrorMsg('Permiso de micrófono denegado para Google Speech API.');
+            } else if (e.error === 'no-speech') {
+                console.log('[VoiceCopilot VAD] No se detectó habla en la ventana.');
+            } else {
+                setErrorMsg(`Error de voz nativo: ${e.error}`);
+            }
             cleanUpAndRestart();
         };
 
@@ -738,6 +750,7 @@ export default function useVoiceCopilot({
             rec.start();
         } catch(err) {
             console.error('[VoiceCopilot VAD] Error al arrancar la Speech API:', err);
+            setErrorMsg(`Error al iniciar micrófono: ${err.message || err}`);
             cleanUpAndRestart();
         }
     }, []);
@@ -756,7 +769,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.65) {
+                    if (score > 0.50) {
                         console.log('[TFJS Go] Word "go" detected on restart with score:', score);
                         try { recognizer.stopListening(); } catch(e){}
                         tfjsListeningRef.current = false;
@@ -764,7 +777,7 @@ export default function useVoiceCopilot({
                         triggerSpeechRecognitionWindow();
                     }
                 }, {
-                    probabilityThreshold: 0.60,
+                    probabilityThreshold: 0.45,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
@@ -921,7 +934,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.65) {
+                    if (score > 0.50) {
                         console.log('[TFJS Go] Palabra "go" detectada con score:', score);
                         try { recognizer.stopListening(); } catch(e){}
                         tfjsListeningRef.current = false;
@@ -929,7 +942,7 @@ export default function useVoiceCopilot({
                         triggerSpeechRecognitionWindow();
                     }
                 }, {
-                    probabilityThreshold: 0.60,
+                    probabilityThreshold: 0.45,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
