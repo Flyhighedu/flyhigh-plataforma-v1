@@ -377,7 +377,7 @@ export default function VoiceSimulatorWidget({
                                     Motor de Voz
                                 </p>
                                 <span className="text-[9px] font-bold opacity-45">
-                                    {copilot.engineMode === 'vosk' ? '🎙️ Vozq Offline Activo' : '🤖 Offline "Go" Activo'}
+                                    {copilot.engineMode === 'vosk' ? '🎙️ Vosk Offline Activo' : copilot.engineMode === 'pocketsphinx-js' ? '🦊 PocketSphinx Activo' : '🤖 Offline "Go" Activo'}
                                 </span>
                             </div>
                             <div className="flex bg-slate-100/40 p-1 rounded-xl border border-slate-200/50 shadow-inner w-full justify-between gap-1">
@@ -389,8 +389,20 @@ export default function VoiceSimulatorWidget({
                                             : 'text-slate-600 hover:text-slate-900'
                                     }`}
                                 >
-                                    Vozq (Offline)
+                                    Vozq (Vosk)
                                 </button>
+                                {/*
+                                <button
+                                    onClick={() => copilot.changeEngineMode('pocketsphinx-js')}
+                                    className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
+                                        copilot.engineMode === 'pocketsphinx-js' 
+                                            ? 'bg-amber-600 text-white shadow-sm' 
+                                            : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                                >
+                                    PocketSphinx
+                                </button>
+                                */}
                                 <button
                                     onClick={() => copilot.changeEngineMode('tfjs-go')}
                                     className={`flex-1 py-1 rounded-lg text-[9px] font-bold transition-all ${
@@ -399,7 +411,7 @@ export default function VoiceSimulatorWidget({
                                             : 'text-slate-600 hover:text-slate-900'
                                     }`}
                                 >
-                                    Offline (TFJS)
+                                    TFJS (Go)
                                 </button>
                             </div>
                         </div>

@@ -21,7 +21,10 @@ const CopilotOrbUI = forwardRef(({
 
     useImperativeHandle(ref, () => ({
         startListening: copilot.startListening,
-        stopListening: copilot.stopListening
+        stopListening: copilot.stopListening,
+        changeEngineMode: copilot.changeEngineMode,
+        engineMode: copilot.engineMode,
+        deviceInfo: copilot.deviceInfo
     }));
 
     const [showDictionary, setShowDictionary] = useState(false);
@@ -134,6 +137,46 @@ const CopilotOrbUI = forwardRef(({
                         )}
                     </div>
                 )}
+
+                {/* ── ENGINE SWITCHER ── */}
+                <div className={`flex items-center gap-1 mt-2 border rounded-full p-0.5 ${
+                    isPeripheralActive 
+                        ? 'border-white/10 bg-white/5' 
+                        : 'border-slate-200 bg-slate-50/50'
+                }`}>
+                    <button
+                        onClick={() => copilot.changeEngineMode('vosk')}
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-all ${
+                            copilot.engineMode === 'vosk'
+                                ? (isPeripheralActive ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-800 text-white shadow-sm')
+                                : (isPeripheralActive ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')
+                        }`}
+                    >
+                        Vosk
+                    </button>
+                    {/*
+                    <button
+                        onClick={() => copilot.changeEngineMode('pocketsphinx-js')}
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-all ${
+                            copilot.engineMode === 'pocketsphinx-js'
+                                ? (isPeripheralActive ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-800 text-white shadow-sm')
+                                : (isPeripheralActive ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')
+                        }`}
+                    >
+                        Sphinx
+                    </button>
+                    */}
+                    <button
+                        onClick={() => copilot.changeEngineMode('tfjs-go')}
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-all ${
+                            copilot.engineMode === 'tfjs-go'
+                                ? (isPeripheralActive ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-800 text-white shadow-sm')
+                                : (isPeripheralActive ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')
+                        }`}
+                    >
+                        TFJS + Web
+                    </button>
+                </div>
             </div>
 
             {/* ── THE ORB ── */}

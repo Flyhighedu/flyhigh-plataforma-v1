@@ -7,7 +7,7 @@ import * as speechCommands from '@tensorflow-models/speech-commands';
 // ═══════════════════════════════════════════════════════════════
 // Helper utilities
 // ═══════════════════════════════════════════════════════════════
-const VAD_ENERGY_THRESHOLD = 0.006;
+const VAD_ENERGY_THRESHOLD = 0.0015;
 const VAD_TRAILING_FRAMES = 5;
 
 function getAudioEnergy(buffer) {
@@ -113,7 +113,12 @@ export default function useVoiceCopilot({
             if (saved === 'vosk' || saved === 'tfjs-go') {
                 return saved;
             }
-            return 'vosk';
+            const ram = navigator.deviceMemory || 8;
+            const cores = navigator.hardwareConcurrency || 8;
+            const isLowEnd = ram <= 4 || cores <= 4;
+            const defaultMode = isLowEnd ? 'tfjs-go' : 'vosk';
+            localStorage.setItem('flyhigh_voice_engine_mode', defaultMode);
+            return defaultMode;
         }
         return 'vosk';
     });
@@ -150,6 +155,9 @@ export default function useVoiceCopilot({
     
     // Vosk Worker
     const voskWorkerRef = useRef(null);
+
+    // PocketSphinx Worker
+    const pocketsphinxWorkerRef = useRef(null);
 
     // TFJS and Web Speech recognition refs
     const tfjsRecognizerRef = useRef(null);
@@ -309,16 +317,22 @@ export default function useVoiceCopilot({
             }
             setIsDetectingVoice(maxVal > 0.015);
 
-            if (engineModeRef.current === 'vosk') {
+            const mode = engineModeRef.current;
+            if (mode === 'vosk' || mode === 'pocketsphinx-js') {
                 if (stateRef.current === 'listening' || stateRef.current === 'wake') {
-                    if (voskWorkerRef.current) {
+                    const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
+                    if (worker) {
                         const energy = getAudioEnergy(inputData);
-                        if (energy >= VAD_ENERGY_THRESHOLD) {
-                            vadTrailingCounter = VAD_TRAILING_FRAMES;
-                            voskWorkerRef.current.postMessage({ action: 'process', data: inputData });
-                        } else if (vadTrailingCounter > 0) {
-                            vadTrailingCounter--;
-                            voskWorkerRef.current.postMessage({ action: 'process', data: inputData });
+                        const isVADActive = energy >= VAD_ENERGY_THRESHOLD;
+                        if (isVADActive || vadTrailingCounter > 0) {
+                            if (isVADActive) {
+                                vadTrailingCounter = VAD_TRAILING_FRAMES;
+                            } else {
+                                vadTrailingCounter--;
+                            }
+                            // Clonamos el Float32Array para evitar que el navegador limpie la memoria de forma asíncrona
+                            const dataCopy = new Float32Array(inputData);
+                            worker.postMessage({ action: 'process', data: dataCopy });
                         }
                     }
                 }
@@ -366,6 +380,14 @@ export default function useVoiceCopilot({
             voskWorkerRef.current = null;
         }
 
+        if (pocketsphinxWorkerRef.current) {
+            try {
+                pocketsphinxWorkerRef.current.postMessage({ action: 'destroy' });
+                pocketsphinxWorkerRef.current.terminate();
+            } catch(e){}
+            pocketsphinxWorkerRef.current = null;
+        }
+
         await closeMicrophone();
 
         setVoiceState('off');
@@ -389,7 +411,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.30) {
+                    if (score > 0.15) {
                         console.log('[TFJS Go] Word "go" detected on restart with score:', score);
                         
                         playFeedbackSound();
@@ -409,7 +431,7 @@ export default function useVoiceCopilot({
                         }, 150);
                     }
                 }, {
-                    probabilityThreshold: 0.25,
+                    probabilityThreshold: 0.08,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
@@ -438,6 +460,12 @@ export default function useVoiceCopilot({
         } else if (engineModeRef.current === 'vosk') {
             if (voskWorkerRef.current) {
                 voskWorkerRef.current.postMessage({ action: 'reset' });
+            }
+            setVoiceState('listening');
+            stateRef.current = 'listening';
+        } else if (engineModeRef.current === 'pocketsphinx-js') {
+            if (pocketsphinxWorkerRef.current) {
+                pocketsphinxWorkerRef.current.postMessage({ action: 'reset' });
             }
             setVoiceState('listening');
             stateRef.current = 'listening';
@@ -533,6 +561,8 @@ export default function useVoiceCopilot({
         rec.interimResults = true;
         rec.lang = 'es-MX';
 
+        let latestText = '';
+
         const cleanUpAndRestart = () => {
             if (!recognitionActiveRef.current) return;
             recognitionActiveRef.current = false;
@@ -556,7 +586,6 @@ export default function useVoiceCopilot({
             if (recognitionActiveRef.current) {
                 console.log('[VoiceCopilot VAD] Expiró la ventana de 6s.');
                 try { rec.stop(); } catch(e){}
-                cleanUpAndRestart();
             }
         }, 6000);
 
@@ -575,8 +604,26 @@ export default function useVoiceCopilot({
         };
 
         rec.onend = () => {
-            console.log('[VoiceCopilot VAD] Fin de ventana de voz.');
-            cleanUpAndRestart();
+            console.log('[VoiceCopilot VAD] Fin de ventana de voz. Procesando texto final:', latestText);
+            
+            let matched = false;
+            if (stateRef.current === 'wake' && latestText.trim()) {
+                const poiMatch = callbacksRef.current.findMatchInBuffer(latestText);
+                if (poiMatch) {
+                    matched = true;
+                    if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
+                    setMatchedPoi(poiMatch);
+                    setVoiceState('matched');
+                    stateRef.current = 'matched';
+                    recognitionActiveRef.current = false;
+                    
+                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 200);
+                }
+            }
+            
+            if (!matched) {
+                cleanUpAndRestart();
+            }
         };
 
         rec.onresult = (event) => {
@@ -594,23 +641,19 @@ export default function useVoiceCopilot({
 
             const cleanText = (final || interim).trim();
             if (cleanText) {
+                latestText = cleanText;
                 console.log('[VoiceCopilot VAD] Texto detectado:', cleanText);
                 setLastTranscript(cleanText);
                 setDictatedText(cleanText);
 
-                if (stateRef.current === 'wake') {
-                    const poiMatch = callbacksRef.current.findMatchInBuffer(cleanText);
-                    if (poiMatch) {
-                        if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
-                        setMatchedPoi(poiMatch);
-                        setVoiceState('matched');
-                        stateRef.current = 'matched';
-                        recognitionActiveRef.current = false;
-                        
+                // Extender el temporizador de inactividad mientras el usuario siga hablando (3.5s)
+                if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
+                vadTimeoutRef.current = setTimeout(() => {
+                    if (recognitionActiveRef.current) {
+                        console.log('[VoiceCopilot VAD] Expiró la ventana por silencio de 3.5s.');
                         try { rec.stop(); } catch(e){}
-                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 200);
                     }
-                }
+                }, 3500);
             }
         };
 
@@ -637,9 +680,15 @@ export default function useVoiceCopilot({
         setLastTranscript('');
 
         try {
-            await initMicrophone();
+            if (initMicrophoneRef.current) {
+                await initMicrophoneRef.current();
+            } else {
+                await initMicrophone();
+            }
 
-            if (engineMode === 'tfjs-go') {
+            const currentMode = engineModeRef.current;
+
+            if (currentMode === 'tfjs-go') {
                 console.log('[TFJS Go] Inicializando TensorFlow.js Speech Commands...');
                 try {
                     await tf.setBackend('webgl');
@@ -662,7 +711,7 @@ export default function useVoiceCopilot({
                 await recognizer.listen(result => {
                     if (stateRef.current !== 'listening') return;
                     const score = result.scores[goIndex];
-                    if (score > 0.30) {
+                    if (score > 0.15) {
                         console.log('[TFJS Go] Palabra "go" detectada con score:', score);
                         
                         playFeedbackSound();
@@ -682,11 +731,11 @@ export default function useVoiceCopilot({
                         }, 150);
                     }
                 }, {
-                    probabilityThreshold: 0.25,
+                    probabilityThreshold: 0.08,
                     overlapFactor: 0.50,
                     invokeCallbackOnNoiseAndUnknown: true
                 });
-            } else {
+            } else if (currentMode === 'vosk') {
                 // engineMode === 'vosk'
                 if (!voskWorkerRef.current) {
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
@@ -765,13 +814,90 @@ export default function useVoiceCopilot({
                     setVoiceState('listening');
                     stateRef.current = 'listening';
                 }
+            } else if (currentMode === 'pocketsphinx-js') {
+                if (!pocketsphinxWorkerRef.current) {
+                    pocketsphinxWorkerRef.current = new Worker('/pocketsphinx/pocketsphinxWorker.js');
+                    
+                    pocketsphinxWorkerRef.current.onmessage = (e) => {
+                        const { type, status, result, error } = e.data;
+                        
+                        if (type === 'status') {
+                            if (status === 'ready') {
+                                setVoiceState('listening');
+                                stateRef.current = 'listening';
+                            }
+                        } else if (type === 'partial' || type === 'final') {
+                            const transcript = result?.partial || result?.text || '';
+                            if (!transcript) return;
+                            
+                            setLastTranscript(transcript);
+                            setDictatedText(transcript);
+
+                            const currentWakeWord = callbacksRef.current.wakeWord;
+                            const hasWakeWord = isWakeWordDetected(transcript, currentWakeWord);
+
+                            if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                                if (stateRef.current !== 'wake') {
+                                    setVoiceState('wake');
+                                    stateRef.current = 'wake';
+                                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+                                }
+
+                                if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                attentionTimeoutRef.current = setTimeout(() => {
+                                    if (stateRef.current === 'wake') {
+                                        setVoiceState('listening');
+                                        stateRef.current = 'listening';
+                                        setLastTranscript('');
+                                        setDictatedText('');
+                                    }
+                                }, 5000);
+                            }
+
+                            if (type === 'final') {
+                                if (stateRef.current === 'wake') {
+                                    const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
+                                    if (poiMatch) {
+                                        if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                        setMatchedPoi(poiMatch);
+                                        setVoiceState('matched');
+                                        stateRef.current = 'matched';
+                                        
+                                        if (pocketsphinxWorkerRef.current) {
+                                            pocketsphinxWorkerRef.current.postMessage({ action: 'reset' });
+                                        }
+
+                                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
+                                    }
+                                }
+                            }
+                        } else if (type === 'error') {
+                            setErrorMsg(`Error del motor PocketSphinx: ${error}`);
+                            console.error('[PocketSphinx]', error);
+                            callbacksRef.current.stopListening();
+                        }
+                    };
+
+                    const audioCtx = audioContextRef.current;
+                    pocketsphinxWorkerRef.current.postMessage({
+                        action: 'init',
+                        data: {
+                            wakeWord: callbacksRef.current.wakeWord,
+                            deviceSampleRate: audioCtx.sampleRate
+                        }
+                    });
+                } else {
+                    pocketsphinxWorkerRef.current.postMessage({ action: 'reset' });
+                    setVoiceState('listening');
+                    stateRef.current = 'listening';
+                }
             }
         } catch (err) {
             setErrorMsg(err.message || 'Permiso de micrófono denegado o no soportado.');
             console.error('[VoiceCopilot] Error iniciando micrófono:', err);
-            stopListening();
+            callbacksRef.current.stopListening();
         }
-    }, [engineMode, triggerSpeechRecognitionWindow]);
+    }, []);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -812,25 +938,36 @@ export default function useVoiceCopilot({
         localStorage.setItem('flyhigh_voice_wake_word', finalVal);
     };
 
-    const changeEngineMode = (mode) => {
-        setEngineMode(mode);
-        localStorage.setItem('flyhigh_voice_engine_mode', mode);
-        if (isActive) {
-            stopListening();
+    const changeEngineMode = async (mode) => {
+        let targetMode = mode;
+        if (targetMode === 'pocketsphinx-js') {
+            targetMode = 'vosk';
+        }
+        if (targetMode === engineModeRef.current) return;
+        
+        const wasActive = isActiveRef.current;
+        if (wasActive) {
+            await stopListening();
+        }
+        
+        engineModeRef.current = targetMode;
+        setEngineMode(targetMode);
+        localStorage.setItem('flyhigh_voice_engine_mode', targetMode);
+        
+        if (wasActive) {
             setTimeout(() => {
-                setInternalIsActive(true);
-                if (controlledSetIsActive) {
-                    controlledSetIsActive(true);
-                }
-            }, 100);
+                startListening();
+            }, 200);
         }
     };
 
-    useEffect(() => {
-        if (isActive) {
-            startListening();
-        }
-    }, [engineMode]);
+    const deviceInfo = (() => {
+        if (typeof window === 'undefined') return { ram: 8, cores: 8, isLowEnd: false };
+        const ram = navigator.deviceMemory || 8;
+        const cores = navigator.hardwareConcurrency || 8;
+        const isLowEnd = ram <= 4 || cores <= 4;
+        return { ram, cores, isLowEnd };
+    })();
 
     return {
         isActive,
@@ -851,6 +988,7 @@ export default function useVoiceCopilot({
         analyserRef,
         engineMode,
         changeEngineMode,
+        deviceInfo,
         tfjsIsLoaded: true,
         tfjsIsCalibrated: true,
         collectExample: async () => {},

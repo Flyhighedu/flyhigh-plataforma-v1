@@ -14,7 +14,7 @@
 //   - SimulationContainer.js (academia, mock handlers)
 // =====================================================
 
-import { useState, useRef, useCallback, memo } from 'react';
+import { useState, useRef, useCallback, memo, useEffect } from 'react';
 import { MoreVertical, RotateCcw, Clock, Pause, LogOut } from 'lucide-react';
 import FlightLogger from '@/components/staff/FlightLogger';
 import TodayFlightList from '@/components/staff/TodayFlightList';
@@ -129,6 +129,38 @@ export default function OperationUI({
     const [closeHoldProgress, setCloseHoldProgress] = useState(0);
     const [isClosingOperation, setIsClosingOperation] = useState(false);
     const [closeOperationError, setCloseOperationError] = useState(null);
+
+    // ── Voice Engine Setup Modal State ──
+    const [showVoiceSetupModal, setShowVoiceSetupModal] = useState(false);
+    const [selectedEngineMode, setSelectedEngineMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('flyhigh_voice_engine_mode');
+            if (saved === 'vosk' || saved === 'tfjs-go') return saved;
+            
+            const ram = navigator.deviceMemory || 8;
+            const cores = navigator.hardwareConcurrency || 8;
+            const isLowEnd = ram <= 4 || cores <= 4;
+            return isLowEnd ? 'tfjs-go' : 'vosk';
+        }
+        return 'vosk';
+    });
+
+    const getDeviceHardwareInfo = () => {
+        if (typeof window === 'undefined') return { ram: 8, cores: 8, isLowEnd: false };
+        const ram = navigator.deviceMemory || 8;
+        const cores = navigator.hardwareConcurrency || 8;
+        const isLowEnd = ram <= 4 || cores <= 4;
+        return { ram, cores, isLowEnd };
+    };
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('flyhigh_voice_engine_mode');
+            if (isSimulation || !saved) {
+                setShowVoiceSetupModal(true);
+            }
+        }
+    }, [isSimulation]);
 
     // ── Peripheral Vision State ──
     const [peripheralState, setPeripheralState] = useState('off');
@@ -457,7 +489,7 @@ export default function OperationUI({
                                         
                                         <button
                                             type="button"
-                                            onClick={onPrepareCabin}
+                                            onClick={() => setShowVoiceSetupModal(true)}
                                             className={`w-full py-4 rounded-[20px] font-black text-[15px] tracking-wide flex items-center justify-center transition-all duration-300 active:scale-[0.96] ${
                                                 isPeripheralActive
                                                     ? 'bg-white hover:bg-slate-100 text-slate-900 shadow-[0_0_20px_rgba(255,255,255,0.2)]'
@@ -678,6 +710,127 @@ export default function OperationUI({
                 onClose={() => setShowResumeModal(false)}
                 onConfirmResume={handleConfirmResumeInternal}
             />
+
+            {/* ── Voice Engine Setup Modal ── */}
+            {showVoiceSetupModal && (() => {
+                const hw = getDeviceHardwareInfo();
+                
+                const handleConfirm = () => {
+                    localStorage.setItem('flyhigh_voice_engine_mode', selectedEngineMode);
+                    if (copilotRef.current && typeof copilotRef.current.changeEngineMode === 'function') {
+                        copilotRef.current.changeEngineMode(selectedEngineMode);
+                    }
+                    if (typeof onPrepareCabin === 'function') {
+                        onPrepareCabin();
+                    }
+                    setShowVoiceSetupModal(false);
+                };
+
+                return (
+                    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-[2px] px-4 py-6 flex items-end justify-center sm:items-center animate-in fade-in duration-200">
+                        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_36px_72px_-34px_rgba(15,23,42,0.65)] animate-in zoom-in-95 duration-300">
+                            
+                            <p className="m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                                Asistente de voz
+                            </p>
+                            <h3 className="mt-1 text-xl font-black text-slate-900">
+                                Escoge tu copiloto
+                            </h3>
+                            <p className="mt-2 text-[13px] font-medium leading-relaxed text-slate-500">
+                                {hw.isLowEnd
+                                    ? `Tu dispositivo tiene ~${hw.ram} GB de RAM y ${hw.cores} núcleos. Para que todo fluya sin trabas, te recomendamos la opción ligera.`
+                                    : `Tu dispositivo tiene ~${hw.ram} GB de RAM y ${hw.cores} núcleos. Tienes suficiente potencia para usar cualquiera de las dos opciones.`}
+                            </p>
+
+                            <div className="mt-5 grid grid-cols-1 gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedEngineMode('vosk')}
+                                    className={`w-full rounded-2xl border-2 px-4 py-3.5 text-left transition-all active:scale-[0.98] ${
+                                        selectedEngineMode === 'vosk'
+                                            ? 'border-blue-600 bg-blue-50/40'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="flex items-center justify-between">
+                                        <span className="text-sm font-extrabold text-slate-900">Alta precisión (Vosk)</span>
+                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                            selectedEngineMode === 'vosk' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
+                                        }`}>
+                                            {selectedEngineMode === 'vosk' && <span className="block w-2 h-2 bg-white rounded-full" />}
+                                        </span>
+                                    </span>
+                                    <span className="block mt-1 text-xs font-medium text-slate-500">
+                                        Funciona 100% offline. Descarga de 40 MB. Recomienda más de 4 GB RAM.
+                                    </span>
+                                </button>
+
+                                {/*
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedEngineMode('pocketsphinx-js')}
+                                    className={`w-full rounded-2xl border-2 px-4 py-3.5 text-left transition-all active:scale-[0.98] ${
+                                        selectedEngineMode === 'pocketsphinx-js'
+                                            ? 'border-blue-600 bg-blue-50/40'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="flex items-center justify-between">
+                                        <span className="text-sm font-extrabold text-slate-900">Personalizado (PocketSphinx)</span>
+                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                            selectedEngineMode === 'pocketsphinx-js' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
+                                        }`}>
+                                            {selectedEngineMode === 'pocketsphinx-js' && <span className="block w-2 h-2 bg-white rounded-full" />}
+                                        </span>
+                                    </span>
+                                    <span className="block mt-1 text-xs font-medium text-slate-500">
+                                        Totalmente offline, ultra-ligero y rápido, palabra clave editable.
+                                    </span>
+                                </button>
+                                */}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedEngineMode('tfjs-go')}
+                                    className={`w-full rounded-2xl border-2 px-4 py-3.5 text-left transition-all active:scale-[0.98] ${
+                                        selectedEngineMode === 'tfjs-go'
+                                            ? 'border-blue-600 bg-blue-50/40'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                    }`}
+                                >
+                                    <span className="flex items-center justify-between">
+                                        <span className="text-sm font-extrabold text-slate-900">Línea ligera (TFJS)</span>
+                                        <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                            selectedEngineMode === 'tfjs-go' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
+                                        }`}>
+                                            {selectedEngineMode === 'tfjs-go' && <span className="block w-2 h-2 bg-white rounded-full" />}
+                                        </span>
+                                    </span>
+                                    <span className="block mt-1 text-xs font-medium text-slate-500">
+                                        Solo 1 MB, ahorra batería, palabra clave fija ("go").
+                                    </span>
+                                </button>
+                            </div>
+
+                            {/* Recommendation hint — only on low-end */}
+                            {hw.isLowEnd && selectedEngineMode === 'vosk' && (
+                                <p className="mt-3 text-[11px] font-semibold leading-relaxed text-amber-700">
+                                    Con los recursos de tu dispositivo, la opción de alta precisión puede causar lentitud o sobrecalentamiento durante el vuelo.
+                                </p>
+                            )}
+
+                            {/* CTA */}
+                            <button
+                                type="button"
+                                onClick={handleConfirm}
+                                className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3.5 text-center text-sm font-extrabold tracking-wide text-white shadow-[0_18px_30px_-18px_rgba(37,99,235,0.65)] transition active:scale-[0.99] hover:bg-blue-700"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Escuadrón Slot (overlays injected by smart container) ── */}
             {escuadronSlot}
