@@ -738,7 +738,9 @@ export default function useVoiceCopilot({
                     invokeCallbackOnNoiseAndUnknown: true
                 });
             } else if (currentMode === 'vosk') {
-                // engineMode === 'vosk'
+                // ═══ VOSK STATE MACHINE MODE ═══
+                // Wake word detection now lives inside the Worker for minimal latency.
+                // The Worker emits: 'wake', 'active_timeout', 'partial', 'final', 'status', 'error'
                 if (!voskWorkerRef.current) {
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
                     
@@ -750,6 +752,22 @@ export default function useVoiceCopilot({
                                 setVoiceState('listening');
                                 stateRef.current = 'listening';
                             }
+                        } else if (type === 'wake') {
+                            // Worker detected wake word → transitioned to ACTIVE_LISTEN
+                            if (stateRef.current !== 'matched' && stateRef.current !== 'playing') {
+                                setVoiceState('wake');
+                                stateRef.current = 'wake';
+                                playFeedbackSound();
+                                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+                            }
+                        } else if (type === 'active_timeout') {
+                            // Worker's 6s grace window expired without POI match
+                            if (stateRef.current === 'wake') {
+                                setVoiceState('listening');
+                                stateRef.current = 'listening';
+                                setLastTranscript('');
+                                setDictatedText('');
+                            }
                         } else if (type === 'partial' || type === 'final') {
                             const transcript = result?.partial || result?.text || '';
                             if (!transcript) return;
@@ -757,42 +775,20 @@ export default function useVoiceCopilot({
                             setLastTranscript(transcript);
                             setDictatedText(transcript);
 
-                            const currentWakeWord = callbacksRef.current.wakeWord;
-                            const hasWakeWord = isWakeWordDetected(transcript, currentWakeWord);
-
-                            if (hasWakeWord && stateRef.current !== 'matched' && stateRef.current !== 'playing') {
-                                if (stateRef.current !== 'wake') {
-                                    setVoiceState('wake');
-                                    stateRef.current = 'wake';
-                                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
-                                }
-
-                                if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
-                                attentionTimeoutRef.current = setTimeout(() => {
-                                    if (stateRef.current === 'wake') {
-                                        setVoiceState('listening');
-                                        stateRef.current = 'listening';
-                                        setLastTranscript('');
-                                        setDictatedText('');
+                            // POI matching only during wake (ACTIVE_LISTEN in worker)
+                            if (type === 'final' && stateRef.current === 'wake') {
+                                const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
+                                if (poiMatch) {
+                                    setMatchedPoi(poiMatch);
+                                    setVoiceState('matched');
+                                    stateRef.current = 'matched';
+                                    
+                                    // Immediate amnesia — force worker back to PATROL
+                                    if (voskWorkerRef.current) {
+                                        voskWorkerRef.current.postMessage({ action: 'force_reset' });
                                     }
-                                }, 5000);
-                            }
 
-                            if (type === 'final') {
-                                if (stateRef.current === 'wake') {
-                                    const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
-                                    if (poiMatch) {
-                                        if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
-                                        setMatchedPoi(poiMatch);
-                                        setVoiceState('matched');
-                                        stateRef.current = 'matched';
-                                        
-                                        if (voskWorkerRef.current) {
-                                            voskWorkerRef.current.postMessage({ action: 'reset' });
-                                        }
-
-                                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
-                                    }
+                                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
                                 }
                             }
                         } else if (type === 'error') {
@@ -808,7 +804,8 @@ export default function useVoiceCopilot({
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
-                            deviceSampleRate: audioCtx.sampleRate
+                            deviceSampleRate: audioCtx.sampleRate,
+                            wakeWord: callbacksRef.current.wakeWord
                         }
                     });
                 } else {
