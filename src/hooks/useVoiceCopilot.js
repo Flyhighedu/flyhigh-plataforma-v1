@@ -236,30 +236,67 @@ export default function useVoiceCopilot({
 
     const closeMicrophone = async () => {
         console.log('[VoiceCopilot] Cerrando y liberando micrófono local...');
+        
+        // Limpieza de audio de retroalimentación o TTS pendiente
+        if (audioRef?.current) {
+            try {
+                if (audioRef.current.__source_node) {
+                    audioRef.current.__source_node.disconnect();
+                }
+                audioRef.current.pause();
+                audioRef.current.src = '';
+                audioRef.current.load();
+            } catch (e) {}
+            audioRef.current = null;
+        }
+
+        // Limpieza del Loopback Virtual
+        if (typeof window !== 'undefined') {
+            if (window.__flyhigh_loopback_audio) {
+                try {
+                    window.__flyhigh_loopback_audio.pause();
+                    window.__flyhigh_loopback_audio.srcObject = null;
+                } catch (e) {}
+                window.__flyhigh_loopback_audio = null;
+            }
+            if (window.__flyhigh_media_stream_destination) {
+                try {
+                    if (window.__flyhigh_media_stream_destination.stream) {
+                        window.__flyhigh_media_stream_destination.stream.getTracks().forEach(track => track.stop());
+                    }
+                } catch (e) {}
+                window.__flyhigh_media_stream_destination = null;
+            }
+            window.__flyhigh_eq_node = null;
+            window.__flyhigh_compressor_node = null;
+            window.__flyhigh_audio_context = null;
+        }
+
         if (processorNodeRef.current) {
-            try { processorNodeRef.current.disconnect(); } catch(e){}
+            try { processorNodeRef.current.disconnect(); } catch (e) {}
             processorNodeRef.current.onaudioprocess = null;
             processorNodeRef.current = null;
         }
         if (sourceNodeRef.current) {
-            try { sourceNodeRef.current.disconnect(); } catch(e){}
+            try { sourceNodeRef.current.disconnect(); } catch (e) {}
             sourceNodeRef.current = null;
         }
         if (analyserRef.current) {
-            try { analyserRef.current.disconnect(); } catch(e){}
+            try { analyserRef.current.disconnect(); } catch (e) {}
             analyserRef.current = null;
         }
         if (audioContextRef.current) {
             try {
                 if (audioContextRef.current.state !== 'closed') {
-                    await audioContextRef.current.suspend();
+                    await audioContextRef.current.close();
                 }
-            } catch(e){}
+            } catch (e) {}
+            audioContextRef.current = null;
         }
         if (mediaStreamRef.current) {
             try {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
-            } catch(e){}
+            } catch (e) {}
             mediaStreamRef.current = null;
         }
         setIsDetectingVoice(false);
@@ -293,6 +330,56 @@ export default function useVoiceCopilot({
 
         if (typeof window !== 'undefined') {
             window.__flyhigh_audio_context = audioCtx;
+
+            // ── INICIALIZACIÓN DEL PUENTE DE ENRUTAMIENTO LOOPBACK ──
+            if (!window.__flyhigh_media_stream_destination) {
+                try {
+                    const dest = audioCtx.createMediaStreamDestination();
+                    window.__flyhigh_media_stream_destination = dest;
+                    
+                    // 1. Ecualizador (BiquadFilterNode) para realzar graves y medios (HD Premium)
+                    const eqNode = audioCtx.createBiquadFilter();
+                    eqNode.type = 'peaking';
+                    eqNode.frequency.value = 300; // Realce en la región de calidez/cuerpo
+                    eqNode.Q.value = 1.0;
+                    eqNode.gain.value = 5.0; // Boost controlado de 5dB
+                    window.__flyhigh_eq_node = eqNode;
+                    
+                    // 2. Compresor de dinámica para emparejar volúmenes y dar potencia
+                    const compressorNode = audioCtx.createDynamicsCompressor();
+                    compressorNode.threshold.value = -20;
+                    compressorNode.knee.value = 25;
+                    compressorNode.ratio.value = 8;
+                    compressorNode.attack.value = 0.005;
+                    compressorNode.release.value = 0.15;
+                    window.__flyhigh_compressor_node = compressorNode;
+                    
+                    // Conexión del Grafo HD Premium de salida
+                    eqNode.connect(compressorNode);
+                    compressorNode.connect(dest);
+                    
+                    console.log('[VoiceCopilot] Puente de salida y ecualizador HD configurados.');
+                } catch (e) {
+                    console.error('[VoiceCopilot] Error al inicializar puente de salida:', e);
+                }
+            }
+
+            if (!window.__flyhigh_loopback_audio && window.__flyhigh_media_stream_destination) {
+                try {
+                    const loopback = new Audio();
+                    loopback.crossOrigin = 'anonymous';
+                    loopback.srcObject = window.__flyhigh_media_stream_destination.stream;
+                    loopback.volume = 1.0;
+                    window.__flyhigh_loopback_audio = loopback;
+                    
+                    loopback.play().catch(e => {
+                        console.warn('[VoiceCopilot] Error al reproducir loopbackAudio:', e);
+                    });
+                    console.log('[VoiceCopilot] Audio Loopback enlazado y reproduciendo.');
+                } catch (e) {
+                    console.error('[VoiceCopilot] Error al instanciar loopbackAudio:', e);
+                }
+            }
         }
 
         const source = audioCtx.createMediaStreamSource(stream);
@@ -307,7 +394,7 @@ export default function useVoiceCopilot({
         const processor = audioCtx.createScriptProcessor(8192, 1, 1);
         processorNodeRef.current = processor;
         analyser.connect(processor);
-        processor.connect(audioCtx.destination);
+        processor.connect(audioCtx.destination); // Importante para mantener el onaudioprocess activo en Chrome
 
         let vadTrailingCounter = 0;
 
@@ -334,7 +421,6 @@ export default function useVoiceCopilot({
                             } else {
                                 vadTrailingCounter--;
                             }
-                            // Clonamos el Float32Array para evitar que el navegador limpie la memoria de forma asíncrona
                             const dataCopy = new Float32Array(inputData);
                             worker.postMessage({ action: 'process', data: dataCopy });
                         }
@@ -353,6 +439,18 @@ export default function useVoiceCopilot({
         if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
         if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
 
+        if (audioRef?.current) {
+            try {
+                if (audioRef.current.__source_node) {
+                    audioRef.current.__source_node.disconnect();
+                }
+                audioRef.current.pause();
+                audioRef.current.src = '';
+                audioRef.current.load();
+            } catch (e) {}
+            audioRef.current = null;
+        }
+
         if (tfjsRecognizerRef.current) {
             try {
                 if (tfjsRecognizerRef.current.audioDataExtractor) {
@@ -362,7 +460,7 @@ export default function useVoiceCopilot({
                     }
                 }
                 await tfjsRecognizerRef.current.stopListening().catch(() => {});
-            } catch(e){}
+            } catch (e) {}
             tfjsRecognizerRef.current = null;
         }
         tfjsListeningRef.current = false;
@@ -371,7 +469,7 @@ export default function useVoiceCopilot({
             try {
                 recognitionRef.current.onend = null;
                 recognitionRef.current.stop();
-            } catch(e){}
+            } catch (e) {}
             recognitionRef.current = null;
         }
         recognitionActiveRef.current = false;
@@ -380,7 +478,7 @@ export default function useVoiceCopilot({
             try {
                 voskWorkerRef.current.postMessage({ action: 'destroy' });
                 voskWorkerRef.current.terminate();
-            } catch(e){}
+            } catch (e) {}
             voskWorkerRef.current = null;
         }
 
@@ -388,7 +486,7 @@ export default function useVoiceCopilot({
             try {
                 pocketsphinxWorkerRef.current.postMessage({ action: 'destroy' });
                 pocketsphinxWorkerRef.current.terminate();
-            } catch(e){}
+            } catch (e) {}
             pocketsphinxWorkerRef.current = null;
         }
 
@@ -399,7 +497,7 @@ export default function useVoiceCopilot({
         setLastTranscript('');
         setDictatedText('');
         setMatchedPoi(null);
-    }, []);
+    }, [audioRef]);
 
     const restartTfjsIfNeeded = async () => {
         if (engineModeRef.current === 'tfjs-go' && tfjsRecognizerRef.current && !tfjsListeningRef.current && isActiveRef.current) {
@@ -493,7 +591,13 @@ export default function useVoiceCopilot({
             const gainNode = ctx.createGain();
             
             osc.connect(gainNode);
-            gainNode.connect(ctx.destination);
+            
+            // Redirigir el feedback al ecualizador si está disponible
+            if (typeof window !== 'undefined' && window.__flyhigh_eq_node) {
+                gainNode.connect(window.__flyhigh_eq_node);
+            } else {
+                gainNode.connect(ctx.destination);
+            }
             
             osc.type = 'sine';
             osc.frequency.setValueAtTime(800, ctx.currentTime);
@@ -504,7 +608,7 @@ export default function useVoiceCopilot({
             
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.15);
-        } catch(e) {
+        } catch (e) {
             console.warn('[VoiceCopilot] No se pudo reproducir tono sintético:', e);
         }
     };
@@ -512,8 +616,15 @@ export default function useVoiceCopilot({
     const playMatchedAudio = useCallback((poi) => {
         if (!poi?.audio_url) return;
         if (audioRef?.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
+            try {
+                if (audioRef.current.__source_node) {
+                    audioRef.current.__source_node.disconnect();
+                }
+                audioRef.current.pause();
+                audioRef.current.src = '';
+                audioRef.current.load();
+            } catch (e) {}
+            audioRef.current = null;
         }
         const audio = new Audio();
         audio.crossOrigin = 'anonymous';
@@ -532,8 +643,16 @@ export default function useVoiceCopilot({
             }
             try {
                 const sourceNode = audioCtx.createMediaElementSource(audio);
-                sourceNode.connect(audioCtx.destination);
-                console.log('[VoiceCopilot] TTS audio routed to active AudioContext destination');
+                audio.__source_node = sourceNode;
+                audio.__routed_context = audioCtx;
+                
+                if (typeof window !== 'undefined' && window.__flyhigh_eq_node) {
+                    sourceNode.connect(window.__flyhigh_eq_node);
+                    console.log('[VoiceCopilot] TTS audio routed to HD EQ Node');
+                } else {
+                    sourceNode.connect(audioCtx.destination);
+                    console.log('[VoiceCopilot] TTS audio routed to default destination');
+                }
             } catch (err) {
                 console.warn('[VoiceCopilot] Failed to route TTS to AudioContext:', err);
             }
@@ -552,6 +671,13 @@ export default function useVoiceCopilot({
             stateRef.current = 'listening';
             setDictatedText('');
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+            
+            try {
+                if (audio.__source_node) {
+                    audio.__source_node.disconnect();
+                }
+            } catch (e) {}
+            
             restartNativeIfNeeded();
         };
         
@@ -560,6 +686,13 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setDictatedText('');
+            
+            try {
+                if (audio.__source_node) {
+                    audio.__source_node.disconnect();
+                }
+            } catch (e) {}
+            
             restartNativeIfNeeded();
         };
     }, [audioRef, setPlayingPoiId]);
@@ -612,7 +745,7 @@ export default function useVoiceCopilot({
         vadTimeoutRef.current = setTimeout(() => {
             if (recognitionActiveRef.current) {
                 console.log('[VoiceCopilot VAD] Expiró la ventana de 6s.');
-                try { rec.stop(); } catch(e){}
+                try { rec.stop(); } catch (e) {}
             }
         }, 6000);
 
@@ -678,7 +811,7 @@ export default function useVoiceCopilot({
                 vadTimeoutRef.current = setTimeout(() => {
                     if (recognitionActiveRef.current) {
                         console.log('[VoiceCopilot VAD] Expiró la ventana por silencio de 3.5s.');
-                        try { rec.stop(); } catch(e){}
+                        try { rec.stop(); } catch (e) {}
                     }
                 }, 3500);
             }
@@ -686,7 +819,7 @@ export default function useVoiceCopilot({
 
         try {
             rec.start();
-        } catch(err) {
+        } catch (err) {
             console.error('[VoiceCopilot VAD] Error al arrancar la Speech API:', err);
             setErrorMsg(`Error al iniciar micrófono: ${err.message || err}`);
             cleanUpAndRestart();
@@ -720,7 +853,7 @@ export default function useVoiceCopilot({
                 try {
                     await tf.setBackend('webgl');
                     await tf.ready();
-                } catch(e) {
+                } catch (e) {
                     console.warn('[TFJS Go] No se pudo configurar backend WebGL, usando default:', e);
                 }
                 
@@ -763,7 +896,6 @@ export default function useVoiceCopilot({
                     invokeCallbackOnNoiseAndUnknown: true
                 });
             } else if (currentMode === 'vosk') {
-                // engineMode === 'vosk'
                 if (!voskWorkerRef.current) {
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
                     

@@ -134,18 +134,32 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
 
     const ensureAudioRouting = useCallback((audio) => {
         if (!audio) return;
-        if (audio.__routed_to_context) return;
 
         if (typeof window !== 'undefined' && window.__flyhigh_audio_context) {
             const ctx = window.__flyhigh_audio_context;
+
+            // Si ya está enrutado al contexto actual, no hacemos nada
+            if (audio.__routed_to_context && audio.__routed_context === ctx) return;
+
             if (ctx.state === 'suspended') {
                 ctx.resume().catch(() => {});
             }
             try {
                 const sourceNode = ctx.createMediaElementSource(audio);
-                sourceNode.connect(ctx.destination);
+                audio.__source_node = sourceNode;
+                audio.__routed_context = ctx;
+
+                if (window.__flyhigh_eq_node) {
+                    sourceNode.connect(window.__flyhigh_eq_node);
+                    console.log('[FlightAudio] Routed track to window.__flyhigh_eq_node (HD EQ)');
+                } else if (window.__flyhigh_media_stream_destination) {
+                    sourceNode.connect(window.__flyhigh_media_stream_destination);
+                    console.log('[FlightAudio] Routed track to window.__flyhigh_media_stream_destination');
+                } else {
+                    sourceNode.connect(ctx.destination);
+                    console.log('[FlightAudio] Routed track to ctx.destination');
+                }
                 audio.__routed_to_context = true;
-                console.log('[FlightAudio] Dynamically routed track to active AudioContext destination');
             } catch (err) {
                 console.warn('[FlightAudio] Failed to route track to AudioContext:', err);
             }
@@ -189,6 +203,19 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
 
         setIsLoading(true);
         setHasError(false);
+
+        // Limpiar el audio de boarding anterior si existe
+        if (boardingAudioRef.current) {
+            try {
+                if (boardingAudioRef.current.__source_node) {
+                    boardingAudioRef.current.__source_node.disconnect();
+                }
+                boardingAudioRef.current.pause();
+                boardingAudioRef.current.src = '';
+                boardingAudioRef.current.load();
+            } catch (e) {}
+            boardingAudioRef.current = null;
+        }
 
         // Create audio SYNCHRONOUSLY inside the click handler (Safari requirement)
         const audio = createAudioElement(track, false);
@@ -239,7 +266,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         setCurrentTrack(track);
         setFlightPhase('boarding');
         return true;
-    }, [soundtracks.boarding, getNextBoardingTrack, createAudioElement]);
+    }, [soundtracks.boarding, getNextBoardingTrack, createAudioElement, playAudioElement]);
 
     // ══════════════════════════════════════════════════════
     // transitionToFlight() — Crossfade boarding → in_flight
@@ -255,6 +282,19 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             // No in_flight tracks — just change phase
             setFlightPhase('in_flight');
             return;
+        }
+
+        // Limpiar el audio de vuelo anterior si existe para evitar duplicación y leaks
+        if (flightAudioRef.current) {
+            try {
+                if (flightAudioRef.current.__source_node) {
+                    flightAudioRef.current.__source_node.disconnect();
+                }
+                flightAudioRef.current.pause();
+                flightAudioRef.current.src = '';
+                flightAudioRef.current.load();
+            } catch (e) {}
+            flightAudioRef.current = null;
         }
 
         // Create in-flight audio
@@ -300,7 +340,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         setCurrentTrack(track);
         setFlightPhase('in_flight');
         setIsPlaying(true);
-    }, [soundtracks.inFlight, getNextFlightTrack, createAudioElement]);
+    }, [soundtracks.inFlight, getNextFlightTrack, createAudioElement, playAudioElement]);
 
     // ══════════════════════════════════════════════════════
     // transitionToBoarding() — Crossfade in_flight → boarding
@@ -327,8 +367,22 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             return;
         }
 
-        // Reuse existing boarding audio or create new
+        // Reuse or recreate boarding audio depending on context routing status
         let boardingAudio = boardingAudioRef.current;
+        const currentCtx = typeof window !== 'undefined' ? window.__flyhigh_audio_context : null;
+
+        if (boardingAudio && boardingAudio.__routed_to_context && boardingAudio.__routed_context !== currentCtx) {
+            try {
+                if (boardingAudio.__source_node) {
+                    boardingAudio.__source_node.disconnect();
+                }
+                boardingAudio.pause();
+                boardingAudio.src = '';
+                boardingAudio.load();
+            } catch (e) {}
+            boardingAudio = null;
+        }
+
         if (!boardingAudio || !boardingAudio.src) {
             boardingAudio = createAudioElement(track, false);
             boardingAudioRef.current = boardingAudio;
@@ -372,7 +426,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         setCurrentTrack(track);
         setFlightPhase('boarding');
         setIsPlaying(true);
-    }, [getNextBoardingTrack, createAudioElement]);
+    }, [getNextBoardingTrack, createAudioElement, playAudioElement]);
 
     // ══════════════════════════════════════════════════════
     // shutdown() — Stop all audio and cleanup
@@ -384,6 +438,10 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         [boardingAudioRef, flightAudioRef].forEach(ref => {
             if (ref.current) {
                 try {
+                    if (ref.current.__source_node) {
+                        ref.current.__source_node.disconnect();
+                        ref.current.__source_node = null;
+                    }
                     ref.current.pause();
                     ref.current.src = '';
                     ref.current.load(); // Release resources
@@ -468,6 +526,10 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             [boardingAudioRef, flightAudioRef].forEach(ref => {
                 if (ref.current) {
                     try {
+                        if (ref.current.__source_node) {
+                            ref.current.__source_node.disconnect();
+                            ref.current.__source_node = null;
+                        }
                         ref.current.pause();
                         ref.current.src = '';
                         ref.current.load();
