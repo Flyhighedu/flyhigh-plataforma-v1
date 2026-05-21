@@ -270,14 +270,16 @@ export default function useVoiceCopilot({
         if (mediaStreamRef.current) return mediaStreamRef.current;
         
         console.log('[VoiceCopilot] Inicializando micrófono...');
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        const constraints = {
             audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                channelCount: 1
-            } 
-        });
+                deviceId: 'default', // Opcional: Esto ayuda a que el SO no se confunda
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            },
+            video: false
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         mediaStreamRef.current = stream;
 
         let audioCtx = audioContextRef.current;
