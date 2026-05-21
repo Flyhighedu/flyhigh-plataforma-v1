@@ -62,16 +62,8 @@ function makeIcon(poi, showLabels) {
     if (isOfficial) {
         return L.divIcon({
             className: 'poi-marker-container',
-            html: `<div style="
-                width:40px;height:40px;border-radius:50%;
-                background:linear-gradient(135deg, #2563EB, #1D4ED8);border:3px solid #DBEAFE;
-                display:flex;align-items:center;justify-content:center;
-                font-size:22px;color:white;font-weight:900;
-                box-shadow:0 4px 12px rgba(37,99,235,0.4);
-                cursor:pointer;
-                z-index: 3000;
-            ">✓</div>
-            ${shortName ? `<div class="poi-marker-label" style="font-size:12px;padding:4px 8px;background:#1E3A8A;border-color:#3B82F6;color:white;font-weight:bold;">${shortName}</div>` : ''}`,
+            html: `<div class="poi-pin poi-pin--official">✓</div>
+            ${shortName ? `<div class="poi-marker-label poi-marker-label--official">${shortName}</div>` : ''}`,
             iconSize: [40, 40],
             iconAnchor: [20, 20]
         });
@@ -81,13 +73,7 @@ function makeIcon(poi, showLabels) {
     const emoji = CAT_EMOJI[category] || CAT_EMOJI.general;
     return L.divIcon({
         className: 'poi-marker-container',
-        html: `<div style="
-            width:32px;height:32px;border-radius:8px;
-            background:${color};border:2px solid white;
-            display:flex;align-items:center;justify-content:center;
-            font-size:16px;
-            cursor:pointer;
-        ">${emoji}</div>
+        html: `<div class="poi-pin" style="background:${color}">${emoji}</div>
         ${shortName ? `<div class="poi-marker-label">${shortName}</div>` : ''}`,
         iconSize: [32, 32],
         iconAnchor: [16, 16]
@@ -110,6 +96,8 @@ export default function TacticalMapLeaflet({
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
+    const markersLayerRef = useRef(null);        // LayerGroup for saved POIs
+    const suggestedLayerRef = useRef(null);       // LayerGroup for suggested POIs
     const markersRef = useRef([]);
     const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
@@ -141,6 +129,10 @@ export default function TacticalMapLeaflet({
         L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 19, subdomains: 'abc' }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
+
+        // Initialize LayerGroups for batch marker management
+        markersLayerRef.current = L.layerGroup().addTo(map);
+        suggestedLayerRef.current = L.layerGroup().addTo(map);
 
         // ═══ LONG-PRESS DETECTION ═══
         let pressTimer = null;
@@ -221,9 +213,17 @@ export default function TacticalMapLeaflet({
             }
         }, 100);
 
+        // Staggered invalidateSize to handle overlay/flex layout settling
+        const sizeFixA = setTimeout(() => { if (mapRef.current) map.invalidateSize(); }, 150);
+        const sizeFixB = setTimeout(() => { if (mapRef.current) map.invalidateSize(); }, 400);
+
         return () => {
             clearTimeout(initialBoundsTimeout);
+            clearTimeout(sizeFixA);
+            clearTimeout(sizeFixB);
             resizeObserver.disconnect();
+            markersLayerRef.current = null;
+            suggestedLayerRef.current = null;
             map.remove();
             mapRef.current = null;
         };
@@ -248,7 +248,8 @@ export default function TacticalMapLeaflet({
     const poisKeyRef = useRef('');
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) return;
+        const layer = markersLayerRef.current;
+        if (!map || !layer) return;
 
         // Build a key representing the POI data (not label state)
         const dataKey = pois.filter(p => p.latitude != null && p.longitude != null)
@@ -259,27 +260,30 @@ export default function TacticalMapLeaflet({
         poisKeyRef.current = dataKey;
 
         if (dataChanged) {
-            // Full rebuild: POI data actually changed
-            markersRef.current.forEach(m => map.removeLayer(m.marker));
+            // Full rebuild: clear LayerGroup at once (single DOM operation)
+            layer.clearLayers();
             markersRef.current = [];
 
             pois.filter(p => p.latitude != null && p.longitude != null).forEach(poi => {
                 const marker = L.marker([poi.latitude, poi.longitude], {
                     icon: makeIcon(poi, showLabels),
                     zIndexOffset: poi.is_official ? 3000 : 0
-                }).addTo(map);
+                });
 
                 marker.on('click', () => {
                     markerClickedRef.current = true;
                     onMarkerClick?.(poi);
                 });
 
+                layer.addLayer(marker);
                 markersRef.current.push({ marker, poi });
             });
         } else {
-            // Labels-only change: swap icons in-place (no DOM rebuild)
-            markersRef.current.forEach(({ marker, poi }) => {
-                marker.setIcon(makeIcon(poi, showLabels));
+            // Labels-only change: swap icons in-place via rAF to batch DOM writes
+            requestAnimationFrame(() => {
+                markersRef.current.forEach(({ marker, poi }) => {
+                    marker.setIcon(makeIcon(poi, showLabels));
+                });
             });
         }
     }, [pois, onMarkerClick, showLabels]);
@@ -287,22 +291,25 @@ export default function TacticalMapLeaflet({
     // Sync Suggested POI markers — tap opens modal directly
     useEffect(() => {
         const map = mapRef.current;
-        if (!map) return;
+        const layer = suggestedLayerRef.current;
+        if (!map || !layer) return;
 
-        suggestedMarkersRef.current.forEach(m => map.removeLayer(m));
+        // Clear all suggested markers at once
+        layer.clearLayers();
         suggestedMarkersRef.current = [];
 
         suggestedPois.forEach(poi => {
             const marker = L.marker([poi.latitude, poi.longitude], {
                 icon: makeSuggestedIcon(showLabels ? poi.name : null, poi.category),
                 zIndexOffset: poi.category === 'city' ? 2000 : 1000
-            }).addTo(map);
+            });
 
             marker.on('click', () => {
                 markerClickedRef.current = true;
                 onSuggestedPoiClick?.(poi);
             });
 
+            layer.addLayer(marker);
             suggestedMarkersRef.current.push(marker);
         });
     }, [suggestedPois, onSuggestedPoiClick, showLabels]);
@@ -322,6 +329,22 @@ export default function TacticalMapLeaflet({
                     flex-direction: column;
                     align-items: center;
                     overflow: visible !important;
+                    will-change: transform;
+                }
+                .poi-pin {
+                    width: 32px; height: 32px; border-radius: 8px;
+                    border: 2px solid white;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 16px; cursor: pointer;
+                    will-change: transform;
+                }
+                .poi-pin--official {
+                    width: 40px; height: 40px; border-radius: 50%;
+                    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+                    border: 3px solid #DBEAFE;
+                    font-size: 22px; color: white; font-weight: 900;
+                    box-shadow: 0 4px 12px rgba(37,99,235,0.4);
+                    z-index: 3000;
                 }
                 .poi-marker-label {
                     margin-top: 4px;
@@ -334,6 +357,11 @@ export default function TacticalMapLeaflet({
                     padding: 2px 4px;
                     white-space: nowrap;
                     pointer-events: none;
+                }
+                .poi-marker-label--official {
+                    font-size: 12px; padding: 4px 8px;
+                    background: #1E3A8A; border-color: #3B82F6;
+                    color: white; font-weight: bold;
                 }
             `}</style>
         </>

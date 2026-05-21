@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Copy, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Lightbulb, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIDetailModal from './POIDetailModal';
@@ -39,8 +39,9 @@ const PremiumRadarIcon = () => (
     </div>
 );
 
-export default function TacticalMapScreen({ userId, profile }) {
+export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     const router = useRouter();
+    const handleBack = onClose || (() => router.back());
     const [pois, setPois] = useState([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('map'); // 'map' | 'list'
@@ -55,7 +56,7 @@ export default function TacticalMapScreen({ userId, profile }) {
     const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [groqQuota, setGroqQuota] = useState(null);
     const [lastGeoContext, setLastGeoContext] = useState('');
-    const [copiedPrompt, setCopiedPrompt] = useState(false);
+
 
     // ═══ UNIFIED MODAL STATE ═══
     const [modalPoi, setModalPoi] = useState(null);    // null = closed
@@ -484,194 +485,6 @@ export default function TacticalMapScreen({ userId, profile }) {
         }
     };
 
-    // ═══ COPY MEGA-PROMPT FOR GEMINI ULTRA ═══
-    const handleCopyForResearch = useCallback(async () => {
-        if (suggestedPois.length === 0) return;
-
-        const poiList = suggestedPois.map((p, i) =>
-            `${i + 1}. "${p.name}" — Coords: ${p.latitude}, ${p.longitude} — Tipo: ${p.description}`
-        ).join('\n');
-
-        const megaPrompt = `Eres un investigador enciclopédico y narrador con acceso a Google Search. Necesito que investigues ${suggestedPois.length} puntos de interés de ${lastGeoContext || 'Uruapan, Michoacán'}. Quiero artículos que cuenten la HISTORIA del lugar de forma envolvente, pero que incluyan DATOS DUROS verificables tejidos en la narrativa.
-
-REGLAS OBLIGATORIAS DE CALIDAD:
-1. USA GOOGLE SEARCH para cada punto. No respondas de memoria.
-2. Cada artículo debe contar una HISTORIA RICA que incluya:
-   - Contexto histórico: quién lo fundó, por qué, qué pasaba en esa época
-   - Significado cultural: qué representa para la comunidad, tradiciones vinculadas
-   - Anécdotas o leyendas locales si las hay
-   - Conexión con personajes históricos (nombre completo y cargo)
-   - Estado actual: cómo se usa hoy, quién lo visita
-   Y ADEMÁS, AL MENOS 4 datos numéricos verificables tejidos DENTRO de la narrativa (no como lista), del siguiente catálogo:
-
-PARA RÍOS, ARROYOS, CASCADAS:
-- Longitud total del río en km
-- Caudal promedio en litros por segundo
-- Altitud del nacimiento en msnm
-- Temperatura del agua en °C
-- Cuenca hidrológica a la que pertenece
-- Altura de la caída de agua (cascadas)
-
-PARA CERROS, MONTAÑAS, VOLCANES:
-- Altitud exacta en metros sobre el nivel del mar
-- Prominencia topográfica
-- Última erupción (volcanes) con fecha
-- Distancia a la ciudad más cercana
-- Tipo de roca o suelo predominante
-
-PARA PARQUES, RESERVAS NATURALES, BOSQUES:
-- Extensión en hectáreas o km²
-- Año de decreto o fundación
-- Número de especies de flora y/o fauna registradas
-- Visitantes por año
-- Especies endémicas destacadas
-- Tipo de ecosistema (bosque templado, selva, etc.)
-
-PARA IGLESIAS, TEMPLOS, CAPILLAS:
-- Año exacto de construcción o consagración
-- Estilo arquitectónico (barroco, neoclásico, etc.)
-- Altura de la torre o cúpula en metros
-- Fecha de la fiesta patronal (día/mes)
-- Siglo de origen
-
-PARA MUSEOS, CENTROS CULTURALES, TEATROS:
-- Año de fundación
-- Número de piezas o exposiciones permanentes
-- Visitantes anuales
-- Superficie del inmueble en m²
-- Colecciones o piezas destacadas
-
-PARA PRESAS, LAGOS, LAGUNAS, CUERPOS DE AGUA:
-- Capacidad de almacenamiento en millones de m³
-- Superficie del espejo de agua en hectáreas
-- Profundidad máxima y promedio
-- Año de construcción (presas)
-- Volumen anual captado
-
-PARA MONUMENTOS, PLAZAS, SITIOS HISTÓRICOS:
-- Fecha del evento histórico conmemorado (día/mes/año)
-- Año de construcción o inauguración del monumento
-- Dimensiones (altura, ancho)
-- Personaje histórico vinculado con nombre completo y cargo
-- Decreto o acta oficial que lo protege
-
-PARA UNIVERSIDADES, ESCUELAS, BIBLIOTECAS:
-- Año de fundación
-- Matrícula o número de estudiantes
-- Número de carreras o programas
-- Egresados notables con nombre
-
-PARA FÁBRICAS, PLANTAS, INFRAESTRUCTURA INDUSTRIAL:
-- Año de inicio de operaciones
-- Capacidad de producción con unidades
-- Número de empleados
-- Tipo de industria
-
-PARA ESTACIONES DE TREN, AEROPUERTOS, PUENTES:
-- Año de inauguración
-- Longitud de pista o puente en metros
-- Pasajeros anuales o tráfico diario
-- Ruta o línea que atendía
-
-PARA MERCADOS, PLAZAS COMERCIALES:
-- Año de fundación
-- Número de locatarios o puestos
-- Producto estrella o especialidad regional
-
-PARA ESTADIOS, UNIDADES DEPORTIVAS:
-- Aforo o capacidad
-- Año de inauguración
-- Equipos o eventos que alberga
-
-PARA MIRADORES, PUNTOS PANORÁMICOS:
-- Altitud del punto
-- Distancia de visibilidad en km
-- Qué se puede observar desde ahí
-
-PARA EDIFICIOS NOTABLES, ARQUITECTURA CIVIL, PALACIOS DE GOBIERNO:
-- Año de construcción o inauguración
-- Estilo arquitectónico (art déco, colonial, neoclásico, modernista, etc.)
-- Arquitecto o constructor (nombre completo)
-- Superficie construida en m²
-- Número de pisos o niveles
-- Material de construcción (cantera, adobe, concreto, etc.)
-- Uso original vs. uso actual si cambió
-
-PARA PANTEONES, CEMENTERIOS:
-- Año de fundación
-- Superficie en hectáreas
-- Personajes históricos sepultados (nombre y cargo)
-- Estilo de las capillas o monumentos funerarios
-- Si tiene declaratoria de patrimonio
-
-PARA GLORIETAS, ROTONDAS, FUENTES:
-- Año de construcción
-- Diámetro o dimensiones en metros
-- Escultura o monumento central (autor, altura)
-- Evento o personaje que conmemora
-
-PARA MURALES, ESCULTURAS, ARTE PÚBLICO:
-- Artista (nombre completo)
-- Año de creación
-- Dimensiones (alto x ancho en metros)
-- Técnica o material (óleo, mosaico, bronce, cantera)
-- Tema o historia que representa
-
-PARA HOSPITALES, CLÍNICAS:
-- Año de fundación
-- Número de camas o capacidad
-- Especialidades médicas
-- Población que atiende
-
-PARA HACIENDAS, CASONAS HISTÓRICAS:
-- Siglo o año de construcción
-- Familia original propietaria
-- Extensión original del terreno en hectáreas
-- Actividad productiva histórica (café, caña, ganadería)
-- Estado de conservación actual
-
-PARA ACUEDUCTOS, FUENTES, INFRAESTRUCTURA HIDRÁULICA HISTÓRICA:
-- Año o siglo de construcción
-- Longitud en metros o km
-- Capacidad de conducción en litros por segundo
-- Material (cantera, ladrillo, piedra)
-- Si sigue en funcionamiento
-
-3. PROHIBIDO usar frases vagas como "en la época de", "hace muchos años", "una gran extensión", "es muy importante". Reemplázalas SIEMPRE con el dato exacto.
-4. Si NO encuentras un dato específico verificable, escríbelo como: "[dato no verificado]" en lugar de inventarlo.
-5. El "dato curioso" debe ser SORPRENDENTE y contener un número o comparación concreta ("X veces más grande que una cancha de fútbol", "uno de los N más antiguos de México", "produce X toneladas al año").
-6. El tono debe ser el de un narrador apasionado que cuenta la historia del lugar a niños de 9-12 años. Que sea ENVOLVENTE e INTERESANTE, que despierte curiosidad, pero sin sacrificar precisión. Los datos numéricos deben estar integrados naturalmente en la narrativa, no como una ficha técnica fría.
-7. 6-10 oraciones por artículo. Entre 500 y 1000 caracteres.
-8. NO uses markdown, asteriscos, negritas, ni formato especial. Solo texto plano limpio.
-
-FORMATO DE RESPUESTA (JSON estricto, sin explicaciones fuera del JSON):
-[
-  {
-    "name": "Nombre exacto del POI",
-    "coords": "lat, lng",
-    "article": "Artículo con datos duros aquí..."
-  }
-]
-
-LISTA DE ${suggestedPois.length} PUNTOS A INVESTIGAR:
-${poiList}`;
-
-        try {
-            await navigator.clipboard.writeText(megaPrompt);
-            setCopiedPrompt(true);
-            setTimeout(() => setCopiedPrompt(false), 3000);
-        } catch (e) {
-            // Fallback for older browsers
-            const ta = document.createElement('textarea');
-            ta.value = megaPrompt;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            setCopiedPrompt(true);
-            setTimeout(() => setCopiedPrompt(false), 3000);
-        }
-    }, [suggestedPois, lastGeoContext]);
 
     // ═══ SAVE (unified — includes ficha fields) ═══
     const handleSave = useCallback(async (poiData) => {
@@ -779,7 +592,12 @@ ${poiList}`;
     }
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#F8FAFC' }}>
+        <div style={{
+            ...(onClose
+                ? { position: 'fixed', inset: 0, zIndex: 9997, display: 'flex', flexDirection: 'column', background: '#F8FAFC' }
+                : { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#F8FAFC' }
+            )
+        }}>
             {/* Header */}
             <div style={{
                 background: '#FFFFFF',
@@ -788,7 +606,7 @@ ${poiList}`;
                 boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button onClick={() => router.back()} style={{
+                    <button onClick={handleBack} style={{
                         width: 36, height: 36, borderRadius: 12, border: 'none',
                         background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         cursor: 'pointer', color: '#334155', transition: 'background 0.2s ease'
@@ -919,34 +737,35 @@ ${poiList}`;
                         </button>
                     </div>
 
-                    {/* Copy for Gemini Research Button */}
-                    {suggestedPois.length > 0 && (
-                        <button
-                            onClick={handleCopyForResearch}
-                            style={{
-                                position: 'absolute', bottom: 88, right: 16, zIndex: 2000,
-                                height: 48, borderRadius: 14,
-                                padding: '0 20px',
-                                background: copiedPrompt ? '#10B981' : '#7C3AED',
-                                border: 'none',
-                                color: 'white',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                boxShadow: copiedPrompt
-                                    ? '0 12px 28px -6px rgba(16,185,129,0.5)'
-                                    : '0 12px 28px -6px rgba(124,58,237,0.5)',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                fontSize: 13, fontWeight: 800,
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            {copiedPrompt ? (
-                                <><ClipboardCheck size={18} /> ¡Prompt copiado!</>
-                            ) : (
-                                <><Copy size={18} /> Copiar {suggestedPois.length} POIs</>
-                            )}
-                        </button>
-                    )}
+                    {/* Nuevo Tema General FAB */}
+                    <button
+                        onClick={() => {
+                            setModalPoi({
+                                name: '',
+                                description: 'Tema general',
+                                is_general_topic: true,
+                                latitude: null,
+                                longitude: null
+                            });
+                            setIsNewPin(true);
+                        }}
+                        style={{
+                            position: 'absolute', bottom: 88, right: 16, zIndex: 2000,
+                            height: 48, borderRadius: 24,
+                            padding: '0 18px',
+                            background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                            border: 'none',
+                            color: 'white',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            boxShadow: '0 8px 24px -4px rgba(245,158,11,0.45)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            fontSize: 13, fontWeight: 800,
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        <Lightbulb size={18} /> Tema General
+                    </button>
 
                     {/* Groq AI Quota Badge */}
                     {groqQuota && (
@@ -976,11 +795,46 @@ ${poiList}`;
             ) : (
                 /* List View */
                 <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+                    {/* Quick-create general topic button */}
+                    <button
+                        onClick={() => {
+                            setModalPoi({
+                                name: '',
+                                description: 'Tema general',
+                                is_general_topic: true,
+                                latitude: null,
+                                longitude: null
+                            });
+                            setIsNewPin(true);
+                        }}
+                        style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                            padding: '14px 16px', borderRadius: 16, marginBottom: 16,
+                            background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+                            border: '1.5px dashed #F59E0B',
+                            cursor: 'pointer', textAlign: 'left',
+                            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                        }}
+                    >
+                        <div style={{
+                            width: 44, height: 44, borderRadius: 14,
+                            background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <Plus size={22} style={{ color: 'white' }} />
+                        </div>
+                        <div>
+                            <p style={{ fontSize: 14, fontWeight: 800, color: '#92400E', margin: 0 }}>Nuevo Tema General</p>
+                            <p style={{ fontSize: 11, color: '#B45309', margin: '2px 0 0', fontWeight: 600 }}>Sin ubicación — ideal para temas culturales</p>
+                        </div>
+                    </button>
+
                     {pois.length === 0 ? (
-                        <div style={{ textAlign: 'center', paddingTop: 60 }}>
+                        <div style={{ textAlign: 'center', paddingTop: 40 }}>
                             <Navigation size={48} strokeWidth={1.5} style={{ color: '#94A3B8', margin: '0 auto 16px' }} />
                             <p style={{ fontSize: 16, fontWeight: 800, color: '#0F172A' }}>Sin puntos guardados</p>
-                            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Mantén presionado el mapa para crear tu primer punto.</p>
+                            <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Mantén presionado el mapa para crear un punto, o usa el botón de arriba para un tema general.</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

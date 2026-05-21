@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { getDismantlingSyncBadge } from '@/utils/dismantlingRouting';
 
@@ -117,6 +117,9 @@ import HeaderOperativo from './HeaderOperativo';
 import { getHeaderPhaseForState } from '../../constants/headerPhases';
 import useUploadQueueStatus from '@/hooks/useUploadQueueStatus';
 
+// Lazy-load TacticalMapScreen — only fetched when pilot opens "Mis Puntos de Interés"
+const TacticalMapScreenLazy = lazy(() => import('./TacticalMapScreen'));
+
 const CIVIC_REQUIRED_SECONDS = 90;
 const CIVIC_EARLY_FINISH_REASONS = [
     'El acto cívico fue más corto',
@@ -194,6 +197,7 @@ export default function SyncHeader({
     const [useFixedMobileHeader, setUseFixedMobileHeader] = useState(false);
     const [mobileHeaderOffset, setMobileHeaderOffset] = useState(0);
     const [compactProgress, setCompactProgress] = useState(0);
+    const [showQuickPoi, setShowQuickPoi] = useState(false);
     const [showCivicStartModal, setShowCivicStartModal] = useState(false);
     const [showCivicRecorder, setShowCivicRecorder] = useState(false);
     const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
@@ -893,6 +897,7 @@ export default function SyncHeader({
                         profile={{ full_name: firstName, role }}
                         onDemoStart={onDemoStart}
                         onCloseMission={onCloseMission}
+                        onOpenQuickPoi={role === 'pilot' ? () => setShowQuickPoi(true) : null}
                     />
                 )}
             />
@@ -1283,6 +1288,21 @@ export default function SyncHeader({
                 <div className="fixed left-1/2 -translate-x-1/2 bottom-5 z-[130] rounded-full bg-slate-900 text-white px-4 py-2 text-[13px] font-bold shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)]">
                     {civicToast}
                 </div>
+            )}
+
+            {/* ═══ PILOT QUICK POI OVERLAY ═══ */}
+            {showQuickPoi && (
+                <Suspense fallback={
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9997, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Loader2 size={32} style={{ color: '#06B6D4', animation: 'spin 1s linear infinite' }} />
+                    </div>
+                }>
+                    <TacticalMapScreenLazy
+                        userId={userId}
+                        profile={{ full_name: firstName, role }}
+                        onClose={() => setShowQuickPoi(false)}
+                    />
+                </Suspense>
             )}
         </>
     );

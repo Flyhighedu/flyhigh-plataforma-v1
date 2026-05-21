@@ -103,9 +103,7 @@ export function clearJourneyLocalOperationalData(journeyId) {
         writeArrayOrRemove(PENDING_CHECKINS_KEY, filteredPendingCheckIns);
     }
 
-    if (window.sessionStorage) {
-        window.sessionStorage.removeItem(CLOSED_FLIGHTS_KEY);
-    }
+    localStorage.removeItem(CLOSED_FLIGHTS_KEY);
 
     return { removedFlights };
 }

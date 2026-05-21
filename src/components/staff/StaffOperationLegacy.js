@@ -123,9 +123,9 @@ function buildFlightFingerprint(flight) {
 }
 
 function readClosedFlightIdsFromSession() {
-    if (typeof window === 'undefined' || !window.sessionStorage) return [];
+    if (typeof window === 'undefined' || !window.localStorage) return [];
 
-    const parsed = safeParseJson(window.sessionStorage.getItem(CLOSED_FLIGHTS_KEY), []);
+    const parsed = safeParseJson(window.localStorage.getItem(CLOSED_FLIGHTS_KEY), []);
     if (!Array.isArray(parsed)) return [];
 
     return parsed
@@ -135,14 +135,14 @@ function readClosedFlightIdsFromSession() {
 }
 
 function writeClosedFlightIdsToSession(ids) {
-    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    if (typeof window === 'undefined' || !window.localStorage) return;
 
     const payload = Array.from(ids)
         .map((id) => normalizeFlightId(id))
         .filter(Boolean)
         .slice(-80);
 
-    window.sessionStorage.setItem(CLOSED_FLIGHTS_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(CLOSED_FLIGHTS_KEY, JSON.stringify(payload));
 }
 
 function waitMs(ms) {
@@ -698,7 +698,34 @@ export default function StaffOperationLegacy({
         const nextFlightId = normalizeFlightId(nextActive.flightId);
         if (nextFlightId && recentlyClosedFlightIdsRef.current.has(nextFlightId)) {
             localStorage.removeItem(ACTIVE_FLIGHT_KEY);
+            setActiveFlight((prev) => {
+                if (prev && normalizeFlightId(prev.flightId) === nextFlightId) {
+                    return null;
+                }
+                return prev;
+            });
             return;
+        }
+
+        // Prevent real-time server updates from overwriting a newer/in-progress local active flight
+        const localActiveRaw = safeParseJson(localStorage.getItem(ACTIVE_FLIGHT_KEY));
+        const localActive = normalizeActiveFlightPayload(localActiveRaw);
+
+        if (localActive) {
+            const getFlightTime = (f) => {
+                if (!f) return 0;
+                const upMs = toIsoEpochMs(f.updatedAt);
+                const startMs = toIsoEpochMs(f.startTime || f.startedAt);
+                return Math.max(upMs, startMs);
+            };
+
+            const serverTime = getFlightTime(nextActive);
+            const localTime = getFlightTime(localActive);
+
+            // If local active flight is newer or equal, ignore the older server update
+            if (localTime >= serverTime) {
+                return;
+            }
         }
 
         setActiveFlight((prev) => {
