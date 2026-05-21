@@ -291,6 +291,10 @@ export default function useVoiceCopilot({
             await audioCtx.resume();
         }
 
+        if (typeof window !== 'undefined') {
+            window.__flyhigh_audio_context = audioCtx;
+        }
+
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
@@ -476,6 +480,12 @@ export default function useVoiceCopilot({
         try {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             const ctx = audioContextRef.current || new AudioContextClass();
+            if (!audioContextRef.current) {
+                audioContextRef.current = ctx;
+            }
+            if (typeof window !== 'undefined') {
+                window.__flyhigh_audio_context = ctx;
+            }
             if (ctx.state === 'suspended') {
                 ctx.resume();
             }
@@ -505,12 +515,29 @@ export default function useVoiceCopilot({
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
         }
-        const audio = new Audio(poi.audio_url);
+        const audio = new Audio();
+        audio.crossOrigin = 'anonymous';
+        audio.src = poi.audio_url;
+        
         if (audioRef) audioRef.current = audio;
         if (setPlayingPoiId) setPlayingPoiId(poi.id);
         
         setVoiceState('playing');
         stateRef.current = 'playing';
+
+        const audioCtx = audioContextRef.current || (typeof window !== 'undefined' && window.__flyhigh_audio_context);
+        if (audioCtx) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            try {
+                const sourceNode = audioCtx.createMediaElementSource(audio);
+                sourceNode.connect(audioCtx.destination);
+                console.log('[VoiceCopilot] TTS audio routed to active AudioContext destination');
+            } catch (err) {
+                console.warn('[VoiceCopilot] Failed to route TTS to AudioContext:', err);
+            }
+        }
 
         audio.play().catch(() => {
             setVoiceState('listening');

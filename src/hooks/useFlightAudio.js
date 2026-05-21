@@ -127,9 +127,36 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         audio.preload = 'metadata';
         audio.loop = loop;
         audio.volume = 0;
+        audio.crossOrigin = 'anonymous';
         audio.src = track.public_url;
         return audio;
     }, []);
+
+    const ensureAudioRouting = useCallback((audio) => {
+        if (!audio) return;
+        if (audio.__routed_to_context) return;
+
+        if (typeof window !== 'undefined' && window.__flyhigh_audio_context) {
+            const ctx = window.__flyhigh_audio_context;
+            if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+            }
+            try {
+                const sourceNode = ctx.createMediaElementSource(audio);
+                sourceNode.connect(ctx.destination);
+                audio.__routed_to_context = true;
+                console.log('[FlightAudio] Dynamically routed track to active AudioContext destination');
+            } catch (err) {
+                console.warn('[FlightAudio] Failed to route track to AudioContext:', err);
+            }
+        }
+    }, []);
+
+    const playAudioElement = useCallback((audio) => {
+        if (!audio) return Promise.reject(new Error('No audio element'));
+        ensureAudioRouting(audio);
+        return audio.play();
+    }, [ensureAudioRouting]);
 
     // ── Helper: Pick next track from a playlist (sequential) ──
     const getNextBoardingTrack = useCallback(() => {
@@ -176,13 +203,13 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
                 const nextTrack = getNextBoardingTrack();
                 if (nextTrack) {
                     audio.src = nextTrack.public_url;
-                    audio.play().catch(() => {});
+                    playAudioElement(audio).catch(() => {});
                     setCurrentTrack(nextTrack);
                 }
             } else if (phaseRef.current === 'boarding') {
                 // Single track: loop manually
                 audio.currentTime = 0;
-                audio.play().catch(() => {});
+                playAudioElement(audio).catch(() => {});
             }
         };
 
@@ -193,7 +220,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         };
 
         // CRITICAL: play() must be called synchronously from onClick
-        const playPromise = audio.play();
+        const playPromise = playAudioElement(audio);
         if (playPromise !== undefined) {
             playPromise
                 .then(() => {
@@ -238,12 +265,12 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
                 const nextTrack = getNextFlightTrack();
                 if (nextTrack) {
                     flightAudio.src = nextTrack.public_url;
-                    flightAudio.play().catch(() => {});
+                    playAudioElement(flightAudio).catch(() => {});
                     setCurrentTrack(nextTrack);
                 }
             } else if (phaseRef.current === 'in_flight') {
                 flightAudio.currentTime = 0;
-                flightAudio.play().catch(() => {});
+                playAudioElement(flightAudio).catch(() => {});
             }
         };
 
@@ -252,7 +279,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         };
 
         // Start playing in-flight audio at volume 0
-        flightAudio.play()
+        playAudioElement(flightAudio)
             .then(() => {
                 // Crossfade: fade out boarding, fade in flight
                 const cleanup1 = fadeVolume(boardingAudioRef.current, 0, CROSSFADE_DURATION_MS, () => {
@@ -315,16 +342,16 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
                 const nextTrack = getNextBoardingTrack();
                 if (nextTrack) {
                     boardingAudio.src = nextTrack.public_url;
-                    boardingAudio.play().catch(() => {});
+                    playAudioElement(boardingAudio).catch(() => {});
                     setCurrentTrack(nextTrack);
                 } else {
                     boardingAudio.currentTime = 0;
-                    boardingAudio.play().catch(() => {});
+                    playAudioElement(boardingAudio).catch(() => {});
                 }
             }
         };
 
-        boardingAudio.play()
+        playAudioElement(boardingAudio)
             .then(() => {
                 // Crossfade: fade out flight, fade in boarding
                 const cleanup1 = fadeVolume(flightAudioRef.current, 0, CROSSFADE_DURATION_MS, () => {
@@ -407,12 +434,12 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         if (!audio) return;
 
         if (audio.paused) {
-            audio.play().then(() => setIsPlaying(true)).catch(() => {});
+            playAudioElement(audio).then(() => setIsPlaying(true)).catch(() => {});
         } else {
             audio.pause();
             setIsPlaying(false);
         }
-    }, [getActiveAudio]);
+    }, [getActiveAudio, playAudioElement]);
 
     const skipTrack = useCallback(() => {
         const audio = getActiveAudio();
@@ -427,10 +454,10 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
 
         if (nextTrack) {
             audio.src = nextTrack.public_url;
-            audio.play().catch(() => {});
+            playAudioElement(audio).catch(() => {});
             setCurrentTrack(nextTrack);
         }
-    }, [getActiveAudio, getNextBoardingTrack, getNextFlightTrack]);
+    }, [getActiveAudio, getNextBoardingTrack, getNextFlightTrack, playAudioElement]);
 
     // ── Cleanup on unmount ──
     useEffect(() => {
