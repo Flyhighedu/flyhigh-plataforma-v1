@@ -17,8 +17,9 @@ function levelToGain(level) {
 }
 
 const GUIDE_PHRASES = [
+    '🗣️ Di: "Probando, probando"',
     '🗣️ Di: "Computadora"',
-    '🗣️ Di: "Compu"',
+    '🗣️ Di: "Uno, dos, tres"',
 ];
 
 export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClose }) {
@@ -90,7 +91,7 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
                 <div className="text-center mb-5">
                     <div className="text-3xl mb-2">🎙️</div>
                     <h2 className="text-lg font-bold text-slate-800">Ajusta tu micrófono</h2>
-                    <p className="text-sm text-slate-500 mt-1">Sube hasta que el sistema reconozca tu comando.</p>
+                    <p className="text-sm text-slate-500 mt-1">Sube hasta que veas tus palabras aparecer.</p>
                 </div>
 
                 {/* Guide phrase — Duolingo style */}
