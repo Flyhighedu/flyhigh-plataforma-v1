@@ -163,6 +163,8 @@ export default function useVoiceCopilot({
     
     // Vosk Worker
     const voskWorkerRef = useRef(null);
+    const pendingPoiRef = useRef(null);       // POI detectado esperando a que el piloto termine de hablar
+    const speechEndTimerRef = useRef(null);   // Timer de 1.5s de silencio para lanzar narración
 
     // PocketSphinx Worker
     const pocketsphinxWorkerRef = useRef(null);
@@ -419,6 +421,8 @@ export default function useVoiceCopilot({
         if (detectTimeoutRef.current) clearTimeout(detectTimeoutRef.current);
         if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
         if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
+        if (speechEndTimerRef.current) clearTimeout(speechEndTimerRef.current);
+        pendingPoiRef.current = null;
 
         if (tfjsRecognizerRef.current) {
             try {
@@ -852,6 +856,7 @@ export default function useVoiceCopilot({
                                     stateRef.current = 'wake';
                                     setDictatedText('');
                                     setLastTranscript('');
+                                    pendingPoiRef.current = null;
                                     playFeedbackSound();
                                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
 
@@ -863,31 +868,61 @@ export default function useVoiceCopilot({
                                     // Timeout de atención: 6s para decir el POI
                                     if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     attentionTimeoutRef.current = setTimeout(() => {
-                                        if (stateRef.current === 'wake') {
+                                        // Si hay un POI pendiente al expirar la ventana, reproducirlo
+                                        if (pendingPoiRef.current && stateRef.current === 'matched') {
+                                            clearTimeout(speechEndTimerRef.current);
+                                            const poi = pendingPoiRef.current;
+                                            pendingPoiRef.current = null;
+                                            if (voskWorkerRef.current) {
+                                                voskWorkerRef.current.postMessage({ action: 'reset' });
+                                            }
+                                            callbacksRef.current.playMatchedAudio(poi);
+                                        } else if (stateRef.current === 'wake') {
                                             setVoiceState('listening');
                                             stateRef.current = 'listening';
                                             setLastTranscript('');
                                             setDictatedText('');
                                         }
                                     }, 6000);
+
+                                    // NO procesar POI matching con este transcript — 
+                                    // contiene texto de ANTES del wake word.
+                                    // El recognizer se acaba de resetear; el próximo
+                                    // partial/final vendrá limpio.
+                                    return;
                                 }
                             }
 
-                            // 2) POI matching: wake → matched
-                            if (stateRef.current === 'wake') {
+                            // 2) POI matching: wake → matched (azul)
+                            //    Detectamos el POI y cambiamos a azul, pero NO
+                            //    lanzamos la narración de inmediato. Esperamos a que
+                            //    el piloto termine de hablar (1.5s de silencio).
+                            if (stateRef.current === 'wake' || stateRef.current === 'matched') {
                                 const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
-                                if (poiMatch) {
-                                    if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                if (poiMatch && stateRef.current === 'wake') {
+                                    // Primera detección → cambiar a azul
+                                    pendingPoiRef.current = poiMatch;
                                     setMatchedPoi(poiMatch);
                                     setVoiceState('matched');
                                     stateRef.current = 'matched';
-                                    
-                                    // Reset limpio del worker
-                                    if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ action: 'reset' });
-                                    }
+                                }
 
-                                    setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
+                                // Mientras el piloto siga hablando (llegan partials),
+                                // reiniciar el timer de silencio.
+                                if (pendingPoiRef.current) {
+                                    clearTimeout(speechEndTimerRef.current);
+                                    speechEndTimerRef.current = setTimeout(() => {
+                                        // 1.5s de silencio → el piloto terminó de hablar
+                                        if (pendingPoiRef.current && stateRef.current === 'matched') {
+                                            if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                            const poi = pendingPoiRef.current;
+                                            pendingPoiRef.current = null;
+                                            if (voskWorkerRef.current) {
+                                                voskWorkerRef.current.postMessage({ action: 'reset' });
+                                            }
+                                            callbacksRef.current.playMatchedAudio(poi);
+                                        }
+                                    }, 1500);
                                 }
                             }
                         } else if (type === 'error') {
