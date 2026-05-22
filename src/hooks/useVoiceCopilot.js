@@ -821,15 +821,17 @@ export default function useVoiceCopilot({
                                 setDictatedText('');
                             }
                         } else if (type === 'patrol_transcript') {
-                            // PATROL feedback — show what Vosk hears (non-wake text)
+                            // PATROL feedback — show what Vosk hears
+                            // Worker is in PATROL during: listening, matched, playing
                             const text = e.data.text || '';
-                            if (text && stateRef.current === 'listening') {
+                            if (text && (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing')) {
                                 setLastTranscript(text);
                                 setDictatedText(text);
                             }
                         } else if (type === 'cycle_reset') {
                             // 7s amnesia — clear displayed transcript
-                            if (stateRef.current === 'listening') {
+                            // Worker is in PATROL during: listening, matched, playing
+                            if (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing') {
                                 setLastTranscript('');
                                 setDictatedText('');
                             }
@@ -837,8 +839,11 @@ export default function useVoiceCopilot({
                             const transcript = result?.partial || result?.text || '';
                             if (!transcript) return;
                             
-                            setLastTranscript(transcript);
-                            setDictatedText(transcript);
+                            // Only update displayed text during ACTIVE_LISTEN (wake)
+                            if (stateRef.current === 'wake') {
+                                setLastTranscript(transcript);
+                                setDictatedText(transcript);
+                            }
 
                             // POI matching only during wake (ACTIVE_LISTEN in worker)
                             if (type === 'final' && stateRef.current === 'wake') {
