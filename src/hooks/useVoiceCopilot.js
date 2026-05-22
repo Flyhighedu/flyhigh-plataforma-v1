@@ -129,6 +129,13 @@ export default function useVoiceCopilot({
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
+    const [micGain, setMicGainState] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
+            return isNaN(saved) ? 0.22 : saved;
+        }
+        return 0.22;
+    });
 
     useEffect(() => {
         if (typeof onStateChange === 'function') {
@@ -152,6 +159,7 @@ export default function useVoiceCopilot({
     const sourceNodeRef = useRef(null);
     const processorNodeRef = useRef(null);
     const analyserRef = useRef(null);
+    const gainNodeRef = useRef(null);
     
     // Vosk Worker
     const voskWorkerRef = useRef(null);
@@ -304,11 +312,13 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
-        // Attenuate mic input to 30% — reduces podcast/background noise energy
+        // Attenuate mic input — reduces podcast/background noise energy
         // below VAD threshold while pilot voice at 30cm stays above it.
-        // Runs natively in audio thread: 0 CPU, 0 RAM overhead.
+        // Value is persisted in localStorage via MicCalibrator.
+        const savedGain = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
         const gainNode = audioCtx.createGain();
-        gainNode.gain.value = 0.22;
+        gainNode.gain.value = isNaN(savedGain) ? 0.22 : savedGain;
+        gainNodeRef.current = gainNode;
 
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
@@ -1080,6 +1090,14 @@ export default function useVoiceCopilot({
         engineMode,
         changeEngineMode,
         deviceInfo,
+        micGain,
+        setMicGain: useCallback((value) => {
+            const clamped = Math.max(0.05, Math.min(0.50, value));
+            const rounded = Math.round(clamped * 100) / 100;
+            if (gainNodeRef.current) gainNodeRef.current.gain.value = rounded;
+            setMicGainState(rounded);
+            try { localStorage.setItem('flyhigh_voice_mic_gain', rounded.toString()); } catch(e) {}
+        }, []),
         tfjsIsLoaded: true,
         tfjsIsCalibrated: true,
         collectExample: async () => {},

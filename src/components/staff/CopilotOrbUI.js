@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
-import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff, SlidersHorizontal } from 'lucide-react';
 import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
+import MicCalibrator from '@/components/staff/MicCalibrator';
 
 const CopilotOrbUI = forwardRef(({
     pois = [],
@@ -142,6 +143,21 @@ const CopilotOrbUI = forwardRef(({
                         TFJS + Web
                     </button>
                 </div>
+
+                {/* ── MIC CALIBRATOR BUTTON ── */}
+                {copilot.isActive && copilot.voiceState !== 'booting' && (
+                    <button
+                        onClick={() => setShowCalibrator(true)}
+                        className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-all active:scale-95 ${
+                            isPeripheralActive
+                                ? 'text-white/50 hover:bg-white/10'
+                                : 'text-slate-400 hover:bg-slate-50'
+                        }`}
+                    >
+                        <SlidersHorizontal size={10} />
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar 🎙️</span>
+                    </button>
+                )}
             </div>
 
             {/* ── THE ORB (CSS-only, zero canvas, zero rAF) ── */}
@@ -216,6 +232,16 @@ const CopilotOrbUI = forwardRef(({
                     </>
                 )}
             </div>
+
+            {/* ── MIC CALIBRATOR MODAL ── */}
+            {showCalibrator && copilot.isActive && (
+                <MicCalibrator
+                    micGain={copilot.micGain}
+                    setMicGain={copilot.setMicGain}
+                    dictatedText={copilot.dictatedText || copilot.lastTranscript}
+                    onClose={() => setShowCalibrator(false)}
+                />
+            )}
         </div>
     );
 });
