@@ -7,7 +7,7 @@ import * as speechCommands from '@tensorflow-models/speech-commands';
 // ═══════════════════════════════════════════════════════════════
 // Helper utilities
 // ═══════════════════════════════════════════════════════════════
-const VAD_ENERGY_THRESHOLD = 0.0015;
+const VAD_ENERGY_THRESHOLD = 0.008;
 const VAD_TRAILING_FRAMES = 5;
 
 function getAudioEnergy(buffer) {
@@ -282,7 +282,7 @@ export default function useVoiceCopilot({
             audio: {
                 deviceId: 'default', // Opcional: Esto ayuda a que el SO no se confunda
                 echoCancellation: false,
-                noiseSuppression: false,
+                noiseSuppression: true,
                 autoGainControl: false
             },
             video: false
