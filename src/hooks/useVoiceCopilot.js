@@ -324,43 +324,58 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
-        // Sensitivity control: slider value [0.0, 1.0] maps directly to
-        // GainNode value [0.0, 1.0]. At 0% the mic is muted, at 100% it's
-        // full raw mic volume. The GainNode attenuates the signal BEFORE
-        // it reaches the processor, so Vosk only hears attenuated audio.
-        const uiGain = micGainRef.current;
+        // GainNode fixed at 1.0 — Vosk receives full raw audio.
+        // Sensitivity is controlled by the VAD threshold, NOT by volume.
         const gainNode = audioCtx.createGain();
-        gainNode.gain.value = uiGain;
+        gainNode.gain.value = 1.0;
         gainNodeRef.current = gainNode;
 
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyserRef.current = analyser;
 
-        // CRITICAL: source → gainNode → [analyser, processorNode]
-        // The processorNode MUST be downstream of gainNode so that
-        // Vosk receives the gain-adjusted audio, not the raw mic signal.
+        // source → gainNode → [analyser, processorNode]
         source.connect(gainNode);
         gainNode.connect(analyser);
 
         // ═══════════════════════════════════════════════════════════════
-        // Audio Processing: AudioWorkletNode (preferred) or ScriptProcessor (fallback)
-        // The processor is connected to gainNode (NOT source) so the
-        // browser's native audio engine handles attenuation at the
-        // audio-thread level before samples reach JavaScript.
+        // VAD-based sensitivity control.
+        // The calibrator slider (0% to 100%) controls the VAD energy
+        // threshold. At 100% sensitivity the threshold is 0 (everything
+        // passes to Vosk). At 0% only very loud/close speech passes.
+        // Trailing frames prevent cutting words mid-syllable.
         // ═══════════════════════════════════════════════════════════════
+        let vadTrailingCounter = 0;
+        const VAD_TRAILING_FRAMES = 8;
+
         const handleAudioFrame = (inputData, peak) => {
-            // inputData is ALREADY attenuated by the GainNode — no manual
-            // multiplication needed. Energy reflects the true gain-adjusted level.
             const energy = getAudioEnergy(inputData);
-            setIsDetectingVoice(energy > 0.001);
+            const sensitivity = micGainRef.current; // 0.0 to 1.0
+
+            // Dynamic noise gate threshold:
+            //   100% sensitivity → threshold 0.000 (everything passes)
+            //    75% sensitivity → threshold 0.010
+            //    50% sensitivity → threshold 0.020 (≈ old fixed VAD)
+            //    25% sensitivity → threshold 0.030
+            //     0% sensitivity → threshold 0.040 (only loud/close speech)
+            const vadThreshold = sensitivity >= 1.0 ? 0 : (1.0 - sensitivity) * 0.04;
+            const isVoiceActive = energy >= vadThreshold;
+
+            setIsDetectingVoice(isVoiceActive || vadTrailingCounter > 0);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
                 const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
                 if (worker) {
-                    const dataCopy = new Float32Array(inputData);
-                    worker.postMessage({ action: 'process', data: dataCopy });
+                    if (isVoiceActive || vadTrailingCounter > 0) {
+                        if (isVoiceActive) {
+                            vadTrailingCounter = VAD_TRAILING_FRAMES;
+                        } else {
+                            vadTrailingCounter--;
+                        }
+                        const dataCopy = new Float32Array(inputData);
+                        worker.postMessage({ action: 'process', data: dataCopy });
+                    }
                 }
             }
         };
@@ -1141,7 +1156,7 @@ export default function useVoiceCopilot({
             const clamped = Math.max(0.0, Math.min(1.0, value));
             const rounded = Math.round(clamped * 100) / 100;
             micGainRef.current = rounded;
-            if (gainNodeRef.current) gainNodeRef.current.gain.value = rounded;
+            // GainNode stays at 1.0 — sensitivity is VAD-threshold based
             setMicGainState(rounded);
             try { localStorage.setItem('flyhigh_voice_mic_gain', rounded.toString()); } catch(e) {}
         }, []),
