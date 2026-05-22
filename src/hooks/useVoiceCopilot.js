@@ -304,11 +304,18 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
+        // Attenuate mic input to 30% — reduces podcast/background noise energy
+        // below VAD threshold while pilot voice at 30cm stays above it.
+        // Runs natively in audio thread: 0 CPU, 0 RAM overhead.
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.3;
+
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyserRef.current = analyser;
 
-        source.connect(analyser);
+        source.connect(gainNode);
+        gainNode.connect(analyser);
 
         // ═══════════════════════════════════════════════════════════════
         // Audio Processing: AudioWorkletNode (preferred) or ScriptProcessor (fallback)
