@@ -814,9 +814,9 @@ export default function useVoiceCopilot({
                     invokeCallbackOnNoiseAndUnknown: true
                 });
             } else if (currentMode === 'vosk') {
-                // ═══ VOSK STATE MACHINE MODE ═══
-                // Wake word detection now lives inside the Worker for minimal latency.
-                // The Worker emits: 'wake', 'active_timeout', 'partial', 'final', 'status', 'error'
+                // ═══ VOSK MODO LIMPIO ═══
+                // Worker solo emite: 'status', 'partial', 'final', 'cycle_reset', 'error'
+                // Wake word + POI matching se hacen aquí en el hilo principal.
                 if (!voskWorkerRef.current) {
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
                     
@@ -828,61 +828,63 @@ export default function useVoiceCopilot({
                                 setVoiceState('listening');
                                 stateRef.current = 'listening';
                             }
-                        } else if (type === 'wake') {
-                            // Worker detected wake word → transitioned to ACTIVE_LISTEN
-                            if (stateRef.current !== 'matched' && stateRef.current !== 'playing') {
-                                setVoiceState('wake');
-                                stateRef.current = 'wake';
-                                setDictatedText('');
-                                setLastTranscript('');
-                                playFeedbackSound();
-                                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
-                            }
-                        } else if (type === 'active_timeout') {
-                            // Worker's 6s grace window expired without POI match
-                            if (stateRef.current === 'wake') {
-                                setVoiceState('listening');
-                                stateRef.current = 'listening';
-                                setLastTranscript('');
-                                setDictatedText('');
-                            }
-                        } else if (type === 'patrol_transcript') {
-                            // PATROL feedback — show what Vosk hears
-                            // Worker is in PATROL during: listening, matched, playing
-                            const text = e.data.text || '';
-                            if (text && (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing')) {
-                                setLastTranscript(text);
-                                setDictatedText(text);
-                            }
                         } else if (type === 'cycle_reset') {
-                            // 7s amnesia — clear displayed transcript
-                            // Worker is in PATROL during: listening, matched, playing
-                            if (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing') {
+                            // Amnesia cada 10s — limpiar texto en pantalla
+                            if (stateRef.current !== 'matched' && stateRef.current !== 'playing') {
                                 setLastTranscript('');
                                 setDictatedText('');
                             }
                         } else if (type === 'partial' || type === 'final') {
                             const transcript = result?.partial || result?.text || '';
                             if (!transcript) return;
-                            
-                            // Only update displayed text during ACTIVE_LISTEN (wake)
-                            if (stateRef.current === 'wake') {
+
+                            // Siempre mostrar lo que Vosk escucha (excepto en matched/playing)
+                            if (stateRef.current !== 'matched' && stateRef.current !== 'playing') {
                                 setLastTranscript(transcript);
                                 setDictatedText(transcript);
                             }
 
-                            // POI matching during wake (ACTIVE_LISTEN in worker)
-                            // Match on both partial AND final for faster detection
+                            // 1) Detección de wake word: listening → wake
+                            if (stateRef.current === 'listening') {
+                                const currentWakeWord = callbacksRef.current.wakeWord;
+                                if (isWakeWordDetected(transcript, currentWakeWord)) {
+                                    setVoiceState('wake');
+                                    stateRef.current = 'wake';
+                                    setDictatedText('');
+                                    setLastTranscript('');
+                                    playFeedbackSound();
+                                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+
+                                    // Reset recognizer para que el POI se detecte limpio
+                                    if (voskWorkerRef.current) {
+                                        voskWorkerRef.current.postMessage({ action: 'reset' });
+                                    }
+
+                                    // Timeout de atención: 6s para decir el POI
+                                    if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                    attentionTimeoutRef.current = setTimeout(() => {
+                                        if (stateRef.current === 'wake') {
+                                            setVoiceState('listening');
+                                            stateRef.current = 'listening';
+                                            setLastTranscript('');
+                                            setDictatedText('');
+                                        }
+                                    }, 6000);
+                                }
+                            }
+
+                            // 2) POI matching: wake → matched
                             if (stateRef.current === 'wake') {
                                 const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
                                 if (poiMatch) {
+                                    if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     setMatchedPoi(poiMatch);
                                     setVoiceState('matched');
                                     stateRef.current = 'matched';
                                     
-                                    // Immediate amnesia — force worker back to PATROL
+                                    // Reset limpio del worker
                                     if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ action: 'force_reset' });
+                                        voskWorkerRef.current.postMessage({ action: 'reset' });
                                     }
 
                                     setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
@@ -890,13 +892,11 @@ export default function useVoiceCopilot({
                             }
                         } else if (type === 'error') {
                             console.warn('[VoiceCopilot] Worker error (non-fatal):', error);
-                            // Attempt soft recovery instead of killing everything
                             if (voskWorkerRef.current) {
                                 try {
                                     voskWorkerRef.current.postMessage({ action: 'reset' });
                                 } catch (e) {
-                                    // Worker is truly dead — now it's fatal
-                                    console.error('[VoiceCopilot] Worker irrecoverable:', e);
+                                    console.error('[VoiceCopilot] Worker irrecuperable:', e);
                                     callbacksRef.current.stopListening();
                                 }
                             }
@@ -909,8 +909,7 @@ export default function useVoiceCopilot({
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
-                            deviceSampleRate: audioCtx.sampleRate,
-                            wakeWord: callbacksRef.current.wakeWord
+                            deviceSampleRate: audioCtx.sampleRate
                         }
                     });
                 } else {
