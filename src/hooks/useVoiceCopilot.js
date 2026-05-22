@@ -324,47 +324,42 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
-        // Attenuate/Amplify mic input. Real gain maps UI slider value [0.0, 1.0]
-        // to a real amplification factor of [0.0, 3.0] (0% to 100% volume adjustment).
+        // Sensitivity control: slider value [0.0, 1.0] maps directly to
+        // GainNode value [0.0, 1.0]. At 0% the mic is muted, at 100% it's
+        // full raw mic volume. The GainNode attenuates the signal BEFORE
+        // it reaches the processor, so Vosk only hears attenuated audio.
         const uiGain = micGainRef.current;
-        const actualGain = uiGain * 3.0;
         const gainNode = audioCtx.createGain();
-        gainNode.gain.value = actualGain;
+        gainNode.gain.value = uiGain;
         gainNodeRef.current = gainNode;
 
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyserRef.current = analyser;
 
+        // CRITICAL: source → gainNode → [analyser, processorNode]
+        // The processorNode MUST be downstream of gainNode so that
+        // Vosk receives the gain-adjusted audio, not the raw mic signal.
         source.connect(gainNode);
         gainNode.connect(analyser);
 
         // ═══════════════════════════════════════════════════════════════
         // Audio Processing: AudioWorkletNode (preferred) or ScriptProcessor (fallback)
-        // AudioWorklet runs in a dedicated real-time thread, eliminating
-        // GC pressure from AudioProcessingEvent objects on the main thread.
+        // The processor is connected to gainNode (NOT source) so the
+        // browser's native audio engine handles attenuation at the
+        // audio-thread level before samples reach JavaScript.
         // ═══════════════════════════════════════════════════════════════
         const handleAudioFrame = (inputData, peak) => {
-            const currentUiGain = micGainRef.current;
-            const currentActualGain = currentUiGain * 3.0;
-
-            const energy = getAudioEnergy(inputData) * currentActualGain;
-            
-            // Set voice detection feedback matching voice activity above a low noise floor
-            setIsDetectingVoice(energy > 0.005);
+            // inputData is ALREADY attenuated by the GainNode — no manual
+            // multiplication needed. Energy reflects the true gain-adjusted level.
+            const energy = getAudioEnergy(inputData);
+            setIsDetectingVoice(energy > 0.001);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
                 const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
                 if (worker) {
-                    // Send ALL frames to the worker, scaled by currentActualGain and digitally clamped
-                    const dataCopy = new Float32Array(inputData.length);
-                    for (let i = 0; i < inputData.length; i++) {
-                        let val = inputData[i] * currentActualGain;
-                        if (val > 1.0) val = 1.0;
-                        else if (val < -1.0) val = -1.0;
-                        dataCopy[i] = val;
-                    }
+                    const dataCopy = new Float32Array(inputData);
                     worker.postMessage({ action: 'process', data: dataCopy });
                 }
             }
@@ -378,8 +373,8 @@ export default function useVoiceCopilot({
                 const workletNode = new AudioWorkletNode(audioCtx, 'audio-feeder-processor');
                 processorNodeRef.current = workletNode;
                 
-                // Connect worklet node directly to source for clean, raw audio input (no digital clipping)
-                source.connect(workletNode);
+                // Connect processor to gainNode (NOT source) — this is the key fix
+                gainNode.connect(workletNode);
                 workletNode.connect(audioCtx.destination);
 
                 workletNode.port.onmessage = (e) => {
@@ -387,14 +382,14 @@ export default function useVoiceCopilot({
                         handleAudioFrame(e.data.frame, e.data.peak);
                     }
                 };
-                console.log('[VoiceCopilot] ✅ AudioWorkletNode activo (procesando audio continuo sin VAD)');
+                console.log('[VoiceCopilot] ✅ AudioWorkletNode conectado a gainNode (sensibilidad controlada)');
             } catch (workletErr) {
                 console.warn('[VoiceCopilot] AudioWorklet falló, usando ScriptProcessor fallback:', workletErr);
                 const processor = audioCtx.createScriptProcessor(8192, 1, 1);
                 processorNodeRef.current = processor;
                 
-                // Connect processor directly to source for clean, raw audio input
-                source.connect(processor);
+                // Connect processor to gainNode (NOT source)
+                gainNode.connect(processor);
                 processor.connect(audioCtx.destination);
                 processor.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
@@ -411,8 +406,8 @@ export default function useVoiceCopilot({
             const processor = audioCtx.createScriptProcessor(8192, 1, 1);
             processorNodeRef.current = processor;
             
-            // Connect processor directly to source for clean, raw audio input
-            source.connect(processor);
+            // Connect processor to gainNode (NOT source)
+            gainNode.connect(processor);
             processor.connect(audioCtx.destination);
             processor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
@@ -1146,8 +1141,7 @@ export default function useVoiceCopilot({
             const clamped = Math.max(0.0, Math.min(1.0, value));
             const rounded = Math.round(clamped * 100) / 100;
             micGainRef.current = rounded;
-            const actualGain = rounded * 3.0;
-            if (gainNodeRef.current) gainNodeRef.current.gain.value = actualGain;
+            if (gainNodeRef.current) gainNodeRef.current.gain.value = rounded;
             setMicGainState(rounded);
             try { localStorage.setItem('flyhigh_voice_mic_gain', rounded.toString()); } catch(e) {}
         }, []),
