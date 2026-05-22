@@ -176,6 +176,12 @@ function transitionToActiveListen() {
     state = 'ACTIVE_LISTEN';
     clearTimeout(safetyTimer); // Pause patrol clock
 
+    // Reset recognizer so POI detection starts with clean buffer
+    // Without this, Vosk accumulates "computadora" + POI name = contaminated transcript
+    try {
+        if (recognizer) recognizer.reset();
+    } catch(e) {}
+
     clearTimeout(activeListenTimer);
     activeListenTimer = setTimeout(() => {
         if (state === 'ACTIVE_LISTEN') {
@@ -247,7 +253,7 @@ self.onmessage = async (e) => {
                     suppressOutput = false;
                     suppressRemaining = 0;
                     transitionToActiveListen();
-                    self.postMessage({ type: 'final', result: message.result });
+                    // Do NOT emit this result — it contains the wake word, not a POI
                     return;
                 }
                 if (suppressOutput) return;
@@ -266,7 +272,7 @@ self.onmessage = async (e) => {
                     suppressOutput = false;
                     suppressRemaining = 0;
                     transitionToActiveListen();
-                    self.postMessage({ type: 'partial', result: message.result });
+                    // Do NOT emit this partial — it contains the wake word, not a POI
                     return;
                 }
                 if (suppressOutput) return;

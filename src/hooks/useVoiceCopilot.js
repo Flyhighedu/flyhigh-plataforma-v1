@@ -833,6 +833,8 @@ export default function useVoiceCopilot({
                             if (stateRef.current !== 'matched' && stateRef.current !== 'playing') {
                                 setVoiceState('wake');
                                 stateRef.current = 'wake';
+                                setDictatedText('');
+                                setLastTranscript('');
                                 playFeedbackSound();
                                 if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
                             }
@@ -869,8 +871,9 @@ export default function useVoiceCopilot({
                                 setDictatedText(transcript);
                             }
 
-                            // POI matching only during wake (ACTIVE_LISTEN in worker)
-                            if (type === 'final' && stateRef.current === 'wake') {
+                            // POI matching during wake (ACTIVE_LISTEN in worker)
+                            // Match on both partial AND final for faster detection
+                            if (stateRef.current === 'wake') {
                                 const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
                                 if (poiMatch) {
                                     setMatchedPoi(poiMatch);
