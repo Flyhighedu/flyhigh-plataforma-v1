@@ -180,6 +180,10 @@ export default function useVoiceCopilot({
     const closeMicrophoneRef = useRef(null);
     const triggerSpeechRecognitionWindowRef = useRef(null);
 
+    // Temporal guard — suppress residual patrol_transcript/cycle_reset events
+    // for 2s after returning from wake/matched state to prevent text contamination
+    const lastWakeReturnedAtRef = useRef(0);
+
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -577,6 +581,9 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setMatchedPoi(null);
+            setDictatedText('');
+            setLastTranscript('');
+            lastWakeReturnedAtRef.current = Date.now();
             return;
         }
         if (audioRef?.current) {
@@ -594,6 +601,10 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             if (setPlayingPoiId) setPlayingPoiId(null);
+            setDictatedText('');
+            setLastTranscript('');
+            setMatchedPoi(null);
+            lastWakeReturnedAtRef.current = Date.now();
             restartNativeIfNeeded();
         });
 
@@ -602,6 +613,9 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setDictatedText('');
+            setLastTranscript('');
+            setMatchedPoi(null);
+            lastWakeReturnedAtRef.current = Date.now();
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
             restartNativeIfNeeded();
         };
@@ -611,6 +625,9 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setDictatedText('');
+            setLastTranscript('');
+            setMatchedPoi(null);
+            lastWakeReturnedAtRef.current = Date.now();
             restartNativeIfNeeded();
         };
     }, [audioRef, setPlayingPoiId]);
@@ -835,8 +852,29 @@ export default function useVoiceCopilot({
                                 stateRef.current = 'wake';
                                 setDictatedText('');
                                 setLastTranscript('');
+                                setMatchedPoi(null);
                                 playFeedbackSound();
                                 if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
+
+                                // Try immediate POI match from post-wake text
+                                // e.g. pilot said "computadora catedral" in one breath
+                                const seedText = e.data.postWakeText || '';
+                                if (seedText.trim()) {
+                                    console.log('[VoiceCopilot] Post-wake seed text:', seedText);
+                                    setDictatedText(seedText);
+                                    setLastTranscript(seedText);
+                                    const poiMatch = callbacksRef.current.findMatchInBuffer(seedText);
+                                    if (poiMatch) {
+                                        console.log('[VoiceCopilot] Instant POI match from seed:', poiMatch.name);
+                                        setMatchedPoi(poiMatch);
+                                        setVoiceState('matched');
+                                        stateRef.current = 'matched';
+                                        if (voskWorkerRef.current) {
+                                            voskWorkerRef.current.postMessage({ action: 'force_reset' });
+                                        }
+                                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
+                                    }
+                                }
                             }
                         } else if (type === 'active_timeout') {
                             // Worker's 6s grace window expired without POI match
@@ -845,19 +883,23 @@ export default function useVoiceCopilot({
                                 stateRef.current = 'listening';
                                 setLastTranscript('');
                                 setDictatedText('');
+                                setMatchedPoi(null);
+                                lastWakeReturnedAtRef.current = Date.now();
                             }
                         } else if (type === 'patrol_transcript') {
                             // PATROL feedback — show what Vosk hears
-                            // Worker is in PATROL during: listening, matched, playing
+                            // Skip residual transcripts for 2s after returning from wake/matched
                             const text = e.data.text || '';
-                            if (text && (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing')) {
+                            if (text && (stateRef.current === 'listening')) {
+                                if (Date.now() - lastWakeReturnedAtRef.current < 2000) return;
                                 setLastTranscript(text);
                                 setDictatedText(text);
                             }
                         } else if (type === 'cycle_reset') {
                             // 7s amnesia — clear displayed transcript
-                            // Worker is in PATROL during: listening, matched, playing
-                            if (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing') {
+                            // Skip if we just returned from wake (overlap was skipped, no stale text)
+                            if (stateRef.current === 'listening') {
+                                if (Date.now() - lastWakeReturnedAtRef.current < 2000) return;
                                 setLastTranscript('');
                                 setDictatedText('');
                             }

@@ -35,6 +35,9 @@ let suppressBackstopTimer = null;
 let safetyTimer = null;
 let activeListenTimer = null;
 
+// Wake word cooldown — prevents spurious re-activation from overlap echo
+let wakeWordCooldownUntil = 0;
+
 // Wake word config
 let wakeWordAliases = [
     'computadora', 'computador', 'compu', 'conputadora', 'conmutadora',
@@ -171,7 +174,23 @@ function checkWakeWord(transcript) {
     return false;
 }
 
-function transitionToActiveListen() {
+// Extract text AFTER the wake word from the transcript that triggered detection.
+// This preserves POI words the pilot said in the same breath as the wake word.
+// e.g. "computadora catedral de morelia" → "catedral de morelia"
+function extractPostWakeText(transcript) {
+    const norm = normalizeFull(transcript);
+    for (const alias of wakeWordAliases) {
+        const na = normalizeFull(alias);
+        const idx = norm.indexOf(na);
+        if (idx !== -1) {
+            const after = norm.substring(idx + na.length).trim();
+            if (after.length >= 3) return after;
+        }
+    }
+    return '';
+}
+
+function transitionToActiveListen(postWakeText) {
     if (state === 'ACTIVE_LISTEN') return; // Ignore repeated wake words
     state = 'ACTIVE_LISTEN';
     clearTimeout(safetyTimer); // Pause patrol clock
@@ -186,31 +205,51 @@ function transitionToActiveListen() {
     activeListenTimer = setTimeout(() => {
         if (state === 'ACTIVE_LISTEN') {
             console.log('[Vosk SM] ACTIVE_LISTEN timeout (6s) → PATROL');
-            returnToPatrol();
+            returnToPatrol(true); // skipOverlap — overlap contains wake word echo
             self.postMessage({ type: 'active_timeout' });
         }
     }, ACTIVE_LISTEN_SECONDS * 1000);
 
-    console.log('[Vosk SM] PATROL → ACTIVE_LISTEN');
-    self.postMessage({ type: 'wake' });
+    console.log('[Vosk SM] PATROL → ACTIVE_LISTEN' + (postWakeText ? ` (seed: "${postWakeText}")` : ''));
+    // Send wake event WITH any post-wake-word text for immediate POI matching
+    self.postMessage({ type: 'wake', postWakeText: postWakeText || '' });
 }
 
-function returnToPatrol() {
+function returnToPatrol(skipOverlap = false) {
     if (!recognizer) return;
     clearTimeout(activeListenTimer);
 
+    // Activate cooldown — prevents overlap echo from re-triggering wake word
+    wakeWordCooldownUntil = performance.now() + 3000;
+
     try {
-        const overlap = extractOverlap();
-        recognizer.reset();
+        if (skipOverlap) {
+            // Coming from ACTIVE_LISTEN or force_reset — overlap contains
+            // the wake word and pilot speech that would cause spurious re-detection.
+            // Start with a completely clean buffer instead.
+            recognizer.reset();
+            ringBuffer.fill(0);
+            writePos = 0;
+            samplesInCycle = 0;
+            state = 'PATROL';
+            suppressOutput = false;
+            suppressRemaining = 0;
+            console.log('[Vosk SM] → PATROL (clean start, no overlap)');
+        } else {
+            // Normal patrol cycle reset — re-inject overlap for Kaldi continuity
+            const overlap = extractOverlap();
+            recognizer.reset();
 
-        ringBuffer.fill(0);
-        ringBuffer.set(overlap);
-        writePos = OVERLAP_SAMPLES;
-        samplesInCycle = OVERLAP_SAMPLES;
-        state = 'PATROL';
+            ringBuffer.fill(0);
+            ringBuffer.set(overlap);
+            writePos = OVERLAP_SAMPLES;
+            samplesInCycle = OVERLAP_SAMPLES;
+            state = 'PATROL';
 
-        recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
-        activateSuppression();
+            recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
+            activateSuppression();
+            console.log('[Vosk SM] → PATROL (reset + overlap)');
+        }
     } catch (err) {
         // Non-fatal: recover without overlap
         console.warn('[Vosk SM] returnToPatrol failed, recovering:', err.message);
@@ -225,7 +264,6 @@ function returnToPatrol() {
     clearTimeout(safetyTimer);
     safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
     self.postMessage({ type: 'cycle_reset' });
-    console.log('[Vosk SM] → PATROL (reset + overlap)');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -248,12 +286,17 @@ self.onmessage = async (e) => {
 
             recognizer.on("result", (message) => {
                 const text = message.result?.text || '';
-                // Wake word detection ALWAYS bypasses suppression
+                // Wake word detection bypasses suppression but respects cooldown
                 if (state === 'PATROL' && text && checkWakeWord(text)) {
+                    if (performance.now() < wakeWordCooldownUntil) {
+                        // Ignore — this is echo from overlap re-injection
+                        console.log('[Vosk SM] Wake word ignored (cooldown active)');
+                        return;
+                    }
                     suppressOutput = false;
                     suppressRemaining = 0;
-                    transitionToActiveListen();
-                    // Do NOT emit this result — it contains the wake word, not a POI
+                    const postWakeText = extractPostWakeText(text);
+                    transitionToActiveListen(postWakeText);
                     return;
                 }
                 if (suppressOutput) return;
@@ -267,12 +310,16 @@ self.onmessage = async (e) => {
 
             recognizer.on("partialresult", (message) => {
                 const text = message.result?.partial || '';
-                // Wake word detection ALWAYS bypasses suppression
+                // Wake word detection bypasses suppression but respects cooldown
                 if (state === 'PATROL' && text && checkWakeWord(text)) {
+                    if (performance.now() < wakeWordCooldownUntil) {
+                        // Ignore — this is echo from overlap re-injection
+                        return;
+                    }
                     suppressOutput = false;
                     suppressRemaining = 0;
-                    transitionToActiveListen();
-                    // Do NOT emit this partial — it contains the wake word, not a POI
+                    const postWakeText = extractPostWakeText(text);
+                    transitionToActiveListen(postWakeText);
                     return;
                 }
                 if (suppressOutput) return;
@@ -320,7 +367,7 @@ self.onmessage = async (e) => {
     }
 
     if (action === 'force_reset') {
-        // POI matched — immediate amnesia
+        // POI matched — immediate amnesia with cooldown
         console.log('[Vosk SM] Force reset (POI matched)');
         clearTimeout(activeListenTimer);
         clearTimeout(safetyTimer);
@@ -336,6 +383,8 @@ self.onmessage = async (e) => {
         ringBuffer.fill(0);
         suppressOutput = false;
         suppressRemaining = 0;
+        // Activate cooldown — prevents overlap echo from re-triggering wake
+        wakeWordCooldownUntil = performance.now() + 3000;
         safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
         self.postMessage({ type: 'cycle_reset' });
     }
