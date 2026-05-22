@@ -170,46 +170,48 @@ const CopilotOrbUI = forwardRef(({
                 </div>
             </button>
 
-            {/* ── LIVE TRANSCRIPT / STATUS TEXT ── */}
-            <div className="mt-2 h-6 flex items-center justify-center min-w-[200px]">
-                {copilot.isActive ? (
-                    <div className="text-center px-4">
-                        <p className={`text-[11px] font-bold uppercase tracking-widest opacity-60 transition-colors duration-300 ${isPeripheralActive ? 'text-white/80' : 'text-slate-400'}`}>
-                            {vs === 'booting' ? 'Conectando Copiloto...' : 
-                             vs === 'idle' || vs === 'listening' ? `Di "${copilot.wakeWord}"...` : 
-                             vs === 'wake' ? 'Escuchando...' : 
-                             vs === 'matched' ? 'Comando detectado' :
-                             vs === 'playing' ? 'Reproduciendo...' : ''}
+            {/* ── STATUS + LIVE TRANSCRIPT (unified, minimal) ── */}
+            <div className="mt-3 flex flex-col items-center justify-center min-h-[40px] max-w-[260px] px-2">
+                {copilot.isActive && (
+                    <>
+                        {/* State label */}
+                        <p className={`text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+                            isPeripheralActive ? 'text-white/50' : 'text-slate-300'
+                        }`}>
+                            {vs === 'booting' ? 'Conectando…' : 
+                             vs === 'idle' || vs === 'listening' ? `Di "${copilot.wakeWord}"` : 
+                             vs === 'wake' ? 'Escuchando' : 
+                             vs === 'matched' ? 'Detectado' :
+                             vs === 'playing' ? 'Reproduciendo' : ''}
                         </p>
-                    </div>
-                ) : null}
-            </div>
 
-            {/* Live Transcript Display Card */}
-            {copilot.isActive && (copilot.dictatedText || copilot.lastTranscript) && vs !== 'booting' && vs !== 'matched' && vs !== 'playing' && (
-                <div className={`mt-2.5 px-4 py-2 border rounded-xl max-w-[280px] text-center backdrop-blur-sm shadow-sm transition-all duration-300 animate-fade-in ${
-                    isPeripheralActive 
-                    ? 'bg-white/10 border-white/20 text-white' 
-                    : 'bg-blue-500/5 border-blue-500/10 text-slate-700'
-                }`}>
-                    <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${isPeripheralActive ? 'text-white/70' : 'text-blue-600'}`}>
-                        Transcripción en Vivo
-                    </span>
-                    <p className="text-xs font-semibold italic">
-                        &ldquo;{copilot.dictatedText || copilot.lastTranscript}&rdquo;
-                    </p>
-                </div>
-            )}
-            
-            {/* Matched POI Name Display below transcript when playing */}
-            {copilot.isActive && copilot.matchedPoi && (vs === 'matched' || vs === 'playing') && (
-                <div className={`mt-2 flex items-center gap-2 px-3 py-1 rounded-full border transition-colors duration-300 ${isPeripheralActive ? 'bg-white/20 border-white/30 backdrop-blur-md' : 'bg-black/5 border-black/10'}`}>
-                    <span className="text-xs">{vs === 'matched' ? '✅' : '🔊'}</span>
-                    <p className={`text-[11px] font-bold truncate max-w-[200px] transition-colors duration-300 ${isPeripheralActive ? 'text-white' : 'text-slate-700'}`}>
-                        {copilot.matchedPoi.name}
-                    </p>
-                </div>
-            )}
+                        {/* Live transcript — inline floating text */}
+                        {(copilot.dictatedText || copilot.lastTranscript) && vs !== 'booting' && (
+                            <p className={`mt-1 text-[13px] font-medium text-center leading-snug transition-all duration-300 ${
+                                isPeripheralActive ? 'text-white/90' : 'text-slate-600'
+                            }`}>
+                                {copilot.dictatedText || copilot.lastTranscript}
+                            </p>
+                        )}
+
+                        {/* Matched POI pill */}
+                        {copilot.matchedPoi && (vs === 'matched' || vs === 'playing') && (
+                            <div className={`mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300 ${
+                                isPeripheralActive 
+                                    ? 'bg-white/15 backdrop-blur-sm' 
+                                    : 'bg-slate-50 border border-slate-100'
+                            }`}>
+                                <span className="text-[11px]">{vs === 'matched' ? '✓' : '♪'}</span>
+                                <span className={`text-[11px] font-semibold truncate max-w-[180px] ${
+                                    isPeripheralActive ? 'text-white' : 'text-slate-700'
+                                }`}>
+                                    {copilot.matchedPoi.name}
+                                </span>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 });

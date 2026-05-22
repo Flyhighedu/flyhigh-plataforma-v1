@@ -322,20 +322,22 @@ export default function useVoiceCopilot({
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
-                if (stateRef.current === 'listening' || stateRef.current === 'wake') {
-                    const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
-                    if (worker) {
-                        const energy = getAudioEnergy(inputData);
-                        const isVADActive = energy >= VAD_ENERGY_THRESHOLD;
-                        if (isVADActive || vadTrailingCounter > 0) {
-                            if (isVADActive) {
-                                vadTrailingCounter = VAD_TRAILING_FRAMES;
-                            } else {
-                                vadTrailingCounter--;
-                            }
-                            const dataCopy = new Float32Array(inputData);
-                            worker.postMessage({ action: 'process', data: dataCopy });
+                // Audio ALWAYS flows to worker — the State Machine inside
+                // the worker handles suppression and wake word detection.
+                // This keeps the Kaldi lattice "warm" during playback,
+                // enabling instant wake word detection after narration ends.
+                const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
+                if (worker) {
+                    const energy = getAudioEnergy(inputData);
+                    const isVADActive = energy >= VAD_ENERGY_THRESHOLD;
+                    if (isVADActive || vadTrailingCounter > 0) {
+                        if (isVADActive) {
+                            vadTrailingCounter = VAD_TRAILING_FRAMES;
+                        } else {
+                            vadTrailingCounter--;
                         }
+                        const dataCopy = new Float32Array(inputData);
+                        worker.postMessage({ action: 'process', data: dataCopy });
                     }
                 }
             }

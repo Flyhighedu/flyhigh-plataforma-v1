@@ -197,24 +197,34 @@ self.onmessage = async (e) => {
             recognizer.setWords(true);
 
             recognizer.on("result", (message) => {
-                if (suppressOutput) return;
                 const text = message.result?.text || '';
+                // Wake word detection ALWAYS bypasses suppression
                 if (state === 'PATROL' && text && checkWakeWord(text)) {
+                    suppressOutput = false;
+                    suppressRemaining = 0;
                     transitionToActiveListen();
                     self.postMessage({ type: 'final', result: message.result });
-                } else if (state === 'ACTIVE_LISTEN') {
+                    return;
+                }
+                if (suppressOutput) return;
+                if (state === 'ACTIVE_LISTEN') {
                     self.postMessage({ type: 'final', result: message.result });
                 }
                 // PATROL without wake word → silently discard
             });
 
             recognizer.on("partialresult", (message) => {
-                if (suppressOutput) return;
                 const text = message.result?.partial || '';
+                // Wake word detection ALWAYS bypasses suppression
                 if (state === 'PATROL' && text && checkWakeWord(text)) {
+                    suppressOutput = false;
+                    suppressRemaining = 0;
                     transitionToActiveListen();
                     self.postMessage({ type: 'partial', result: message.result });
-                } else if (state === 'ACTIVE_LISTEN') {
+                    return;
+                }
+                if (suppressOutput) return;
+                if (state === 'ACTIVE_LISTEN') {
                     self.postMessage({ type: 'partial', result: message.result });
                 }
             });
