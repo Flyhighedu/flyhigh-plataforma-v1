@@ -308,7 +308,7 @@ export default function useVoiceCopilot({
         // below VAD threshold while pilot voice at 30cm stays above it.
         // Runs natively in audio thread: 0 CPU, 0 RAM overhead.
         const gainNode = audioCtx.createGain();
-        gainNode.gain.value = 0.3;
+        gainNode.gain.value = 0.15;
 
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
