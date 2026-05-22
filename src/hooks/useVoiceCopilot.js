@@ -184,6 +184,9 @@ export default function useVoiceCopilot({
     // for 2s after returning from wake/matched state to prevent text contamination
     const lastWakeReturnedAtRef = useRef(0);
 
+    // Track active listening epoch/session ID to drop late-arriving async messages
+    const voiceSessionIdRef = useRef(1);
+
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -339,14 +342,19 @@ export default function useVoiceCopilot({
         let vadTrailingCounter = 0;
 
         const handleAudioFrame = (inputData, peak) => {
+            // Block microphone processing completely during playback or matching states
+            // to prevent speaker output loopback from poisoning the recognizer state.
+            if (stateRef.current === 'playing' || stateRef.current === 'matched') {
+                setIsDetectingVoice(false);
+                return;
+            }
+
             setIsDetectingVoice(peak > 0.015);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
-                // Audio ALWAYS flows to worker — the State Machine inside
+                // Audio flows to worker — the State Machine inside
                 // the worker handles suppression and wake word detection.
-                // This keeps the Kaldi lattice "warm" during playback,
-                // enabling instant wake word detection after narration ends.
                 const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
                 if (worker) {
                     const energy = getAudioEnergy(inputData);
@@ -358,7 +366,11 @@ export default function useVoiceCopilot({
                             vadTrailingCounter--;
                         }
                         const dataCopy = new Float32Array(inputData);
-                        worker.postMessage({ action: 'process', data: dataCopy });
+                        worker.postMessage({
+                            action: 'process',
+                            sessionId: voiceSessionIdRef.current,
+                            data: dataCopy
+                        });
                     }
                 }
             }
@@ -533,8 +545,12 @@ export default function useVoiceCopilot({
                 }
             }
         } else if (engineModeRef.current === 'vosk') {
+            voiceSessionIdRef.current++;
             if (voskWorkerRef.current) {
-                voskWorkerRef.current.postMessage({ action: 'reset' });
+                voskWorkerRef.current.postMessage({
+                    action: 'reset',
+                    sessionId: voiceSessionIdRef.current
+                });
             }
             setVoiceState('listening');
             stateRef.current = 'listening';
@@ -578,12 +594,11 @@ export default function useVoiceCopilot({
         if (!poi?.audio_url) {
             // No audio to play — return to listening immediately
             // Without this, stateRef stays stuck at 'matched' forever
-            setVoiceState('listening');
-            stateRef.current = 'listening';
             setMatchedPoi(null);
             setDictatedText('');
             setLastTranscript('');
             lastWakeReturnedAtRef.current = Date.now();
+            restartNativeIfNeeded();
             return;
         }
         if (audioRef?.current) {
@@ -838,7 +853,13 @@ export default function useVoiceCopilot({
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
                     
                     voskWorkerRef.current.onmessage = (e) => {
-                        const { type, status, result, error } = e.data;
+                        const { type, status, result, error, sessionId } = e.data;
+
+                        // Ignore messages from previous epochs (e.g. stale transcripts from playback audio)
+                        if (sessionId !== undefined && sessionId !== voiceSessionIdRef.current) {
+                            console.log(`[VoiceCopilot] Ignoring stale message of type "${type}" from epoch ${sessionId} (current: ${voiceSessionIdRef.current})`);
+                            return;
+                        }
                         
                         if (type === 'status') {
                             if (status === 'ready') {
@@ -869,8 +890,12 @@ export default function useVoiceCopilot({
                                         setMatchedPoi(poiMatch);
                                         setVoiceState('matched');
                                         stateRef.current = 'matched';
+                                        voiceSessionIdRef.current++;
                                         if (voskWorkerRef.current) {
-                                            voskWorkerRef.current.postMessage({ action: 'force_reset' });
+                                            voskWorkerRef.current.postMessage({
+                                                action: 'force_reset',
+                                                sessionId: voiceSessionIdRef.current
+                                            });
                                         }
                                         setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
                                     }
@@ -923,8 +948,12 @@ export default function useVoiceCopilot({
                                     stateRef.current = 'matched';
                                     
                                     // Immediate amnesia — force worker back to PATROL
+                                    voiceSessionIdRef.current++;
                                     if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ action: 'force_reset' });
+                                        voskWorkerRef.current.postMessage({
+                                            action: 'force_reset',
+                                            sessionId: voiceSessionIdRef.current
+                                        });
                                     }
 
                                     setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
@@ -935,7 +964,10 @@ export default function useVoiceCopilot({
                             // Attempt soft recovery instead of killing everything
                             if (voskWorkerRef.current) {
                                 try {
-                                    voskWorkerRef.current.postMessage({ action: 'reset' });
+                                    voskWorkerRef.current.postMessage({
+                                        action: 'reset',
+                                        sessionId: voiceSessionIdRef.current
+                                    });
                                 } catch (e) {
                                     // Worker is truly dead — now it's fatal
                                     console.error('[VoiceCopilot] Worker irrecoverable:', e);
@@ -948,6 +980,7 @@ export default function useVoiceCopilot({
                     const audioCtx = audioContextRef.current;
                     voskWorkerRef.current.postMessage({
                         action: 'init',
+                        sessionId: voiceSessionIdRef.current,
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
@@ -956,7 +989,11 @@ export default function useVoiceCopilot({
                         }
                     });
                 } else {
-                    voskWorkerRef.current.postMessage({ action: 'reset' });
+                    voiceSessionIdRef.current++;
+                    voskWorkerRef.current.postMessage({
+                        action: 'reset',
+                        sessionId: voiceSessionIdRef.current
+                    });
                     setVoiceState('listening');
                     stateRef.current = 'listening';
                 }
