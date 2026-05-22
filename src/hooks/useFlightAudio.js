@@ -175,6 +175,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             if (phaseRef.current === 'boarding' && soundtracks.boarding.length > 1) {
                 const nextTrack = getNextBoardingTrack();
                 if (nextTrack) {
+                    audio.load(); // Release previous decode buffer
                     audio.src = nextTrack.public_url;
                     audio.play().catch(() => {});
                     setCurrentTrack(nextTrack);
@@ -237,6 +238,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             if (phaseRef.current === 'in_flight' && soundtracks.inFlight.length > 1) {
                 const nextTrack = getNextFlightTrack();
                 if (nextTrack) {
+                    flightAudio.load(); // Release previous decode buffer
                     flightAudio.src = nextTrack.public_url;
                     flightAudio.play().catch(() => {});
                     setCurrentTrack(nextTrack);
@@ -314,6 +316,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
             if (phaseRef.current === 'boarding') {
                 const nextTrack = getNextBoardingTrack();
                 if (nextTrack) {
+                    boardingAudio.load(); // Release previous decode buffer
                     boardingAudio.src = nextTrack.public_url;
                     boardingAudio.play().catch(() => {});
                     setCurrentTrack(nextTrack);
@@ -426,6 +429,7 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
         }
 
         if (nextTrack) {
+            audio.load(); // Release previous decode buffer
             audio.src = nextTrack.public_url;
             audio.play().catch(() => {});
             setCurrentTrack(nextTrack);

@@ -237,8 +237,16 @@ export default function useVoiceCopilot({
     const closeMicrophone = async () => {
         console.log('[VoiceCopilot] Cerrando y liberando micrófono local...');
         if (processorNodeRef.current) {
-            try { processorNodeRef.current.disconnect(); } catch(e){}
-            processorNodeRef.current.onaudioprocess = null;
+            try {
+                // AudioWorkletNode uses port, ScriptProcessor uses onaudioprocess
+                if (processorNodeRef.current.port) {
+                    processorNodeRef.current.port.onmessage = null;
+                    processorNodeRef.current.port.close();
+                } else {
+                    processorNodeRef.current.onaudioprocess = null;
+                }
+                processorNodeRef.current.disconnect();
+            } catch(e){}
             processorNodeRef.current = null;
         }
         if (sourceNodeRef.current) {
@@ -302,22 +310,15 @@ export default function useVoiceCopilot({
 
         source.connect(analyser);
 
-        const processor = audioCtx.createScriptProcessor(8192, 1, 1);
-        processorNodeRef.current = processor;
-        analyser.connect(processor);
-        processor.connect(audioCtx.destination);
-
+        // ═══════════════════════════════════════════════════════════════
+        // Audio Processing: AudioWorkletNode (preferred) or ScriptProcessor (fallback)
+        // AudioWorklet runs in a dedicated real-time thread, eliminating
+        // GC pressure from AudioProcessingEvent objects on the main thread.
+        // ═══════════════════════════════════════════════════════════════
         let vadTrailingCounter = 0;
 
-        processor.onaudioprocess = (e) => {
-            const inputData = e.inputBuffer.getChannelData(0);
-            
-            let maxVal = 0;
-            for (let i = 0; i < inputData.length; i++) {
-                const absVal = Math.abs(inputData[i]);
-                if (absVal > maxVal) maxVal = absVal;
-            }
-            setIsDetectingVoice(maxVal > 0.015);
+        const handleAudioFrame = (inputData, peak) => {
+            setIsDetectingVoice(peak > 0.015);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
@@ -332,7 +333,6 @@ export default function useVoiceCopilot({
                             } else {
                                 vadTrailingCounter--;
                             }
-                            // Clonamos el Float32Array para evitar que el navegador limpie la memoria de forma asíncrona
                             const dataCopy = new Float32Array(inputData);
                             worker.postMessage({ action: 'process', data: dataCopy });
                         }
@@ -340,6 +340,56 @@ export default function useVoiceCopilot({
                 }
             }
         };
+
+        const useWorklet = typeof audioCtx.audioWorklet !== 'undefined';
+
+        if (useWorklet) {
+            try {
+                await audioCtx.audioWorklet.addModule('/audio-feeder-worklet.js');
+                const workletNode = new AudioWorkletNode(audioCtx, 'audio-feeder-processor');
+                processorNodeRef.current = workletNode;
+                analyser.connect(workletNode);
+                workletNode.connect(audioCtx.destination);
+
+                workletNode.port.onmessage = (e) => {
+                    if (e.data.type === 'audio-frame') {
+                        handleAudioFrame(e.data.frame, e.data.peak);
+                    }
+                };
+                console.log('[VoiceCopilot] ✅ AudioWorkletNode activo (zero main-thread GC)');
+            } catch (workletErr) {
+                console.warn('[VoiceCopilot] AudioWorklet falló, usando ScriptProcessor fallback:', workletErr);
+                const processor = audioCtx.createScriptProcessor(8192, 1, 1);
+                processorNodeRef.current = processor;
+                analyser.connect(processor);
+                processor.connect(audioCtx.destination);
+                processor.onaudioprocess = (e) => {
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    let maxVal = 0;
+                    for (let i = 0; i < inputData.length; i++) {
+                        const absVal = Math.abs(inputData[i]);
+                        if (absVal > maxVal) maxVal = absVal;
+                    }
+                    handleAudioFrame(inputData, maxVal);
+                };
+            }
+        } else {
+            // Fallback: ScriptProcessor for older browsers
+            const processor = audioCtx.createScriptProcessor(8192, 1, 1);
+            processorNodeRef.current = processor;
+            analyser.connect(processor);
+            processor.connect(audioCtx.destination);
+            processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                let maxVal = 0;
+                for (let i = 0; i < inputData.length; i++) {
+                    const absVal = Math.abs(inputData[i]);
+                    if (absVal > maxVal) maxVal = absVal;
+                }
+                handleAudioFrame(inputData, maxVal);
+            };
+            console.log('[VoiceCopilot] ⚠️ Usando ScriptProcessor (fallback)');
+        }
 
         return stream;
     };

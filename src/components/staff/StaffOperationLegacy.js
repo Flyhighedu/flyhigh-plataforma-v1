@@ -299,6 +299,7 @@ export default function StaffOperationLegacy({
     const [showResumeModal, setShowResumeModal] = useState(false);
     const [completedPauses, setCompletedPauses] = useState([]);
     const [nowMs, setNowMs] = useState(Date.now());
+    const nowMsRef = useRef(Date.now());
     const [flightEditModal, setFlightEditModal] = useState(null);
     const [editedStudentCount, setEditedStudentCount] = useState('0');
     const [flightEditReason, setFlightEditReason] = useState('');
@@ -471,7 +472,8 @@ export default function StaffOperationLegacy({
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setNowMs(Date.now());
+            nowMsRef.current = Date.now();
+            setNowMs(nowMsRef.current);
         }, 1000);
 
         return () => clearInterval(timer);
