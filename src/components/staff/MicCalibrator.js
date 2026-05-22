@@ -3,18 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Minus, Plus, Mic } from 'lucide-react';
 
-const GAIN_MIN = 0.05;
-const GAIN_MAX = 0.50;
+const GAIN_MIN = 0.0;
+const GAIN_MAX = 1.0;
 const GAIN_STEP = 0.05;
-const LEVELS = 10;
-
-function gainToLevel(gain) {
-    return Math.round(((gain - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * (LEVELS - 1)) + 1;
-}
-
-function levelToGain(level) {
-    return GAIN_MIN + ((level - 1) / (LEVELS - 1)) * (GAIN_MAX - GAIN_MIN);
-}
 
 const GUIDE_PHRASES = [
     '🗣️ Di: "Probando, probando"',
@@ -49,7 +40,6 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
         };
     }, [dictatedText]);
 
-    const level = gainToLevel(micGain);
 
     const handleStepDown = () => {
         if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
@@ -134,9 +124,9 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
                 <div className="flex items-center gap-3 mb-2">
                     <button
                         onClick={handleStepDown}
-                        disabled={level <= 1}
+                        disabled={micGain <= GAIN_MIN}
                         className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 ${
-                            level <= 1
+                            micGain <= GAIN_MIN
                                 ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
@@ -158,9 +148,9 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
 
                     <button
                         onClick={handleStepUp}
-                        disabled={level >= LEVELS}
+                        disabled={micGain >= GAIN_MAX}
                         className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all active:scale-90 ${
-                            level >= LEVELS
+                            micGain >= GAIN_MAX
                                 ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                                 : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
                         }`}
@@ -171,7 +161,7 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
 
                 {/* Level label */}
                 <p className="text-center text-xs font-bold text-slate-400 mb-5 tracking-wide">
-                    Nivel {level} de {LEVELS}
+                    Sensibilidad: {Math.round(micGain * 100)}%
                 </p>
 
                 {/* Duolingo tip */}

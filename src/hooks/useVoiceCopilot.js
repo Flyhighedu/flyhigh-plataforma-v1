@@ -132,10 +132,20 @@ export default function useVoiceCopilot({
     const [micGain, setMicGainState] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
-            return isNaN(saved) ? 0.22 : saved;
+            if (isNaN(saved)) return 0.40;
+            // Migrate old slider range [0.05, 0.50] to new [0.0, 1.0]
+            if (saved <= 0.50) {
+                return Math.max(0.0, Math.min(1.0, saved * 2.0));
+            }
+            return saved;
         }
-        return 0.22;
+        return 0.40;
     });
+
+    const micGainRef = useRef(micGain);
+    useEffect(() => {
+        micGainRef.current = micGain;
+    }, [micGain]);
 
     useEffect(() => {
         if (typeof onStateChange === 'function') {
@@ -314,12 +324,12 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
-        // Attenuate mic input — reduces podcast/background noise energy
-        // below VAD threshold while pilot voice at 30cm stays above it.
-        // Value is persisted in localStorage via MicCalibrator.
-        const savedGain = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
+        // Attenuate/Amplify mic input. Real gain maps UI slider value [0.0, 1.0]
+        // to a real amplification factor of [0.0, 3.0] (0% to 100% volume adjustment).
+        const uiGain = micGainRef.current;
+        const actualGain = uiGain * 3.0;
         const gainNode = audioCtx.createGain();
-        gainNode.gain.value = isNaN(savedGain) ? 0.22 : savedGain;
+        gainNode.gain.value = actualGain;
         gainNodeRef.current = gainNode;
 
         const analyser = audioCtx.createAnalyser();
@@ -334,30 +344,28 @@ export default function useVoiceCopilot({
         // AudioWorklet runs in a dedicated real-time thread, eliminating
         // GC pressure from AudioProcessingEvent objects on the main thread.
         // ═══════════════════════════════════════════════════════════════
-        let vadTrailingCounter = 0;
-
         const handleAudioFrame = (inputData, peak) => {
-            setIsDetectingVoice(peak > 0.015);
+            const currentUiGain = micGainRef.current;
+            const currentActualGain = currentUiGain * 3.0;
+
+            const energy = getAudioEnergy(inputData) * currentActualGain;
+            
+            // Set voice detection feedback matching voice activity above a low noise floor
+            setIsDetectingVoice(energy > 0.005);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
-                // Audio ALWAYS flows to worker — the State Machine inside
-                // the worker handles suppression and wake word detection.
-                // This keeps the Kaldi lattice "warm" during playback,
-                // enabling instant wake word detection after narration ends.
                 const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
                 if (worker) {
-                    const energy = getAudioEnergy(inputData);
-                    const isVADActive = energy >= VAD_ENERGY_THRESHOLD;
-                    if (isVADActive || vadTrailingCounter > 0) {
-                        if (isVADActive) {
-                            vadTrailingCounter = VAD_TRAILING_FRAMES;
-                        } else {
-                            vadTrailingCounter--;
-                        }
-                        const dataCopy = new Float32Array(inputData);
-                        worker.postMessage({ action: 'process', data: dataCopy });
+                    // Send ALL frames to the worker, scaled by currentActualGain and digitally clamped
+                    const dataCopy = new Float32Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        let val = inputData[i] * currentActualGain;
+                        if (val > 1.0) val = 1.0;
+                        else if (val < -1.0) val = -1.0;
+                        dataCopy[i] = val;
                     }
+                    worker.postMessage({ action: 'process', data: dataCopy });
                 }
             }
         };
@@ -369,7 +377,9 @@ export default function useVoiceCopilot({
                 await audioCtx.audioWorklet.addModule('/audio-feeder-worklet.js');
                 const workletNode = new AudioWorkletNode(audioCtx, 'audio-feeder-processor');
                 processorNodeRef.current = workletNode;
-                analyser.connect(workletNode);
+                
+                // Connect worklet node directly to source for clean, raw audio input (no digital clipping)
+                source.connect(workletNode);
                 workletNode.connect(audioCtx.destination);
 
                 workletNode.port.onmessage = (e) => {
@@ -377,12 +387,14 @@ export default function useVoiceCopilot({
                         handleAudioFrame(e.data.frame, e.data.peak);
                     }
                 };
-                console.log('[VoiceCopilot] ✅ AudioWorkletNode activo (zero main-thread GC)');
+                console.log('[VoiceCopilot] ✅ AudioWorkletNode activo (procesando audio continuo sin VAD)');
             } catch (workletErr) {
                 console.warn('[VoiceCopilot] AudioWorklet falló, usando ScriptProcessor fallback:', workletErr);
                 const processor = audioCtx.createScriptProcessor(8192, 1, 1);
                 processorNodeRef.current = processor;
-                analyser.connect(processor);
+                
+                // Connect processor directly to source for clean, raw audio input
+                source.connect(processor);
                 processor.connect(audioCtx.destination);
                 processor.onaudioprocess = (e) => {
                     const inputData = e.inputBuffer.getChannelData(0);
@@ -398,7 +410,9 @@ export default function useVoiceCopilot({
             // Fallback: ScriptProcessor for older browsers
             const processor = audioCtx.createScriptProcessor(8192, 1, 1);
             processorNodeRef.current = processor;
-            analyser.connect(processor);
+            
+            // Connect processor directly to source for clean, raw audio input
+            source.connect(processor);
             processor.connect(audioCtx.destination);
             processor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
@@ -409,7 +423,7 @@ export default function useVoiceCopilot({
                 }
                 handleAudioFrame(inputData, maxVal);
             };
-            console.log('[VoiceCopilot] ⚠️ Usando ScriptProcessor (fallback)');
+            console.log('[VoiceCopilot] ⚠️ Usando ScriptProcessor (fallback con audio crudo)');
         }
 
         return stream;
@@ -1129,9 +1143,11 @@ export default function useVoiceCopilot({
         deviceInfo,
         micGain,
         setMicGain: useCallback((value) => {
-            const clamped = Math.max(0.05, Math.min(0.50, value));
+            const clamped = Math.max(0.0, Math.min(1.0, value));
             const rounded = Math.round(clamped * 100) / 100;
-            if (gainNodeRef.current) gainNodeRef.current.gain.value = rounded;
+            micGainRef.current = rounded;
+            const actualGain = rounded * 3.0;
+            if (gainNodeRef.current) gainNodeRef.current.gain.value = actualGain;
             setMicGainState(rounded);
             try { localStorage.setItem('flyhigh_voice_mic_gain', rounded.toString()); } catch(e) {}
         }, []),
