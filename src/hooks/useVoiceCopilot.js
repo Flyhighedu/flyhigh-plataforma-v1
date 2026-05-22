@@ -857,9 +857,17 @@ export default function useVoiceCopilot({
                                 }
                             }
                         } else if (type === 'error') {
-                            setErrorMsg(`Error del motor de voz: ${error}`);
-                            console.error('[Vosk]', error);
-                            callbacksRef.current.stopListening();
+                            console.warn('[VoiceCopilot] Worker error (non-fatal):', error);
+                            // Attempt soft recovery instead of killing everything
+                            if (voskWorkerRef.current) {
+                                try {
+                                    voskWorkerRef.current.postMessage({ action: 'reset' });
+                                } catch (e) {
+                                    // Worker is truly dead — now it's fatal
+                                    console.error('[VoiceCopilot] Worker irrecoverable:', e);
+                                    callbacksRef.current.stopListening();
+                                }
+                            }
                         }
                     };
 

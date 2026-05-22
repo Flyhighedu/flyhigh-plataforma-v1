@@ -108,31 +108,49 @@ function activateSuppression() {
 
 function performPatrolReset() {
     if (!recognizer || state !== 'PATROL') return;
-    if (samplesInCycle < OVERLAP_SAMPLES) return; // Not enough audio to justify reset
+    if (samplesInCycle < OVERLAP_SAMPLES) {
+        // Not enough audio yet — reschedule safety timer and wait
+        clearTimeout(safetyTimer);
+        safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+        return;
+    }
 
-    const t0 = performance.now();
-    const overlap = extractOverlap();
+    try {
+        const t0 = performance.now();
+        const overlap = extractOverlap();
 
-    recognizer.reset();
+        recognizer.reset();
 
-    // Re-inject overlap into fresh recognizer
-    recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
+        // Re-inject overlap into fresh recognizer
+        recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
 
-    // Reset ring buffer with overlap at the start
-    ringBuffer.fill(0);
-    ringBuffer.set(overlap);
-    writePos = OVERLAP_SAMPLES;
-    samplesInCycle = OVERLAP_SAMPLES;
+        // Reset ring buffer with overlap at the start
+        ringBuffer.fill(0);
+        ringBuffer.set(overlap);
+        writePos = OVERLAP_SAMPLES;
+        samplesInCycle = OVERLAP_SAMPLES;
 
-    activateSuppression();
+        activateSuppression();
 
-    // Restart safety timer
-    clearTimeout(safetyTimer);
-    safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+        // Restart safety timer
+        clearTimeout(safetyTimer);
+        safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
 
-    // Notify main thread: amnesia happened → clear displayed text
-    self.postMessage({ type: 'cycle_reset' });
-    console.log(`[Vosk SM] PATROL reset: ${(performance.now() - t0).toFixed(1)}ms`);
+        // Notify main thread: amnesia happened → clear displayed text
+        self.postMessage({ type: 'cycle_reset' });
+        console.log(`[Vosk SM] PATROL reset: ${(performance.now() - t0).toFixed(1)}ms`);
+    } catch (err) {
+        // Non-fatal: recover without overlap re-injection
+        console.warn('[Vosk SM] Patrol reset failed, recovering:', err.message);
+        samplesInCycle = 0;
+        writePos = 0;
+        ringBuffer.fill(0);
+        suppressOutput = false;
+        suppressRemaining = 0;
+        clearTimeout(safetyTimer);
+        safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+        self.postMessage({ type: 'cycle_reset' });
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -175,17 +193,28 @@ function returnToPatrol() {
     if (!recognizer) return;
     clearTimeout(activeListenTimer);
 
-    const overlap = extractOverlap();
-    recognizer.reset();
+    try {
+        const overlap = extractOverlap();
+        recognizer.reset();
 
-    ringBuffer.fill(0);
-    ringBuffer.set(overlap);
-    writePos = OVERLAP_SAMPLES;
-    samplesInCycle = OVERLAP_SAMPLES;
-    state = 'PATROL';
+        ringBuffer.fill(0);
+        ringBuffer.set(overlap);
+        writePos = OVERLAP_SAMPLES;
+        samplesInCycle = OVERLAP_SAMPLES;
+        state = 'PATROL';
 
-    recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
-    activateSuppression();
+        recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
+        activateSuppression();
+    } catch (err) {
+        // Non-fatal: recover without overlap
+        console.warn('[Vosk SM] returnToPatrol failed, recovering:', err.message);
+        state = 'PATROL';
+        samplesInCycle = 0;
+        writePos = 0;
+        ringBuffer.fill(0);
+        suppressOutput = false;
+        suppressRemaining = 0;
+    }
 
     clearTimeout(safetyTimer);
     safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
@@ -320,6 +349,7 @@ self.onmessage = async (e) => {
     if (action === 'destroy') {
         clearTimeout(safetyTimer);
         clearTimeout(activeListenTimer);
+        clearTimeout(suppressBackstopTimer);
         state = 'IDLE';
         if (recognizer) { recognizer.free(); recognizer = null; }
         if (model) { model.free(); model = null; }
