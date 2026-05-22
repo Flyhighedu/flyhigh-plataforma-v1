@@ -29,6 +29,7 @@ let samplesInCycle = 0;
 // Output suppression after overlap re-injection
 let suppressOutput = false;
 let suppressRemaining = 0;
+let suppressBackstopTimer = null;
 
 // Timers
 let safetyTimer = null;
@@ -91,6 +92,20 @@ function extractOverlap() {
 // ═══════════════════════════════════════════════════════════════
 // PATROL RESET (amnesia cíclica con solapamiento)
 // ═══════════════════════════════════════════════════════════════
+function activateSuppression() {
+    suppressOutput = true;
+    suppressRemaining = OVERLAP_SAMPLES;
+    // Safety backstop: if suppression isn't cleared naturally within 4s, force it
+    clearTimeout(suppressBackstopTimer);
+    suppressBackstopTimer = setTimeout(() => {
+        if (suppressOutput) {
+            suppressOutput = false;
+            suppressRemaining = 0;
+            console.log('[Vosk SM] Suppression backstop triggered (4s)');
+        }
+    }, 4000);
+}
+
 function performPatrolReset() {
     if (!recognizer || state !== 'PATROL') return;
     if (samplesInCycle < OVERLAP_SAMPLES) return; // Not enough audio to justify reset
@@ -109,14 +124,14 @@ function performPatrolReset() {
     writePos = OVERLAP_SAMPLES;
     samplesInCycle = OVERLAP_SAMPLES;
 
-    // Suppress output until overlap audio is superseded by new audio
-    suppressOutput = true;
-    suppressRemaining = OVERLAP_SAMPLES;
+    activateSuppression();
 
     // Restart safety timer
     clearTimeout(safetyTimer);
     safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
 
+    // Notify main thread: amnesia happened → clear displayed text
+    self.postMessage({ type: 'cycle_reset' });
     console.log(`[Vosk SM] PATROL reset: ${(performance.now() - t0).toFixed(1)}ms`);
 }
 
@@ -170,11 +185,11 @@ function returnToPatrol() {
     state = 'PATROL';
 
     recognizer.acceptWaveformFloat(overlap, VOSK_SAMPLE_RATE);
-    suppressOutput = true;
-    suppressRemaining = OVERLAP_SAMPLES;
+    activateSuppression();
 
     clearTimeout(safetyTimer);
     safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+    self.postMessage({ type: 'cycle_reset' });
     console.log('[Vosk SM] → PATROL (reset + overlap)');
 }
 
@@ -209,8 +224,10 @@ self.onmessage = async (e) => {
                 if (suppressOutput) return;
                 if (state === 'ACTIVE_LISTEN') {
                     self.postMessage({ type: 'final', result: message.result });
+                } else if (state === 'PATROL' && text) {
+                    // Emit patrol transcriptions for UI feedback
+                    self.postMessage({ type: 'patrol_transcript', text });
                 }
-                // PATROL without wake word → silently discard
             });
 
             recognizer.on("partialresult", (message) => {
@@ -226,6 +243,8 @@ self.onmessage = async (e) => {
                 if (suppressOutput) return;
                 if (state === 'ACTIVE_LISTEN') {
                     self.postMessage({ type: 'partial', result: message.result });
+                } else if (state === 'PATROL' && text) {
+                    self.postMessage({ type: 'patrol_transcript', text });
                 }
             });
 
@@ -270,6 +289,7 @@ self.onmessage = async (e) => {
         console.log('[Vosk SM] Force reset (POI matched)');
         clearTimeout(activeListenTimer);
         clearTimeout(safetyTimer);
+        clearTimeout(suppressBackstopTimer);
         if (recognizer) recognizer.reset();
         state = 'PATROL';
         samplesInCycle = 0;
@@ -278,12 +298,14 @@ self.onmessage = async (e) => {
         suppressOutput = false;
         suppressRemaining = 0;
         safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+        self.postMessage({ type: 'cycle_reset' });
     }
 
     if (action === 'reset') {
         // Legacy reset — also resets state machine
         clearTimeout(safetyTimer);
         clearTimeout(activeListenTimer);
+        clearTimeout(suppressBackstopTimer);
         if (recognizer) recognizer.reset();
         state = 'PATROL';
         samplesInCycle = 0;
@@ -292,6 +314,7 @@ self.onmessage = async (e) => {
         suppressOutput = false;
         suppressRemaining = 0;
         safetyTimer = setTimeout(performPatrolReset, SAFETY_CAP_MS);
+        self.postMessage({ type: 'cycle_reset' });
     }
 
     if (action === 'destroy') {

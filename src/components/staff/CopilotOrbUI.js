@@ -176,19 +176,23 @@ const CopilotOrbUI = forwardRef(({
                     <>
                         {/* State label */}
                         <p className={`text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
-                            isPeripheralActive ? 'text-white/50' : 'text-slate-300'
+                            vs === 'wake'
+                                ? (isPeripheralActive ? 'text-amber-200/80' : 'text-amber-500')
+                                : (isPeripheralActive ? 'text-white/40' : 'text-slate-300')
                         }`}>
                             {vs === 'booting' ? 'Conectando…' : 
                              vs === 'idle' || vs === 'listening' ? `Di "${copilot.wakeWord}"` : 
-                             vs === 'wake' ? 'Escuchando' : 
+                             vs === 'wake' ? 'Escuchando comando…' : 
                              vs === 'matched' ? 'Detectado' :
                              vs === 'playing' ? 'Reproduciendo' : ''}
                         </p>
 
-                        {/* Live transcript — inline floating text */}
+                        {/* Live transcript — style adapts to state */}
                         {(copilot.dictatedText || copilot.lastTranscript) && vs !== 'booting' && (
-                            <p className={`mt-1 text-[13px] font-medium text-center leading-snug transition-all duration-300 ${
-                                isPeripheralActive ? 'text-white/90' : 'text-slate-600'
+                            <p className={`mt-1 text-center leading-snug transition-all duration-300 ${
+                                vs === 'wake'
+                                    ? 'text-[14px] font-semibold ' + (isPeripheralActive ? 'text-white' : 'text-slate-800')
+                                    : 'text-[11px] font-normal ' + (isPeripheralActive ? 'text-white/30' : 'text-slate-300')
                             }`}>
                                 {copilot.dictatedText || copilot.lastTranscript}
                             </p>

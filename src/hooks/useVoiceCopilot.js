@@ -820,6 +820,19 @@ export default function useVoiceCopilot({
                                 setLastTranscript('');
                                 setDictatedText('');
                             }
+                        } else if (type === 'patrol_transcript') {
+                            // PATROL feedback — show what Vosk hears (non-wake text)
+                            const text = e.data.text || '';
+                            if (text && stateRef.current === 'listening') {
+                                setLastTranscript(text);
+                                setDictatedText(text);
+                            }
+                        } else if (type === 'cycle_reset') {
+                            // 7s amnesia — clear displayed transcript
+                            if (stateRef.current === 'listening') {
+                                setLastTranscript('');
+                                setDictatedText('');
+                            }
                         } else if (type === 'partial' || type === 'final') {
                             const transcript = result?.partial || result?.text || '';
                             if (!transcript) return;
