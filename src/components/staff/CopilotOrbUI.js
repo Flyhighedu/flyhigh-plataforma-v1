@@ -17,7 +17,14 @@ const CopilotOrbUI = forwardRef(({
     isPeripheralActive = false,
 }, ref) => {
     const copilot = useVoiceCopilot({
-        pois, audioRef, playingPoiId, setPlayingPoiId, onStateChange, isActive, setIsActive
+        pois, 
+        audioRef, 
+        playingPoiId, 
+        setPlayingPoiId, 
+        onStateChange, 
+        isActive, 
+        setIsActive,
+        isCalibrating: showCalibrator
     });
 
     useImperativeHandle(ref, () => ({

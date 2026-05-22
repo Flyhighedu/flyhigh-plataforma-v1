@@ -94,11 +94,17 @@ export default function useVoiceCopilot({
     setPlayingPoiId, 
     onStateChange,
     isActive: controlledIsActive,
-    setIsActive: controlledSetIsActive
+    setIsActive: controlledSetIsActive,
+    isCalibrating = false
 }) {
     const [internalIsActive, setInternalIsActive] = useState(false);
     const isActive = controlledIsActive !== undefined ? controlledIsActive : internalIsActive;
     const setIsActive = controlledSetIsActive || setInternalIsActive;
+    
+    const isCalibratingRef = useRef(isCalibrating);
+    useEffect(() => {
+        isCalibratingRef.current = isCalibrating;
+    }, [isCalibrating]);
     
     const [wakeWord, setWakeWord] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -853,6 +859,13 @@ export default function useVoiceCopilot({
                             if (stateRef.current === 'listening') {
                                 const currentWakeWord = callbacksRef.current.wakeWord;
                                 if (isWakeWordDetected(transcript, currentWakeWord)) {
+                                    if (isCalibratingRef.current) {
+                                        // En modo calibración actualizamos el texto para feedback visual
+                                        // pero evitamos cambiar el estado de la aplicación o reproducir audios/vibrar
+                                        setLastTranscript(transcript);
+                                        setDictatedText(transcript);
+                                        return;
+                                    }
                                     setVoiceState('wake');
                                     stateRef.current = 'wake';
                                     setDictatedText('');
