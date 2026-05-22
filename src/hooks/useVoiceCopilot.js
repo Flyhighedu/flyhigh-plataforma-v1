@@ -180,13 +180,6 @@ export default function useVoiceCopilot({
     const closeMicrophoneRef = useRef(null);
     const triggerSpeechRecognitionWindowRef = useRef(null);
 
-    // Temporal guard — suppress residual patrol_transcript/cycle_reset events
-    // for 2s after returning from wake/matched state to prevent text contamination
-    const lastWakeReturnedAtRef = useRef(0);
-
-    // Track active listening epoch/session ID to drop late-arriving async messages
-    const voiceSessionIdRef = useRef(1);
-
     const [supported, setSupported] = useState(true);
     useEffect(() => {
         setSupported(typeof window !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext));
@@ -342,19 +335,14 @@ export default function useVoiceCopilot({
         let vadTrailingCounter = 0;
 
         const handleAudioFrame = (inputData, peak) => {
-            // Block microphone processing completely during playback or matching states
-            // to prevent speaker output loopback from poisoning the recognizer state.
-            if (stateRef.current === 'playing' || stateRef.current === 'matched') {
-                setIsDetectingVoice(false);
-                return;
-            }
-
             setIsDetectingVoice(peak > 0.015);
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {
-                // Audio flows to worker — the State Machine inside
+                // Audio ALWAYS flows to worker — the State Machine inside
                 // the worker handles suppression and wake word detection.
+                // This keeps the Kaldi lattice "warm" during playback,
+                // enabling instant wake word detection after narration ends.
                 const worker = mode === 'vosk' ? voskWorkerRef.current : pocketsphinxWorkerRef.current;
                 if (worker) {
                     const energy = getAudioEnergy(inputData);
@@ -366,11 +354,7 @@ export default function useVoiceCopilot({
                             vadTrailingCounter--;
                         }
                         const dataCopy = new Float32Array(inputData);
-                        worker.postMessage({
-                            action: 'process',
-                            sessionId: voiceSessionIdRef.current,
-                            data: dataCopy
-                        });
+                        worker.postMessage({ action: 'process', data: dataCopy });
                     }
                 }
             }
@@ -545,12 +529,8 @@ export default function useVoiceCopilot({
                 }
             }
         } else if (engineModeRef.current === 'vosk') {
-            voiceSessionIdRef.current++;
             if (voskWorkerRef.current) {
-                voskWorkerRef.current.postMessage({
-                    action: 'reset',
-                    sessionId: voiceSessionIdRef.current
-                });
+                voskWorkerRef.current.postMessage({ action: 'reset' });
             }
             setVoiceState('listening');
             stateRef.current = 'listening';
@@ -594,11 +574,9 @@ export default function useVoiceCopilot({
         if (!poi?.audio_url) {
             // No audio to play — return to listening immediately
             // Without this, stateRef stays stuck at 'matched' forever
+            setVoiceState('listening');
+            stateRef.current = 'listening';
             setMatchedPoi(null);
-            setDictatedText('');
-            setLastTranscript('');
-            lastWakeReturnedAtRef.current = Date.now();
-            restartNativeIfNeeded();
             return;
         }
         if (audioRef?.current) {
@@ -616,10 +594,6 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             if (setPlayingPoiId) setPlayingPoiId(null);
-            setDictatedText('');
-            setLastTranscript('');
-            setMatchedPoi(null);
-            lastWakeReturnedAtRef.current = Date.now();
             restartNativeIfNeeded();
         });
 
@@ -628,9 +602,6 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setDictatedText('');
-            setLastTranscript('');
-            setMatchedPoi(null);
-            lastWakeReturnedAtRef.current = Date.now();
             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
             restartNativeIfNeeded();
         };
@@ -640,9 +611,6 @@ export default function useVoiceCopilot({
             setVoiceState('listening');
             stateRef.current = 'listening';
             setDictatedText('');
-            setLastTranscript('');
-            setMatchedPoi(null);
-            lastWakeReturnedAtRef.current = Date.now();
             restartNativeIfNeeded();
         };
     }, [audioRef, setPlayingPoiId]);
@@ -853,13 +821,7 @@ export default function useVoiceCopilot({
                     voskWorkerRef.current = new Worker(new URL('../workers/voskProcessorWorker.js', import.meta.url), { type: 'module' });
                     
                     voskWorkerRef.current.onmessage = (e) => {
-                        const { type, status, result, error, sessionId } = e.data;
-
-                        // Ignore messages from previous epochs (e.g. stale transcripts from playback audio)
-                        if (sessionId !== undefined && sessionId !== voiceSessionIdRef.current) {
-                            console.log(`[VoiceCopilot] Ignoring stale message of type "${type}" from epoch ${sessionId} (current: ${voiceSessionIdRef.current})`);
-                            return;
-                        }
+                        const { type, status, result, error } = e.data;
                         
                         if (type === 'status') {
                             if (status === 'ready') {
@@ -873,33 +835,8 @@ export default function useVoiceCopilot({
                                 stateRef.current = 'wake';
                                 setDictatedText('');
                                 setLastTranscript('');
-                                setMatchedPoi(null);
                                 playFeedbackSound();
                                 if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
-
-                                // Try immediate POI match from post-wake text
-                                // e.g. pilot said "computadora catedral" in one breath
-                                const seedText = e.data.postWakeText || '';
-                                if (seedText.trim()) {
-                                    console.log('[VoiceCopilot] Post-wake seed text:', seedText);
-                                    setDictatedText(seedText);
-                                    setLastTranscript(seedText);
-                                    const poiMatch = callbacksRef.current.findMatchInBuffer(seedText);
-                                    if (poiMatch) {
-                                        console.log('[VoiceCopilot] Instant POI match from seed:', poiMatch.name);
-                                        setMatchedPoi(poiMatch);
-                                        setVoiceState('matched');
-                                        stateRef.current = 'matched';
-                                        voiceSessionIdRef.current++;
-                                        if (voskWorkerRef.current) {
-                                            voskWorkerRef.current.postMessage({
-                                                action: 'force_reset',
-                                                sessionId: voiceSessionIdRef.current
-                                            });
-                                        }
-                                        setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
-                                    }
-                                }
                             }
                         } else if (type === 'active_timeout') {
                             // Worker's 6s grace window expired without POI match
@@ -908,23 +845,19 @@ export default function useVoiceCopilot({
                                 stateRef.current = 'listening';
                                 setLastTranscript('');
                                 setDictatedText('');
-                                setMatchedPoi(null);
-                                lastWakeReturnedAtRef.current = Date.now();
                             }
                         } else if (type === 'patrol_transcript') {
                             // PATROL feedback — show what Vosk hears
-                            // Skip residual transcripts for 2s after returning from wake/matched
+                            // Worker is in PATROL during: listening, matched, playing
                             const text = e.data.text || '';
-                            if (text && (stateRef.current === 'listening')) {
-                                if (Date.now() - lastWakeReturnedAtRef.current < 2000) return;
+                            if (text && (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing')) {
                                 setLastTranscript(text);
                                 setDictatedText(text);
                             }
                         } else if (type === 'cycle_reset') {
                             // 7s amnesia — clear displayed transcript
-                            // Skip if we just returned from wake (overlap was skipped, no stale text)
-                            if (stateRef.current === 'listening') {
-                                if (Date.now() - lastWakeReturnedAtRef.current < 2000) return;
+                            // Worker is in PATROL during: listening, matched, playing
+                            if (stateRef.current === 'listening' || stateRef.current === 'matched' || stateRef.current === 'playing') {
                                 setLastTranscript('');
                                 setDictatedText('');
                             }
@@ -948,12 +881,8 @@ export default function useVoiceCopilot({
                                     stateRef.current = 'matched';
                                     
                                     // Immediate amnesia — force worker back to PATROL
-                                    voiceSessionIdRef.current++;
                                     if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({
-                                            action: 'force_reset',
-                                            sessionId: voiceSessionIdRef.current
-                                        });
+                                        voskWorkerRef.current.postMessage({ action: 'force_reset' });
                                     }
 
                                     setTimeout(() => callbacksRef.current.playMatchedAudio(poiMatch), 800);
@@ -964,10 +893,7 @@ export default function useVoiceCopilot({
                             // Attempt soft recovery instead of killing everything
                             if (voskWorkerRef.current) {
                                 try {
-                                    voskWorkerRef.current.postMessage({
-                                        action: 'reset',
-                                        sessionId: voiceSessionIdRef.current
-                                    });
+                                    voskWorkerRef.current.postMessage({ action: 'reset' });
                                 } catch (e) {
                                     // Worker is truly dead — now it's fatal
                                     console.error('[VoiceCopilot] Worker irrecoverable:', e);
@@ -980,7 +906,6 @@ export default function useVoiceCopilot({
                     const audioCtx = audioContextRef.current;
                     voskWorkerRef.current.postMessage({
                         action: 'init',
-                        sessionId: voiceSessionIdRef.current,
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
@@ -989,11 +914,7 @@ export default function useVoiceCopilot({
                         }
                     });
                 } else {
-                    voiceSessionIdRef.current++;
-                    voskWorkerRef.current.postMessage({
-                        action: 'reset',
-                        sessionId: voiceSessionIdRef.current
-                    });
+                    voskWorkerRef.current.postMessage({ action: 'reset' });
                     setVoiceState('listening');
                     stateRef.current = 'listening';
                 }
