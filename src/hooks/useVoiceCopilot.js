@@ -554,7 +554,14 @@ export default function useVoiceCopilot({
     };
 
     const playMatchedAudio = useCallback((poi) => {
-        if (!poi?.audio_url) return;
+        if (!poi?.audio_url) {
+            // No audio to play — return to listening immediately
+            // Without this, stateRef stays stuck at 'matched' forever
+            setVoiceState('listening');
+            stateRef.current = 'listening';
+            setMatchedPoi(null);
+            return;
+        }
         if (audioRef?.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;

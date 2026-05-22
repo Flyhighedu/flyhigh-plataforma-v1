@@ -319,7 +319,11 @@ self.onmessage = async (e) => {
         clearTimeout(activeListenTimer);
         clearTimeout(safetyTimer);
         clearTimeout(suppressBackstopTimer);
-        if (recognizer) recognizer.reset();
+        try {
+            if (recognizer) recognizer.reset();
+        } catch (err) {
+            console.warn('[Vosk SM] force_reset recognizer.reset() failed:', err.message);
+        }
         state = 'PATROL';
         samplesInCycle = 0;
         writePos = 0;
@@ -335,7 +339,11 @@ self.onmessage = async (e) => {
         clearTimeout(safetyTimer);
         clearTimeout(activeListenTimer);
         clearTimeout(suppressBackstopTimer);
-        if (recognizer) recognizer.reset();
+        try {
+            if (recognizer) recognizer.reset();
+        } catch (err) {
+            console.warn('[Vosk SM] reset recognizer.reset() failed:', err.message);
+        }
         state = 'PATROL';
         samplesInCycle = 0;
         writePos = 0;
