@@ -15,6 +15,7 @@ let nativeSampleRate = 48000;
 let voskSampleRate = VOSK_SAMPLE_RATE;
 let amnesiaTimer = null;
 let running = false;
+let currentGrammar = null; // Guardar la gramática actual para recreaciones y amnesia
 
 // ═══════════════════════════════════════════════════════════════
 // DOWNSAMPLER (48kHz → 16kHz)
@@ -45,8 +46,10 @@ function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
 // ═══════════════════════════════════════════════════════════════
 // RECREAR RECOGNIZER (limpieza total, sin arrastrar nada)
 // ═══════════════════════════════════════════════════════════════
-function recreateRecognizer() {
+function recreateRecognizer(grammarStr = null) {
     if (!model) return;
+
+    currentGrammar = grammarStr;
 
     // Liberar el recognizer anterior (memoria WASM)
     if (recognizer) {
@@ -56,8 +59,21 @@ function recreateRecognizer() {
         recognizer = null;
     }
 
-    // Crear uno nuevo, completamente limpio
-    recognizer = new model.KaldiRecognizer(voskSampleRate);
+    // Crear uno nuevo, opcionalmente con gramática restringida
+    try {
+        if (grammarStr) {
+            console.log('[Vosk] Creando recognizer con gramática:', grammarStr);
+            recognizer = new model.KaldiRecognizer(voskSampleRate, grammarStr);
+        } else {
+            console.log('[Vosk] Creando recognizer con diccionario completo');
+            recognizer = new model.KaldiRecognizer(voskSampleRate);
+        }
+    } catch (e) {
+        console.error('[Vosk] Error al instanciar KaldiRecognizer:', e);
+        // Fallback a diccionario completo si falla la gramática
+        recognizer = new model.KaldiRecognizer(voskSampleRate);
+    }
+    
     recognizer.setWords(true);
 
     // Eventos: simplemente reenviar al hilo principal
@@ -84,7 +100,7 @@ function startAmnesiaTimer() {
     amnesiaTimer = setInterval(() => {
         if (!running) return;
         console.log('[Vosk] Amnesia: reseteando recognizer (10s)');
-        recreateRecognizer();
+        recreateRecognizer(currentGrammar);
         self.postMessage({ type: 'cycle_reset' });
     }, AMNESIA_INTERVAL_MS);
 }
@@ -97,14 +113,14 @@ self.onmessage = async (e) => {
 
     // ─── INIT: cargar modelo + crear recognizer + arrancar timer ───
     if (action === 'init') {
-        const { modelUrl, sampleRate, deviceSampleRate } = data;
+        const { modelUrl, sampleRate, deviceSampleRate, grammar } = data;
         nativeSampleRate = deviceSampleRate || 48000;
         voskSampleRate = sampleRate || VOSK_SAMPLE_RATE;
 
         try {
             self.postMessage({ type: 'status', status: 'booting' });
             model = await createModel(modelUrl);
-            recreateRecognizer();
+            recreateRecognizer(grammar || null);
             running = true;
             startAmnesiaTimer();
             self.postMessage({ type: 'status', status: 'ready' });
@@ -126,8 +142,9 @@ self.onmessage = async (e) => {
 
     // ─── RESET: recrear recognizer limpio + reiniciar timer ───
     if (action === 'reset') {
-        console.log('[Vosk] Reset solicitado');
-        recreateRecognizer();
+        const targetGrammar = data?.grammar || null;
+        console.log('[Vosk] Reset solicitado con gramática:', targetGrammar);
+        recreateRecognizer(targetGrammar);
         startAmnesiaTimer();
         self.postMessage({ type: 'cycle_reset' });
     }
