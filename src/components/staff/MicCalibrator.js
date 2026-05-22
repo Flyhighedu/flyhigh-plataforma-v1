@@ -30,18 +30,23 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
 
     // Detect when Vosk transcribes something
     useEffect(() => {
+        let isMounted = true;
         if (dictatedText && dictatedText !== lastTextRef.current && dictatedText.trim().length > 2) {
             lastTextRef.current = dictatedText;
             setHasHeardVoice(true);
             // Reset after 5s of no new text
             clearTimeout(silenceTimerRef.current);
             silenceTimerRef.current = setTimeout(() => {
+                if (!isMounted) return;
                 setHasHeardVoice(false);
                 // Rotate guide phrase
                 setPhraseIndex(prev => (prev + 1) % GUIDE_PHRASES.length);
             }, 5000);
         }
-        return () => clearTimeout(silenceTimerRef.current);
+        return () => {
+            isMounted = false;
+            clearTimeout(silenceTimerRef.current);
+        };
     }, [dictatedText]);
 
     const level = gainToLevel(micGain);

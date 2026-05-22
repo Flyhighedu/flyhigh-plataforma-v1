@@ -145,19 +145,17 @@ const CopilotOrbUI = forwardRef(({
                 </div>
 
                 {/* ── MIC CALIBRATOR BUTTON ── */}
-                {copilot.isActive && copilot.voiceState !== 'booting' && (
-                    <button
-                        onClick={() => setShowCalibrator(true)}
-                        className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-all active:scale-95 ${
-                            isPeripheralActive
-                                ? 'text-white/50 hover:bg-white/10'
-                                : 'text-slate-400 hover:bg-slate-50'
-                        }`}
-                    >
-                        <SlidersHorizontal size={10} />
-                        <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar 🎙️</span>
-                    </button>
-                )}
+                <button
+                    onClick={() => setShowCalibrator(true)}
+                    className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-all active:scale-95 ${
+                        isPeripheralActive
+                            ? 'text-white/50 hover:bg-white/10'
+                            : 'text-slate-400 hover:bg-slate-50'
+                    }`}
+                >
+                    <SlidersHorizontal size={10} />
+                    <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar 🎙️</span>
+                </button>
             </div>
 
             {/* ── THE ORB (CSS-only, zero canvas, zero rAF) ── */}
@@ -234,7 +232,7 @@ const CopilotOrbUI = forwardRef(({
             </div>
 
             {/* ── MIC CALIBRATOR MODAL ── */}
-            {showCalibrator && copilot.isActive && (
+            {showCalibrator && (
                 <MicCalibrator
                     micGain={copilot.micGain}
                     setMicGain={copilot.setMicGain}
