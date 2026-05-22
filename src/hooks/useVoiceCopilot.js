@@ -7,7 +7,7 @@ import * as speechCommands from '@tensorflow-models/speech-commands';
 // ═══════════════════════════════════════════════════════════════
 // Helper utilities
 // ═══════════════════════════════════════════════════════════════
-const VAD_ENERGY_THRESHOLD = 0.008;
+const VAD_ENERGY_THRESHOLD = 0.02;
 const VAD_TRAILING_FRAMES = 5;
 
 function getAudioEnergy(buffer) {
