@@ -534,8 +534,7 @@ export default function useVoiceCopilot({
             }
         } else if (engineModeRef.current === 'vosk') {
             if (voskWorkerRef.current) {
-                const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
-                voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: patrolGrammar } });
+                voskWorkerRef.current.postMessage({ action: 'reset' });
             }
             setVoiceState('listening');
             stateRef.current = 'listening';
@@ -861,9 +860,9 @@ export default function useVoiceCopilot({
                                     playFeedbackSound();
                                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
 
-                                    // Reset recognizer para que el POI se detecte limpio (con diccionario completo)
+                                    // Reset recognizer para que el POI se detecte limpio
                                     if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: null } });
+                                        voskWorkerRef.current.postMessage({ action: 'reset' });
                                     }
 
                                     // Timeout de atención: 6s para decir el POI
@@ -875,7 +874,7 @@ export default function useVoiceCopilot({
                                             const poi = pendingPoiRef.current;
                                             pendingPoiRef.current = null;
                                             if (voskWorkerRef.current) {
-                                                voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: null } });
+                                                voskWorkerRef.current.postMessage({ action: 'reset' });
                                             }
                                             callbacksRef.current.playMatchedAudio(poi);
                                         } else if (stateRef.current === 'wake') {
@@ -883,11 +882,6 @@ export default function useVoiceCopilot({
                                             stateRef.current = 'listening';
                                             setLastTranscript('');
                                             setDictatedText('');
-                                            // Regresar a la gramática de patrulla
-                                            if (voskWorkerRef.current) {
-                                                const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
-                                                voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: patrolGrammar } });
-                                            }
                                         }
                                     }, 6000);
 
@@ -924,8 +918,7 @@ export default function useVoiceCopilot({
                                             const poi = pendingPoiRef.current;
                                             pendingPoiRef.current = null;
                                             if (voskWorkerRef.current) {
-                                                const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
-                                                voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: patrolGrammar } });
+                                                voskWorkerRef.current.postMessage({ action: 'reset' });
                                             }
                                             callbacksRef.current.playMatchedAudio(poi);
                                         }
@@ -936,8 +929,7 @@ export default function useVoiceCopilot({
                             console.warn('[VoiceCopilot] Worker error (non-fatal):', error);
                             if (voskWorkerRef.current) {
                                 try {
-                                    const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
-                                    voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: patrolGrammar } });
+                                    voskWorkerRef.current.postMessage({ action: 'reset' });
                                 } catch (e) {
                                     console.error('[VoiceCopilot] Worker irrecuperable:', e);
                                     callbacksRef.current.stopListening();
@@ -947,19 +939,16 @@ export default function useVoiceCopilot({
                     };
 
                     const audioCtx = audioContextRef.current;
-                    const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
                     voskWorkerRef.current.postMessage({
                         action: 'init',
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
-                            deviceSampleRate: audioCtx.sampleRate,
-                            grammar: patrolGrammar
+                            deviceSampleRate: audioCtx.sampleRate
                         }
                     });
                 } else {
-                    const patrolGrammar = JSON.stringify([callbacksRef.current.wakeWord, "compu", "[unk]"]);
-                    voskWorkerRef.current.postMessage({ action: 'reset', data: { grammar: patrolGrammar } });
+                    voskWorkerRef.current.postMessage({ action: 'reset' });
                     setVoiceState('listening');
                     stateRef.current = 'listening';
                 }
