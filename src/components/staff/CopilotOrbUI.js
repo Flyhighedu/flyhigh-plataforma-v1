@@ -146,7 +146,10 @@ const CopilotOrbUI = forwardRef(({
 
                 {/* ── MIC CALIBRATOR BUTTON ── */}
                 <button
-                    onClick={() => setShowCalibrator(true)}
+                    onClick={() => {
+                        if (!copilot.isActive) copilot.startListening();
+                        setShowCalibrator(true);
+                    }}
                     className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-all active:scale-95 ${
                         isPeripheralActive
                             ? 'text-white/50 hover:bg-white/10'
@@ -154,7 +157,7 @@ const CopilotOrbUI = forwardRef(({
                     }`}
                 >
                     <SlidersHorizontal size={10} />
-                    <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar 🎙️</span>
+                    <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar</span>
                 </button>
             </div>
 
