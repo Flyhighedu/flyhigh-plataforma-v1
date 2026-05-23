@@ -159,6 +159,32 @@ const CopilotOrbUI = forwardRef(({
                     <SlidersHorizontal size={10} />
                     <span className="text-[8px] font-bold uppercase tracking-widest">Calibrar</span>
                 </button>
+
+                {/* ── ACTIVE MIC BADGE ── */}
+                {copilot.activeMicLabel && copilot.isActive && (() => {
+                    const label = copilot.activeMicLabel.toLowerCase();
+                    const isExt = ['usb', 'wired', 'external', 'lavalier', 'lapel', 'solapa', 'headset', 'airpod'].some(kw => label.includes(kw));
+                    return (
+                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full border transition-all ${
+                            isExt
+                                ? (isPeripheralActive ? 'border-emerald-400/30 bg-emerald-500/15' : 'border-emerald-200 bg-emerald-50')
+                                : (isPeripheralActive ? 'border-amber-400/30 bg-amber-500/15' : 'border-amber-200 bg-amber-50')
+                        }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                isExt ? 'bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]' : 'bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.5)]'
+                            }`} />
+                            <span className={`text-[8px] font-semibold truncate max-w-[140px] ${
+                                isExt
+                                    ? (isPeripheralActive ? 'text-emerald-300' : 'text-emerald-700')
+                                    : (isPeripheralActive ? 'text-amber-300' : 'text-amber-700')
+                            }`}>
+                                {copilot.activeMicLabel.length > 25
+                                    ? copilot.activeMicLabel.slice(0, 25) + '…'
+                                    : copilot.activeMicLabel}
+                            </span>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* ── THE ORB (CSS-only, zero canvas, zero rAF) ── */}

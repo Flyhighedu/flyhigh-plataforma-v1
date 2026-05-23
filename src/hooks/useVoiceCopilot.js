@@ -129,6 +129,7 @@ export default function useVoiceCopilot({
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
+    const [activeMicLabel, setActiveMicLabel] = useState(null); // label del micrófono activo
     const [micGain, setMicGainState] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
@@ -298,9 +299,54 @@ export default function useVoiceCopilot({
         if (mediaStreamRef.current) return mediaStreamRef.current;
         
         console.log('[VoiceCopilot] Inicializando micrófono...');
+
+        // ─── Step 1: Request temporary permission so Chrome exposes real labels ───
+        let tempStream;
+        try {
+            tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (permErr) {
+            console.error('[VoiceCopilot] No se pudo obtener permiso de micrófono:', permErr);
+            throw permErr;
+        }
+
+        // ─── Step 2: Enumerate devices and find the best mic ───
+        let selectedDeviceId = null;
+        let selectedLabel = 'Micrófono interno';
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioInputs = devices.filter(d => d.kind === 'audioinput');
+            console.log('[VoiceCopilot] Micrófonos detectados:', audioInputs.map(d => `${d.label} [${d.deviceId.slice(0,8)}]`));
+
+            // Priority keywords for external/USB/lavalier microphones
+            const EXTERNAL_KEYWORDS = ['usb', 'wired', 'external', 'lavalier', 'lapel', 'solapa', 'headset', 'airpod'];
+            const isExternal = (label) => {
+                const lower = label.toLowerCase();
+                return EXTERNAL_KEYWORDS.some(kw => lower.includes(kw));
+            };
+
+            // Prefer external mic, fall back to non-default, then default
+            const externalMic = audioInputs.find(d => isExternal(d.label));
+            if (externalMic) {
+                selectedDeviceId = externalMic.deviceId;
+                selectedLabel = externalMic.label || 'Micrófono externo';
+                console.log('[VoiceCopilot] ✅ Micrófono externo detectado:', selectedLabel);
+            } else if (audioInputs.length > 0) {
+                // Use the first available (usually default)
+                const fallback = audioInputs[0];
+                selectedDeviceId = fallback.deviceId;
+                selectedLabel = fallback.label || 'Micrófono interno';
+                console.log('[VoiceCopilot] ⚠️ Sin micrófono externo, usando:', selectedLabel);
+            }
+        } catch (enumErr) {
+            console.warn('[VoiceCopilot] enumerateDevices falló, usando default:', enumErr);
+        }
+
+        // ─── Step 3: Close temp stream and open the real one with exact deviceId ───
+        tempStream.getTracks().forEach(t => t.stop());
+
         const constraints = {
             audio: {
-                deviceId: 'default', // Opcional: Esto ayuda a que el SO no se confunda
+                ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
                 echoCancellation: false,
                 noiseSuppression: true,
                 autoGainControl: false
@@ -309,6 +355,12 @@ export default function useVoiceCopilot({
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         mediaStreamRef.current = stream;
+
+        // ─── Step 4: Confirm which device we actually got and update UI ───
+        const activeTrack = stream.getAudioTracks()[0];
+        const finalLabel = activeTrack?.label || selectedLabel;
+        setActiveMicLabel(finalLabel);
+        console.log('[VoiceCopilot] 🎤 Micrófono activo:', finalLabel);
 
         let audioCtx = audioContextRef.current;
         if (!audioCtx || audioCtx.state === 'closed') {
@@ -1151,6 +1203,7 @@ export default function useVoiceCopilot({
         engineMode,
         changeEngineMode,
         deviceInfo,
+        activeMicLabel,
         micGain,
         setMicGain: useCallback((value) => {
             const clamped = Math.max(0.0, Math.min(1.0, value));
