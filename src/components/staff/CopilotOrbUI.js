@@ -185,6 +185,30 @@ const CopilotOrbUI = forwardRef(({
                         </div>
                     );
                 })()}
+
+                {/* ── RNNOISE STATUS BADGE ── */}
+                {copilot.isActive && copilot.rnnoiseStatus === 'loading' && (
+                    <div className={`flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full border animate-pulse ${
+                        isPeripheralActive ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            isPeripheralActive ? 'bg-slate-400' : 'bg-slate-300'
+                        }`} />
+                        <span className={`text-[7px] font-semibold uppercase tracking-wider ${
+                            isPeripheralActive ? 'text-white/40' : 'text-slate-400'
+                        }`}>Cargando IA…</span>
+                    </div>
+                )}
+                {copilot.isActive && copilot.rnnoiseStatus === 'active' && (
+                    <div className={`flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full border ${
+                        isPeripheralActive ? 'border-violet-400/30 bg-violet-500/15' : 'border-violet-200 bg-violet-50'
+                    }`}>
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-violet-400 shadow-[0_0_6px_rgba(139,92,246,0.6)]" />
+                        <span className={`text-[7px] font-bold uppercase tracking-wider ${
+                            isPeripheralActive ? 'text-violet-300' : 'text-violet-600'
+                        }`}>RNNoise ✨</span>
+                    </div>
+                )}
             </div>
 
             {/* ── THE ORB (CSS-only, zero canvas, zero rAF) ── */}

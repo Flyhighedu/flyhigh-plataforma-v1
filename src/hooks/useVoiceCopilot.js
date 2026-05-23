@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as speechCommands from '@tensorflow-models/speech-commands';
+import { useRNNoise } from './useRNNoise';
 
 // ═══════════════════════════════════════════════════════════════
 // Helper utilities
@@ -99,6 +100,9 @@ export default function useVoiceCopilot({
     const [internalIsActive, setInternalIsActive] = useState(false);
     const isActive = controlledIsActive !== undefined ? controlledIsActive : internalIsActive;
     const setIsActive = controlledSetIsActive || setInternalIsActive;
+
+    // RNNoise: noise suppression IA (modular, isolated, safe bypass)
+    const { rnnoiseStatus, connectRNNoise, disconnectRNNoise } = useRNNoise();
     
     const [wakeWord, setWakeWord] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -270,6 +274,8 @@ export default function useVoiceCopilot({
             } catch(e){}
             processorNodeRef.current = null;
         }
+        // Disconnect RNNoise node before source
+        disconnectRNNoise();
         if (sourceNodeRef.current) {
             try { sourceNodeRef.current.disconnect(); } catch(e){}
             sourceNodeRef.current = null;
@@ -376,6 +382,12 @@ export default function useVoiceCopilot({
         const source = audioCtx.createMediaStreamSource(stream);
         sourceNodeRef.current = source;
 
+        // ─── RNNoise: insert noise suppression (bypass-safe) ───
+        // connectRNNoise always returns an AudioNode:
+        //   - If RNNoise OK → returns rnnoiseNode (clean audio)
+        //   - If disabled/error → returns source directly (bypass)
+        const cleanSource = await connectRNNoise(audioCtx, source);
+
         // GainNode fixed at 1.0 — Vosk receives full raw audio.
         // Sensitivity is controlled by the VAD threshold, NOT by volume.
         const gainNode = audioCtx.createGain();
@@ -386,8 +398,8 @@ export default function useVoiceCopilot({
         analyser.fftSize = 256;
         analyserRef.current = analyser;
 
-        // source → gainNode → [analyser, processorNode]
-        source.connect(gainNode);
+        // [source → rnnoiseNode?] → cleanSource → gainNode → [analyser, processorNode]
+        cleanSource.connect(gainNode);
         gainNode.connect(analyser);
 
         // ═══════════════════════════════════════════════════════════════
@@ -1204,6 +1216,7 @@ export default function useVoiceCopilot({
         changeEngineMode,
         deviceInfo,
         activeMicLabel,
+        rnnoiseStatus,
         micGain,
         setMicGain: useCallback((value) => {
             const clamped = Math.max(0.0, Math.min(1.0, value));
