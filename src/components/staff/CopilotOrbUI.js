@@ -15,9 +15,14 @@ const CopilotOrbUI = forwardRef(({
     setIsActive,
     onStateChange = null,
     isPeripheralActive = false,
+    // ── Shared Microphone (Plan A) ──
+    sharedMicStreamRef = null,
+    sharedMicLabel = null,
 }, ref) => {
     const copilot = useVoiceCopilot({
-        pois, audioRef, playingPoiId, setPlayingPoiId, onStateChange, isActive, setIsActive
+        pois, audioRef, playingPoiId, setPlayingPoiId, onStateChange, isActive, setIsActive,
+        sharedStreamRef: sharedMicStreamRef,
+        sharedMicLabel
     });
 
     useImperativeHandle(ref, () => ({

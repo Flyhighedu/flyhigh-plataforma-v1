@@ -105,6 +105,10 @@ export default function OperationUI({
     voicePlayingPoiId = null,
     voiceSetPlayingPoiId = null,
 
+    // ── Shared Microphone (Plan A) ──
+    sharedMicStreamRef = null,
+    sharedMicLabel = null,
+
     // ── Flight Audio Ecosystem Props ──
     flightPhase = 'cold',
     onPrepareCabin = null,
@@ -420,6 +424,8 @@ export default function OperationUI({
                         setIsActive={voiceSetIsActive}
                         onStateChange={handleVoiceStateChange}
                         isPeripheralActive={isPeripheralActive}
+                        sharedMicStreamRef={sharedMicStreamRef}
+                        sharedMicLabel={sharedMicLabel}
                     />
                 )}
 

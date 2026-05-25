@@ -37,7 +37,7 @@ const TIMESLICE_MS = 5000; // Collect data every 5s for crash resilience
  *   cancelRecording: () => void
  * }}
  */
-export default function useAudioRecorder() {
+export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
     const [isRecording, setIsRecording] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [durationSeconds, setDurationSeconds] = useState(0);
@@ -79,25 +79,42 @@ export default function useAudioRecorder() {
             clearInterval(timerRef.current);
             try {
                 mediaRecorderRef.current?.stop();
-                streamRef.current?.getTracks().forEach(t => t.stop());
+                // [PLAN A] Only stop tracks if we OWN the stream (not shared)
+                if (!sharedStreamRef) {
+                    streamRef.current?.getTracks().forEach(t => t.stop());
+                }
             } catch (_e) { /* cleanup best-effort */ }
         };
-    }, []);
+    }, [sharedStreamRef]);
 
     const startRecording = useCallback(async () => {
         if (!isSupported || isRecording) return false;
 
         try {
-            // Request microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 16000, // Low sample rate for voice
-                    channelCount: 1    // Mono
+            let stream;
+
+            // [PLAN A] Use shared stream if available, avoiding a second getUserMedia
+            if (sharedStreamRef && sharedStreamRef.current) {
+                const tracks = sharedStreamRef.current.getAudioTracks();
+                if (tracks.length > 0 && tracks[0].readyState === 'live') {
+                    console.log('[AudioRecorder] Using shared microphone stream');
+                    stream = sharedStreamRef.current;
                 }
-            });
+            }
+
+            // Fallback: acquire our own stream
+            if (!stream) {
+                console.log('[AudioRecorder] Acquiring own microphone stream');
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 16000,
+                        channelCount: 1
+                    }
+                });
+            }
 
             streamRef.current = stream;
             chunksRef.current = [];
@@ -115,8 +132,6 @@ export default function useAudioRecorder() {
             };
 
             recorder.onstop = () => {
-                // [CRITICAL FIX] Use raw blob directly — fixWebmDuration was corrupting
-                // headers on mobile devices. The MP3 conversion downstream handles encoding.
                 const blob = new Blob(chunksRef.current, { type: AUDIO_MIME });
                 if (resolveStopRef.current) {
                     resolveStopRef.current(blob);
@@ -152,14 +167,13 @@ export default function useAudioRecorder() {
             }
             return false;
         }
-    }, [isSupported, isRecording]);
+    }, [isSupported, isRecording, sharedStreamRef]);
 
     const stopRecording = useCallback(() => {
         return new Promise((resolve) => {
             clearInterval(timerRef.current);
 
             if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
-                // Build blob from whatever chunks we have
                 if (chunksRef.current.length > 0) {
                     resolve(new Blob(chunksRef.current, { type: AUDIO_MIME }));
                 } else {
@@ -174,11 +188,13 @@ export default function useAudioRecorder() {
             setIsRecording(false);
             setIsPaused(false);
 
-            // Release microphone
-            streamRef.current?.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
+            // [PLAN A] Only stop tracks if we OWN the stream (not shared)
+            if (!sharedStreamRef) {
+                streamRef.current?.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
         });
-    }, []);
+    }, [sharedStreamRef]);
 
     const cancelRecording = useCallback(() => {
         clearInterval(timerRef.current);
@@ -191,14 +207,17 @@ export default function useAudioRecorder() {
             }
         } catch (_e) { /* best-effort */ }
 
-        streamRef.current?.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
+        // [PLAN A] Only stop tracks if we OWN the stream (not shared)
+        if (!sharedStreamRef) {
+            streamRef.current?.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
         mediaRecorderRef.current = null;
 
         setIsRecording(false);
         setIsPaused(false);
         setDurationSeconds(0);
-    }, []);
+    }, [sharedStreamRef]);
 
     return {
         isSupported,

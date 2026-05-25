@@ -95,7 +95,12 @@ export default function useVoiceCopilot({
     setPlayingPoiId, 
     onStateChange,
     isActive: controlledIsActive,
-    setIsActive: controlledSetIsActive
+    setIsActive: controlledSetIsActive,
+    // ── Shared Microphone (Plan A) ──
+    // When provided, this hook will NOT call getUserMedia itself.
+    // Instead it will use the shared stream for its AudioContext pipeline.
+    sharedStreamRef = null,
+    sharedMicLabel = null
 }) {
     const [internalIsActive, setInternalIsActive] = useState(false);
     const isActive = controlledIsActive !== undefined ? controlledIsActive : internalIsActive;
@@ -133,7 +138,9 @@ export default function useVoiceCopilot({
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
-    const [activeMicLabel, setActiveMicLabel] = useState(null); // label del micrófono activo
+    const [internalMicLabel, setInternalMicLabel] = useState(null);
+    // If using shared mic, prefer its label; otherwise use internal label
+    const activeMicLabel = sharedMicLabel || internalMicLabel;
     const [micGain, setMicGainState] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = parseFloat(localStorage.getItem('flyhigh_voice_mic_gain'));
@@ -260,7 +267,7 @@ export default function useVoiceCopilot({
     }, [voiceCommands]);
 
     const closeMicrophone = async () => {
-        console.log('[VoiceCopilot] Cerrando y liberando micrófono local...');
+        console.log('[VoiceCopilot] Disconnecting AudioContext pipeline...');
         if (processorNodeRef.current) {
             try {
                 // AudioWorkletNode uses port, ScriptProcessor uses onaudioprocess
@@ -291,10 +298,15 @@ export default function useVoiceCopilot({
                 }
             } catch(e){}
         }
-        if (mediaStreamRef.current) {
+        // [PLAN A] Only stop the MediaStream if we OWN it (no shared stream).
+        // If using a shared stream, the stream lifecycle is managed by useSharedMicrophone.
+        if (mediaStreamRef.current && !sharedStreamRef) {
             try {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
             } catch(e){}
+            mediaStreamRef.current = null;
+        } else if (sharedStreamRef) {
+            // Don't stop the shared stream — just release our local reference
             mediaStreamRef.current = null;
         }
         setIsDetectingVoice(false);
@@ -304,69 +316,80 @@ export default function useVoiceCopilot({
     const initMicrophone = async () => {
         if (mediaStreamRef.current) return mediaStreamRef.current;
         
-        console.log('[VoiceCopilot] Inicializando micrófono...');
+        let stream;
 
-        // ─── Step 1: Request temporary permission so Chrome exposes real labels ───
-        let tempStream;
-        try {
-            tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        } catch (permErr) {
-            console.error('[VoiceCopilot] No se pudo obtener permiso de micrófono:', permErr);
-            throw permErr;
-        }
-
-        // ─── Step 2: Enumerate devices and find the best mic ───
-        let selectedDeviceId = null;
-        let selectedLabel = 'Micrófono interno';
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const audioInputs = devices.filter(d => d.kind === 'audioinput');
-            console.log('[VoiceCopilot] Micrófonos detectados:', audioInputs.map(d => `${d.label} [${d.deviceId.slice(0,8)}]`));
-
-            // Priority keywords for external/USB/lavalier microphones
-            const EXTERNAL_KEYWORDS = ['usb', 'wired', 'external', 'lavalier', 'lapel', 'solapa', 'headset', 'airpod'];
-            const isExternal = (label) => {
-                const lower = label.toLowerCase();
-                return EXTERNAL_KEYWORDS.some(kw => lower.includes(kw));
-            };
-
-            // Prefer external mic, fall back to non-default, then default
-            const externalMic = audioInputs.find(d => isExternal(d.label));
-            if (externalMic) {
-                selectedDeviceId = externalMic.deviceId;
-                selectedLabel = externalMic.label || 'Micrófono externo';
-                console.log('[VoiceCopilot] ✅ Micrófono externo detectado:', selectedLabel);
-            } else if (audioInputs.length > 0) {
-                // Use the first available (usually default)
-                const fallback = audioInputs[0];
-                selectedDeviceId = fallback.deviceId;
-                selectedLabel = fallback.label || 'Micrófono interno';
-                console.log('[VoiceCopilot] ⚠️ Sin micrófono externo, usando:', selectedLabel);
+        // [PLAN A] If a shared stream is available, use it instead of calling getUserMedia.
+        // The shared stream is managed by useSharedMicrophone and already has external mic preference.
+        if (sharedStreamRef && sharedStreamRef.current) {
+            const tracks = sharedStreamRef.current.getAudioTracks();
+            if (tracks.length > 0 && tracks[0].readyState === 'live') {
+                console.log('[VoiceCopilot] Using shared microphone stream');
+                stream = sharedStreamRef.current;
+                mediaStreamRef.current = stream;
             }
-        } catch (enumErr) {
-            console.warn('[VoiceCopilot] enumerateDevices falló, usando default:', enumErr);
         }
 
-        // ─── Step 3: Close temp stream and open the real one with exact deviceId ───
-        tempStream.getTracks().forEach(t => t.stop());
+        // Fallback: acquire our own stream (simulation mode, or shared not available)
+        if (!stream) {
+            console.log('[VoiceCopilot] Acquiring own microphone (no shared stream)...');
 
-        const constraints = {
-            audio: {
-                ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
-                echoCancellation: false,
-                noiseSuppression: true,
-                autoGainControl: false
-            },
-            video: false
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        mediaStreamRef.current = stream;
+            // ─── Step 1: Request temporary permission so Chrome exposes real labels ───
+            let tempStream;
+            try {
+                tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            } catch (permErr) {
+                console.error('[VoiceCopilot] No se pudo obtener permiso de micrófono:', permErr);
+                throw permErr;
+            }
 
-        // ─── Step 4: Confirm which device we actually got and update UI ───
-        const activeTrack = stream.getAudioTracks()[0];
-        const finalLabel = activeTrack?.label || selectedLabel;
-        setActiveMicLabel(finalLabel);
-        console.log('[VoiceCopilot] 🎤 Micrófono activo:', finalLabel);
+            // ─── Step 2: Enumerate devices and find the best mic ───
+            let selectedDeviceId = null;
+            let selectedLabel = 'Micrófono interno';
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+                console.log('[VoiceCopilot] Micrófonos detectados:', audioInputs.map(d => `${d.label} [${d.deviceId.slice(0,8)}]`));
+
+                const EXTERNAL_KEYWORDS = ['usb', 'wired', 'external', 'lavalier', 'lapel', 'solapa', 'headset', 'airpod'];
+                const isExternal = (label) => {
+                    const lower = label.toLowerCase();
+                    return EXTERNAL_KEYWORDS.some(kw => lower.includes(kw));
+                };
+
+                const externalMic = audioInputs.find(d => isExternal(d.label));
+                if (externalMic) {
+                    selectedDeviceId = externalMic.deviceId;
+                    selectedLabel = externalMic.label || 'Micrófono externo';
+                    console.log('[VoiceCopilot] ✅ Micrófono externo detectado:', selectedLabel);
+                } else if (audioInputs.length > 0) {
+                    const fallback = audioInputs[0];
+                    selectedDeviceId = fallback.deviceId;
+                    selectedLabel = fallback.label || 'Micrófono interno';
+                    console.log('[VoiceCopilot] ⚠️ Sin micrófono externo, usando:', selectedLabel);
+                }
+            } catch (enumErr) {
+                console.warn('[VoiceCopilot] enumerateDevices falló, usando default:', enumErr);
+            }
+
+            tempStream.getTracks().forEach(t => t.stop());
+
+            const constraints = {
+                audio: {
+                    ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
+                    echoCancellation: false,
+                    noiseSuppression: true,
+                    autoGainControl: false
+                },
+                video: false
+            };
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            mediaStreamRef.current = stream;
+
+            const activeTrack = stream.getAudioTracks()[0];
+            const finalLabel = activeTrack?.label || selectedLabel;
+            setInternalMicLabel(finalLabel);
+            console.log('[VoiceCopilot] 🎤 Micrófono activo (propio):', finalLabel);
+        }
 
         let audioCtx = audioContextRef.current;
         if (!audioCtx || audioCtx.state === 'closed') {

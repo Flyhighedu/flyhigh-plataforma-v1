@@ -31,6 +31,8 @@ import { ROLE_TO_ESCUADRON, LOCAL_KEYS, META_KEYS } from '@/config/escuadronConf
 // ── Pilot Audio Recording ──
 import useAudioRecorder from '@/hooks/useAudioRecorder';
 import { triggerAudioAudit } from '@/utils/triggerAudioAudit';
+// ── Shared Microphone (Plan A: single stream for Vosk + Recorder) ──
+import useSharedMicrophone from '@/hooks/useSharedMicrophone';
 // ── Flight Audio Ecosystem ──
 import useFlightAudio from '@/hooks/useFlightAudio';
 
@@ -317,6 +319,11 @@ export default function StaffOperationLegacy({
     // ── Flight Audio Ecosystem ──
     const flightAudio = useFlightAudio({ copilotVoiceState });
 
+    // ── Shared Microphone (Plan A) ──
+    // One stream for both Vosk (narration AI) and pilot recorder.
+    // External mic preference is handled centrally here.
+    const sharedMic = useSharedMicrophone();
+
     // ── Pilot Audio Recording (fire-and-forget, never blocks flight ops) ──
     const {
         isSupported: pilotMicSupported,
@@ -326,7 +333,7 @@ export default function StaffOperationLegacy({
         startRecording: startPilotRecording,
         stopRecording: stopPilotRecording,
         cancelRecording: cancelPilotRecording
-    } = useAudioRecorder();
+    } = useAudioRecorder({ sharedStreamRef: sharedMic.streamRef });
     const pilotRecDurationRef = useRef(0);
     useEffect(() => { pilotRecDurationRef.current = pilotRecDuration; }, [pilotRecDuration]);
 
@@ -1292,10 +1299,19 @@ export default function StaffOperationLegacy({
         // ── Flight Audio: Crossfade boarding→in_flight on takeoff ──
         flightAudio.transitionToFlight();
 
+        // ── Shared Mic: Ensure the shared stream is active before activating consumers ──
+        try {
+            await sharedMic.startMicrophone();
+            console.log('[StaffOp] 🎤 Shared mic active for Copilot + Recorder');
+        } catch (micErr) {
+            console.warn('⚠️ Shared mic failed to start:', micErr);
+        }
+
         // ── Copilot AI: Auto-activate on takeoff ──
         setVoiceIsActive(true);
 
         // ── Pilot Audio: Start recording on takeoff (fire-and-forget) ──
+        // Now uses the shared stream, so NO second getUserMedia call
         if (currentRole === 'pilot' && pilotMicSupported && !pilotRecording) {
             startPilotRecording().catch(err => console.warn('⚠️ Pilot mic auto-start failed:', err));
         }
@@ -1775,6 +1791,9 @@ export default function StaffOperationLegacy({
                 voiceSetIsActive={setVoiceIsActive}
                 voicePlayingPoiId={voicePlayingPoiId}
                 voiceSetPlayingPoiId={setVoicePlayingPoiId}
+                // ── Shared Microphone (Plan A) ──
+                sharedMicStreamRef={sharedMic.streamRef}
+                sharedMicLabel={sharedMic.activeMicLabel}
                 // ── Flight Audio Ecosystem Props ──
                 flightPhase={flightAudio.flightPhase}
                 onPrepareCabin={flightAudio.prepareCabin}
