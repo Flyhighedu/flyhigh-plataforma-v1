@@ -223,6 +223,23 @@ export default function useVoiceCopilot({
             }));
     }, [pois]);
 
+    // Calcular palabras clave que son únicas/exclusivas de un solo POI en todo el catálogo
+    const uniqueKeywords = useMemo(() => {
+        const counts = {};
+        voiceCommands.forEach(cmd => {
+            cmd.keywords.forEach(kw => {
+                counts[kw] = (counts[kw] || 0) + 1;
+            });
+        });
+        const uniques = new Set();
+        Object.entries(counts).forEach(([kw, count]) => {
+            if (count === 1) {
+                uniques.add(kw);
+            }
+        });
+        return uniques;
+    }, [voiceCommands]);
+
     // Build the dynamic grammar list for Vosk to optimize CPU and eliminate lag
     const grammarList = useMemo(() => {
         const words = new Set();
@@ -330,14 +347,18 @@ export default function useVoiceCopilot({
                 ? totalKeywordsCount 
                 : Math.ceil(totalKeywordsCount * 0.6);
 
-            if (matchedKeywordsCount >= requiredMatches && score > bestScore && score >= requiredScore) {
+            // Si alguna de las palabras clave que coincidieron es única en todo el catálogo de POIs,
+            // permitimos la coincidencia (match) de este comando/POI de inmediato
+            const hasUniqueMatch = cmd.keywords.some(kw => uniqueKeywords.has(kw) && transcriptWords.includes(kw));
+
+            if ((matchedKeywordsCount >= requiredMatches || hasUniqueMatch) && score > bestScore && (score >= requiredScore || hasUniqueMatch)) {
                 bestScore = score;
                 best = cmd;
             }
         }
         
         return best;
-    }, [voiceCommands]);
+    }, [voiceCommands, uniqueKeywords]);
 
     const closeMicrophone = async () => {
         console.log('[VoiceCopilot] Disconnecting AudioContext pipeline...');
@@ -1076,10 +1097,15 @@ export default function useVoiceCopilot({
                                 // Filtrar palabras por confianza para evitar falsos positivos de palabras fuera de vocabulario
                                 if (result?.result && Array.isArray(result.result)) {
                                     const highConfWords = result.result
-                                        .filter(w => w.conf >= 0.80)
+                                        .filter(w => {
+                                            const cleanWord = (w.word || '').toLowerCase().trim();
+                                            const isWordInVocabulary = grammarListRef.current?.includes(cleanWord);
+                                            const threshold = isWordInVocabulary ? 0.65 : 0.75;
+                                            return w.conf >= threshold;
+                                        })
                                         .map(w => w.word);
                                     transcript = highConfWords.join(' ');
-                                    console.log('[VoiceCopilot] 📊 Transcripción filtrada por confianza (>= 0.80):', transcript, result.result);
+                                    console.log('[VoiceCopilot] 📊 Transcripción filtrada por confianza dinámica (vocabulario >= 0.65, otros >= 0.75):', transcript, result.result);
                                 } else {
                                     transcript = result?.text || '';
                                 }
