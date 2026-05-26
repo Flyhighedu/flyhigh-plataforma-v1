@@ -1106,7 +1106,7 @@ export default function useVoiceCopilot({
                                     playFeedbackSound();
                                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
 
-                                    // Timeout de atención: 6s para decir el POI
+                                    // Timeout de atención inicial: 6s de gracia si no hay entrada de voz posterior
                                     if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     attentionTimeoutRef.current = setTimeout(() => {
                                         if (stateRef.current === 'wake' || stateRef.current === 'matched') {
@@ -1127,7 +1127,27 @@ export default function useVoiceCopilot({
                                 }
                             }
 
-                            // 2) POI matching: wake → matched (azul) y reproducción
+                            // 2) Extender la ventana de atención dinámicamente si el usuario está hablando
+                            if (stateRef.current === 'wake' && transcript.trim()) {
+                                if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                attentionTimeoutRef.current = setTimeout(() => {
+                                    if (stateRef.current === 'wake' || stateRef.current === 'matched') {
+                                        console.log('[VoiceCopilot] ⏰ Ventana de atención expirada por silencio.');
+                                        setVoiceState('listening');
+                                        stateRef.current = 'listening';
+                                        setLastTranscript('');
+                                        setDictatedText('');
+                                        if (voskWorkerRef.current) {
+                                            voskWorkerRef.current.postMessage({ 
+                                                action: 'reset',
+                                                grammar: JSON.stringify(grammarListRef.current)
+                                            });
+                                        }
+                                    }
+                                }, 4000); // 4 segundos de silencio máximo tras hablar
+                            }
+
+                            // 3) POI matching: wake → matched (azul) y reproducción
                             //    IMPORTANTE: Solo procesamos la coincidencia de POI en eventos 'final' (cuando el piloto deja de hablar)
                             if (isFinal && stateRef.current === 'wake') {
                                 const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
