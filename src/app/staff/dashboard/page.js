@@ -1165,6 +1165,28 @@ export default function StaffDashboard() {
                     }
                 }
 
+                // [BUG-FIX] Detect if teacher already completed prep via DB events.
+                // Without this, a page reload loses teacherFlowState (local state)
+                // and the teacher gets sent back to PrepChecklist.
+                if (profile?.role === 'teacher' && ['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
+                    try {
+                        const { data: teacherPrepDone } = await supabase
+                            .from('staff_prep_events')
+                            .select('id')
+                            .eq('journey_id', journeyData.id)
+                            .eq('user_id', userId)
+                            .eq('event_type', 'prep_complete')
+                            .limit(1);
+
+                        if (teacherPrepDone && teacherPrepDone.length > 0) {
+                            console.log('🛡️ [Recovery] Teacher already completed prep — restoring waitingState');
+                            setTeacherFlowState('waiting');
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Teacher prep check failed (non-blocking):', e);
+                    }
+                }
+
                 // Determine Step based on State (LOCAL GATING APPLIED)
                 // We must use the just-fetched checkInEvent to decide.
                 // The variable 'checkInAvailable' will track if this user has checked in.
@@ -1206,6 +1228,21 @@ export default function StaffDashboard() {
                             }
                         } else if (checkInAvailable) {
                             setShowBrief(false);
+                        }
+
+                        // [BUG-FIX] Always restore flow states from IndexedDB,
+                        // regardless of step comparison. Without this, teacherFlowState
+                        // and auxFlowState are lost on reload — causing the teacher to
+                        // be sent back to PrepChecklist even though they already completed it.
+                        if (localProgress) {
+                            if (localProgress.teacherFlowState && profile?.role === 'teacher') {
+                                console.log(`🛡️ [CrashRecovery] Restoring teacherFlowState: ${localProgress.teacherFlowState}`);
+                                setTeacherFlowState(localProgress.teacherFlowState);
+                            }
+                            if (localProgress.auxFlowState && profile?.role === 'assistant') {
+                                console.log(`🛡️ [CrashRecovery] Restoring auxFlowState: ${localProgress.auxFlowState}`);
+                                setAuxFlowState(localProgress.auxFlowState);
+                            }
                         }
                     } catch (e) {
                         console.warn('[CrashRecovery] Could not read IndexedDB:', e);
