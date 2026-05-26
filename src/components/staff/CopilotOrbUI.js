@@ -30,7 +30,8 @@ const CopilotOrbUI = memo(forwardRef(({
         stopListening: copilot.stopListening,
         changeEngineMode: copilot.changeEngineMode,
         engineMode: copilot.engineMode,
-        deviceInfo: copilot.deviceInfo
+        deviceInfo: copilot.deviceInfo,
+        cancelNarration: copilot.cancelNarration
     }));
 
     const [showDictionary, setShowDictionary] = useState(false);

@@ -944,6 +944,19 @@ export default function useVoiceCopilot({
         };
     }, [audioRef, setPlayingPoiId]);
 
+    const cancelNarration = useCallback(() => {
+        if (audioRef?.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        if (setPlayingPoiId) setPlayingPoiId(null);
+        setVoiceState('listening');
+        stateRef.current = 'listening';
+        setDictatedText('');
+        restartNativeIfNeeded();
+        console.log('[VoiceCopilot] Narración cancelada manualmente.');
+    }, [audioRef, setPlayingPoiId]);
+
     const triggerSpeechRecognitionWindow = useCallback(() => {
         if (recognitionActiveRef.current || stateRef.current === 'playing' || stateRef.current === 'matched') return;
         
@@ -1507,6 +1520,7 @@ export default function useVoiceCopilot({
         engineMode,
         changeEngineMode,
         deviceInfo,
+        cancelNarration,
         activeMicLabel,
         rnnoiseStatus,
         micGain,

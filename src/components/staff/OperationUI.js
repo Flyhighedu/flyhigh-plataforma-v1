@@ -191,6 +191,12 @@ export default function OperationUI({
         }
     }, [onCopilotVoiceStateChange]);
 
+    const handleCancelNarration = useCallback(() => {
+        if (copilotRef.current && typeof copilotRef.current.cancelNarration === 'function') {
+            copilotRef.current.cancelNarration();
+        }
+    }, []);
+
     // ── Close Day Hold (2s long-press) ──
     const CLOSE_DAY_HOLD_MS = 2000;
     const closeHoldStartedAtRef = { current: 0 };
@@ -848,6 +854,36 @@ export default function OperationUI({
 
             {/* ── Escuadrón Slot (overlays injected by smart container) ── */}
             {escuadronSlot}
+
+            {/* ── Overlay Minimalista de Narración a Pantalla Completa ── */}
+            {voicePlayingPoiId && copilotVoiceState === 'playing' && (() => {
+                const activePoi = pois.find(p => p.id === voicePlayingPoiId);
+                if (!activePoi) return null;
+                return (
+                    <div 
+                        onClick={handleCancelNarration}
+                        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center text-center p-6 backdrop-blur-md bg-slate-950/80 transition-all duration-300 animate-in fade-in cursor-pointer"
+                    >
+                        <div className="max-w-2xl px-4 space-y-8 select-none">
+                            <div className="space-y-3">
+                                <div className="flex justify-center">
+                                    <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.25em] text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">
+                                        Copiloto narrando
+                                    </span>
+                                </div>
+                                <h2 className="text-4xl md:text-7xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-indigo-400 py-2 animate-[pulse_2.5s_cubic-bezier(0.4,0,0.6,1)_infinite]">
+                                    {activePoi.name}
+                                </h2>
+                            </div>
+                            <div className="pt-8 border-t border-white/10">
+                                <p className="text-[10px] md:text-xs text-slate-400/80 font-bold uppercase tracking-[0.2em] animate-pulse">
+                                    Toca en cualquier parte de la pantalla para cancelar narración
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
