@@ -857,7 +857,7 @@ export default function OperationUI({
 
             {/* ── Overlay Minimalista de Narración a Pantalla Completa ── */}
             {voicePlayingPoiId && copilotVoiceState === 'playing' && (() => {
-                const activePoi = pois.find(p => p.id === voicePlayingPoiId);
+                const activePoi = (pois || []).find(p => p && p.id === voicePlayingPoiId);
                 if (!activePoi) return null;
                 return (
                     <div 

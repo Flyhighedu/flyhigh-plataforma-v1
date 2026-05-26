@@ -240,8 +240,8 @@ export default function useVoiceCopilot({
     }, []);
 
     const voiceCommands = useMemo(() => {
-        return pois
-            .filter(p => p.audio_url)
+        return (pois || [])
+            .filter(p => p && p.audio_url)
             .map(p => ({
                 id: p.id,
                 name: p.name,
@@ -313,8 +313,8 @@ export default function useVoiceCopilot({
         ];
 
         // 3. POIs vocabulary words/phrases
-        pois.forEach(poi => {
-            if (!poi.name) return;
+        (pois || []).forEach(poi => {
+            if (!poi || !poi.name) return;
             
             const rawClean = cleanTextWithAccents(poi.name);
             if (!rawClean) return;
