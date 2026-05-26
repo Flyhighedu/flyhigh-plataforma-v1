@@ -286,41 +286,51 @@ export default function useVoiceCopilot({
         const norm = normalizeFull(text);
         if (!norm || norm.length < 3) return null;
 
-        const noSpaceNorm = norm.replace(/\s+/g, '');
+        const transcriptWords = norm.split(/\s+/);
         let best = null;
         let bestScore = 0;
 
         for (const cmd of voiceCommands) {
             if (!cmd.keywords.length) continue;
             let score = 0;
+            let matchedKeywordsCount = 0;
             const totalKwLength = cmd.keywords.reduce((sum, kw) => sum + kw.length, 0);
             const requiredScore = Math.min(4, totalKwLength);
             
             for (const kw of cmd.keywords) {
-                if (norm.includes(kw)) {
+                let kwMatched = false;
+                
+                // 1. Coincidencia exacta de palabra completa (Whole-word exact match)
+                if (transcriptWords.includes(kw)) {
                     score += kw.length;
-                    continue;
-                }
-                if (noSpaceNorm.includes(kw)) {
-                    score += kw.length;
-                    continue;
-                }
-                if (kw.length >= 5) {
-                    const transcriptWords = norm.split(/\s+/);
-                    let matched = false;
+                    kwMatched = true;
+                } 
+                // 2. Coincidencia difusa de palabra completa para términos largos (>= 5 caracteres)
+                else if (kw.length >= 5) {
                     for (const tw of transcriptWords) {
                         const tolerance = kw.length > 7 ? 2 : 1;
                         if (levenshteinDistance(tw, kw) <= tolerance) {
                             score += kw.length - 1;
-                            matched = true;
+                            kwMatched = true;
                             break;
                         }
                     }
-                    if (matched) continue;
+                }
+                
+                if (kwMatched) {
+                    matchedKeywordsCount++;
                 }
             }
 
-            if (score > bestScore && score >= requiredScore) {
+            const totalKeywordsCount = cmd.keywords.length;
+            // Regla de coincidencia fraccional:
+            // - 1 o 2 palabras clave: requiere coincidencia del 100% (todas)
+            // - 3 o más palabras clave: requiere coincidencia de al menos el 60% (redondeado hacia arriba)
+            const requiredMatches = totalKeywordsCount <= 2 
+                ? totalKeywordsCount 
+                : Math.ceil(totalKeywordsCount * 0.6);
+
+            if (matchedKeywordsCount >= requiredMatches && score > bestScore && score >= requiredScore) {
                 bestScore = score;
                 best = cmd;
             }
