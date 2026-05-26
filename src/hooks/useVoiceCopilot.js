@@ -186,6 +186,7 @@ export default function useVoiceCopilot({
     
     // Vosk Worker
     const voskWorkerRef = useRef(null);
+    const voskBridgeChannelRef = useRef(null); // [PERF] MessageChannel for direct AudioWorklet→Vosk Worker
     const pendingPoiRef = useRef(null);       // POI detectado esperando a que el piloto termine de hablar
     const speechEndTimerRef = useRef(null);   // Timer de 1.5s de silencio para lanzar narración
 
@@ -427,29 +428,28 @@ export default function useVoiceCopilot({
         gainNode.connect(analyser);
 
         // ═══════════════════════════════════════════════════════════════
-        // VAD-based sensitivity control.
-        // The calibrator slider (0% to 100%) controls the VAD energy
-        // threshold. At 100% sensitivity the threshold is 0 (everything
-        // passes to Vosk). At 0% only very loud/close speech passes.
-        // Trailing frames prevent cutting words mid-syllable.
+        // [PERF FIX] Dual-mode audio processor:
+        //
+        // MODE 1 (Bridge worklet + MessagePort → Vosk):
+        //   VAD + downsampling happen in the audio thread.
+        //   Audio goes DIRECTLY to Vosk Worker via MessagePort.
+        //   Main thread only receives lightweight VAD state changes.
+        //
+        // MODE 2 (Fallback for pocketsphinx/tfjs-go):
+        //   Audio frames sent to main thread for processing.
+        //   Same behavior as the old audio-feeder-worklet.js.
         // ═══════════════════════════════════════════════════════════════
+
+        // handleAudioFrame is ONLY used in fallback mode (no MessagePort)
         let vadTrailingCounter = 0;
         const VAD_TRAILING_FRAMES = 8;
 
         const handleAudioFrame = (inputData, peak) => {
             const energy = getAudioEnergy(inputData);
-            const sensitivity = micGainRef.current; // 0.0 to 1.0
-
-            // Dynamic noise gate threshold:
-            //   100% sensitivity → threshold 0.000 (everything passes)
-            //    75% sensitivity → threshold 0.010
-            //    50% sensitivity → threshold 0.020 (≈ old fixed VAD)
-            //    25% sensitivity → threshold 0.030
-            //     0% sensitivity → threshold 0.040 (only loud/close speech)
+            const sensitivity = micGainRef.current;
             const vadThreshold = sensitivity >= 1.0 ? 0 : (1.0 - sensitivity) * 0.04;
             const isVoiceActive = energy >= vadThreshold;
 
-            // [PERF FIX] Only trigger re-render when detection state actually changes
             const newDetecting = isVoiceActive || vadTrailingCounter > 0;
             if (newDetecting !== lastDetectingRef.current) {
                 lastDetectingRef.current = newDetecting;
@@ -477,44 +477,71 @@ export default function useVoiceCopilot({
 
         if (useWorklet) {
             try {
-                await audioCtx.audioWorklet.addModule('/audio-feeder-worklet.js');
-                const workletNode = new AudioWorkletNode(audioCtx, 'audio-feeder-processor');
+                // Try the optimized bridge worklet first
+                await audioCtx.audioWorklet.addModule('/audio-vosk-bridge-worklet.js');
+                const workletNode = new AudioWorkletNode(audioCtx, 'audio-vosk-bridge-processor');
                 processorNodeRef.current = workletNode;
-                
-                // Connect processor to gainNode (NOT source) — this is the key fix
+
                 gainNode.connect(workletNode);
                 workletNode.connect(audioCtx.destination);
 
+                // Send initial sensitivity to the worklet
+                workletNode.port.postMessage({
+                    type: 'set-sensitivity',
+                    sensitivity: micGainRef.current
+                });
+
+                // Listen for messages from the bridge worklet
                 workletNode.port.onmessage = (e) => {
-                    if (e.data.type === 'audio-frame') {
+                    if (e.data.type === 'vad-state') {
+                        // Lightweight VAD state update (no audio data)
+                        const newDetecting = e.data.isVoiceActive;
+                        if (newDetecting !== lastDetectingRef.current) {
+                            lastDetectingRef.current = newDetecting;
+                            setIsDetectingVoice(newDetecting);
+                        }
+                    } else if (e.data.type === 'audio-frame') {
+                        // Fallback path (no MessagePort connected)
                         handleAudioFrame(e.data.frame, e.data.peak);
                     }
                 };
-                console.log('[VoiceCopilot] ✅ AudioWorkletNode conectado a gainNode (sensibilidad controlada)');
+
+                console.log('[VoiceCopilot] ✅ Bridge worklet loaded (MessagePort will connect when Vosk starts)');
             } catch (workletErr) {
-                console.warn('[VoiceCopilot] AudioWorklet falló, usando ScriptProcessor fallback:', workletErr);
-                const processor = audioCtx.createScriptProcessor(8192, 1, 1);
-                processorNodeRef.current = processor;
-                
-                // Connect processor to gainNode (NOT source)
-                gainNode.connect(processor);
-                processor.connect(audioCtx.destination);
-                processor.onaudioprocess = (e) => {
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    let maxVal = 0;
-                    for (let i = 0; i < inputData.length; i++) {
-                        const absVal = Math.abs(inputData[i]);
-                        if (absVal > maxVal) maxVal = absVal;
-                    }
-                    handleAudioFrame(inputData, maxVal);
-                };
+                console.warn('[VoiceCopilot] Bridge worklet failed, trying old feeder worklet:', workletErr);
+                try {
+                    await audioCtx.audioWorklet.addModule('/audio-feeder-worklet.js');
+                    const workletNode = new AudioWorkletNode(audioCtx, 'audio-feeder-processor');
+                    processorNodeRef.current = workletNode;
+                    gainNode.connect(workletNode);
+                    workletNode.connect(audioCtx.destination);
+                    workletNode.port.onmessage = (e) => {
+                        if (e.data.type === 'audio-frame') {
+                            handleAudioFrame(e.data.frame, e.data.peak);
+                        }
+                    };
+                    console.log('[VoiceCopilot] ✅ Old feeder worklet connected (fallback)');
+                } catch (feederErr) {
+                    console.warn('[VoiceCopilot] All worklets failed, using ScriptProcessor:', feederErr);
+                    const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+                    processorNodeRef.current = processor;
+                    gainNode.connect(processor);
+                    processor.connect(audioCtx.destination);
+                    processor.onaudioprocess = (e) => {
+                        const inputData = e.inputBuffer.getChannelData(0);
+                        let maxVal = 0;
+                        for (let i = 0; i < inputData.length; i++) {
+                            const absVal = Math.abs(inputData[i]);
+                            if (absVal > maxVal) maxVal = absVal;
+                        }
+                        handleAudioFrame(inputData, maxVal);
+                    };
+                }
             }
         } else {
             // Fallback: ScriptProcessor for older browsers
-            const processor = audioCtx.createScriptProcessor(8192, 1, 1);
+            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
             processorNodeRef.current = processor;
-            
-            // Connect processor to gainNode (NOT source)
             gainNode.connect(processor);
             processor.connect(audioCtx.destination);
             processor.onaudioprocess = (e) => {
@@ -526,7 +553,7 @@ export default function useVoiceCopilot({
                 }
                 handleAudioFrame(inputData, maxVal);
             };
-            console.log('[VoiceCopilot] ⚠️ Usando ScriptProcessor (fallback con audio crudo)');
+            console.log('[VoiceCopilot] ⚠️ Usando ScriptProcessor (fallback)');
         }
 
         return stream;
@@ -563,6 +590,19 @@ export default function useVoiceCopilot({
             recognitionRef.current = null;
         }
         recognitionActiveRef.current = false;
+
+        // [PERF] Clean up MessageChannel bridge
+        if (voskBridgeChannelRef.current) {
+            try { voskBridgeChannelRef.current.port1.close(); } catch (e) {}
+            try { voskBridgeChannelRef.current.port2.close(); } catch (e) {}
+            voskBridgeChannelRef.current = null;
+        }
+
+        // Disconnect bridge worklet from Vosk
+        const workletNode = processorNodeRef.current;
+        if (workletNode && workletNode.port) {
+            try { workletNode.port.postMessage({ type: 'disconnect-vosk-port' }); } catch (e) {}
+        }
 
         if (voskWorkerRef.current) {
             try {
@@ -1064,6 +1104,47 @@ export default function useVoiceCopilot({
                             deviceSampleRate: audioCtx.sampleRate
                         }
                     });
+
+                    // ═══════════════════════════════════════════════════════════
+                    // [PERF] Wire MessageChannel: AudioWorklet → Vosk Worker
+                    // Audio frames bypass the main thread completely.
+                    // ═══════════════════════════════════════════════════════════
+                    const workletNode = processorNodeRef.current;
+                    if (workletNode && workletNode.port) {
+                        try {
+                            // Clean up previous channel if any
+                            if (voskBridgeChannelRef.current) {
+                                try { voskBridgeChannelRef.current.port1.close(); } catch (e) {}
+                                try { voskBridgeChannelRef.current.port2.close(); } catch (e) {}
+                            }
+
+                            const channel = new MessageChannel();
+                            voskBridgeChannelRef.current = channel;
+
+                            // Send port1 to the AudioWorklet (audio thread)
+                            workletNode.port.postMessage(
+                                { type: 'connect-vosk-port', port: channel.port1 },
+                                [channel.port1]
+                            );
+
+                            // Send port2 to the Vosk Worker (worker thread)
+                            voskWorkerRef.current.postMessage(
+                                { action: 'connect-port', data: { port: channel.port2 } },
+                                [channel.port2]
+                            );
+
+                            // Sync sensitivity to the worklet
+                            workletNode.port.postMessage({
+                                type: 'set-sensitivity',
+                                sensitivity: micGainRef.current
+                            });
+
+                            console.log('[VoiceCopilot] 🚀 MessageChannel connected: AudioWorklet → Vosk Worker (zero main thread)');
+                        } catch (channelErr) {
+                            console.warn('[VoiceCopilot] MessageChannel failed, using main-thread fallback:', channelErr);
+                            // Bridge worklet will fall back to sending frames to main thread
+                        }
+                    }
                 } else {
                     voskWorkerRef.current.postMessage({ action: 'reset' });
                     setVoiceState('listening');
@@ -1253,6 +1334,13 @@ export default function useVoiceCopilot({
             micGainRef.current = rounded;
             // GainNode stays at 1.0 — sensitivity is VAD-threshold based
             setMicGainState(rounded);
+            // [PERF] Sync sensitivity to bridge worklet (VAD runs there now)
+            try {
+                const workletNode = processorNodeRef.current;
+                if (workletNode && workletNode.port) {
+                    workletNode.port.postMessage({ type: 'set-sensitivity', sensitivity: rounded });
+                }
+            } catch (e) { /* worklet may not support this message */ }
             try { localStorage.setItem('flyhigh_voice_mic_gain', rounded.toString()); } catch(e) {}
         }, []),
         tfjsIsLoaded: true,

@@ -48,6 +48,19 @@ export function useRNNoise() {
             return sourceNode;
         }
 
+        // [PERF] Auto-disable on low-end devices to save CPU for Vosk
+        // On a mid-range phone with tethering, every bit of CPU matters.
+        // The external lavalier mic already captures clean audio.
+        if (typeof navigator !== 'undefined') {
+            const ram = navigator.deviceMemory || 8;
+            const cores = navigator.hardwareConcurrency || 8;
+            if (ram <= 4 || cores <= 4) {
+                setRnnoiseStatus('disabled');
+                console.log(`[RNNoise] ⏭️ Auto-disabled on low-end device (RAM=${ram}GB, cores=${cores})`);
+                return sourceNode;
+            }
+        }
+
         try {
             setRnnoiseStatus('loading');
             console.log('[RNNoise] ⏳ Cargando worklet + WASM...');

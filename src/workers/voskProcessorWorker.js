@@ -15,6 +15,7 @@ let nativeSampleRate = 48000;
 let voskSampleRate = VOSK_SAMPLE_RATE;
 let amnesiaTimer = null;
 let running = false;
+let directPort = null; // [PERF] MessagePort from AudioWorklet — bypasses main thread
 
 // ═══════════════════════════════════════════════════════════════
 // DOWNSAMPLER (48kHz → 16kHz)
@@ -83,7 +84,7 @@ function startAmnesiaTimer() {
     clearInterval(amnesiaTimer);
     amnesiaTimer = setInterval(() => {
         if (!running) return;
-        console.log('[Vosk] Amnesia: reseteando recognizer (10s)');
+        console.log('[Vosk] Amnesia: reseteando recognizer (30s)');
         recreateRecognizer();
         self.postMessage({ type: 'cycle_reset' });
     }, AMNESIA_INTERVAL_MS);
@@ -94,6 +95,35 @@ function startAmnesiaTimer() {
 // ═══════════════════════════════════════════════════════════════
 self.onmessage = async (e) => {
     const { action, data } = e.data;
+
+    // ─── CONNECT-PORT: Direct audio from AudioWorklet (bypass main thread) ───
+    if (action === 'connect-port') {
+        directPort = data.port;
+        directPort.onmessage = (portEvent) => {
+            // Audio arrives pre-downsampled at 16kHz from the bridge worklet
+            if (portEvent.data.action === 'process' && recognizer && running) {
+                try {
+                    const rawData = portEvent.data.data instanceof Float32Array
+                        ? portEvent.data.data
+                        : new Float32Array(portEvent.data.data);
+                    // Already at 16kHz — feed directly to recognizer
+                    recognizer.acceptWaveformFloat(rawData, VOSK_SAMPLE_RATE);
+                } catch (err) {
+                    self.postMessage({ type: 'error', error: err.message });
+                }
+            }
+        };
+        console.log('[Vosk] ✅ Direct MessagePort connected — audio bypasses main thread');
+    }
+
+    // ─── DISCONNECT-PORT: Remove direct audio path ───
+    if (action === 'disconnect-port') {
+        if (directPort) {
+            directPort.onmessage = null;
+            directPort.close();
+            directPort = null;
+        }
+    }
 
     // ─── INIT: cargar modelo + crear recognizer + arrancar timer ───
     if (action === 'init') {
@@ -113,10 +143,11 @@ self.onmessage = async (e) => {
         }
     }
 
-    // ─── PROCESS: alimentar audio al recognizer ───
+    // ─── PROCESS: alimentar audio al recognizer (fallback from main thread) ───
     if (action === 'process' && recognizer && running) {
         try {
             const rawData = data instanceof Float32Array ? data : new Float32Array(data);
+            // Data from main thread is still at native sample rate — downsample
             const downsampled = downsampleBuffer(rawData, nativeSampleRate, VOSK_SAMPLE_RATE);
             recognizer.acceptWaveformFloat(downsampled, VOSK_SAMPLE_RATE);
         } catch (err) {
@@ -136,6 +167,11 @@ self.onmessage = async (e) => {
     if (action === 'destroy') {
         running = false;
         clearInterval(amnesiaTimer);
+        if (directPort) {
+            directPort.onmessage = null;
+            try { directPort.close(); } catch (e) {}
+            directPort = null;
+        }
         if (recognizer) {
             try { recognizer.remove(); } catch (e) {}
             recognizer = null;
