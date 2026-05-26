@@ -1069,14 +1069,6 @@ export default function useVoiceCopilot({
                                     playFeedbackSound();
                                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
 
-                                    // Reset recognizer para que el POI se detecte limpio
-                                    if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ 
-                                            action: 'reset',
-                                            grammar: JSON.stringify(grammarList)
-                                        });
-                                    }
-
                                     // Timeout de atención: 6s para decir el POI
                                     if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     attentionTimeoutRef.current = setTimeout(() => {
@@ -1085,6 +1077,12 @@ export default function useVoiceCopilot({
                                             stateRef.current = 'listening';
                                             setLastTranscript('');
                                             setDictatedText('');
+                                            if (voskWorkerRef.current) {
+                                                voskWorkerRef.current.postMessage({ 
+                                                    action: 'reset',
+                                                    grammar: JSON.stringify(grammarList)
+                                                });
+                                            }
                                         }
                                     }, 6000);
 
