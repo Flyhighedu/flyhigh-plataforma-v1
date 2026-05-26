@@ -19,7 +19,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 // ═══════════════════════════════════════════════════════════════
 
 const CROSSFADE_DURATION_MS = 1500;
-const DUCK_FADE_MS = 500;
+const DUCK_FADE_DOWN_MS = 250;
+const DUCK_FADE_UP_MS = 600;
 const DUCK_VOLUME = 0.05;
 const FULL_VOLUME = 1.0;
 
@@ -380,27 +381,25 @@ export default function useFlightAudio({ copilotVoiceState = 'off' } = {}) {
     // Auto-Ducking — React to copilot voice state
     // ══════════════════════════════════════════════════════
     useEffect(() => {
-        if (phaseRef.current !== 'in_flight') return;
-
-        const activeAudio = flightAudioRef.current;
+        const activeAudio = getActiveAudio();
         if (!activeAudio) return;
 
-        if (copilotVoiceState === 'playing') {
-            // Duck: lower volume to 20%
+        if (copilotVoiceState === 'playing' || copilotVoiceState === 'matched') {
+            // Duck: bajar volumen al 5%
             if (!isDuckedRef.current) {
                 isDuckedRef.current = true;
                 if (duckCleanupRef.current) duckCleanupRef.current();
-                duckCleanupRef.current = fadeVolume(activeAudio, DUCK_VOLUME, DUCK_FADE_MS);
+                duckCleanupRef.current = fadeVolume(activeAudio, DUCK_VOLUME, DUCK_FADE_DOWN_MS);
             }
         } else {
-            // Unduck: restore to 100%
+            // Unduck: restaurar al 100%
             if (isDuckedRef.current) {
                 isDuckedRef.current = false;
                 if (duckCleanupRef.current) duckCleanupRef.current();
-                duckCleanupRef.current = fadeVolume(activeAudio, FULL_VOLUME, DUCK_FADE_MS);
+                duckCleanupRef.current = fadeVolume(activeAudio, FULL_VOLUME, DUCK_FADE_UP_MS);
             }
         }
-    }, [copilotVoiceState]);
+    }, [copilotVoiceState, getActiveAudio]);
 
     // ══════════════════════════════════════════════════════
     // Manual Controls (Mini-Player Plan B)
