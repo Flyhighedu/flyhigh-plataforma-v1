@@ -855,29 +855,25 @@ export default function OperationUI({
             {/* ── Escuadrón Slot (overlays injected by smart container) ── */}
             {escuadronSlot}
 
-            {/* ── Overlay Minimalista de Narración a Pantalla Completa ── */}
+            {/* ── Overlay de Cancelación a Pantalla Completa (Verde Sólido, Sin Animaciones, Texto Abajo) ── */}
             {voicePlayingPoiId && peripheralState === 'playing' && (() => {
                 const activePoi = (pois || []).find(p => p && p.id === voicePlayingPoiId);
                 if (!activePoi) return null;
                 return (
                     <div 
                         onClick={handleCancelNarration}
-                        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center text-center p-6 backdrop-blur-md bg-slate-950/80 transition-all duration-300 animate-in fade-in cursor-pointer"
+                        className="fixed inset-0 z-[9999] flex flex-col justify-end items-start p-10 md:p-16 pb-24 md:pb-32 bg-emerald-500 cursor-pointer select-none"
                     >
-                        <div className="max-w-2xl px-4 space-y-8 select-none">
-                            <div className="space-y-3">
-                                <div className="flex justify-center">
-                                    <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.25em] text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">
-                                        Copiloto narrando
-                                    </span>
-                                </div>
-                                <h2 className="text-4xl md:text-7xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-indigo-400 py-2 animate-[pulse_2.5s_cubic-bezier(0.4,0,0.6,1)_infinite]">
-                                    {activePoi.name}
-                                </h2>
-                            </div>
-                            <div className="pt-8 border-t border-white/10">
-                                <p className="text-[10px] md:text-xs text-slate-400/80 font-bold uppercase tracking-[0.2em] animate-pulse">
-                                    Toca en cualquier parte de la pantalla para cancelar narración
+                        <div className="w-full max-w-4xl space-y-4">
+                            <span className="text-xs md:text-sm font-black uppercase tracking-[0.25em] text-emerald-100">
+                                Copiloto narrando
+                            </span>
+                            <h2 className="text-6xl md:text-8xl font-black text-white leading-tight uppercase">
+                                {activePoi.name}
+                            </h2>
+                            <div className="pt-6 border-t border-emerald-400/60 max-w-xl">
+                                <p className="text-xs md:text-sm text-emerald-100 font-extrabold uppercase tracking-[0.15em]">
+                                    Toca cualquier parte de la pantalla para cancelar narración
                                 </p>
                             </div>
                         </div>
