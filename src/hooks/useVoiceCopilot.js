@@ -45,14 +45,29 @@ export function normalizeCommand(text) {
         .join(' ') || text.toLowerCase().trim().split(/\s+/)[0] || '';
 }
 
+const PHONETIC_NORMALIZATION_MAP = {
+    // Variantes fonéticas/ortográficas de Jicalán
+    'xicalan': 'jicalan',
+    'gicalan': 'jicalan',
+    'hicalan': 'jicalan',
+    'yicalan': 'jicalan',
+    'chicalan': 'jicalan',
+    'icalan': 'jicalan'
+};
+
 function normalizeFull(text) {
     if (!text) return '';
-    return text
+    const clean = text
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-zA-Z0-9\s]/g, '')
         .toLowerCase()
         .trim();
+    
+    return clean
+        .split(/\s+/)
+        .map(w => PHONETIC_NORMALIZATION_MAP[w] || w)
+        .join(' ');
 }
 
 function levenshteinDistance(a, b) {
@@ -288,6 +303,15 @@ export default function useVoiceCopilot({
             return ACCENT_CORRECTIONS[unaccented] || w;
         };
 
+        const JICALAN_PHONETIC_VARIATIONS = [
+            'jicalan', 'jicalán',
+            'xicalan', 'xicalán',
+            'gicalan', 'gicalán',
+            'hicalan', 'hicalán',
+            'icalan', 'icalán',
+            'chicalan', 'chicalán'
+        ];
+
         // 3. POIs vocabulary words/phrases
         pois.forEach(poi => {
             if (!poi.name) return;
@@ -297,10 +321,15 @@ export default function useVoiceCopilot({
 
             const rawWords = rawClean.split(/\s+/).filter(Boolean);
             rawWords.forEach(w => {
+                const unaccented = getUnaccentedWord(w);
                 if (w.length > 2) {
                     words.add(w); // Con acento original
-                    words.add(getUnaccentedWord(w)); // Sin acento
+                    words.add(unaccented); // Sin acento
                     words.add(getCorrectedWord(w)); // Con acento corregido
+                    
+                    if (unaccented === 'jicalan') {
+                        JICALAN_PHONETIC_VARIATIONS.forEach(v => words.add(v));
+                    }
                 }
             });
 
@@ -310,6 +339,14 @@ export default function useVoiceCopilot({
             // Frase con acento corregido palabra por palabra
             const correctedPhrase = rawWords.map(getCorrectedWord).join(' ');
             words.add(correctedPhrase);
+
+            // Inyectar combinaciones de frases fonéticas para Jicalán
+            if (rawClean.includes('jicalan') || rawClean.includes('jicalán')) {
+                JICALAN_PHONETIC_VARIATIONS.forEach(variant => {
+                    words.add(rawClean.replace(/jicalan|jicalán/g, variant));
+                    words.add(getUnaccentedWord(rawClean).replace(/jicalan|jicalán/g, variant));
+                });
+            }
         });
 
         const result = Array.from(words);
