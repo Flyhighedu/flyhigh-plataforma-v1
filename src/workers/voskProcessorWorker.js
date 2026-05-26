@@ -4,7 +4,7 @@ import { createModel } from 'vosk-browser';
 // CONFIGURACIÓN
 // ═══════════════════════════════════════════════════════════════
 const VOSK_SAMPLE_RATE = 16000;
-const AMNESIA_INTERVAL_MS = 10000; // Reseteo limpio cada 10 segundos
+const AMNESIA_INTERVAL_MS = 30000; // [PERF FIX] 30s gives Vosk more acoustic context (was 10s)
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO (mínimo)

@@ -138,6 +138,7 @@ export default function useVoiceCopilot({
     const [matchedPoi, setMatchedPoi] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isDetectingVoice, setIsDetectingVoice] = useState(false);
+    const lastDetectingRef = useRef(false); // [PERF FIX] dedup to avoid re-renders
     const [internalMicLabel, setInternalMicLabel] = useState(null);
     // If using shared mic, prefer its label; otherwise use internal label
     const activeMicLabel = sharedMicLabel || internalMicLabel;
@@ -448,7 +449,12 @@ export default function useVoiceCopilot({
             const vadThreshold = sensitivity >= 1.0 ? 0 : (1.0 - sensitivity) * 0.04;
             const isVoiceActive = energy >= vadThreshold;
 
-            setIsDetectingVoice(isVoiceActive || vadTrailingCounter > 0);
+            // [PERF FIX] Only trigger re-render when detection state actually changes
+            const newDetecting = isVoiceActive || vadTrailingCounter > 0;
+            if (newDetecting !== lastDetectingRef.current) {
+                lastDetectingRef.current = newDetecting;
+                setIsDetectingVoice(newDetecting);
+            }
 
             const mode = engineModeRef.current;
             if (mode === 'vosk' || mode === 'pocketsphinx-js') {

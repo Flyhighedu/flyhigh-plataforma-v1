@@ -23,6 +23,9 @@ import PauseActiveOverlay from '@/components/staff/PauseActiveOverlay';
 import ResumeProtocolModal from '@/components/staff/ResumeProtocolModal';
 import CopilotOrbUI from '@/components/staff/CopilotOrbUI';
 import FlightMiniPlayer from '@/components/staff/FlightMiniPlayer';
+// [PERF FIX] Self-ticking timer hook — only re-renders OperationUI, not
+// the entire 2035-line StaffOperationLegacy parent.
+import useElapsedTimer from '@/hooks/useElapsedTimer';
 
 function formatTime(seconds) {
     const safe = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -51,8 +54,10 @@ export default function OperationUI({
     // ── Timers ──
     operationElapsedSeconds = 0,
     showOperationTimer = false,
+    operationStartedAtMs = 0,
     interFlightElapsedSeconds = 0,
     showInterFlightTimer = false,
+    interFlightStartMs = 0,
     totalStudentsFlown = 0,
 
     // ── Sync Badge ──
@@ -124,6 +129,15 @@ export default function OperationUI({
     // ── Audio ref for VoiceSimulatorWidget ──
     const voiceAudioRef = useRef(null);
     const copilotRef = useRef(null);
+
+    // [PERF FIX] Self-ticking timers — compute elapsed seconds locally
+    // instead of receiving them from StaffOperationLegacy (which was
+    // re-rendering its entire 2035-line tree every second).
+    const localOperationElapsed = useElapsedTimer(operationStartedAtMs, showOperationTimer);
+    const localInterFlightElapsed = useElapsedTimer(interFlightStartMs, showInterFlightTimer);
+    // Use local values if parent sends 0 (new behavior), fallback to prop values (backward compat)
+    const effectiveOperationElapsed = operationElapsedSeconds > 0 ? operationElapsedSeconds : localOperationElapsed;
+    const effectiveInterFlightElapsed = interFlightElapsedSeconds > 0 ? interFlightElapsedSeconds : localInterFlightElapsed;
 
     // ── Local UI-only state (no business logic) ──
     const [showMenu, setShowMenu] = useState(false);
@@ -403,7 +417,7 @@ export default function OperationUI({
                         </p>
                         <p className={`text-[11px] font-black tabular-nums tracking-wider transition-colors ${isPeripheralActive ? 'text-white/80' : 'text-slate-700'}`}>
                             {(() => {
-                                const total = Math.max(0, Math.floor(operationElapsedSeconds || 0));
+                                const total = Math.max(0, Math.floor(effectiveOperationElapsed || 0));
                                 const mins = Math.floor(total / 60).toString().padStart(2, '0');
                                 const secs = (total % 60).toString().padStart(2, '0');
                                 return `${mins}:${secs}`;
@@ -534,9 +548,9 @@ export default function OperationUI({
                                         nextFlightNumber={nextFlightNumber}
                                         activeFlightNumber={activeFlightNumber}
                                         showInterFlightTimer={showInterFlightTimer}
-                                        interFlightElapsedSeconds={interFlightElapsedSeconds}
+                                        interFlightElapsedSeconds={effectiveInterFlightElapsed}
                                         totalStudentsFlown={totalStudentsFlown}
-                                        totalOperationElapsedSeconds={operationElapsedSeconds}
+                                        totalOperationElapsedSeconds={effectiveOperationElapsed}
                                         showTotalOperationTimer={showOperationTimer}
                                         disabled={!!activePause}
                                         pilotRecording={currentRole === 'pilot' && pilotRecording}

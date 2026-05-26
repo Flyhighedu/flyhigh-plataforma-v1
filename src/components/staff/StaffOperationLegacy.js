@@ -300,7 +300,9 @@ export default function StaffOperationLegacy({
     const [activePause, setActivePause] = useState(null);
     const [showResumeModal, setShowResumeModal] = useState(false);
     const [completedPauses, setCompletedPauses] = useState([]);
-    const [nowMs, setNowMs] = useState(Date.now());
+    // [PERF FIX] Removed setNowMs state — it was causing a full re-render of this
+    // 2035-line component every second. nowMsRef is updated silently; elapsed
+    // timers are computed locally in OperationUI via useElapsedTimer.
     const nowMsRef = useRef(Date.now());
     const [flightEditModal, setFlightEditModal] = useState(null);
     const [editedStudentCount, setEditedStudentCount] = useState('0');
@@ -478,9 +480,10 @@ export default function StaffOperationLegacy({
     const router = useRouter();
 
     useEffect(() => {
+        // [PERF FIX] Only update the ref, NO setState. Timer display
+        // is handled by useElapsedTimer inside OperationUI.
         const timer = setInterval(() => {
             nowMsRef.current = Date.now();
-            setNowMs(nowMsRef.current);
         }, 1000);
 
         return () => clearInterval(timer);
@@ -1141,9 +1144,6 @@ export default function StaffOperationLegacy({
     );
     // [BUG-FIX] Only show inter-flight timer when operation phase is still active
     const showInterFlightTimer = !activeFlight && missionFlights.length > 0 && lastMissionFlightEndMs > 0 && isOperationPhaseActive;
-    const interFlightElapsedSeconds = showInterFlightTimer
-        ? Math.max(0, Math.floor((nowMs - lastMissionFlightEndMs) / 1000))
-        : 0;
 
     const totalStudentsFlown = missionFlights.reduce((acc, flight) => {
         const students = Number(flight?.studentCount ?? flight?.student_count ?? 0);
@@ -1176,9 +1176,9 @@ export default function StaffOperationLegacy({
         ? Math.min(...operationAnchorCandidates)
         : 0;
 
-    const operationElapsedSeconds = operationStartedAtMs > 0
-        ? Math.max(0, Math.floor((nowMs - operationStartedAtMs) / 1000))
-        : 0;
+    // [PERF FIX] operationElapsedSeconds and interFlightElapsedSeconds are now
+    // computed locally in OperationUI via useElapsedTimer, instead of here with
+    // a global setNowMs that caused full re-renders of this 2035-line component.
 
     // ── Pilot Audio: Upload telemetry and trigger AI audit (fire-and-forget) ──
     const uploadPilotTelemetry = useCallback(async (blob, flightNumber) => {
@@ -1748,10 +1748,12 @@ export default function StaffOperationLegacy({
                 activeFlightNumber={activeFlightNumber}
                 activePause={activePause}
                 completedPauses={completedPauses}
-                operationElapsedSeconds={operationElapsedSeconds}
+                operationElapsedSeconds={0}
                 showOperationTimer={operationStartedAtMs > 0}
-                interFlightElapsedSeconds={interFlightElapsedSeconds}
+                operationStartedAtMs={operationStartedAtMs}
+                interFlightElapsedSeconds={0}
                 showInterFlightTimer={showInterFlightTimer}
+                interFlightStartMs={lastMissionFlightEndMs}
                 totalStudentsFlown={totalStudentsFlown}
                 pendingSyncCount={pendingSyncCount}
                 onFlightStart={handleFlightStart}
