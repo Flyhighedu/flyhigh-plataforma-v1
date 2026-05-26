@@ -11,6 +11,19 @@ import { useRNNoise } from './useRNNoise';
 const VAD_ENERGY_THRESHOLD = 0.02;
 const VAD_TRAILING_FRAMES = 5;
 
+const ACCENT_CORRECTIONS = {
+    'teleferico': 'teleférico',
+    'fabrica': 'fábrica',
+    'jicalan': 'jicalán',
+    'michoacan': 'michoacán',
+    'aguila': 'águila',
+    'que': 'qué',
+    'estan': 'están',
+    'como': 'cómo',
+    'ecologico': 'ecológico',
+    'publica': 'pública'
+};
+
 function getAudioEnergy(buffer) {
     let sum = 0;
     for (let i = 0; i < buffer.length; i++) {
@@ -258,27 +271,45 @@ export default function useVoiceCopilot({
             ['computadora', 'computador', 'compu', 'conputadora', 'comutadora'].forEach(w => words.add(w));
         }
 
+        const cleanTextWithAccents = (text) => {
+            if (!text) return '';
+            return text
+                .toLowerCase()
+                .replace(/[^a-zA-Z0-9\sáéíóúüñ]/g, '')
+                .trim();
+        };
+
+        const getUnaccentedWord = (w) => {
+            return w.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        };
+
+        const getCorrectedWord = (w) => {
+            const unaccented = getUnaccentedWord(w);
+            return ACCENT_CORRECTIONS[unaccented] || w;
+        };
+
         // 3. POIs vocabulary words/phrases
         pois.forEach(poi => {
             if (!poi.name) return;
             
-            const normName = poi.name
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9\s]/g, '')
-                .toLowerCase()
-                .trim();
-            
-            if (normName) {
-                words.add(normName);
-                normName.split(/\s+/).filter(w => w.length > 2).forEach(w => words.add(w));
-            }
+            const rawClean = cleanTextWithAccents(poi.name);
+            if (!rawClean) return;
 
-            const cmd = normalizeCommand(poi.name);
-            if (cmd) {
-                words.add(cmd);
-                cmd.split(/\s+/).filter(w => w.length > 2).forEach(w => words.add(w));
-            }
+            const rawWords = rawClean.split(/\s+/).filter(Boolean);
+            rawWords.forEach(w => {
+                if (w.length > 2) {
+                    words.add(w); // Con acento original
+                    words.add(getUnaccentedWord(w)); // Sin acento
+                    words.add(getCorrectedWord(w)); // Con acento corregido
+                }
+            });
+
+            words.add(rawClean); // Frase con acento original
+            words.add(getUnaccentedWord(rawClean)); // Frase sin acento
+            
+            // Frase con acento corregido palabra por palabra
+            const correctedPhrase = rawWords.map(getCorrectedWord).join(' ');
+            words.add(correctedPhrase);
         });
 
         const result = Array.from(words);
