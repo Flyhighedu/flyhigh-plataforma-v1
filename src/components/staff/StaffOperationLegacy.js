@@ -1783,9 +1783,16 @@ export default function StaffOperationLegacy({
                 pilotMicPermission={pilotMicPermission}
                 pilotMicSupported={pilotMicSupported}
                 onRetryMicPermission={currentRole === 'pilot' ? async () => {
-                    const ok = await startPilotRecording();
-                    if (ok) cancelPilotRecording();
-                    return ok;
+                    try {
+                        const stream = await sharedMic.startMicrophone();
+                        if (stream) {
+                            sharedMic.stopMicrophone();
+                            return true;
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Falló la verificación de permisos:', e);
+                    }
+                    return false;
                 } : null}
                 currentRole={currentRole}
                 pois={voicePois}

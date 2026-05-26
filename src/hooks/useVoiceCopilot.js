@@ -183,6 +183,7 @@ export default function useVoiceCopilot({
     const processorNodeRef = useRef(null);
     const analyserRef = useRef(null);
     const gainNodeRef = useRef(null);
+    const isStreamSharedRef = useRef(false);
     
     // Vosk Worker
     const voskWorkerRef = useRef(null);
@@ -300,15 +301,13 @@ export default function useVoiceCopilot({
                 }
             } catch(e){}
         }
-        // [PLAN A] Only stop the MediaStream if we OWN it (no shared stream).
-        // If using a shared stream, the stream lifecycle is managed by useSharedMicrophone.
-        if (mediaStreamRef.current && !sharedStreamRef) {
+        // [PLAN A] Only stop the MediaStream if we OWN it (no shared stream was actually used).
+        if (mediaStreamRef.current && !isStreamSharedRef.current) {
             try {
                 mediaStreamRef.current.getTracks().forEach(track => track.stop());
             } catch(e){}
             mediaStreamRef.current = null;
-        } else if (sharedStreamRef) {
-            // Don't stop the shared stream — just release our local reference
+        } else {
             mediaStreamRef.current = null;
         }
         setIsDetectingVoice(false);
@@ -319,6 +318,7 @@ export default function useVoiceCopilot({
         if (mediaStreamRef.current) return mediaStreamRef.current;
         
         let stream;
+        let isShared = false;
 
         // [PLAN A] If a shared stream is available, use it instead of calling getUserMedia.
         // The shared stream is managed by useSharedMicrophone and already has external mic preference.
@@ -328,6 +328,7 @@ export default function useVoiceCopilot({
                 console.log('[VoiceCopilot] Using shared microphone stream');
                 stream = sharedStreamRef.current;
                 mediaStreamRef.current = stream;
+                isShared = true;
             }
         }
 
@@ -386,12 +387,15 @@ export default function useVoiceCopilot({
             };
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             mediaStreamRef.current = stream;
+            isShared = false;
 
             const activeTrack = stream.getAudioTracks()[0];
             const finalLabel = activeTrack?.label || selectedLabel;
             setInternalMicLabel(finalLabel);
             console.log('[VoiceCopilot] 🎤 Micrófono activo (propio):', finalLabel);
         }
+
+        isStreamSharedRef.current = isShared;
 
         let audioCtx = audioContextRef.current;
         if (!audioCtx || audioCtx.state === 'closed') {
@@ -1257,6 +1261,15 @@ export default function useVoiceCopilot({
             }
         };
     }, []);
+
+    // Reactively start or stop listening based on the controlled isActive prop
+    useEffect(() => {
+        if (isActive) {
+            startListening();
+        } else {
+            stopListening();
+        }
+    }, [isActive, startListening, stopListening]);
 
     const handleToggle = useCallback(() => {
         if (isActive) {

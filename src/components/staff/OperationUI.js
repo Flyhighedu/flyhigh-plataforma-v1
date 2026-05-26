@@ -528,17 +528,11 @@ export default function OperationUI({
                                     <MemoizedFlightLogger
                                         key={activeFlight?.flightId ? `active-${activeFlight.flightId}` : 'idle-flight-logger'}
                                         onFlightComplete={(data) => {
-                                            if (voiceSetIsActive && copilotRef.current) {
-                                                copilotRef.current.stopListening();
-                                            }
                                             if (typeof onFlightComplete === 'function') {
                                                 return onFlightComplete(data);
                                             }
                                         }}
                                         onFlightStart={(payload) => {
-                                            if (voiceSetIsActive && copilotRef.current) {
-                                                copilotRef.current.startListening();
-                                            }
                                             if (typeof onFlightStart === 'function') {
                                                 return onFlightStart(payload);
                                             }

@@ -49,6 +49,7 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
     const timerRef = useRef(null);
     const resolveStopRef = useRef(null);
     const durationRef = useRef(0);
+    const isStreamSharedRef = useRef(false);
 
     // Feature detection
     const isSupported = typeof window !== 'undefined' &&
@@ -80,18 +81,19 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
             try {
                 mediaRecorderRef.current?.stop();
                 // [PLAN A] Only stop tracks if we OWN the stream (not shared)
-                if (!sharedStreamRef) {
+                if (!isStreamSharedRef.current) {
                     streamRef.current?.getTracks().forEach(t => t.stop());
                 }
             } catch (_e) { /* cleanup best-effort */ }
         };
-    }, [sharedStreamRef]);
+    }, []);
 
     const startRecording = useCallback(async () => {
         if (!isSupported || isRecording) return false;
 
         try {
             let stream;
+            let isShared = false;
 
             // [PLAN A] Use shared stream if available, avoiding a second getUserMedia
             if (sharedStreamRef && sharedStreamRef.current) {
@@ -99,6 +101,7 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
                 if (tracks.length > 0 && tracks[0].readyState === 'live') {
                     console.log('[AudioRecorder] Using shared microphone stream');
                     stream = sharedStreamRef.current;
+                    isShared = true;
                 }
             }
 
@@ -114,9 +117,11 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
                         channelCount: 1
                     }
                 });
+                isShared = false;
             }
 
             streamRef.current = stream;
+            isStreamSharedRef.current = isShared;
             chunksRef.current = [];
             setPermissionState('granted');
 
@@ -189,12 +194,12 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
             setIsPaused(false);
 
             // [PLAN A] Only stop tracks if we OWN the stream (not shared)
-            if (!sharedStreamRef) {
+            if (!isStreamSharedRef.current) {
                 streamRef.current?.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
             }
         });
-    }, [sharedStreamRef]);
+    }, []);
 
     const cancelRecording = useCallback(() => {
         clearInterval(timerRef.current);
@@ -208,7 +213,7 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
         } catch (_e) { /* best-effort */ }
 
         // [PLAN A] Only stop tracks if we OWN the stream (not shared)
-        if (!sharedStreamRef) {
+        if (!isStreamSharedRef.current) {
             streamRef.current?.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
@@ -217,7 +222,7 @@ export default function useAudioRecorder({ sharedStreamRef = null } = {}) {
         setIsRecording(false);
         setIsPaused(false);
         setDurationSeconds(0);
-    }, [sharedStreamRef]);
+    }, []);
 
     return {
         isSupported,
