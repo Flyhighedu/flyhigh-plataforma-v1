@@ -16,6 +16,7 @@ let voskSampleRate = VOSK_SAMPLE_RATE;
 let amnesiaTimer = null;
 let running = false;
 let directPort = null; // [PERF] MessagePort from AudioWorklet — bypasses main thread
+let currentGrammar = null;
 
 // ═══════════════════════════════════════════════════════════════
 // DOWNSAMPLER (48kHz → 16kHz)
@@ -57,8 +58,12 @@ function recreateRecognizer() {
         recognizer = null;
     }
 
-    // Crear uno nuevo, completamente limpio
-    recognizer = new model.KaldiRecognizer(voskSampleRate);
+    // Crear uno nuevo, completamente limpio (usando gramática si está provista para optimizar CPU)
+    if (currentGrammar) {
+        recognizer = new model.KaldiRecognizer(voskSampleRate, currentGrammar);
+    } else {
+        recognizer = new model.KaldiRecognizer(voskSampleRate);
+    }
     recognizer.setWords(true);
 
     // Eventos: simplemente reenviar al hilo principal
@@ -127,9 +132,10 @@ self.onmessage = async (e) => {
 
     // ─── INIT: cargar modelo + crear recognizer + arrancar timer ───
     if (action === 'init') {
-        const { modelUrl, sampleRate, deviceSampleRate } = data;
+        const { modelUrl, sampleRate, deviceSampleRate, grammar } = data;
         nativeSampleRate = deviceSampleRate || 48000;
         voskSampleRate = sampleRate || VOSK_SAMPLE_RATE;
+        currentGrammar = grammar || null;
 
         try {
             self.postMessage({ type: 'status', status: 'booting' });
@@ -157,6 +163,10 @@ self.onmessage = async (e) => {
 
     // ─── RESET: recrear recognizer limpio + reiniciar timer ───
     if (action === 'reset') {
+        const { grammar } = e.data || {};
+        if (grammar !== undefined) {
+            currentGrammar = grammar;
+        }
         console.log('[Vosk] Reset solicitado');
         recreateRecognizer();
         startAmnesiaTimer();

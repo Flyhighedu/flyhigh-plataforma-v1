@@ -224,6 +224,52 @@ export default function useVoiceCopilot({
             }));
     }, [pois]);
 
+    // Build the dynamic grammar list for Vosk to optimize CPU and eliminate lag
+    const grammarList = useMemo(() => {
+        const words = new Set();
+        // 1. Unknown token for out-of-vocabulary sounds
+        words.add('[unk]');
+        
+        // 2. Wake word variations
+        const normWake = (wakeWord || '').toLowerCase().trim();
+        if (normWake) {
+            words.add(normWake);
+            normWake.split(/\s+/).forEach(w => {
+                if (w.length > 2) words.add(w);
+            });
+        }
+        if (normWake === 'computadora') {
+            ['computadora', 'computador', 'compu', 'conputadora', 'comutadora'].forEach(w => words.add(w));
+        }
+
+        // 3. POIs vocabulary words/phrases
+        pois.forEach(poi => {
+            if (!poi.name) return;
+            
+            const normName = poi.name
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-zA-Z0-9\s]/g, '')
+                .toLowerCase()
+                .trim();
+            
+            if (normName) {
+                words.add(normName);
+                normName.split(/\s+/).filter(w => w.length > 2).forEach(w => words.add(w));
+            }
+
+            const cmd = normalizeCommand(poi.name);
+            if (cmd) {
+                words.add(cmd);
+                cmd.split(/\s+/).filter(w => w.length > 2).forEach(w => words.add(w));
+            }
+        });
+
+        const result = Array.from(words);
+        console.log('[VoiceCopilot] 📝 Gramática generada para Vosk (palabras/frases):', result.length, result);
+        return result;
+    }, [pois, wakeWord]);
+
     const findMatchInBuffer = useCallback((text) => {
         const norm = normalizeFull(text);
         if (!norm || norm.length < 4) return null;
@@ -1105,7 +1151,8 @@ export default function useVoiceCopilot({
                         data: {
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
-                            deviceSampleRate: audioCtx.sampleRate
+                            deviceSampleRate: audioCtx.sampleRate,
+                            grammar: JSON.stringify(grammarList)
                         }
                     });
 
@@ -1150,7 +1197,10 @@ export default function useVoiceCopilot({
                         }
                     }
                 } else {
-                    voskWorkerRef.current.postMessage({ action: 'reset' });
+                    voskWorkerRef.current.postMessage({ 
+                        action: 'reset',
+                        grammar: JSON.stringify(grammarList)
+                    });
                     setVoiceState('listening');
                     stateRef.current = 'listening';
                 }

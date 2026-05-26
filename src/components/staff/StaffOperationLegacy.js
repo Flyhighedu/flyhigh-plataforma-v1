@@ -339,6 +339,16 @@ export default function StaffOperationLegacy({
     const pilotRecDurationRef = useRef(0);
     useEffect(() => { pilotRecDurationRef.current = pilotRecDuration; }, [pilotRecDuration]);
 
+    // ── Auto-activate Shared Microphone for Pilot ──
+    useEffect(() => {
+        if (currentRole === 'pilot' && pilotMicSupported) {
+            console.log('[StaffOp] 🎤 Auto-iniciando micrófono compartido para el piloto');
+            sharedMic.startMicrophone().catch(err => {
+                console.warn('⚠️ Auto-start microphone failed:', err);
+            });
+        }
+    }, [currentRole, pilotMicSupported]);
+
     // ── Fetch + Realtime POIs for Sistema de Narración ──
     // Official POIs: fetched immediately (no auth needed — API uses service role)
     // Personal POIs: fetched when userId is available (client-side auth)
