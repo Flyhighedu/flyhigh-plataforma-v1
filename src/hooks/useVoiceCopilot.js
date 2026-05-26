@@ -269,6 +269,19 @@ export default function useVoiceCopilot({
         return result;
     }, [pois, wakeWord]);
 
+    const grammarListRef = useRef(grammarList);
+    useEffect(() => {
+        grammarListRef.current = grammarList;
+        // Si el worker de Vosk está activo, actualizar su gramática de inmediato
+        if (stateRef.current !== 'off' && engineModeRef.current === 'vosk' && voskWorkerRef.current) {
+            console.log('[VoiceCopilot] 📝 Actualizando gramática del reconocedor en ejecución con POIs cargados.');
+            voskWorkerRef.current.postMessage({
+                action: 'reset',
+                grammar: JSON.stringify(grammarList)
+            });
+        }
+    }, [grammarList]);
+
     const findMatchInBuffer = useCallback((text) => {
         const norm = normalizeFull(text);
         if (!norm || norm.length < 3) return null;
@@ -1080,7 +1093,7 @@ export default function useVoiceCopilot({
                                             if (voskWorkerRef.current) {
                                                 voskWorkerRef.current.postMessage({ 
                                                     action: 'reset',
-                                                    grammar: JSON.stringify(grammarList)
+                                                    grammar: JSON.stringify(grammarListRef.current)
                                                 });
                                             }
                                         }
@@ -1105,7 +1118,7 @@ export default function useVoiceCopilot({
                                     if (voskWorkerRef.current) {
                                         voskWorkerRef.current.postMessage({ 
                                             action: 'reset',
-                                            grammar: JSON.stringify(grammarList)
+                                            grammar: JSON.stringify(grammarListRef.current)
                                         });
                                     }
                                     
@@ -1135,7 +1148,7 @@ export default function useVoiceCopilot({
                             modelUrl: '/vosk-models/vosk-model-small-es-0.42.zip',
                             sampleRate: 16000,
                             deviceSampleRate: audioCtx.sampleRate,
-                            grammar: JSON.stringify(grammarList)
+                            grammar: JSON.stringify(grammarListRef.current)
                         }
                     });
 
@@ -1182,7 +1195,7 @@ export default function useVoiceCopilot({
                 } else {
                     voskWorkerRef.current.postMessage({ 
                         action: 'reset',
-                        grammar: JSON.stringify(grammarList)
+                        grammar: JSON.stringify(grammarListRef.current)
                     });
                     setVoiceState('listening');
                     stateRef.current = 'listening';
