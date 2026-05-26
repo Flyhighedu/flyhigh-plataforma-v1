@@ -1491,18 +1491,22 @@ export default function StaffOperationLegacy({
             await clearActiveFlight(completedFlightId);
 
             // [CRITICAL FIX] Always attempt sync — navigator.onLine is unreliable on mobile PWAs
-            // If sync fails, the retry queue (every 30s) will pick it up automatically
-            const success = await syncFlightLog(newLog);
-            if (success) {
-                newLog.synced = true;
-                const syncedLogs = dedupeFlightLogs(updatedLogs.map(l => l.id === newLog.id ? newLog : l));
-                localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
-                setFlightLogs(syncedLogs);
-                setPendingSyncCount(prev => Math.max(0, prev - 1));
-            } else {
+            // Run asynchronously in the background so it never blocks the UI/landing completion
+            syncFlightLog(newLog).then((success) => {
+                if (success) {
+                    newLog.synced = true;
+                    const syncedLogs = dedupeFlightLogs(updatedLogs.map(l => l.id === newLog.id ? newLog : l));
+                    localStorage.setItem('flyhigh_flight_logs', JSON.stringify(syncedLogs));
+                    setFlightLogs(syncedLogs);
+                    setPendingSyncCount(prev => Math.max(0, prev - 1));
+                } else {
+                    setPendingSyncCount(prev => prev + 1);
+                    console.warn('⚠️ Sync falló — vuelo en cola de retry automático (cada 30s)');
+                }
+            }).catch((err) => {
                 setPendingSyncCount(prev => prev + 1);
-                console.warn('⚠️ Sync falló — vuelo en cola de retry automático (cada 30s)');
-            }
+                console.warn('⚠️ Sync falló con error:', err);
+            });
         } finally {
             processingFlightIdsRef.current.delete(completedFlightId);
         }
