@@ -1581,9 +1581,16 @@ export default function StaffDashboard() {
                         }
 
                         if (['PILOT_PREP', 'prep'].includes(newState)) {
-                            console.warn('⚠️ Global Reset (State Change) Detected! Reloading...');
-                            clearJourneyLocalOperationalData(journeyId);
-                            window.location.reload();
+                            // CRITICAL: Only reload if state CHANGED to prep (actual global reset).
+                            // Previously this would reload on ANY update while state was 'prep',
+                            // causing the teacher to be kicked back to PrepChecklist repeatedly.
+                            const prevState = prevMissionStateRef.current;
+                            const isActualReset = prevState && !['PILOT_PREP', 'prep', null, undefined].includes(prevState);
+                            if (isActualReset) {
+                                console.warn(`⚠️ Global Reset (State Change) Detected! ${prevState} → ${newState}. Reloading...`);
+                                clearJourneyLocalOperationalData(journeyId);
+                                window.location.reload();
+                            }
                         }
 
 
