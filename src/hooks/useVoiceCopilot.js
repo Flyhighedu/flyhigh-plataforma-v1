@@ -856,7 +856,7 @@ export default function useVoiceCopilot({
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) return;
 
-        console.log('[VoiceCopilot VAD] Disparando ventana de voz de 6s en modo Offline (Woke)');
+        console.log('[VoiceCopilot VAD] Disparando ventana de voz de 7s en modo Offline (Woke)');
         recognitionActiveRef.current = true;
         
         setDictatedText('');
@@ -897,10 +897,10 @@ export default function useVoiceCopilot({
         if (vadTimeoutRef.current) clearTimeout(vadTimeoutRef.current);
         vadTimeoutRef.current = setTimeout(() => {
             if (recognitionActiveRef.current) {
-                console.log('[VoiceCopilot VAD] Expiró la ventana de 6s.');
+                console.log('[VoiceCopilot VAD] Expiró la ventana de 7s.');
                 try { rec.stop(); } catch(e){}
             }
-        }, 6000);
+        }, 7000);
 
         rec.onerror = (e) => {
             console.error('[VoiceCopilot VAD] Error de reconocimiento:', e);
@@ -1106,7 +1106,7 @@ export default function useVoiceCopilot({
                                     playFeedbackSound();
                                     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(80);
 
-                                    // Timeout de atención: 6s para decir el POI
+                                    // Timeout de atención: 7s para decir el POI
                                     if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     attentionTimeoutRef.current = setTimeout(() => {
                                         if (stateRef.current === 'wake' || stateRef.current === 'matched') {
@@ -1121,7 +1121,7 @@ export default function useVoiceCopilot({
                                                 });
                                             }
                                         }
-                                    }, 6000);
+                                    }, 7000);
 
                                     return;
                                 }
