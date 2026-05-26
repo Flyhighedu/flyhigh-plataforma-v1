@@ -204,8 +204,8 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                         return (
                             <div
                                 key={`pause-${safeText(item.pauseId, 'no-id')}-${idx}`}
-                                className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${isPeripheralActive
-                                    ? 'bg-white/10 border-white/20 backdrop-blur-md'
+                                className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-colors ${isPeripheralActive
+                                    ? 'bg-white/10 border-white/20'
                                     : isReceso
                                         ? 'bg-amber-50 border-amber-200'
                                         : 'bg-red-50 border-red-200'
@@ -240,7 +240,7 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                         return (
                             <div
                                 key={`inter-${safeText(item.key, 'no-key')}-${idx}`}
-                                className={`mx-2 rounded-lg border px-3 py-2 flex items-center justify-between transition-all ${isPeripheralActive ? 'bg-white/10 border-white/20 backdrop-blur-sm' : 'border-slate-200 bg-slate-50/90'}`}
+                                className={`mx-2 rounded-lg border px-3 py-2 flex items-center justify-between transition-colors ${isPeripheralActive ? 'bg-white/10 border-white/20' : 'border-slate-200 bg-slate-50/90'}`}
                             >
                                 <div>
                                     <p className={`text-[10px] font-extrabold uppercase tracking-wide transition-colors ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>Tiempo entre vuelos</p>
@@ -257,7 +257,7 @@ export default function TodayFlightList({ flights, pauses = [], activeFlight = n
                     const studentCount = safeCount(normalizedFlight.studentCount);
 
                     return (
-                        <div key={`flight-${safeText(item.key || item.id, 'no-key')}-${idx}`} className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${isPeripheralActive ? 'bg-white/10 border-white/20 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
+                        <div key={`flight-${safeText(item.key || item.id, 'no-key')}-${idx}`} className={`border rounded-xl p-4 flex items-center justify-between shadow-sm transition-colors ${isPeripheralActive ? 'bg-white/10 border-white/20' : 'bg-white border-slate-200'}`}>
                             <div className="flex items-center gap-4">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${isPeripheralActive ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'}`}>
                                     {flightNumber || '--'}

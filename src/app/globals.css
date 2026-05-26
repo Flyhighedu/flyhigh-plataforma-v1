@@ -43,6 +43,15 @@
   }
 
   --animate-text-shimmer: text-shimmer 3s linear infinite;
+
+  /* [PERF] Lighter alternative to animate-ping — scales to 1.5x instead of 2x,
+     reducing raster area by ~56% while maintaining the visual sonar effect. */
+  @keyframes sonarPing {
+    75%, 100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
 }
 
 /* Body scroll optimization */

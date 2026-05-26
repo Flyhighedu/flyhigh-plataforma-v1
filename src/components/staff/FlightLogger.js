@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useElapsedTimer from '@/hooks/useElapsedTimer';
 import { StopCircle, Clock, Plane, AlertTriangle, XCircle, Mic, MicOff, Settings, RefreshCw } from 'lucide-react';
 import CounterData from './CounterData';
 import IncidentReporter from './IncidentReporter';
@@ -114,7 +115,9 @@ export default function FlightLogger({
     const initialState = buildInitialFlightState(initialActiveFlight);
     const [status, setStatus] = useState(() => initialState.status); // 'idle' (pre-flight), 'active' (in-flight)
     const [startTime, setStartTime] = useState(() => initialState.startTime);
-    const [elapsed, setElapsed] = useState(() => initialState.elapsed);
+    // [PERF FIX] Use useElapsedTimer instead of manual setInterval to avoid
+    // a redundant re-render cycle every second.
+    const elapsed = useElapsedTimer(startTime, status === 'active');
     const [students, setStudents] = useState(() => initialState.students);
     const [staff, setStaff] = useState(() => initialState.staff);
     const [showIncidentModal, setShowIncidentModal] = useState(false);
@@ -130,7 +133,7 @@ export default function FlightLogger({
     const [isLanding, setIsLanding] = useState(false);
     const [showLandConfirm, setShowLandConfirm] = useState(false);
 
-    const timerRef = useRef(null);
+
     const isLandingRef = useRef(false);
     const lastCompletedFlightIdRef = useRef(null);
 
@@ -153,17 +156,8 @@ export default function FlightLogger({
         : 0;
     const shouldShowOperationTimer = showTotalOperationTimer || safeOperationElapsedSeconds > 0;
 
-    // Timer Effect
-    useEffect(() => {
-        if (status === 'active' && startTime) {
-            timerRef.current = setInterval(() => {
-                setElapsed(Math.floor((Date.now() - startTime) / 1000));
-            }, 1000);
-        } else {
-            clearInterval(timerRef.current);
-        }
-        return () => clearInterval(timerRef.current);
-    }, [status, startTime]);
+    // [PERF FIX] Timer is now handled by useElapsedTimer hook above.
+    // No manual setInterval needed — the hook ticks internally.
 
     const handleTakeOff = () => {
         if (isLandingRef.current) return;
@@ -187,7 +181,7 @@ export default function FlightLogger({
         setIsLanding(false);
         setStatus('active');
         setStartTime(takeOffMs);
-        setElapsed(0);
+        // elapsed is now computed by useElapsedTimer (auto-resets when startTime changes)
         setIncidents([]);
         lastCompletedFlightIdRef.current = null;
 
@@ -288,8 +282,7 @@ export default function FlightLogger({
                 navigator.vibrate(200); // Long single pulse for destructive action
             }
 
-            // Immediately stop the timer to prevent any lingering ticks
-            clearInterval(timerRef.current);
+            // Timer is now managed by useElapsedTimer — no manual cleanup needed
 
             if (typeof onFlightCancel === 'function') {
                 onFlightCancel({
@@ -304,7 +297,7 @@ export default function FlightLogger({
             setStatus('idle');
             // We intentionally do NOT reset students and staff here so they persist
             setIncidents([]);
-            setElapsed(0);
+            // elapsed auto-resets via useElapsedTimer when startTime is set to null
             setStartTime(null);
             setActiveFlightId(null);
             setActiveFlightNumberState(null);
@@ -335,7 +328,7 @@ export default function FlightLogger({
     return (
         <div className="space-y-2 pb-1 animate-in slide-in-from-bottom-10 duration-500 flex flex-col justify-center">
             {/* Timer Display (No Container) */}
-            <div className={`transition-all duration-500 flex flex-col items-center justify-center relative ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}>
+            <div className={`transition-colors duration-500 flex flex-col items-center justify-center relative ${isPeripheralActive ? 'text-white' : 'text-slate-800'}`}>
 
                 {/* Flight Number Pill */}
                 <div className="flex justify-center mb-1">
@@ -479,7 +472,7 @@ export default function FlightLogger({
                         <button
                             onClick={handleRetryMic}
                             disabled={micRetrying || micRetryResult === 'success'}
-                            className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:active:scale-100"
+                            className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 disabled:active:scale-100"
                         >
                             {micRetrying ? (
                                 <><RefreshCw size={14} className="animate-spin" /> Verificando...</>
@@ -491,7 +484,7 @@ export default function FlightLogger({
                         </button>
                         <button
                             onClick={() => setMicBannerDismissed(true)}
-                            className="px-4 h-11 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold hover:bg-slate-50 transition-all active:scale-95"
+                            className="px-4 h-11 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold hover:bg-slate-50 transition-colors active:scale-95"
                         >
                             Omitir
                         </button>
@@ -568,7 +561,7 @@ export default function FlightLogger({
                             <button
                                 onClick={handleCancelFlight}
                                 disabled={isLanding}
-                                className="px-6 py-2 rounded-full bg-red-50/70 text-red-500 text-xs font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="px-6 py-2 rounded-full bg-red-50/70 text-red-500 text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <XCircle size={14} /> Abortar Vuelo
                             </button>

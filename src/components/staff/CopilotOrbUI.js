@@ -54,10 +54,10 @@ const CopilotOrbUI = memo(forwardRef(({
     let ringClass = 'scale-100 opacity-0';
     if (vs === 'booting') ringClass = 'scale-105 opacity-40 animate-pulse';
     if (vs === 'listening' || vs === 'idle') ringClass = 'scale-100 opacity-20';
-    if (vs === 'wake') ringClass = 'scale-110 opacity-70 animate-ping';
+    if (vs === 'wake') ringClass = 'scale-110 opacity-70 animate-[sonarPing_1s_cubic-bezier(0,0,0.2,1)_infinite]';
     if (vs === 'matched' || vs === 'success') ringClass = 'scale-105 opacity-60';
     if (vs === 'playing') ringClass = 'scale-105 opacity-50 animate-pulse';
-    if (copilot.isDetectingVoice && copilot.isActive) ringClass = 'scale-110 opacity-60 animate-ping';
+    if (copilot.isDetectingVoice && copilot.isActive) ringClass = 'scale-110 opacity-60 animate-[sonarPing_1s_cubic-bezier(0,0,0.2,1)_infinite]';
 
     // Ring color
     let ringColorClass = 'bg-blue-400';
@@ -89,7 +89,7 @@ const CopilotOrbUI = memo(forwardRef(({
     let dotClass = 'bg-slate-300';
     if (copilot.isActive) {
         dotClass = 'bg-blue-400 animate-pulse';
-        if (vs === 'wake') dotClass = 'bg-amber-400 animate-ping';
+        if (vs === 'wake') dotClass = 'bg-amber-400 animate-pulse';
         if (vs === 'matched') dotClass = 'bg-emerald-400';
         if (vs === 'playing') dotClass = 'bg-blue-400 animate-pulse';
     }
@@ -129,7 +129,7 @@ const CopilotOrbUI = memo(forwardRef(({
                 }`}>
                     <button
                         onClick={() => copilot.changeEngineMode('vosk')}
-                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-all ${
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-colors ${
                             copilot.engineMode === 'vosk'
                                 ? (isPeripheralActive ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-800 text-white shadow-sm')
                                 : (isPeripheralActive ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')
@@ -139,7 +139,7 @@ const CopilotOrbUI = memo(forwardRef(({
                     </button>
                     <button
                         onClick={() => copilot.changeEngineMode('tfjs-go')}
-                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-all ${
+                        className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full tracking-wider transition-colors ${
                             copilot.engineMode === 'tfjs-go'
                                 ? (isPeripheralActive ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-800 text-white shadow-sm')
                                 : (isPeripheralActive ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')
@@ -155,7 +155,7 @@ const CopilotOrbUI = memo(forwardRef(({
                         if (!copilot.isActive) copilot.startListening();
                         setShowCalibrator(true);
                     }}
-                    className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-all active:scale-95 ${
+                    className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full transition-colors active:scale-95 ${
                         isPeripheralActive
                             ? 'text-white/50 hover:bg-white/10'
                             : 'text-slate-400 hover:bg-slate-50'
@@ -170,7 +170,7 @@ const CopilotOrbUI = memo(forwardRef(({
                     const label = copilot.activeMicLabel.toLowerCase();
                     const isExt = ['usb', 'wired', 'external', 'lavalier', 'lapel', 'solapa', 'headset', 'airpod'].some(kw => label.includes(kw));
                     return (
-                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full border transition-all ${
+                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full border transition-colors ${
                             isExt
                                 ? (isPeripheralActive ? 'border-emerald-400/30 bg-emerald-500/15' : 'border-emerald-200 bg-emerald-50')
                                 : (isPeripheralActive ? 'border-amber-400/30 bg-amber-500/15' : 'border-amber-200 bg-amber-50')
@@ -247,7 +247,7 @@ const CopilotOrbUI = memo(forwardRef(({
                 {copilot.isActive && (
                     <>
                         {/* State label */}
-                        <p className={`text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+                        <p className={`text-[10px] font-bold uppercase tracking-[0.2em] transition-colors duration-300 ${
                             vs === 'wake'
                                 ? (isPeripheralActive ? 'text-amber-200/80' : 'text-amber-500')
                                 : (isPeripheralActive ? 'text-white/40' : 'text-slate-300')
@@ -261,7 +261,7 @@ const CopilotOrbUI = memo(forwardRef(({
 
                         {/* Live transcript — style adapts to state */}
                         {(copilot.dictatedText || copilot.lastTranscript) && vs !== 'booting' && (
-                            <p className={`mt-1 text-center leading-snug transition-all duration-300 ${
+                            <p className={`mt-1 text-center leading-snug transition-colors duration-300 ${
                                 vs === 'wake'
                                     ? 'text-[14px] font-semibold ' + (isPeripheralActive ? 'text-white' : 'text-slate-800')
                                     : 'text-[11px] font-normal ' + (isPeripheralActive ? 'text-white/30' : 'text-slate-300')
@@ -272,9 +272,9 @@ const CopilotOrbUI = memo(forwardRef(({
 
                         {/* Matched POI pill */}
                         {copilot.matchedPoi && (vs === 'matched' || vs === 'playing') && (
-                            <div className={`mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-300 ${
+                            <div className={`mt-1.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full transition-colors duration-300 ${
                                 isPeripheralActive 
-                                    ? 'bg-white/15 backdrop-blur-sm' 
+                                    ? 'bg-white/15' 
                                     : 'bg-slate-50 border border-slate-100'
                             }`}>
                                 <span className="text-[11px]">{vs === 'matched' ? '✓' : '♪'}</span>

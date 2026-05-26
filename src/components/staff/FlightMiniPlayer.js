@@ -58,7 +58,9 @@ const FlightMiniPlayer = memo(function FlightMiniPlayer({
                                         className={`w-[3px] rounded-full ${isPeripheralActive ? 'bg-white/80' : 'bg-violet-500'}`}
                                         style={{
                                             animation: `equalizerBounce ${0.4 + i * 0.15}s ease-in-out infinite alternate`,
-                                            height: `${4 + i * 3}px`
+                                            height: '12px',
+                                            transformOrigin: 'bottom',
+                                            willChange: 'transform'
                                         }}
                                     />
                                 ))}
@@ -117,8 +119,8 @@ const FlightMiniPlayer = memo(function FlightMiniPlayer({
             {/* ── Equalizer Animation Keyframes ── */}
             <style jsx>{`
                 @keyframes equalizerBounce {
-                    0% { height: 3px; }
-                    100% { height: 12px; }
+                    0% { transform: scaleY(0.25); }
+                    100% { transform: scaleY(1); }
                 }
             `}</style>
         </div>

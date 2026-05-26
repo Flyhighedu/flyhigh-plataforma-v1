@@ -350,7 +350,7 @@ export default function OperationUI({
 
             {/* ── Legacy Sticky Header ── */}
             {!hideMenu && !headerSlot && (
-                <div className={`sticky top-0 backdrop-blur-md z-40 shadow-sm border-b transition-all ${headerBgClass}`}>
+                <div className={`sticky top-0 backdrop-blur-sm z-40 shadow-sm border-b transition-colors duration-300 ${headerBgClass}`}>
                     <div className="flex items-center justify-between px-4 py-3">
                         <div className="flex-1 min-w-0 pr-2">
                             <h1 className={`text-base font-bold leading-tight truncate transition-colors ${textPrimaryClass}`}>{missionInfo?.school_name || 'Operación'}</h1>
@@ -465,9 +465,9 @@ export default function OperationUI({
                             {/* ── Paso 1: Preparar Cabina (First Touch Obligatorio) ── */}
                             {needsCabinPrep && (
                                 <div className="w-full px-4 py-6 flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-700">
-                                    <div className={`w-full max-w-[340px] rounded-[32px] p-8 flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 ${
+                                    <div className={`w-full max-w-[340px] rounded-[32px] p-8 flex flex-col items-center text-center relative overflow-hidden transition-colors duration-500 ${
                                         isPeripheralActive 
-                                            ? 'bg-white/10 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.2)] backdrop-blur-xl' 
+                                            ? 'bg-white/10 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.2)]' 
                                             : 'bg-white border border-slate-200/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]'
                                     }`}>
                                         
@@ -489,7 +489,7 @@ export default function OperationUI({
                                         </p>
 
                                         {/* ── Recordatorio de Setup (Gafas + Micrófono) ── */}
-                                        <div className={`w-full mb-6 p-3.5 rounded-[16px] text-left flex gap-3 items-start transition-all ${
+                                        <div className={`w-full mb-6 p-3.5 rounded-[16px] text-left flex gap-3 items-start transition-colors ${
                                             isPeripheralActive 
                                                 ? 'bg-white/10 border border-white/10' 
                                                 : 'bg-slate-50 border border-slate-200/80'
@@ -510,7 +510,7 @@ export default function OperationUI({
                                         <button
                                             type="button"
                                             onClick={() => setShowVoiceSetupModal(true)}
-                                            className={`w-full py-4 rounded-[20px] font-black text-[15px] tracking-wide flex items-center justify-center transition-all duration-300 active:scale-[0.96] ${
+                                            className={`w-full py-4 rounded-[20px] font-black text-[15px] tracking-wide flex items-center justify-center transition-colors duration-300 active:scale-[0.96] ${
                                                 isPeripheralActive
                                                     ? 'bg-white hover:bg-slate-100 text-slate-900 shadow-[0_0_20px_rgba(255,255,255,0.2)]'
                                                     : 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-[0_8px_30px_rgba(139,92,246,0.35)] hover:shadow-[0_12px_30px_rgba(139,92,246,0.5)]'
@@ -589,7 +589,7 @@ export default function OperationUI({
                 </div>
 
                 {/* ── Close Operation Section ── */}
-                <section className={`rounded-2xl border px-4 py-4 shadow-xl transition-all ${isPeripheralActive ? 'border-white/20 bg-white/10 backdrop-blur-md' : 'border-blue-200 bg-white shadow-[0_18px_36px_-24px_rgba(30,64,175,0.35)]'}`}>
+                <section className={`rounded-2xl border px-4 py-4 shadow-xl transition-colors ${isPeripheralActive ? 'border-white/20 bg-white/10' : 'border-blue-200 bg-white shadow-[0_18px_36px_-24px_rgba(30,64,175,0.35)]'}`}>
                     <p className={`m-0 text-[10px] font-extrabold uppercase tracking-[0.16em] transition-colors ${isPeripheralActive ? 'text-white/70' : 'text-slate-500'}`}>
                         {isSimulation ? 'Fin de simulación' : 'Cierre operativo'}
                     </p>
@@ -601,7 +601,7 @@ export default function OperationUI({
                     <button
                         type="button"
                         onClick={openCloseConfirmModal}
-                        className={`mt-3 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold tracking-wide text-white transition active:scale-[0.99] ${isPeripheralActive ? 'bg-white/20 hover:bg-white/30 backdrop-blur-md' : 'bg-blue-600 hover:bg-blue-700 shadow-[0_16px_28px_-18px_rgba(37,99,235,0.6)]'}`}
+                        className={`mt-3 w-full rounded-2xl px-4 py-3.5 text-sm font-extrabold tracking-wide text-white transition-colors active:scale-[0.99] ${isPeripheralActive ? 'bg-white/20 hover:bg-white/30' : 'bg-blue-600 hover:bg-blue-700 shadow-[0_16px_28px_-18px_rgba(37,99,235,0.6)]'}`}
                     >
                         {isSimulation ? 'Finalizar simulación' : 'Operación finalizada'}
                     </button>

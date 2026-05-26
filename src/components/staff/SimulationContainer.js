@@ -48,7 +48,10 @@ export default function SimulationContainer({ onExit }) {
     const [mockFlightLogs, setMockFlightLogs] = useState([]);
     const [activePause, setActivePause] = useState(null);
     const [completedPauses, setCompletedPauses] = useState([]);
-    const [nowMs, setNowMs] = useState(Date.now());
+    // [PERF FIX] Use ref instead of state to avoid re-rendering the entire
+    // component tree every second. Timer display is handled locally inside
+    // OperationUI via useElapsedTimer (same fix applied in StaffOperationLegacy).
+    const nowMsRef = useRef(Date.now());
     const [operationStartMs, setOperationStartMs] = useState(0);
     const [toast, setToast] = useState(null);
 
@@ -96,9 +99,10 @@ export default function SimulationContainer({ onExit }) {
         })();
         return () => { cancelled = true; };
     }, []);
-    // ── Timer tick (1 Hz) ──
+    // [PERF FIX] Silent ref update — no re-render. Timer display is handled
+    // by useElapsedTimer inside OperationUI.
     useEffect(() => {
-        const id = setInterval(() => setNowMs(Date.now()), 1000);
+        const id = setInterval(() => { nowMsRef.current = Date.now(); }, 1000);
         return () => clearInterval(id);
     }, []);
 
@@ -127,13 +131,9 @@ export default function SimulationContainer({ onExit }) {
         : 0;
 
     const showInterFlightTimer = !activeFlight && mockFlightLogs.length > 0 && lastFlightEndMs > 0;
-    const interFlightElapsedSeconds = showInterFlightTimer
-        ? Math.max(0, Math.floor((nowMs - lastFlightEndMs) / 1000))
-        : 0;
-
-    const operationElapsedSeconds = operationStartMs > 0
-        ? Math.max(0, Math.floor((nowMs - operationStartMs) / 1000))
-        : 0;
+    // [PERF FIX] No longer compute elapsed seconds here. Pass raw startMs
+    // values to OperationUI and let useElapsedTimer handle the ticking locally.
+    // This eliminates the need for the nowMs state that re-rendered everything.
 
     // ═══════════════════════════════════════════════════
     // MOCK HANDLERS — Zero Supabase, Zero localStorage
@@ -245,10 +245,12 @@ export default function SimulationContainer({ onExit }) {
                 activeFlightNumber={activeFlightNumber}
                 activePause={activePause}
                 completedPauses={completedPauses}
-                operationElapsedSeconds={operationElapsedSeconds}
+                operationElapsedSeconds={0}
                 showOperationTimer={operationStartMs > 0}
-                interFlightElapsedSeconds={interFlightElapsedSeconds}
+                operationStartedAtMs={operationStartMs}
+                interFlightElapsedSeconds={0}
                 showInterFlightTimer={showInterFlightTimer}
+                interFlightStartMs={lastFlightEndMs}
                 totalStudentsFlown={totalStudentsFlown}
                 pendingSyncCount={0}
                 onFlightStart={handleFlightStart}
