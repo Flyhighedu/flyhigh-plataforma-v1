@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, memo } from 'react';
 import useVoiceCopilot from '@/hooks/useVoiceCopilot';
 import { BookOpen, ChevronDown, ChevronUp, Mic, MicOff, SlidersHorizontal } from 'lucide-react';
 import TFCalibratorModal from '@/components/staff/TFCalibratorModal';
 import MicCalibrator from '@/components/staff/MicCalibrator';
 
-const CopilotOrbUI = forwardRef(({
+const CopilotOrbUI = memo(forwardRef(({
     pois = [],
     audioRef,
     playingPoiId,
@@ -223,11 +223,11 @@ const CopilotOrbUI = forwardRef(({
                 aria-label="Toggle Copilot"
             >
                 {/* Sonar Ring — CSS only, GPU-composited */}
-                <div className={`absolute inset-0 rounded-full transition-all duration-500 ${ringColorClass} ${ringClass}`} />
+                <div className={`absolute inset-0 rounded-full transition-[transform,opacity] duration-500 will-change-[transform,opacity] ${ringColorClass} ${ringClass}`} />
 
                 {/* Solid Center Circle */}
                 <div 
-                    className={`relative w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center z-10 transition-all duration-300 border-2 ${haloClass} ${
+                    className={`relative w-[72px] h-[72px] rounded-full bg-white flex items-center justify-center z-10 transition-[transform,opacity,border-color,box-shadow] duration-300 will-change-[transform,opacity] border-2 ${haloClass} ${
                         copilot.isActive ? 'group-hover:scale-105' : 'group-hover:scale-102'
                     }`}
                 >
@@ -300,6 +300,8 @@ const CopilotOrbUI = forwardRef(({
             )}
         </div>
     );
-});
+}));
+
+CopilotOrbUI.displayName = 'CopilotOrbUI';
 
 export default CopilotOrbUI;

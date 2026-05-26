@@ -1,6 +1,7 @@
 'use client';
 
-import { Music, Play, Pause, SkipForward, Loader2, AlertCircle, Headphones } from 'lucide-react';
+import { memo } from 'react';
+import { Music, Play, Pause, SkipForward, Loader2, AlertCircle } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════
 // FlightMiniPlayer — Compact audio player for the cockpit
@@ -17,7 +18,7 @@ const PHASE_LABELS = {
     in_flight: { label: 'En Vuelo', emoji: '🚀', gradient: 'from-violet-500/20 to-purple-500/20', border: 'border-violet-500/30', text: 'text-violet-300' },
 };
 
-export default function FlightMiniPlayer({
+const FlightMiniPlayer = memo(function FlightMiniPlayer({
     flightPhase = 'cold',
     currentTrack = null,
     isPlaying = false,
@@ -35,11 +36,11 @@ export default function FlightMiniPlayer({
     const trackArtist = currentTrack?.artist || '';
 
     return (
-        <div className={`w-full max-w-[280px] mx-auto mt-1 mb-1 transition-all duration-500 animate-in fade-in slide-in-from-bottom-2`}>
-            <div className="relative px-3 py-2 transition-all duration-500">
+        <div className={`w-full max-w-[280px] mx-auto mt-1 mb-1 animate-in fade-in slide-in-from-bottom-2`}>
+            <div className="relative px-3 py-2">
                 <div className="flex items-center gap-2.5">
                     {/* ── Equalizer / Status Icon ── */}
-                    <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                    <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-[background-color] duration-300 ${
                         isPeripheralActive 
                             ? 'bg-white/10' 
                             : 'bg-slate-100'
@@ -122,4 +123,6 @@ export default function FlightMiniPlayer({
             `}</style>
         </div>
     );
-}
+});
+
+export default FlightMiniPlayer;

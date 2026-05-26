@@ -28,8 +28,7 @@ export function normalizeCommand(text) {
         .toLowerCase()
         .trim()
         .split(/\s+/)
-        .filter(w => w.length > 3)
-        .slice(0, 2)
+        .filter(w => w.length > 2)
         .join(' ') || text.toLowerCase().trim().split(/\s+/)[0] || '';
 }
 
@@ -272,7 +271,7 @@ export default function useVoiceCopilot({
 
     const findMatchInBuffer = useCallback((text) => {
         const norm = normalizeFull(text);
-        if (!norm || norm.length < 4) return null;
+        if (!norm || norm.length < 3) return null;
 
         const noSpaceNorm = norm.replace(/\s+/g, '');
         let best = null;
@@ -281,6 +280,8 @@ export default function useVoiceCopilot({
         for (const cmd of voiceCommands) {
             if (!cmd.keywords.length) continue;
             let score = 0;
+            const totalKwLength = cmd.keywords.reduce((sum, kw) => sum + kw.length, 0);
+            const requiredScore = Math.min(4, totalKwLength);
             
             for (const kw of cmd.keywords) {
                 if (norm.includes(kw)) {
@@ -306,13 +307,13 @@ export default function useVoiceCopilot({
                 }
             }
 
-            if (score > bestScore) {
+            if (score > bestScore && score >= requiredScore) {
                 bestScore = score;
                 best = cmd;
             }
         }
         
-        return bestScore >= 4 ? best : null;
+        return best;
     }, [voiceCommands]);
 
     const closeMicrophone = async () => {
@@ -1046,7 +1047,8 @@ export default function useVoiceCopilot({
                                 setDictatedText('');
                             }
                         } else if (type === 'partial' || type === 'final') {
-                            const transcript = result?.partial || result?.text || '';
+                            const isFinal = type === 'final';
+                            const transcript = isFinal ? (result?.text || '') : (result?.partial || '');
                             if (!transcript) return;
 
                             // Siempre mostrar lo que Vosk escucha (excepto en matched/playing)
@@ -1055,7 +1057,7 @@ export default function useVoiceCopilot({
                                 setDictatedText(transcript);
                             }
 
-                            // 1) Detección de wake word: listening → wake
+                            // 1) Detección de wake word: listening → wake (Funciona en partials y finals para respuesta rápida)
                             if (stateRef.current === 'listening') {
                                 const currentWakeWord = callbacksRef.current.wakeWord;
                                 if (isWakeWordDetected(transcript, currentWakeWord)) {
@@ -1069,22 +1071,16 @@ export default function useVoiceCopilot({
 
                                     // Reset recognizer para que el POI se detecte limpio
                                     if (voskWorkerRef.current) {
-                                        voskWorkerRef.current.postMessage({ action: 'reset' });
+                                        voskWorkerRef.current.postMessage({ 
+                                            action: 'reset',
+                                            grammar: JSON.stringify(grammarList)
+                                        });
                                     }
 
                                     // Timeout de atención: 6s para decir el POI
                                     if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
                                     attentionTimeoutRef.current = setTimeout(() => {
-                                        // Si hay un POI pendiente al expirar la ventana, reproducirlo
-                                        if (pendingPoiRef.current && stateRef.current === 'matched') {
-                                            clearTimeout(speechEndTimerRef.current);
-                                            const poi = pendingPoiRef.current;
-                                            pendingPoiRef.current = null;
-                                            if (voskWorkerRef.current) {
-                                                voskWorkerRef.current.postMessage({ action: 'reset' });
-                                            }
-                                            callbacksRef.current.playMatchedAudio(poi);
-                                        } else if (stateRef.current === 'wake') {
+                                        if (stateRef.current === 'wake' || stateRef.current === 'matched') {
                                             setVoiceState('listening');
                                             stateRef.current = 'listening';
                                             setLastTranscript('');
@@ -1092,44 +1088,33 @@ export default function useVoiceCopilot({
                                         }
                                     }, 6000);
 
-                                    // NO procesar POI matching con este transcript — 
-                                    // contiene texto de ANTES del wake word.
-                                    // El recognizer se acaba de resetear; el próximo
-                                    // partial/final vendrá limpio.
                                     return;
                                 }
                             }
 
-                            // 2) POI matching: wake → matched (azul)
-                            //    Detectamos el POI y cambiamos a azul, pero NO
-                            //    lanzamos la narración de inmediato. Esperamos a que
-                            //    el piloto termine de hablar (1.5s de silencio).
-                            if (stateRef.current === 'wake' || stateRef.current === 'matched') {
+                            // 2) POI matching: wake → matched (azul) y reproducción
+                            //    IMPORTANTE: Solo procesamos la coincidencia de POI en eventos 'final' (cuando el piloto deja de hablar)
+                            if (isFinal && stateRef.current === 'wake') {
                                 const poiMatch = callbacksRef.current.findMatchInBuffer(transcript);
-                                if (poiMatch && stateRef.current === 'wake') {
-                                    // Primera detección → cambiar a azul
-                                    pendingPoiRef.current = poiMatch;
+                                if (poiMatch) {
+                                    if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
+                                    
                                     setMatchedPoi(poiMatch);
                                     setVoiceState('matched');
                                     stateRef.current = 'matched';
-                                }
 
-                                // Mientras el piloto siga hablando (llegan partials),
-                                // reiniciar el timer de silencio.
-                                if (pendingPoiRef.current) {
-                                    clearTimeout(speechEndTimerRef.current);
-                                    speechEndTimerRef.current = setTimeout(() => {
-                                        // 1.5s de silencio → el piloto terminó de hablar
-                                        if (pendingPoiRef.current && stateRef.current === 'matched') {
-                                            if (attentionTimeoutRef.current) clearTimeout(attentionTimeoutRef.current);
-                                            const poi = pendingPoiRef.current;
-                                            pendingPoiRef.current = null;
-                                            if (voskWorkerRef.current) {
-                                                voskWorkerRef.current.postMessage({ action: 'reset' });
-                                            }
-                                            callbacksRef.current.playMatchedAudio(poi);
-                                        }
-                                    }, 1500);
+                                    // Reset del worker y reproducción de la narración
+                                    if (voskWorkerRef.current) {
+                                        voskWorkerRef.current.postMessage({ 
+                                            action: 'reset',
+                                            grammar: JSON.stringify(grammarList)
+                                        });
+                                    }
+                                    
+                                    // Reproducir el audio después de un micro-timeout para la animación
+                                    setTimeout(() => {
+                                        callbacksRef.current.playMatchedAudio(poiMatch);
+                                    }, 100);
                                 }
                             }
                         } else if (type === 'error') {
