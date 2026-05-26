@@ -1061,7 +1061,21 @@ export default function useVoiceCopilot({
                             }
                         } else if (type === 'partial' || type === 'final') {
                             const isFinal = type === 'final';
-                            const transcript = isFinal ? (result?.text || '') : (result?.partial || '');
+                            let transcript = '';
+                            if (isFinal) {
+                                // Filtrar palabras por confianza para evitar falsos positivos de palabras fuera de vocabulario
+                                if (result?.result && Array.isArray(result.result)) {
+                                    const highConfWords = result.result
+                                        .filter(w => w.conf >= 0.80)
+                                        .map(w => w.word);
+                                    transcript = highConfWords.join(' ');
+                                    console.log('[VoiceCopilot] 📊 Transcripción filtrada por confianza (>= 0.80):', transcript, result.result);
+                                } else {
+                                    transcript = result?.text || '';
+                                }
+                            } else {
+                                transcript = result?.partial || '';
+                            }
                             if (!transcript) return;
 
                             // Siempre mostrar lo que Vosk escucha (excepto en matched/playing)
