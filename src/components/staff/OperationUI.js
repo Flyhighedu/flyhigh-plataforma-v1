@@ -856,7 +856,7 @@ export default function OperationUI({
             {escuadronSlot}
 
             {/* ── Overlay Minimalista de Narración a Pantalla Completa ── */}
-            {voicePlayingPoiId && copilotVoiceState === 'playing' && (() => {
+            {voicePlayingPoiId && peripheralState === 'playing' && (() => {
                 const activePoi = (pois || []).find(p => p && p.id === voicePlayingPoiId);
                 if (!activePoi) return null;
                 return (
