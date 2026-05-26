@@ -1143,47 +1143,59 @@ export default function StaffDashboard() {
                     aux_id: staffMap.assistant?.id || prev?.aux_id
                 }));
 
+                // ── [RECOVERY] Database-Driven Checklist Completion Sync ──
+                // This acts as the source of truth for whether the current user has completed
+                // their prep checklist, ensuring they are never sent back to PrepChecklist
+                // if they refresh their browser or experience a global update.
+                let prepComplete = false;
+                try {
+                    const { data: prepDoneRows } = await supabase
+                        .from('staff_prep_events')
+                        .select('id')
+                        .eq('journey_id', journeyData.id)
+                        .eq('user_id', userId)
+                        .eq('event_type', 'prep_complete')
+                        .limit(1);
+
+                    if (prepDoneRows && prepDoneRows.length > 0) {
+                        prepComplete = true;
+                        console.log(`🛡️ [Recovery] User (${profile?.role}) has completed prep checklist. Syncing flow states.`);
+                    }
+                } catch (e) {
+                    console.warn('[Recovery] Prep complete check failed:', e);
+                }
+
                 if (profile?.role === 'pilot') {
                     const pilotNeedsControllerConnect = hasPendingPilotControllerConnect(state, meta);
 
                     if (pilotNeedsControllerConnect) {
                         setWaitingForAux(false);
-                    } else if (PILOT_WAITING_FOR_AUX_STATES.has(state)) {
-                        setWaitingForAux(true);
                     } else if (LISTENER_STEP_ONE_STATES.has(state) || state === 'report' || state === 'closed' || state === 'dismantling') {
                         setWaitingForAux(false);
+                    } else if (PILOT_WAITING_FOR_AUX_STATES.has(state) || prepComplete) {
+                        setWaitingForAux(true);
                     }
                 }
 
                 if (profile?.role === 'assistant') {
                     if (state === 'WAITING_AUX_VEHICLE_CHECK') {
                         setAuxFlowState('checklist');
-                    } else if (['AUX_VEHICLE_CHECK_DONE', 'OPERATION', 'ROUTE_READY', 'IN_ROUTE'].includes(state)) {
+                    } else if (['AUX_VEHICLE_CHECK_DONE', 'OPERATION', 'ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS'].includes(state)) {
                         setAuxFlowState(null);
+                    } else if (prepComplete) {
+                        setAuxFlowState('waiting');
                     } else {
                         setAuxFlowState(null);
                     }
                 }
 
-                // [BUG-FIX] Detect if teacher already completed prep via DB events.
-                // Without this, a page reload loses teacherFlowState (local state)
-                // and the teacher gets sent back to PrepChecklist.
-                if (profile?.role === 'teacher' && ['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
-                    try {
-                        const { data: teacherPrepDone } = await supabase
-                            .from('staff_prep_events')
-                            .select('id')
-                            .eq('journey_id', journeyData.id)
-                            .eq('user_id', userId)
-                            .eq('event_type', 'prep_complete')
-                            .limit(1);
-
-                        if (teacherPrepDone && teacherPrepDone.length > 0) {
-                            console.log('🛡️ [Recovery] Teacher already completed prep — restoring waitingState');
-                            setTeacherFlowState('waiting');
-                        }
-                    } catch (e) {
-                        console.warn('[Recovery] Teacher prep check failed (non-blocking):', e);
+                if (profile?.role === 'teacher') {
+                    if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'OPERATION', 'operation', 'dismantling', 'report', 'closed'].includes(state)) {
+                        setTeacherFlowState(null);
+                    } else if (prepComplete) {
+                        setTeacherFlowState('waiting');
+                    } else {
+                        setTeacherFlowState(null);
                     }
                 }
 
@@ -1203,7 +1215,7 @@ export default function StaffDashboard() {
                 if (checkInAvailable) {
                     let serverStep = 0;
                     // [EMERGENCY BYPASS] Allow bypassing check-in wall if contingency is active
-                    if (['prep', 'PILOT_PREP', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
+                    if (['prep', 'PILOT_PREP', 'PILOT_READY_FOR_LOAD', 'AUX_PREP_DONE', 'TEACHER_SUPPORTING_PILOT', 'WAITING_AUX_VEHICLE_CHECK'].includes(state)) {
                         serverStep = 0;
                     } else if (['ROUTE_READY', 'IN_ROUTE', 'ROUTE_IN_PROGRESS', 'waiting_unload_assignment', 'waiting_dropzone', 'unload', 'post_unload_coordination', 'seat_deployment'].includes(state)) {
                         serverStep = 1;
