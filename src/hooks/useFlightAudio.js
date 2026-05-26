@@ -19,9 +19,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 // ═══════════════════════════════════════════════════════════════
 
 const CROSSFADE_DURATION_MS = 1500;
-const DUCK_FADE_DOWN_MS = 250;
-const DUCK_FADE_UP_MS = 600;
-const DUCK_VOLUME = 0.05;
+const DUCK_FADE_DOWN_MS = 800;
+const DUCK_FADE_UP_MS = 1500;
+const DUCK_VOLUME = 0.15;
 const FULL_VOLUME = 1.0;
 
 // ── Volume fade utility using requestAnimationFrame ──
@@ -48,8 +48,8 @@ function fadeVolume(audioElement, targetVolume, durationMs, onComplete) {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / durationMs, 1);
 
-        // Exponential ease-out for natural audio fade
-        const eased = 1 - Math.pow(1 - progress, 3);
+        // Sine ease-in-out for extremely smooth, premium audio transition
+        const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
         audioElement.volume = Math.max(0, Math.min(1, startVolume + delta * eased));
 
         if (progress < 1) {
