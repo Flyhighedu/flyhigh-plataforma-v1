@@ -371,7 +371,12 @@ export default function useVoiceCopilot({
         const norm = normalizeFull(text);
         if (!norm || norm.length < 3) return null;
 
-        const transcriptWords = norm.split(/\s+/);
+        let transcriptWords = norm.split(/\s+/);
+        // Corrección acústica de confusión: si incluye "cerro" y Vosk escuchó "fabrica",
+        // es sumamente probable que sea un falso positivo de "jicalan" debido a la similitud acústica.
+        if (transcriptWords.includes('cerro') && transcriptWords.includes('fabrica')) {
+            transcriptWords = transcriptWords.map(w => w === 'fabrica' ? 'jicalan' : w);
+        }
         let best = null;
         let bestScore = 0;
 
