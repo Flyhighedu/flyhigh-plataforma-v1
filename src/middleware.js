@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
 export async function middleware(request) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.next();
+    }
+
     if (request.nextUrl.pathname.startsWith('/staff-v2')) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = request.nextUrl.pathname.replace('/staff-v2', '/staff')
