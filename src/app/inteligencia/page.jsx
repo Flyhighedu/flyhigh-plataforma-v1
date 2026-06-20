@@ -6,11 +6,10 @@ import { FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightO
 
 import WelcomeModal from './components/WelcomeModal';
 import CommandPanel from './components/CommandPanel';
-import RoutePanel from './components/RoutePanel';
+import RightSidebar from './components/RightSidebar';
 import RouteReportModal from './components/RouteReportModal';
 import ProjectSwitcher from './components/ProjectSwitcher';
 import MunicipioRanking from './components/MunicipioRanking';
-import ConcentrationAnalyzer from './components/ConcentrationAnalyzer';
 import AddConcentradoModal from './components/AddConcentradoModal';
 import MissingSchoolsPanel from './components/MissingSchoolsPanel';
 import { applyFilters, getStudentRange, getStudentRangeByType, getUniqueNiveles } from './lib/filters';
@@ -45,7 +44,6 @@ export default function InteligenciaPage() {
   const [showReport, setShowReport] = useState(false);
   const [showAddConcentrado, setShowAddConcentrado] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
-  const [showConcentration, setShowConcentration] = useState(false);
   const [focusedSchoolKey, setFocusedSchoolKey] = useState(null);
   const [showMissingSchools, setShowMissingSchools] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -352,14 +350,15 @@ export default function InteligenciaPage() {
   }, [filters, prices, routeCCTs, projectMeta.id]);
 
   // ─── Route operations ───
-  const handleSchoolClick = useCallback((school) => {
+  const handleSchoolClick = useCallback((school, isCampus, markerKey) => {
+    setFocusedSchoolKey(prev => prev === (markerKey || school.cct) ? null : (markerKey || school.cct));
+  }, []);
+
+  const handleAddToRoute = useCallback((cctsToAdd) => {
     setRouteCCTs(prev => {
-      if (prev.includes(school.cct)) {
-        // Remove from route
-        return prev.filter(c => c !== school.cct);
-      }
-      // Add to route
-      return [...prev, school.cct];
+      const newSet = new Set(prev);
+      cctsToAdd.forEach(cct => newSet.add(cct));
+      return Array.from(newSet);
     });
   }, []);
 
@@ -562,7 +561,6 @@ export default function InteligenciaPage() {
           onToggleCollapse={() => setLeftCollapsed(!leftCollapsed)}
           campusCount={campusMap.size}
           onOpenMissingSchools={() => setShowMissingSchools(true)}
-          onOpenConcentration={() => setShowConcentration(true)}
         />
 
         {/* Center: Map + floating filter chips */}
@@ -574,6 +572,8 @@ export default function InteligenciaPage() {
             mapInstanceRef={leafletMapRef}
             campusMap={campusMap}
             focusedSchoolKey={focusedSchoolKey}
+            onClearFocus={() => setFocusedSchoolKey(null)}
+            onAddToRoute={handleAddToRoute}
           >
             {/* Ranking trigger — just a button, modal renders at page root */}
             <button
@@ -659,8 +659,12 @@ export default function InteligenciaPage() {
           ) : null}
         </div>
 
-        {/* Right panel: Route */}
-        <RoutePanel
+        {/* Right Sidebar: Distribution + Route Tabs */}
+        <RightSidebar
+          collapsed={rightCollapsed}
+          onToggleCollapse={() => setRightCollapsed(!rightCollapsed)}
+          
+          /* Route Props */
           schools={schools}
           routeCCTs={routeCCTs}
           prices={prices}
@@ -669,7 +673,23 @@ export default function InteligenciaPage() {
           onReorderRoute={handleReorderRoute}
           onSaveProject={handleSave}
           onViewReport={() => setShowReport(true)}
-          collapsed={rightCollapsed}
+          
+          /* Distribution Props */
+          filteredSchools={filteredSchools}
+          campusMap={campusMap}
+          onFocusSchoolKey={setFocusedSchoolKey}
+          onFocusCity={(city) => {
+            if (leafletMapRef.current && city.lats.length) {
+              const p = 0.01;
+              leafletMapRef.current.flyToBounds(
+                [
+                  [Math.min(...city.lats) - p, Math.min(...city.lngs) - p],
+                  [Math.max(...city.lats) + p, Math.max(...city.lngs) + p]
+                ],
+                { duration: 1.2, maxZoom: 14 }
+              );
+            }
+          }}
         />
       </div>
 
@@ -712,27 +732,7 @@ export default function InteligenciaPage() {
         />
       )}
 
-      {showConcentration && (
-        <ConcentrationAnalyzer
-          filteredSchools={filteredSchools}
-          prices={prices}
-          campusMap={campusMap}
-          onFocusSchoolKey={setFocusedSchoolKey}
-          onClose={() => setShowConcentration(false)}
-          onFocusCity={(city) => {
-            if (leafletMapRef.current && city.lats.length) {
-              const p = 0.01;
-              leafletMapRef.current.flyToBounds(
-                [
-                  [Math.min(...city.lats) - p, Math.min(...city.lngs) - p],
-                  [Math.max(...city.lats) + p, Math.max(...city.lngs) + p]
-                ],
-                { duration: 1.2, maxZoom: 14 }
-              );
-            }
-          }}
-        />
-      )}
+
 
       {showMissingSchools && (
         <MissingSchoolsPanel

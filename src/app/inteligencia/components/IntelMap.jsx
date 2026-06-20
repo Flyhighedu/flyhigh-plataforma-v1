@@ -84,16 +84,27 @@ function streetViewLink(lat, lng) {
   `;
 }
 
-function buildSchoolTooltip(school) {
+function buildSchoolTooltip(school, routeSet = new Set()) {
   const tipo = school.isPrivada ? 'Privada' : 'Pública';
   const tipoColor = school.isPrivada ? '#FBBF24' : '#60A5FA';
   const tipoBg = school.isPrivada ? 'rgba(251,191,36,0.12)' : 'rgba(96,165,250,0.12)';
   const nivel = school.nivelEducativo || '';
   const nivelColor = NIVEL_COLOR_MAP[nivel.toUpperCase()] || '#9CA3AF';
 
+  const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+
+  const isInRoute = routeSet.has(school.cct);
+  let routeBtn = '';
+  if (isInRoute) {
+    routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
+  } else {
+    routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${school.cct}'], event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar a Mi Ruta</button>`;
+  }
+
   return `
-    <div class="intel-tooltip-card">
-      <div class="intel-tooltip-name">${school.nombre || 'Sin nombre'}</div>
+    <div class="intel-tooltip-card relative">
+      ${closeBtn}
+      <div class="intel-tooltip-name pr-6">${school.nombre || 'Sin nombre'}</div>
       <div class="intel-tooltip-badges">
         ${nivel ? `<span class="intel-tooltip-badge" style="color:${nivelColor};background:${nivelColor}18;border-color:${nivelColor}30">${nivel}</span>` : ''}
         <span class="intel-tooltip-badge" style="color:${tipoColor};background:${tipoBg};border-color:${tipoColor}30">${tipo}</span>
@@ -108,11 +119,12 @@ function buildSchoolTooltip(school) {
       </div>
       <div class="intel-tooltip-cct">CCT: ${school.cct || '—'}</div>
       ${streetViewLink(school.latitud, school.longitud)}
+      ${routeBtn}
     </div>
   `;
 }
 
-function buildCampusTooltip(campusGroup) {
+function buildCampusTooltip(campusGroup, routeSet = new Set()) {
   // Group by nivel educativo
   const byNivel = {};
   let totalAlumnos = 0;
@@ -154,9 +166,21 @@ function buildCampusTooltip(campusGroup) {
     `;
   }
 
+  const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+
+  const isInRoute = campusGroup.some(s => routeSet.has(s.cct));
+  let routeBtn = '';
+  if (isInRoute) {
+    routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
+  } else {
+    const cctListStr = JSON.stringify(campusGroup.map(s => s.cct)).replace(/"/g, "'");
+    routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a Mi Ruta</button>`;
+  }
+
   return `
-    <div class="intel-tooltip-card intel-tooltip-campus">
-      <div class="intel-tooltip-campus-header">
+    <div class="intel-tooltip-card intel-tooltip-campus relative">
+      ${closeBtn}
+      <div class="intel-tooltip-campus-header pr-6">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C084FC" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/></svg>
         <span class="intel-tooltip-campus-label">CAMPUS · ${niveles.length} niveles · ${campusGroup.length} CCTs</span>
       </div>
@@ -176,6 +200,7 @@ function buildCampusTooltip(campusGroup) {
         ${municipio ? `<div class="intel-tooltip-stat"><span class="intel-tooltip-stat-label">Municipio</span><span class="intel-tooltip-stat-value">${municipio}</span></div>` : ''}
       </div>
       ${streetViewLink(campusGroup[0]?.latitud, campusGroup[0]?.longitud)}
+      ${routeBtn}
     </div>
   `;
 }
@@ -221,6 +246,8 @@ export default function IntelMap({
   mapInstanceRef,
   campusMap,
   focusedSchoolKey,
+  onClearFocus,
+  onAddToRoute,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -236,7 +263,9 @@ export default function IntelMap({
   const [heatmapActive, setHeatmapActive] = useState(false);
   const [heatPluginLoaded, setHeatPluginLoaded] = useState(false);
 
-  const routeSetRef = useRef(new Set());
+  const routeSetRef = useRef(new Set(routeCCTs));
+  const focusedSchoolKeyRef = useRef(focusedSchoolKey);
+
   useEffect(() => {
     routeSetRef.current = new Set(routeCCTs);
   }, [routeCCTs]);
@@ -245,6 +274,61 @@ export default function IntelMap({
   useEffect(() => {
     schoolsRef.current = schools;
   }, [schools]);
+
+  // Configurar funciones globales de interacción para tooltips
+  useEffect(() => {
+    window.__intelClearFocus = onClearFocus;
+    window.__intelAddToRoute = (ccts, e) => {
+      // Lanzar animación visual
+      if (e && typeof document !== 'undefined') {
+        const target = document.getElementById('intel-mi-ruta-tab');
+        if (target) {
+          const rect = target.getBoundingClientRect();
+          // Destino: centro del botón Mi Ruta
+          const endX = rect.left + (rect.width / 2);
+          const endY = rect.top + (rect.height / 2);
+
+          const startX = e.clientX;
+          const startY = e.clientY;
+
+          const flyer = document.createElement('div');
+          // Icono flotante morado/esmeralda para indicar movimiento
+          flyer.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="text-white"><path d="M12 2L15 8L22 9L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9L9 8L12 2Z"/></svg>`;
+          flyer.className = 'fixed z-[9999] flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.8)] pointer-events-none';
+          
+          // Posición inicial absoluta
+          flyer.style.left = '0px';
+          flyer.style.top = '0px';
+          // Usamos transform para mejor rendimiento
+          flyer.style.transform = `translate(${startX - 16}px, ${startY - 16}px) scale(1)`;
+          flyer.style.transition = 'transform 500ms cubic-bezier(0.25, 1, 0.5, 1), opacity 500ms ease-out';
+          
+          document.body.appendChild(flyer);
+          
+          // Forzar reflow
+          flyer.getBoundingClientRect();
+          
+          // Viaje al destino
+          flyer.style.transform = `translate(${endX - 16}px, ${endY - 16}px) scale(0.2) rotate(180deg)`;
+          flyer.style.opacity = '0';
+          
+          setTimeout(() => {
+            if (document.body.contains(flyer)) {
+              document.body.removeChild(flyer);
+            }
+          }, 500);
+        }
+      }
+      
+      // Llamar al handler original
+      onAddToRoute?.(ccts);
+    };
+
+    return () => {
+      delete window.__intelClearFocus;
+      delete window.__intelAddToRoute;
+    };
+  }, [onClearFocus, onAddToRoute]);
 
   // ═══ Initialize map ═══
   useEffect(() => {
@@ -393,19 +477,22 @@ export default function IntelMap({
       });
 
       marker.on('click', () => {
-        onSchoolClick?.(school);
+        onSchoolClick?.(school, isCampus, markerKey);
       });
 
       marker.on('mouseover', (e) => {
+        // Skip hover if this marker is exactly the one currently focused
+        if (focusedSchoolKeyRef.current === markerKey) return;
+
         clearTimeout(hideTimeoutRef.current);
         const tooltip = tooltipRef.current;
         if (!tooltip) return;
 
-        // Build tooltip HTML — campus or single school
+        // Build tooltip HTML
         if (isCampus) {
-          tooltip.innerHTML = buildCampusTooltip(campusGroup, school);
+          tooltip.innerHTML = buildCampusTooltip(campusGroup, routeSetRef.current);
         } else {
-          tooltip.innerHTML = buildSchoolTooltip(school);
+          tooltip.innerHTML = buildSchoolTooltip(school, routeSetRef.current);
         }
 
         tooltip.style.display = 'block';
@@ -512,13 +599,14 @@ export default function IntelMap({
       });
 
       // Native Leaflet Tooltip for physical anchoring
-      const tooltipContent = isCampus ? buildCampusTooltip(campusGroup || [school]) : buildSchoolTooltip(school);
+      const tooltipContent = isCampus ? buildCampusTooltip(campusGroup || [school], routeSetRef.current) : buildSchoolTooltip(school, routeSetRef.current);
       
       focusedMarkerLayerRef.current.bindTooltip(tooltipContent, {
         permanent: true,
         direction: 'top',
-        className: 'intel-native-tooltip',
-        offset: [0, -15],
+        className: 'intel-native-tooltip intel-native-tooltip-interactive',
+        interactive: true,
+        offset: [0, -32],
         opacity: 1
       });
 

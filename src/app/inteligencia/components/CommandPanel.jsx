@@ -535,16 +535,7 @@ export default function CommandPanel({
           </div>
         </section>
 
-        {/* ═══ CTA: DISTRIBUCIÓN POR MUNICIPIO ═══ */}
-        <div className="p-5 border-t border-[var(--intel-border)] bg-[#0B1120]/50 shrink-0">
-          <button 
-            onClick={onOpenConcentration}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:shadow-[0_0_25px_rgba(59,130,246,0.4)]"
-          >
-            <MapPin size={16} />
-            Analizar Distribución por Municipio
-          </button>
-        </div>
+
       </div>
     </div>
   );
