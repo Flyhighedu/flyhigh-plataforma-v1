@@ -1303,3 +1303,17 @@
   border-color: rgba(16, 185, 129, 0.25);
   color: #34D399;
 }
+
+/* ═══ Native Tooltip Overrides ═══ */
+.intel-native-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+.intel-native-tooltip::before,
+.intel-native-tooltip::after {
+  display: none !important;
+}

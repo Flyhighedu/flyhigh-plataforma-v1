@@ -1,10 +1,10 @@
-'use client';
-
-import { useState, useRef, useCallback, useMemo } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Sparkles, X, Plus, Trash2 } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { Upload, FileSpreadsheet, AlertCircle, Sparkles, X, Trash2, FolderOpen, Lock, Unlock, User, Users, Calendar } from 'lucide-react';
 import { parseFile } from '../lib/parser';
+import { listProjects, deleteProject } from '../lib/storage';
 
-export default function WelcomeModal({ onProjectReady, onClose, existingProjects = [] }) {
+export default function WelcomeModal({ onProjectReady, onSelectProject, onClose }) {
+  // New Project State
   const [projectName, setProjectName] = useState('');
   const [ownerName, setOwnerName] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('intelOwnerName') || '';
@@ -13,34 +13,79 @@ export default function WelcomeModal({ onProjectReady, onClose, existingProjects
   const [pin, setPin] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [parsing, setParsing] = useState(false);
-  const [parseResults, setParseResults] = useState([]); // array of { schools, meta }
+  const [parseResults, setParseResults] = useState([]);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Validation Shake State
+  const [shake, setShake] = useState(false);
+
+  // Cloud Projects State
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // PIN Prompt State
+  const [pinPromptProject, setPinPromptProject] = useState(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const list = await listProjects();
+      setProjects(list);
+      setLoadingProjects(false);
+    };
+    fetchProjects();
+  }, []);
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (deletingId === id) {
+      await deleteProject(id);
+      setDeletingId(null);
+      setProjects(prev => prev.filter(p => p.id !== id));
+    } else {
+      setDeletingId(id);
+      setTimeout(() => setDeletingId(prev => prev === id ? null : prev), 3000);
+    }
+  };
+
+  const handleSelect = (project) => {
+    if (project.hasPin) {
+      setPinPromptProject(project);
+      setPinInput('');
+      setPinError(false);
+    } else {
+      onSelectProject(project.id, false);
+    }
+  };
+
+  const submitPin = () => {
+    if (pinInput.trim() === '') {
+      setPinError(true);
+      return;
+    }
+    onSelectProject(pinPromptProject.id, false, pinInput.trim());
+  };
+
+  // --- New Project Logic ---
   const handleFile = useCallback(async (file) => {
     if (!file) return;
-
-    // Validate extension
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['xlsx', 'xls', 'csv'].includes(ext)) {
       setError(`Formato no soportado en "${file.name}". Usa .xlsx, .xls o .csv`);
       return;
     }
-
-    // Prevent duplicates
     if (parseResults.some(r => r.meta.fileName === file.name)) {
       setError(`El archivo "${file.name}" ya fue agregado.`);
       return;
     }
-
     setError(null);
     setParsing(true);
-
     try {
       const result = await parseFile(file);
       setParseResults(prev => [...prev, result]);
-      
-      // Auto-fill project name from first file only if empty
       if (parseResults.length === 0 && !projectName.trim()) {
         const baseName = file.name.replace(/\.\w+$/, '').replace(/[_-]/g, ' ');
         setProjectName(baseName);
@@ -56,7 +101,6 @@ export default function WelcomeModal({ onProjectReady, onClose, existingProjects
     e.preventDefault();
     setDragActive(false);
     if (e.dataTransfer?.files?.length > 0) {
-      // Allow dropping multiple files
       Array.from(e.dataTransfer.files).forEach(file => handleFile(file));
     }
   }, [handleFile]);
@@ -74,18 +118,14 @@ export default function WelcomeModal({ onProjectReady, onClose, existingProjects
     if (e.target.files?.length > 0) {
       Array.from(e.target.files).forEach(file => handleFile(file));
     }
-    // reset input so same file can be selected again if removed
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [handleFile]);
 
   const handleRemoveFile = useCallback((index) => {
     setParseResults(prev => prev.filter((_, i) => i !== index));
-    if (parseResults.length === 1) {
-      setError(null); // Clear errors if removing the last file
-    }
+    if (parseResults.length === 1) setError(null);
   }, [parseResults]);
 
-  // Aggregate stats
   const aggregateStats = useMemo(() => {
     let totalSchools = 0;
     let totalMunicipiosSet = new Set();
@@ -112,13 +152,18 @@ export default function WelcomeModal({ onProjectReady, onClose, existingProjects
     };
   }, [parseResults]);
 
-  const handleSubmit = useCallback(() => {
-    if (parseResults.length === 0 || !projectName.trim() || !ownerName.trim()) return;
-    
-    // Save owner name for next time
-    localStorage.setItem('intelOwnerName', ownerName.trim());
+  const isReady = parseResults.length > 0 && projectName.trim() && ownerName.trim();
 
-    // Combine all schools
+  const handleSubmit = useCallback(() => {
+    if (!isReady) {
+      // Trigger validation feedback
+      setError('Por favor, completa el nombre del proyecto, tu nombre y sube al menos un archivo.');
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    
+    localStorage.setItem('intelOwnerName', ownerName.trim());
     const allSchools = parseResults.flatMap(r => r.schools);
 
     onProjectReady({
@@ -128,297 +173,258 @@ export default function WelcomeModal({ onProjectReady, onClose, existingProjects
       stats: aggregateStats,
       schools: allSchools,
       meta: {
-        ...parseResults[0].meta, // Take the first file's meta as base (e.g. columns mapped)
+        ...parseResults[0].meta,
         validSchools: aggregateStats.totalSchools,
         municipios: aggregateStats.totalMunicipios,
-        fileName: parseResults.map(r => r.meta.fileName).join(', '), // Comma separated names
+        fileName: parseResults.map(r => r.meta.fileName).join(', '),
       },
     });
-  }, [parseResults, projectName, ownerName, pin, aggregateStats, onProjectReady]);
+  }, [parseResults, projectName, ownerName, pin, aggregateStats, onProjectReady, isReady]);
 
-  const isReady = parseResults.length > 0 && projectName.trim() && ownerName.trim();
+  // Helpers
+  const formatDate = (iso) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const getAvatarColor = (name) => {
+    if (!name || name === 'Anónimo') return 'bg-gray-700 text-gray-400';
+    const colors = ['bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-rose-600', 'bg-amber-500', 'bg-cyan-600'];
+    let sum = 0;
+    for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+    return colors[sum % colors.length] + ' text-white';
+  };
 
   return (
-    <div className="intel-modal-backdrop animate-intel-fade-in">
-      <div className="w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-intel-scale-in hide-scrollbar">
-        {/* Glass card */}
-        <div className="intel-glass rounded-3xl overflow-hidden shadow-2xl">
-          {/* Header */}
-          <div className="px-8 pt-8 pb-4 flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-                <Sparkles size={22} className="text-white" />
+    <div className="fixed inset-0 z-[50000] flex items-center justify-center bg-[#0a0f16]/95 backdrop-blur-xl animate-intel-fade-in overflow-y-auto">
+      
+      {/* PIN Prompt Modal */}
+      {pinPromptProject && (
+        <div className="absolute inset-0 z-[50001] flex items-center justify-center bg-black/60 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl animate-intel-scale-in">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center border border-gray-700">
+                <Lock size={20} className="text-blue-400" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Nuevo Proyecto</h1>
-                <p className="text-sm text-gray-400 mt-0.5">Inteligencia Comercial Fly High</p>
-              </div>
-            </div>
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
-              >
-                <X size={18} />
+              <button onClick={() => setPinPromptProject(null)} className="text-gray-500 hover:text-white p-2">
+                <X size={20} />
               </button>
-            )}
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">Proyecto Protegido</h3>
+            <p className="text-sm text-gray-400 mb-6">Ingresa el PIN para abrir "<span className="text-white">{pinPromptProject.name}</span>".</p>
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pinInput}
+                  onChange={(e) => { setPinInput(e.target.value.replace(/[^0-9]/g, '')); setPinError(false); }}
+                  onKeyDown={(e) => e.key === 'Enter' && submitPin()}
+                  placeholder="PIN Numérico"
+                  className={`w-full bg-gray-800 border ${pinError ? 'border-red-500' : 'border-gray-700'} text-white px-4 py-3 rounded-xl font-mono tracking-widest outline-none focus:border-blue-500 transition-colors`}
+                  autoFocus
+                />
+                {pinError && <p className="text-xs text-red-400 mt-1">Ingresa un PIN válido</p>}
+              </div>
+              <button
+                onClick={submitPin}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Unlock size={16} /> Desbloquear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close button if optional */}
+      {onClose && (
+        <button onClick={onClose} className="absolute top-6 right-6 p-3 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+          <X size={24} />
+        </button>
+      )}
+
+      <div className="w-full max-w-6xl mx-auto p-4 md:p-8 flex flex-col xl:flex-row gap-8 items-stretch animate-intel-scale-in mt-10 mb-10">
+        
+        {/* LEFT COLUMN: Cloud Projects */}
+        <div className="flex-1 min-w-[300px] flex flex-col">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-500/10 border border-blue-500/20">
+              <FolderOpen size={18} className="text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Tus Proyectos</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Sincronizados en la nube</p>
+            </div>
           </div>
 
-          <div className="px-8 pb-8 space-y-5">
-            {/* Form Inputs */}
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 bg-gray-900/50 rounded-3xl border border-white/5 p-2 overflow-y-auto custom-scrollbar min-h-[300px] max-h-[500px]">
+            {loadingProjects ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                <div className="w-8 h-8 border-2 border-gray-700 border-t-blue-500 rounded-full animate-intel-spin mb-3" />
+                <p className="text-sm">Buscando proyectos...</p>
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-500 p-8 text-center">
+                <FolderOpen size={48} className="text-gray-700 mb-4" />
+                <p className="text-base font-semibold text-gray-400">Aún no hay proyectos</p>
+                <p className="text-xs mt-1">Crea el tuyo usando el panel de la derecha.</p>
+              </div>
+            ) : (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Nombre del Proyecto
-                </label>
+                {projects.map((p) => (
+                  <div 
+                    key={p.id} 
+                    onClick={() => handleSelect(p)}
+                    className="group relative bg-gray-800/30 hover:bg-gray-800 border border-white/5 hover:border-blue-500/30 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/10 active:scale-[0.98]"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shadow-inner ${getAvatarColor(p.owner)}`}>
+                          {p.owner ? p.owner.substring(0, 2).toUpperCase() : '?'}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            {p.name}
+                            {p.hasPin && <Lock size={12} className="text-amber-400" />}
+                          </h3>
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <span className="flex items-center gap-1 text-[10px] text-gray-400"><User size={10}/> {p.owner || 'Anónimo'}</span>
+                            <span className="flex items-center gap-1 text-[10px] text-gray-400"><Calendar size={10}/> {formatDate(p.updated_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDelete(e, p.id)}
+                        className={`p-2 rounded-lg transition-colors ${deletingId === p.id ? 'bg-red-500/20 text-red-400' : 'text-gray-600 hover:bg-red-500/10 hover:text-red-400 opacity-0 group-hover:opacity-100'}`}
+                        title={deletingId === p.id ? "Haz clic de nuevo para borrar" : "Eliminar proyecto"}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Divider for Desktop */}
+        <div className="hidden xl:block w-px bg-gradient-to-b from-transparent via-white/10 to-transparent my-10" />
+
+        {/* RIGHT COLUMN: Create Project */}
+        <div className="flex-1 min-w-[300px] flex flex-col">
+          <div className="mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20">
+              <Sparkles size={18} className="text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Nuevo Proyecto</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Sube tu base de datos y comienza</p>
+            </div>
+          </div>
+
+          <div className="flex-1 bg-gray-900/50 rounded-3xl border border-white/5 p-6 flex flex-col">
+            
+            {/* Form */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Nombre del Proyecto</label>
                 <input
                   type="text"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   placeholder="Ej: Ruta Uruapan Sur..."
-                  className="intel-input text-base"
-                  autoFocus
+                  className="w-full bg-gray-800/50 border border-white/5 text-white px-4 py-3.5 rounded-xl font-medium outline-none focus:border-emerald-500/50 focus:bg-gray-800 transition-colors"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Tu Nombre (Editor)
-                </label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider pl-1">Tu Nombre (Editor)</label>
                 <input
                   type="text"
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
                   placeholder="Ej: Juan Pérez"
-                  className="intel-input text-base"
+                  className="w-full bg-gray-800/50 border border-white/5 text-white px-4 py-3.5 rounded-xl font-medium outline-none focus:border-emerald-500/50 focus:bg-gray-800 transition-colors"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <LockIcon />
-                Proteger con PIN (Opcional)
-              </label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="Ej: 1234 (4 a 6 dígitos)"
-                className="intel-input text-base font-mono tracking-widest placeholder:tracking-normal w-full max-w-[200px]"
-              />
-              <p className="text-[10px] text-gray-500 mt-1">
-                Si agregas un PIN, otros podrán ver el mapa pero no podrán guardar cambios ni modificar tus datos.
-              </p>
-            </div>
-
-            {/* Empty Dropzone */}
-            {parseResults.length === 0 && (
-              <div
-                className={`intel-dropzone p-8 flex flex-col items-center justify-center gap-4 cursor-pointer min-h-[180px] ${
-                  dragActive ? 'dragging' : ''
-                } ${parsing ? 'pointer-events-none opacity-60' : ''}`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  multiple
-                  onChange={handleFileInput}
-                  className="hidden"
-                />
-
-                {parsing ? (
-                  <LoadingState />
-                ) : (
-                  <>
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-blue-500/10 border border-blue-500/20">
-                      <Upload size={24} className="text-blue-400" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-gray-300">
-                        Arrastra tus archivos Excel del SIGED aquí
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Puedes subir múltiples archivos .xlsx, .xls, .csv
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* List of uploaded files */}
-            {parseResults.length > 0 && (
-              <div className="space-y-4 animate-intel-slide-up">
-                
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-white/[0.06] pb-2 block">
-                  Archivos Cargados ({parseResults.length})
-                </label>
-
-                <div className="space-y-2 max-h-[180px] overflow-y-auto hide-scrollbar pr-1">
-                  {parseResults.map((result, idx) => (
-                    <div key={idx} className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3 flex items-center justify-between group hover:bg-white/[0.04] transition-colors">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 shrink-0">
-                          <CheckCircle size={14} className="text-emerald-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-200 truncate pr-4">{result.meta.fileName}</p>
-                          <p className="text-[10px] text-gray-500 flex items-center gap-2">
-                            <span>{result.meta.validSchools.toLocaleString()} escuelas</span>
-                            <span>•</span>
-                            <span>{result.meta.municipios.length} municipios</span>
-                          </p>
-                          <p className="text-[9px] text-gray-400/80 truncate mt-0.5 max-w-[300px]">
-                            {result.meta.nivelesEducativos?.join(', ')}
-                            {(result.meta.nivelesEducativos?.length > 0 && result.meta.turnos?.length > 0) ? ' | ' : ''}
-                            {result.meta.turnos?.join(', ')}
-                          </p>
+            {/* Dropzone */}
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative flex-1 min-h-[160px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center p-6 transition-all cursor-pointer mb-6 overflow-hidden ${
+                dragActive ? 'border-emerald-500 bg-emerald-500/5 scale-[0.98]' : 'border-white/10 hover:border-emerald-500/30 hover:bg-white/[0.02]'
+              }`}
+            >
+              <input type="file" ref={fileInputRef} onChange={handleFileInput} accept=".csv, .xlsx, .xls" className="hidden" multiple />
+              
+              {parsing ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 border-3 border-gray-700 border-t-emerald-500 rounded-full animate-intel-spin mb-4" />
+                  <p className="text-sm text-emerald-400 font-medium">Procesando...</p>
+                </div>
+              ) : parseResults.length > 0 ? (
+                <div className="w-full text-left space-y-2">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 text-center">Archivos Cargados</p>
+                  {parseResults.map((r, i) => (
+                    <div key={i} onClick={(e) => e.stopPropagation()} className="bg-gray-800/80 rounded-xl p-3 flex items-center justify-between border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <FileSpreadsheet size={16} className="text-emerald-400" />
+                        <div>
+                          <p className="text-xs font-bold text-white truncate max-w-[150px]">{r.meta.fileName}</p>
+                          <p className="text-[10px] text-gray-400">{r.meta.validSchools} escuelas</p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => handleRemoveFile(idx)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                        title="Remover archivo"
-                      >
-                        <Trash2 size={14} />
+                      <button onClick={(e) => { e.stopPropagation(); handleRemoveFile(i); }} className="p-3 text-gray-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors">
+                        <X size={14} />
                       </button>
                     </div>
                   ))}
-
-                  {/* Secondary Dropzone */}
-                  <div
-                    className={`border-2 border-dashed border-gray-700 hover:border-blue-500/50 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                      dragActive ? 'bg-blue-500/10 border-blue-500' : 'bg-transparent'
-                    } ${parsing ? 'pointer-events-none opacity-60' : ''}`}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      multiple
-                      onChange={handleFileInput}
-                      className="hidden"
-                    />
-                    {parsing ? (
-                       <div className="flex items-center gap-2">
-                         <div className="w-4 h-4 border-2 border-gray-600 border-t-blue-500 rounded-full animate-intel-spin" />
-                         <span className="text-xs font-semibold text-gray-400">Procesando...</span>
-                       </div>
-                    ) : (
-                      <>
-                        <Plus size={16} className="text-gray-500" />
-                        <span className="text-sm font-semibold text-gray-400">Agregar otro archivo</span>
-                      </>
-                    )}
+                  <div className="text-center mt-2">
+                    <span className="text-[10px] text-emerald-400 font-bold hover:underline">Toca para añadir otro archivo</span>
                   </div>
                 </div>
-
-                {/* Aggregated Stats */}
-                <div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-semibold text-blue-400/80 uppercase tracking-wider mb-1">Total Consolidado</p>
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <span className="text-xl font-bold text-white mr-1">{aggregateStats.totalSchools.toLocaleString()}</span>
-                          <span className="text-xs text-gray-400">escuelas</span>
-                        </div>
-                        <div className="w-px h-6 bg-blue-500/20"></div>
-                        <div>
-                          <span className="text-xl font-bold text-white mr-1">{aggregateStats.totalMunicipios}</span>
-                          <span className="text-xs text-gray-400">municipios</span>
-                        </div>
-                      </div>
-                    </div>
+              ) : (
+                <div className="flex flex-col items-center pointer-events-none">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-colors ${dragActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-500'}`}>
+                    <Upload size={24} />
                   </div>
-                  
-                  {(aggregateStats.niveles.length > 0 || aggregateStats.turnos.length > 0) && (
-                    <div className="pt-3 border-t border-blue-500/10 flex flex-wrap gap-x-6 gap-y-2">
-                      {aggregateStats.niveles.length > 0 && (
-                        <div>
-                          <span className="text-[9px] text-blue-400/60 uppercase tracking-wider block mb-0.5">Niveles Educativos</span>
-                          <span className="text-xs text-blue-200">{aggregateStats.niveles.join(', ')}</span>
-                        </div>
-                      )}
-                      {aggregateStats.turnos.length > 0 && (
-                        <div>
-                          <span className="text-[9px] text-blue-400/60 uppercase tracking-wider block mb-0.5">Turnos</span>
-                          <span className="text-xs text-blue-200">{aggregateStats.turnos.join(', ')}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-sm font-bold text-white mb-1">Arrastra tus Excels aquí</p>
+                  <p className="text-xs text-gray-500">o toca para explorar archivos (.xlsx, .csv)</p>
                 </div>
+              )}
+            </div>
 
-              </div>
-            )}
-
-            {/* Error state */}
             {error && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 animate-intel-slide-up">
-                <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-400">Error al procesar</p>
-                  <p className="text-xs text-red-300/70 mt-1">{error}</p>
-                </div>
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 animate-intel-slide-up mb-6">
+                <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-red-300">{error}</p>
               </div>
             )}
 
-            {/* Submit button */}
+            {/* ALWAYS ENABLED SUBMIT BUTTON */}
             <button
               onClick={handleSubmit}
-              disabled={!isReady}
-              className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              className={`w-full py-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                shake ? 'animate-tw-shake' : ''
+              } ${
                 isReady
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-gray-900 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 translate-y-0 hover:-translate-y-0.5'
-                  : 'bg-white/[0.05] text-gray-500 cursor-not-allowed'
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-gray-900 shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5'
+                  : 'bg-emerald-500/20 text-emerald-300/50 hover:bg-emerald-500/30'
               }`}
             >
-              {isReady ? (
-                <>
-                  <Sparkles size={16} />
-                  Iniciar Proyecto con {parseResults.length} {parseResults.length === 1 ? 'archivo' : 'archivos'}
-                </>
-              ) : (
-                'Completa los datos para iniciar'
-              )}
+              <Sparkles size={16} className={isReady ? 'text-gray-900' : 'text-emerald-500/50'} />
+              {isReady ? `Iniciar Proyecto (${aggregateStats.totalSchools} escuelas)` : 'Comenzar Proyecto'}
             </button>
+
           </div>
         </div>
+
       </div>
     </div>
-  );
-}
-
-// Extract small UI components to keep code clean
-function LockIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-    </svg>
-  );
-}
-
-function LoadingState() {
-  return (
-    <>
-      <div className="w-10 h-10 border-3 border-gray-600 border-t-blue-500 rounded-full animate-intel-spin" />
-      <p className="text-sm font-medium text-gray-400">Procesando archivo...</p>
-      <div className="w-48 h-1.5 rounded-full bg-gray-800 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-intel-shimmer" />
-      </div>
-    </>
   );
 }

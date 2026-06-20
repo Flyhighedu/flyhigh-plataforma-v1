@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Building2, Users, DollarSign, ChevronDown, ChevronUp, MapPin, Search } from 'lucide-react';
 import { formatNumber, formatMXN } from '../lib/filters';
 
@@ -7,12 +7,22 @@ export default function ConcentrationAnalyzer({
   prices, 
   campusMap, 
   onClose,
-  onFocusCity // Callback to fly map to city bounds if needed
+  onFocusCity,
+  onFocusSchoolKey // Callback to highlight school on map
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('escuelas'); // 'escuelas' | 'alumnos' | 'ingresos'
   const [filterSost, setFilterSost] = useState('todas'); // 'todas' | 'publicas' | 'privadas'
   const [expandedCity, setExpandedCity] = useState(null);
+  
+  // Row hover/click state for map connection
+  const [hoveredRowKey, setHoveredRowKey] = useState(null);
+  const [clickedRowKey, setClickedRowKey] = useState(null);
+
+  // Sync focused school up
+  useEffect(() => {
+    onFocusSchoolKey?.(hoveredRowKey || clickedRowKey);
+  }, [hoveredRowKey, clickedRowKey, onFocusSchoolKey]);
 
   // Group and calculate stats
   const cityData = useMemo(() => {
@@ -64,9 +74,10 @@ export default function ConcentrationAnalyzer({
         entry.lngs.push(s.longitud);
       }
       
-      const schoolKey = isCampus ? coordKey : s.cct;
+      const schoolKey = isCampus ? coordKey + '_cmp' : s.cct;
       if (!entry.schoolsMap.has(schoolKey)) {
         entry.schoolsMap.set(schoolKey, {
+          schoolKey, // Store it for hover tracking
           isCampus,
           nombre: s.nombre || 'SIN NOMBRE',
           alumnos: 0,
@@ -74,7 +85,9 @@ export default function ConcentrationAnalyzer({
           isPrivada: s.isPrivada,
           maxAlumnosSeen: 0,
           ccts: [],
-          niveles: []
+          niveles: [],
+          latitud: s.latitud,
+          longitud: s.longitud,
         });
       }
       
@@ -323,7 +336,13 @@ export default function ConcentrationAnalyzer({
                           {city.schools
                             .sort((a, b) => (b.alumnos || 0) - (a.alumnos || 0))
                             .map((s, sIdx) => (
-                            <tr key={sIdx} className="hover:bg-white/[0.02] transition-colors">
+                            <tr 
+                              key={sIdx} 
+                              className={`transition-colors cursor-pointer ${clickedRowKey === s.schoolKey ? 'bg-blue-500/10' : 'hover:bg-white/[0.05]'}`}
+                              onMouseEnter={() => setHoveredRowKey(s.schoolKey)}
+                              onMouseLeave={() => setHoveredRowKey(null)}
+                              onClick={() => setClickedRowKey(prev => prev === s.schoolKey ? null : s.schoolKey)}
+                            >
                               <td className="py-2 pr-2">
                                 <div className="flex items-center gap-2">
                                   {s.isCampus && (

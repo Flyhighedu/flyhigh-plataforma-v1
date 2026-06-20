@@ -200,6 +200,18 @@ function LegendShape({ shape, fill, stroke }) {
   }
 }
 
+function renderShapeToString(shape, fill, stroke) {
+  const props = `width="24" height="24" viewBox="0 0 14 14" style="display:block;margin:auto;"`;
+  switch (shape) {
+    case 'triangle': return `<svg ${props}><polygon points="7,1 13,12 1,12" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+    case 'square':   return `<svg ${props}><rect x="2" y="2" width="10" height="10" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+    case 'diamond':  return `<svg ${props}><polygon points="7,1 13,7 7,13 1,7" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+    case 'hexagon':  return `<svg ${props}><polygon points="7,1 12.5,4 12.5,10 7,13 1.5,10 1.5,4" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+    case 'star':     return `<svg ${props}><polygon points="7,1 8.8,5.2 13,5.6 9.8,8.4 10.8,13 7,10.6 3.2,13 4.2,8.4 1,5.6 5.2,5.2" fill="${fill}" stroke="${stroke}" stroke-width="0.8" /></svg>`;
+    default:         return `<svg ${props}><circle cx="7" cy="7" r="5.5" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+  }
+}
+
 export default function IntelMap({
   schools = [],
   routeCCTs = [],
@@ -208,6 +220,7 @@ export default function IntelMap({
   children,
   mapInstanceRef,
   campusMap,
+  focusedSchoolKey,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -216,6 +229,7 @@ export default function IntelMap({
   const heatLayerRef = useRef(null);
   const tooltipRef = useRef(null);
   const hideTimeoutRef = useRef(null);
+  const focusedMarkerLayerRef = useRef(null);
   const schoolsRef = useRef(schools);
   const isFirstLoad = useRef(true);
 
@@ -341,15 +355,29 @@ export default function IntelMap({
     if (schools.length === 0) return;
 
     const bounds = L.latLngBounds([]);
+    const drawnCampuses = new Set();
 
     schools.forEach(school => {
       if (school.latitud == null || school.longitud == null) return;
 
-      const isInRoute = routeSetRef.current.has(school.cct);
       const coordKey = `${school.latitud},${school.longitud}`;
       const campusGroup = campusMap?.get(coordKey);
       const isCampus = campusGroup && campusGroup.length >= 2;
+
+      // Optimización: Dibujar la estrella de Campus una sola vez por coordenada
+      if (isCampus) {
+        if (drawnCampuses.has(coordKey)) return;
+        drawnCampuses.add(coordKey);
+      }
+
+      // Si es campus, está "en ruta" si alguna de sus escuelas está en ruta
+      const isInRoute = isCampus 
+        ? campusGroup.some(s => routeSetRef.current.has(s.cct))
+        : routeSetRef.current.has(school.cct);
+        
       const style = getMarkerStyle(school, isInRoute, isCampus);
+
+      const markerKey = isCampus ? `${school.latitud},${school.longitud}_cmp` : school.cct;
 
       // ShapeMarker renders on Canvas — zero DOM overhead per point
       const marker = L.shapeMarker([school.latitud, school.longitud], {
@@ -360,6 +388,8 @@ export default function IntelMap({
         fillOpacity: style.fillOpacity,
         weight: style.weight,
         _school: school,
+        _markerKey: markerKey,
+        _isCampus: isCampus,
       });
 
       marker.on('click', () => {
@@ -421,6 +451,89 @@ export default function IntelMap({
       isFirstLoad.current = false;
     }
   }, [schools, routeCCTs, onSchoolClick, campusMap]);
+
+  // ═══ Sync focused school (Pop & Elevate) ═══
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !markersLayerRef.current) return;
+
+    if (focusedMarkerLayerRef.current) {
+      map.removeLayer(focusedMarkerLayerRef.current);
+      focusedMarkerLayerRef.current = null;
+    }
+    
+    const tooltip = tooltipRef.current;
+    if (tooltip && hideTimeoutRef.current) {
+       tooltip.style.display = 'none';
+       tooltip.style.opacity = '0';
+    }
+
+    if (!focusedSchoolKey) return;
+
+    let targetMarker = null;
+    markersLayerRef.current.eachLayer((layer) => {
+      if (layer.options && layer.options._markerKey === focusedSchoolKey) {
+        targetMarker = layer;
+      }
+    });
+
+    if (targetMarker) {
+      const school = targetMarker.options._school;
+      const isCampus = targetMarker.options._isCampus;
+      const campusGroup = isCampus ? campusMap?.get(focusedSchoolKey.replace('_cmp', '')) : null;
+      const style = getMarkerStyle(school, routeSetRef.current.has(school.cct), isCampus);
+
+      // Ocultar temporalmente el marcador original del canvas para que no se asome por debajo
+      if (targetMarker && targetMarker.setStyle) {
+        targetMarker.setStyle({ opacity: 0, fillOpacity: 0, weight: 0 });
+      }
+
+      const svgHtml = renderShapeToString(style.shape, style.fillColor, style.color);
+      
+      // Iniciamos en escala 1 para que la animación CSS se note fluidamente
+      const divIcon = L.divIcon({
+        className: 'intel-focused-marker',
+        html: `<div class="intel-focused-marker-inner" style="filter: drop-shadow(0 10px 15px rgba(0,0,0,0.8)) drop-shadow(0 4px 6px rgba(0,0,0,0.6)); transform: scale(1) translateY(0px); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: bottom center;">${svgHtml}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12] // Center the SVG over the point
+      });
+
+      focusedMarkerLayerRef.current = L.marker([school.latitud, school.longitud], { icon: divIcon, interactive: false });
+      focusedMarkerLayerRef.current.addTo(map);
+
+      // Disparamos la animación en el siguiente frame
+      requestAnimationFrame(() => {
+        if (focusedMarkerLayerRef.current) {
+          const inner = focusedMarkerLayerRef.current.getElement()?.querySelector('.intel-focused-marker-inner');
+          if (inner) {
+            inner.style.transform = 'scale(1.7) translateY(-4px)';
+          }
+        }
+      });
+
+      // Native Leaflet Tooltip for physical anchoring
+      const tooltipContent = isCampus ? buildCampusTooltip(campusGroup || [school]) : buildSchoolTooltip(school);
+      
+      focusedMarkerLayerRef.current.bindTooltip(tooltipContent, {
+        permanent: true,
+        direction: 'top',
+        className: 'intel-native-tooltip',
+        offset: [0, -15],
+        opacity: 1
+      });
+
+      // Limpieza: restaurar el marcador original cuando se quita el foco
+      return () => {
+        if (targetMarker && targetMarker.setStyle) {
+          targetMarker.setStyle({ 
+            opacity: style.color === 'transparent' ? 0 : 1, 
+            fillOpacity: style.fillOpacity,
+            weight: style.weight
+          });
+        }
+      };
+    }
+  }, [focusedSchoolKey, campusMap]);
 
   // ═══ Route polyline ═══
   useEffect(() => {

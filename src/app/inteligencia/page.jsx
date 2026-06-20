@@ -46,6 +46,7 @@ export default function InteligenciaPage() {
   const [showAddConcentrado, setShowAddConcentrado] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [showConcentration, setShowConcentration] = useState(false);
+  const [focusedSchoolKey, setFocusedSchoolKey] = useState(null);
   const [showMissingSchools, setShowMissingSchools] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -377,6 +378,7 @@ export default function InteligenciaPage() {
   // ─── Project switching ───
   const handleSelectProject = useCallback(async (id, readOnly = false, enteredPin = null) => {
     hasLoadedRef.current = false; // Pause auto-save during switch
+    setLoading(true);
     const project = await loadProject(id);
     if (project) {
       // PIN verification
@@ -394,6 +396,8 @@ export default function InteligenciaPage() {
       hasLoadedRef.current = !finalReadOnly; // Resume auto-save ONLY if not read-only
     }
     setShowProjectSwitcher(false);
+    setShowWelcome(false);
+    setLoading(false);
   }, [restoreProject]);
 
   const handleNewProject = useCallback(() => {
@@ -441,6 +445,7 @@ export default function InteligenciaPage() {
       <div className="h-screen flex items-center justify-center bg-[var(--intel-bg)]">
         <WelcomeModal
           onProjectReady={handleProjectReady}
+          onSelectProject={handleSelectProject}
           onClose={schools.length > 0 ? () => setShowWelcome(false) : null}
         />
       </div>
@@ -568,6 +573,7 @@ export default function InteligenciaPage() {
             onSchoolClick={handleSchoolClick}
             mapInstanceRef={leafletMapRef}
             campusMap={campusMap}
+            focusedSchoolKey={focusedSchoolKey}
           >
             {/* Ranking trigger — just a button, modal renders at page root */}
             <button
@@ -711,6 +717,7 @@ export default function InteligenciaPage() {
           filteredSchools={filteredSchools}
           prices={prices}
           campusMap={campusMap}
+          onFocusSchoolKey={setFocusedSchoolKey}
           onClose={() => setShowConcentration(false)}
           onFocusCity={(city) => {
             if (leafletMapRef.current && city.lats.length) {
