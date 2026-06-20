@@ -1,0 +1,1305 @@
+/* ═══════════════════════════════════════════════════════════════
+   inteligencia.css — Fly High Inteligencia Comercial
+   Design system, animations, map styles, glassmorphism
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Dark palette ─── */
+:root {
+  --intel-bg: #0B1120;
+  --intel-surface: #111827;
+  --intel-surface-2: #1F2937;
+  --intel-surface-3: #374151;
+  --intel-border: rgba(255, 255, 255, 0.06);
+  --intel-border-hover: rgba(255, 255, 255, 0.12);
+  --intel-text: #F9FAFB;
+  --intel-text-sub: #9CA3AF;
+  --intel-text-muted: #6B7280;
+  --intel-gold: #F59E0B;
+  --intel-gold-glow: rgba(245, 158, 11, 0.25);
+  --intel-blue: #3B82F6;
+  --intel-blue-glow: rgba(59, 130, 246, 0.25);
+  --intel-gray-pin: #94A3B8;
+  --intel-emerald: #10B981;
+  --intel-rose: #F43F5E;
+  --intel-purple: #8B5CF6;
+  --intel-gradient-gold: linear-gradient(135deg, #F59E0B, #D97706);
+  --intel-gradient-blue: linear-gradient(135deg, #3B82F6, #2563EB);
+  --intel-gradient-emerald: linear-gradient(135deg, #10B981, #059669);
+  --intel-glass: rgba(17, 24, 39, 0.80);
+  --intel-glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Base resets for inteligencia scope ─── */
+.intel-app {
+  background: var(--intel-bg);
+  color: var(--intel-text);
+  font-family: var(--font-inter, 'Inter', sans-serif);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Custom scrollbar ─── */
+.intel-app ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.intel-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.intel-app ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.intel-app ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Glassmorphism surfaces ─── */
+.intel-glass {
+  background: var(--intel-glass);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--intel-glass-border);
+}
+
+.intel-card {
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.intel-card:hover {
+  border-color: var(--intel-border-hover);
+}
+
+/* ─── Animations ─── */
+@keyframes intel-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes intel-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intel-scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes intel-scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes intel-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 20px 4px rgba(245, 158, 11, 0.15); }
+}
+
+@keyframes intel-breathing-border {
+  0%, 100% { border-color: rgba(59, 130, 246, 0.2); }
+  50% { border-color: rgba(59, 130, 246, 0.5); }
+}
+
+@keyframes intel-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes intel-count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intel-fly-to-panel {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.5) translateX(100px); }
+  100% { opacity: 0; transform: scale(0) translateX(200px); }
+}
+
+@keyframes intel-drop-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes intel-spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-intel-fade-in {
+  animation: intel-fade-in 0.4s ease-out forwards;
+}
+.animate-intel-slide-up {
+  animation: intel-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-intel-scale-in {
+  animation: intel-scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-intel-scale-out {
+  animation: intel-scale-out 0.3s ease-in forwards;
+}
+.animate-intel-pulse-glow {
+  animation: intel-pulse-glow 2.5s ease-in-out infinite;
+}
+.animate-intel-breathing-border {
+  animation: intel-breathing-border 2s ease-in-out infinite;
+}
+.animate-intel-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: intel-shimmer 1.5s linear infinite;
+}
+.animate-intel-drop-in {
+  animation: intel-drop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-intel-spin {
+  animation: intel-spin 1s linear infinite;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.1s; opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.2s; opacity: 0; }
+.stagger-5 { animation-delay: 0.25s; opacity: 0; }
+
+/* ─── Drag & drop zone ─── */
+.intel-dropzone {
+  border: 2px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.intel-dropzone.dragging {
+  border-color: var(--intel-blue);
+  background: rgba(59, 130, 246, 0.05);
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.1) inset;
+}
+.intel-dropzone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: intel-breathing-border 2s ease-in-out infinite;
+  border: 2px dashed transparent;
+  pointer-events: none;
+}
+
+/* ─── Range slider custom styling ─── */
+.intel-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--intel-surface-3);
+  outline: none;
+  cursor: pointer;
+}
+.intel-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--intel-blue);
+  border: 2px solid var(--intel-bg);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.intel-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+}
+.intel-range::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.1);
+}
+.intel-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--intel-blue);
+  border: 2px solid var(--intel-bg);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  cursor: grab;
+}
+
+.intel-range-gold::-webkit-slider-thumb {
+  background: var(--intel-gold);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+.intel-range-gold::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+}
+.intel-range-gold::-moz-range-thumb {
+  background: var(--intel-gold);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.intel-range-emerald::-webkit-slider-thumb {
+  background: var(--intel-emerald);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+.intel-range-emerald::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+}
+
+/* ─── Map pin styles ─── */
+.intel-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  will-change: transform;
+}
+.intel-pin:hover {
+  transform: scale(1.25);
+  z-index: 10000 !important;
+}
+
+.intel-pin-gold {
+  width: 14px; height: 14px;
+  background: var(--intel-gold);
+  border: 2px solid #FEF3C7;
+  box-shadow: 0 0 8px var(--intel-gold-glow);
+}
+.intel-pin-blue {
+  width: 14px; height: 14px;
+  background: var(--intel-blue);
+  border: 2px solid #DBEAFE;
+  box-shadow: 0 0 8px var(--intel-blue-glow);
+}
+.intel-pin-gray {
+  width: 12px; height: 12px;
+  background: var(--intel-gray-pin);
+  border: 2px solid #E2E8F0;
+  box-shadow: 0 0 4px rgba(148, 163, 184, 0.2);
+}
+
+.intel-pin-selected {
+  transform: scale(1.4);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.6), 0 0 20px rgba(16, 185, 129, 0.3);
+  border-color: #10B981 !important;
+}
+
+/* ═══ School tooltip card ═══ */
+.intel-pin-tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 50000;
+  transition: opacity 0.12s ease-out;
+}
+
+.intel-tooltip-card {
+  min-width: 260px;
+  max-width: 340px;
+  background: rgba(10, 15, 30, 0.96);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  font-family: inherit;
+}
+
+/* School name */
+.intel-tooltip-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+
+/* Badge row */
+.intel-tooltip-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.intel-tooltip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+}
+
+/* Stats grid */
+.intel-tooltip-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.intel-tooltip-stat {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.intel-tooltip-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.intel-tooltip-stat-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #e5e7eb;
+  line-height: 1.2;
+}
+
+/* CCT footer */
+.intel-tooltip-cct {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4b5563;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  font-family: 'SF Mono', 'Menlo', monospace;
+  letter-spacing: 0.03em;
+}
+
+/* Street View link */
+.intel-tooltip-streetview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.intel-tooltip-streetview:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93BBFD;
+  transform: translateY(-1px);
+}
+.intel-tooltip-streetview svg:last-child {
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+/* Campus range slider purple accent */
+.intel-range-campus::-webkit-slider-thumb {
+  background: #A855F7 !important;
+}
+.intel-range-campus::-moz-range-thumb {
+  background: #A855F7 !important;
+}
+.intel-range-campus::-webkit-slider-runnable-track {
+  background: rgba(168, 85, 247, 0.2) !important;
+}
+.intel-range-campus::-moz-range-track {
+  background: rgba(168, 85, 247, 0.2) !important;
+}
+
+/* ═══ Campus tooltip enhancements ═══ */
+.intel-tooltip-campus {
+  border-color: rgba(192, 132, 252, 0.2);
+  max-width: 380px;
+}
+.intel-tooltip-campus-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(192, 132, 252, 0.12);
+}
+.intel-tooltip-campus-label {
+  font-size: 10px;
+  font-weight: 900;
+  color: #C084FC;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.intel-tooltip-campus-turnos {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9CA3AF;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  background: rgba(156, 163, 175, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(156, 163, 175, 0.1);
+}
+
+/* Nivel section inside campus tooltip */
+.intel-tooltip-nivel {
+  margin-bottom: 10px;
+}
+.intel-tooltip-nivel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.intel-tooltip-nivel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.intel-tooltip-nivel-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+.intel-tooltip-nivel-school {
+  padding: 6px 8px;
+  margin-bottom: 3px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+.intel-tooltip-nivel-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e5e7eb;
+  line-height: 1.3;
+}
+.intel-tooltip-nivel-meta {
+  display: block;
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+  margin-top: 2px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+/* Campus total summary */
+.intel-tooltip-campus-total {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 6px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(192, 132, 252, 0.1);
+}
+
+/* Campus filter chip color variant */
+.intel-chip-campus {
+  color: #C084FC !important;
+  background: rgba(192, 132, 252, 0.1) !important;
+  border-color: rgba(192, 132, 252, 0.2) !important;
+}
+.intel-chip-campus:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #f87171 !important;
+}
+
+/* ─── Leaflet overrides for dark theme ─── */
+.intel-map .leaflet-control-zoom a {
+  background: var(--intel-surface) !important;
+  color: var(--intel-text-sub) !important;
+  border-color: var(--intel-border) !important;
+  font-weight: 800 !important;
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 16px !important;
+  border-radius: 10px !important;
+  transition: all 0.15s ease !important;
+}
+.intel-map .leaflet-control-zoom a:hover {
+  background: var(--intel-surface-2) !important;
+  color: var(--intel-text) !important;
+}
+.intel-map .leaflet-control-zoom {
+  border: none !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+.intel-map .leaflet-control-attribution {
+  background: rgba(11, 17, 32, 0.7) !important;
+  color: var(--intel-text-muted) !important;
+  font-size: 9px !important;
+  border-radius: 6px 0 0 0 !important;
+  padding: 2px 8px !important;
+}
+.intel-map .leaflet-control-attribution a {
+  color: var(--intel-text-sub) !important;
+}
+
+/* ─── Route polyline ─── */
+.intel-route-line {
+  stroke: var(--intel-emerald);
+  stroke-width: 3;
+  stroke-dasharray: 8 4;
+  stroke-linecap: round;
+}
+
+/* ─── Panel toggle button ─── */
+.intel-panel-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 56px;
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--intel-text-sub);
+  transition: all 0.2s ease;
+  z-index: 30;
+}
+.intel-panel-toggle:hover {
+  background: var(--intel-surface-2);
+  color: var(--intel-text);
+}
+.intel-panel-toggle-left {
+  right: -13px;
+  border-radius: 0 8px 8px 0;
+}
+.intel-panel-toggle-right {
+  left: -13px;
+  border-radius: 8px 0 0 8px;
+}
+
+/* ─── Button variants ─── */
+.intel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+.intel-btn:active {
+  transform: scale(0.96);
+}
+.intel-btn-primary {
+  background: var(--intel-gradient-blue);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.intel-btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  filter: brightness(1.1);
+}
+.intel-btn-gold {
+  background: var(--intel-gradient-gold);
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+.intel-btn-gold:hover {
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  filter: brightness(1.1);
+}
+.intel-btn-emerald {
+  background: var(--intel-gradient-emerald);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.intel-btn-emerald:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  filter: brightness(1.1);
+}
+.intel-btn-ghost {
+  background: transparent;
+  color: var(--intel-text-sub);
+  border: 1px solid var(--intel-border);
+}
+.intel-btn-ghost:hover {
+  background: var(--intel-surface-2);
+  color: var(--intel-text);
+  border-color: var(--intel-border-hover);
+}
+
+/* ─── Input styles ─── */
+.intel-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  color: var(--intel-text);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.intel-input::placeholder {
+  color: var(--intel-text-muted);
+}
+.intel-input:focus {
+  border-color: var(--intel-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ─── Select styles ─── */
+.intel-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  color: var(--intel-text);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.intel-select:focus {
+  border-color: var(--intel-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.intel-select option {
+  background: var(--intel-surface);
+  color: var(--intel-text);
+}
+
+/* ─── Metric cards ─── */
+.intel-metric-card {
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  border-radius: 14px;
+  padding: 14px;
+  transition: all 0.2s ease;
+}
+.intel-metric-card-gold {
+  border-color: rgba(245, 158, 11, 0.2);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), transparent);
+}
+.intel-metric-card-blue {
+  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent);
+}
+.intel-metric-card-emerald {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent);
+}
+
+/* ─── Modal backdrop ─── */
+.intel-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Badge styles ─── */
+.intel-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.intel-badge-gold {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+}
+.intel-badge-blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+}
+.intel-badge-gray {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94A3B8;
+}
+.intel-badge-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+}
+
+/* ═══ Active filter chips (floating on map) ═══ */
+.intel-active-filters {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(10, 15, 30, 0.88);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  animation: intel-drop-in 0.25s ease-out;
+  flex-wrap: wrap;
+  max-width: 90%;
+}
+.intel-active-filters-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.intel-active-filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.intel-active-filter-chip:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+.intel-chip-x {
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.intel-active-filter-chip:hover .intel-chip-x {
+  opacity: 1;
+}
+.intel-active-filter-clear {
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.intel-active-filter-clear:hover {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ─── Route list item ─── */
+.intel-route-item {
+  background: var(--intel-surface);
+  border: 1px solid var(--intel-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  cursor: grab;
+}
+.intel-route-item:hover {
+  border-color: var(--intel-border-hover);
+  background: var(--intel-surface-2);
+}
+.intel-route-item:active {
+  cursor: grabbing;
+}
+.intel-route-item.is-dragging {
+  opacity: 0.5;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* ─── Empty state ─── */
+.intel-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--intel-text-muted);
+}
+
+/* ─── Section divider ─── */
+.intel-divider {
+  height: 1px;
+  background: var(--intel-border);
+  margin: 16px 0;
+}
+
+/* ─── Floating heatmap toggle ─── */
+.intel-float-toggle {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RANKING MODAL — Large centered modal
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Fullscreen overlay */
+.intel-ranking-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 24px;
+}
+
+/* The modal itself */
+.intel-ranking-modal {
+  width: 100%;
+  max-width: 960px;
+  max-height: 85vh;
+  background: rgba(11, 17, 32, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: default;
+}
+
+/* ── Top bar ── */
+.intel-ranking-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px 16px;
+  flex-shrink: 0;
+}
+.intel-ranking-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.intel-ranking-topbar-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(167, 139, 250, 0.12);
+  flex-shrink: 0;
+}
+.intel-ranking-modal-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  line-height: 1.2;
+}
+.intel-ranking-modal-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.intel-ranking-close-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.intel-ranking-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Summary strip ── */
+.intel-ranking-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 0 28px 16px;
+  flex-shrink: 0;
+}
+.intel-ranking-stat {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+}
+.intel-ranking-stat-gold {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.15);
+}
+.intel-ranking-stat-gold .intel-ranking-stat-num { color: #fbbf24; }
+.intel-ranking-stat-gold .intel-ranking-stat-label { color: rgba(251, 191, 36, 0.6); }
+.intel-ranking-stat-blue {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+.intel-ranking-stat-blue .intel-ranking-stat-num { color: #60a5fa; }
+.intel-ranking-stat-blue .intel-ranking-stat-label { color: rgba(96, 165, 250, 0.6); }
+.intel-ranking-stat-num {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  display: block;
+  line-height: 1.2;
+}
+.intel-ranking-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── Controls (tabs + active filter) ── */
+.intel-ranking-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 28px 12px;
+  flex-shrink: 0;
+}
+.intel-ranking-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 3px;
+}
+.intel-ranking-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.intel-ranking-tab:hover {
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.04);
+}
+.intel-ranking-tab-active-purple {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.15);
+}
+.intel-ranking-tab-active-gold {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+}
+.intel-ranking-tab-active-blue {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+}
+.intel-ranking-active-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.intel-ranking-active-chip:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+/* ── Table header ── */
+.intel-ranking-table-header {
+  display: grid;
+  grid-template-columns: 52px 1fr 90px 90px 100px 140px;
+  gap: 8px;
+  padding: 8px 28px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+.intel-ranking-th-pos { text-align: center; }
+.intel-ranking-th-name { }
+.intel-ranking-th-stat { text-align: right; }
+.intel-ranking-th-bar { text-align: left; padding-left: 8px; }
+
+/* ── Scrollable list ── */
+.intel-ranking-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 20px 20px;
+}
+
+/* ── Row ── */
+.intel-ranking-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 90px 90px 100px 140px;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  animation: intel-drop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+.intel-ranking-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.intel-ranking-row:active {
+  transform: scale(0.995);
+}
+.intel-ranking-row-active {
+  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+.intel-ranking-row-active:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* Position badge */
+.intel-ranking-cell-pos {
+  display: flex;
+  justify-content: center;
+}
+.intel-rank-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.intel-rank-badge-num {
+  background: rgba(255, 255, 255, 0.04);
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+/* City name — MOST PROMINENT */
+.intel-ranking-cell-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.intel-ranking-city-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.intel-ranking-row-active .intel-ranking-city-name {
+  color: #34d399;
+}
+.intel-ranking-city-count {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Stat cells */
+.intel-ranking-cell-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: flex-end;
+  font-size: 13px;
+  font-weight: 700;
+}
+.intel-color-gold { color: #fbbf24; }
+.intel-color-blue { color: #60a5fa; }
+.intel-color-gray { color: #9ca3af; }
+
+/* Bar cell */
+.intel-ranking-cell-bar {
+  padding-left: 8px;
+}
+.intel-ranking-bar-bg {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+.intel-ranking-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  display: flex;
+  transition: width 0.5s ease-out;
+}
+.intel-ranking-bar-priv {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  transition: width 0.5s ease-out;
+}
+.intel-ranking-bar-pub {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  flex: 1;
+}
+
+/* ── Responsive: smaller screens ── */
+@media (max-width: 768px) {
+  .intel-ranking-modal {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+  }
+  .intel-ranking-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .intel-ranking-table-header,
+  .intel-ranking-row {
+    grid-template-columns: 44px 1fr 70px 70px;
+  }
+  .intel-ranking-th-bar,
+  .intel-ranking-cell-bar,
+  .intel-ranking-th-stat:last-child,
+  .intel-ranking-cell-stat.intel-color-gray {
+    display: none;
+  }
+}
+
+/* ═══ Turno filter pills ═══ */
+.intel-turno-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  color: #6B7280;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.intel-turno-pill:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #9CA3AF;
+}
+.intel-turno-pill.active {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #FBBF24;
+}
+.intel-turno-pill[data-turno="vespertino"].active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #818CF8;
+}
+.intel-turno-pill[data-turno="nocturno"].active {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.25);
+  color: #94A3B8;
+}
+.intel-turno-pill[data-turno="discontinuo"].active,
+.intel-turno-pill[data-turno="continuo"].active {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34D399;
+}

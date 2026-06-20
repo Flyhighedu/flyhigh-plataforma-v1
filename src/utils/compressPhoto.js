@@ -28,7 +28,7 @@ export function compressPhotoForUpload(file) {
             img.src = event.target?.result;
 
             img.onload = () => {
-                const MAX_WIDTH = 1600;
+                const MAX_WIDTH = 1200;
                 const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
                 const width = Math.round(img.width * scale);
                 const height = Math.round(img.height * scale);
@@ -52,7 +52,7 @@ export function compressPhotoForUpload(file) {
 
                     const baseName = (file.name || 'evidence').replace(/\.[^/.]+$/, '');
                     resolve(new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' }));
-                }, 'image/jpeg', 0.82);
+                }, 'image/jpeg', 0.72);
             };
 
             img.onerror = () => resolve(file);
