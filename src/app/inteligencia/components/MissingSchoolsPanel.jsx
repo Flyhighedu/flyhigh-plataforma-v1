@@ -80,15 +80,15 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/40 z-[200] backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/40 z-[3000] backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Side Panel */}
-      <div className="fixed inset-y-0 right-0 w-[600px] max-w-[100vw] bg-[var(--intel-surface)] border-l border-[var(--intel-border)] z-[210] flex flex-col shadow-2xl transition-transform duration-300 translate-x-0">
+      <div className="fixed inset-y-0 right-0 w-[600px] max-w-[100vw] bg-gray-900 border-l border-white/5 z-[3001] flex flex-col shadow-2xl transition-transform duration-300 translate-x-0">
         
         {/* Header */}
-        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-[var(--intel-border)] bg-gray-900/50">
+        <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-white/5 bg-gray-900/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500/10 border border-amber-500/20">
               <MapPinOff size={18} className="text-amber-500" />
@@ -111,7 +111,7 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
         </header>
 
         {/* Filters Section */}
-        <div className="shrink-0 p-5 border-b border-[var(--intel-border)] bg-gray-900/30 space-y-4">
+        <div className="shrink-0 p-5 border-b border-white/5 bg-gray-900/30 space-y-4">
           
           <div className="flex gap-4 items-center">
             {/* Search */}

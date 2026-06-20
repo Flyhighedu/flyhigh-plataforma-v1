@@ -10,6 +10,7 @@ import RoutePanel from './components/RoutePanel';
 import RouteReportModal from './components/RouteReportModal';
 import ProjectSwitcher from './components/ProjectSwitcher';
 import MunicipioRanking from './components/MunicipioRanking';
+import ConcentrationAnalyzer from './components/ConcentrationAnalyzer';
 import AddConcentradoModal from './components/AddConcentradoModal';
 import MissingSchoolsPanel from './components/MissingSchoolsPanel';
 import { applyFilters, getStudentRange, getStudentRangeByType, getUniqueNiveles } from './lib/filters';
@@ -35,7 +36,6 @@ export default function InteligenciaPage() {
     revenueMaxPriv: null,
   });
   const [prices, setPrices] = useState({ premium: 200, base: 80 });
-  const [somPercent, setSomPercent] = useState(30);
   const [routeCCTs, setRouteCCTs] = useState([]);
 
   // ─── UI state ───
@@ -45,6 +45,7 @@ export default function InteligenciaPage() {
   const [showReport, setShowReport] = useState(false);
   const [showAddConcentrado, setShowAddConcentrado] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
+  const [showConcentration, setShowConcentration] = useState(false);
   const [showMissingSchools, setShowMissingSchools] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -216,7 +217,6 @@ export default function InteligenciaPage() {
     setRouteCCTs(project.route || []);
     if (project.filters) setFilters(project.filters);
     if (project.prices) setPrices(project.prices);
-    if (project.somPercent) setSomPercent(project.somPercent);
 
     // Set min/max for alumnos if not set
     if (!project.filters?.alumnosMinPub) {
@@ -303,7 +303,6 @@ export default function InteligenciaPage() {
         await saveProjectMeta(projectMeta.id, {
           filters,
           prices,
-          somPercent,
           route: routeCCTs,
         });
       } else {
@@ -318,7 +317,6 @@ export default function InteligenciaPage() {
           route: routeCCTs,
           filters,
           prices,
-          somPercent,
         });
         setProjectMeta(prev => ({ ...prev, id }));
       }
@@ -329,7 +327,7 @@ export default function InteligenciaPage() {
     } finally {
       setSaving(false);
     }
-  }, [projectMeta, schools, routeCCTs, filters, prices, somPercent]);
+  }, [projectMeta, schools, routeCCTs, filters, prices]);
 
   // ─── Auto-save debounced effect ───
   useEffect(() => {
@@ -341,7 +339,6 @@ export default function InteligenciaPage() {
         await saveProjectMeta(projectMeta.id, {
           filters,
           prices,
-          somPercent,
           route: routeCCTs,
         });
         console.log('[Intel] Auto-saved');
@@ -351,7 +348,7 @@ export default function InteligenciaPage() {
     }, 2000);
 
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [filters, prices, somPercent, routeCCTs, projectMeta.id]);
+  }, [filters, prices, routeCCTs, projectMeta.id]);
 
   // ─── Route operations ───
   const handleSchoolClick = useCallback((school) => {
@@ -556,12 +553,11 @@ export default function InteligenciaPage() {
           onFilterChange={setFilters}
           prices={prices}
           onPriceChange={setPrices}
-          somPercent={somPercent}
-          onSomChange={setSomPercent}
           collapsed={leftCollapsed}
           onToggleCollapse={() => setLeftCollapsed(!leftCollapsed)}
           campusCount={campusMap.size}
           onOpenMissingSchools={() => setShowMissingSchools(true)}
+          onOpenConcentration={() => setShowConcentration(true)}
         />
 
         {/* Center: Map + floating filter chips */}
@@ -707,6 +703,27 @@ export default function InteligenciaPage() {
             setFilters(prev => ({ ...prev, municipio: muni }));
           }}
           onClose={() => setShowRanking(false)}
+        />
+      )}
+
+      {showConcentration && (
+        <ConcentrationAnalyzer
+          filteredSchools={filteredSchools}
+          prices={prices}
+          campusMap={campusMap}
+          onClose={() => setShowConcentration(false)}
+          onFocusCity={(city) => {
+            if (leafletMapRef.current && city.lats.length) {
+              const p = 0.01;
+              leafletMapRef.current.flyToBounds(
+                [
+                  [Math.min(...city.lats) - p, Math.min(...city.lngs) - p],
+                  [Math.max(...city.lats) + p, Math.max(...city.lngs) + p]
+                ],
+                { duration: 1.2, maxZoom: 14 }
+              );
+            }
+          }}
         />
       )}
 

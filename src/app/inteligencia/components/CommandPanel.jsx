@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { Filter, RotateCcw, School, TrendingUp, Target, Layers, BookOpen, MapPinOff } from 'lucide-react';
+import { Filter, RotateCcw, School, TrendingUp, Target, Layers, BookOpen, MapPinOff, MapPin } from 'lucide-react';
 import { formatMXN, formatNumber, calculateTAM, calculateSOM, getUniqueMunicipios, getUniqueTurnos, getUniqueNiveles, getStudentRange, getStudentRangeByType, getRevenueRangeByType } from '../lib/filters';
 
 export default function CommandPanel({
@@ -12,11 +12,10 @@ export default function CommandPanel({
   onFilterChange,
   prices,
   onPriceChange,
-  somPercent,
-  onSomChange,
   collapsed,
   onToggleCollapse,
   onOpenMissingSchools,
+  onOpenConcentration,
 }) {
   const municipios = useMemo(() => getUniqueMunicipios(schools), [schools]);
   const turnos = useMemo(() => getUniqueTurnos(schools), [schools]);
@@ -29,7 +28,6 @@ export default function CommandPanel({
   // ─── Debounced slider state ───
   const [localPremium, setLocalPremium] = useState(prices.premium);
   const [localBase, setLocalBase] = useState(prices.base);
-  const [localSom, setLocalSom] = useState(somPercent);
   const [localRevPubMin, setLocalRevPubMin] = useState(filters.revenueMinPub ?? 0);
   const [localRevPubMax, setLocalRevPubMax] = useState(filters.revenueMaxPub ?? revenueRangeByType.pub.max);
   const [localRevPrivMin, setLocalRevPrivMin] = useState(filters.revenueMinPriv ?? 0);
@@ -50,10 +48,6 @@ export default function CommandPanel({
     setLocalBase(prices.base);
   }, [prices]);
 
-  useEffect(() => {
-    setLocalSom(somPercent);
-  }, [somPercent]);
-
   const debouncedFilterChange = useCallback((key, value) => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -68,17 +62,8 @@ export default function CommandPanel({
     }, 150);
   }, [onPriceChange]);
 
-  const debouncedSomChange = useCallback((value) => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      onSomChange(value);
-    }, 150);
-  }, [onSomChange]);
-
   // Use the parent's provided filteredSchools for TAM calculation
   const tam = useMemo(() => calculateTAM(filteredSchools, prices), [filteredSchools, prices]);
-
-  const som = useMemo(() => calculateSOM(tam, somPercent), [tam, somPercent]);
 
   const handleReset = () => {
     onFilterChange({
@@ -386,6 +371,19 @@ export default function CommandPanel({
             </div>
           </div>
 
+          {/* Contextual TAM Público */}
+          <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-1">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+              💰 Potencial Público
+            </div>
+            <div className="text-lg font-black text-blue-400">
+              {formatMXN(tam.publicValue)}
+            </div>
+            <div className="text-[10px] text-gray-500">
+              <strong className="text-blue-400/80">{formatNumber(tam.publicSchools)} Escuelas</strong> × {formatNumber(tam.publicStudents)} alumnos × {formatMXN(prices.base)}
+            </div>
+          </div>
+
           {/* ═══ ESCUELAS PRIVADAS ═══ */}
           <div className="space-y-3 mt-2 pt-3 border-t border-amber-500/20">
             <label className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -522,76 +520,31 @@ export default function CommandPanel({
               />
             </div>
           </div>
-        </section>
 
-        <div className="intel-divider" />
-
-        {/* ═══ SECTION B: RESULTADOS FINANCIEROS ═══ */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={14} className="text-amber-400" />
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-              Resultados Financieros
-            </h3>
-          </div>
-
-          {/* TAM Card */}
-          <div className="intel-metric-card intel-metric-card-gold space-y-3">
-            <div className="flex items-center gap-2">
-              <Layers size={13} className="text-amber-400" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">💰 Potencial de Venta Total</span>
+          {/* Contextual TAM Privado */}
+          <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-1">
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+              💰 Potencial Privado
             </div>
-            <p className="text-2xl font-black text-amber-400">{formatMXN(tam.totalValue)}</p>
-            <p className="text-[10px] text-gray-500">
-              Si vendieras a <strong className="text-white">{formatNumber(tam.totalSchools)} escuelas</strong> en el mapa
-            </p>
-
-            {/* Breakdown */}
-            <div className="space-y-1.5 pt-2 border-t border-gray-800">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-amber-400/80">🟡 {formatNumber(tam.privateSchools)} Privadas</span>
-                <span className="text-gray-400">
-                  {formatNumber(tam.privateStudents)} × {formatMXN(prices.premium)} = <strong className="text-amber-400">{formatMXN(tam.privateValue)}</strong>
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-blue-400/80">🔵 {formatNumber(tam.publicSchools)} Públicas</span>
-                <span className="text-gray-400">
-                  {formatNumber(tam.publicStudents)} × {formatMXN(prices.base)} = <strong className="text-blue-400">{formatMXN(tam.publicValue)}</strong>
-                </span>
-              </div>
+            <div className="text-lg font-black text-amber-400">
+              {formatMXN(tam.privateValue)}
             </div>
-          </div>
-
-          {/* SOM Card */}
-          <div className="intel-metric-card intel-metric-card-blue space-y-3">
-            <div className="flex items-center gap-2">
-              <Target size={13} className="text-blue-400" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">🎯 Meta Realista</span>
-            </div>
-            <p className="text-2xl font-black text-blue-400">{formatMXN(som.value)}</p>
-            <p className="text-[10px] text-gray-500">
-              Si alcanzas al <strong className="text-white">{localSom}%</strong> de esos alumnos ({formatNumber(som.students)} alumnos)
-            </p>
-            {/* SOM percentage slider */}
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="range"
-                className="intel-range intel-range-emerald flex-1"
-                min={5}
-                max={100}
-                step={5}
-                value={localSom}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value);
-                  setLocalSom(v);
-                  debouncedSomChange(v);
-                }}
-              />
-              <span className="text-xs font-bold text-emerald-400 w-10 text-right">{localSom}%</span>
+            <div className="text-[10px] text-gray-500">
+              <strong className="text-amber-400/80">{formatNumber(tam.privateSchools)} Escuelas</strong> × {formatNumber(tam.privateStudents)} alumnos × {formatMXN(prices.premium)}
             </div>
           </div>
         </section>
+
+        {/* ═══ CTA: DISTRIBUCIÓN POR MUNICIPIO ═══ */}
+        <div className="p-5 border-t border-[var(--intel-border)] bg-[#0B1120]/50 shrink-0">
+          <button 
+            onClick={onOpenConcentration}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:shadow-[0_0_25px_rgba(59,130,246,0.4)]"
+          >
+            <MapPin size={16} />
+            Analizar Distribución por Municipio
+          </button>
+        </div>
       </div>
     </div>
   );
