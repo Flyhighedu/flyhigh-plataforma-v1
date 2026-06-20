@@ -343,6 +343,8 @@ export default function IntelMap({
     const bounds = L.latLngBounds([]);
 
     schools.forEach(school => {
+      if (school.latitud == null || school.longitud == null) return;
+
       const isInRoute = routeSetRef.current.has(school.cct);
       const coordKey = `${school.latitud},${school.longitud}`;
       const campusGroup = campusMap?.get(coordKey);
