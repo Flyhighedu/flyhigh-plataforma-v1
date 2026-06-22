@@ -83,6 +83,10 @@
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes intel-slide-in-right {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 @keyframes intel-scale-in {
   from { opacity: 0; transform: scale(0.95); }
@@ -383,32 +387,59 @@
   letter-spacing: 0.03em;
 }
 
+/* Ops block (Variables view) */
+.intel-tooltip-ops {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(16, 185, 129, 0.15);
+}
+.intel-tooltip-ops-title {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #34D399;
+  margin-bottom: 6px;
+}
+.intel-tooltip-oportunidad {
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  color: #FBBF24;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  line-height: 1.4;
+}
+
 /* Street View link */
 .intel-tooltip-streetview {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  padding: 8px 10px;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.15);
-  color: #60A5FA;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38BDF8;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
-  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.3s ease;
   cursor: pointer;
 }
 .intel-tooltip-streetview:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #93BBFD;
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38BDF8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
   transform: translateY(-1px);
-}
-.intel-tooltip-streetview svg:last-child {
-  margin-left: auto;
-  opacity: 0.5;
 }
 
 /* Campus range slider purple accent */
@@ -1304,6 +1335,140 @@
   color: #34D399;
 }
 
+/* ═══ Redesigned Tabular Rows ═══ */
+.intel-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  transition: opacity 0.2s;
+}
+.intel-tooltip-row-inactive {
+  opacity: 0.4;
+  background: rgba(0, 0, 0, 0.2);
+}
+.intel-tooltip-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.intel-tooltip-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.intel-tooltip-row-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #E2E8F0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.intel-tooltip-row-meta {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+.intel-tooltip-row-right {
+  font-size: 12px;
+  font-weight: 800;
+  color: #34D399;
+  text-align: right;
+}
+
+/* Minimalist Footer */
+.intel-tooltip-summary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+  text-align: center;
+}
+.intel-tooltip-summary .intel-tooltip-row-left {
+  align-items: center !important;
+}
+
+/* ═══ Distribution Drawer ═══ */
+.intel-distribution-drawer {
+  position: absolute;
+  width: 360px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  background: rgba(11, 17, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px 18px 14px 14px;
+  box-shadow: 0 -18px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(59,130,246,0.06) inset;
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  overflow: hidden;
+  transition: height 0.18s ease, transform 0.18s ease;
+}
+.intel-distribution-drawer.is-collapsed {
+  cursor: pointer;
+}
+.intel-distribution-drawer-handle {
+  height: 12px;
+  cursor: ns-resize;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.intel-distribution-drawer-handle::after {
+  content: '';
+  width: 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148,163,184,0.45);
+}
+.intel-distribution-drawer-header {
+  height: 32px;
+  padding: 0 14px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.intel-distribution-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.intel-municipio-chip,
+.intel-municipio-chip-sm,
+.intel-tooltip-municipio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 160px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(59, 130, 246, 0.10);
+  color: #93C5FD;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.intel-municipio-chip { padding: 3px 8px; font-size: 10px; }
+.intel-municipio-chip-sm { padding: 2px 6px; font-size: 9px; }
+.intel-tooltip-municipio-chip { padding: 3px 8px; font-size: 9px; margin-top: 6px; }
+
 /* ═══ Native Tooltip Overrides ═══ */
 .intel-native-tooltip {
   background: transparent !important;
@@ -1312,6 +1477,8 @@
   padding: 0 !important;
   margin: 0 !important;
   overflow: visible !important;
+  white-space: normal !important;
+  width: max-content !important;
 }
 .intel-native-tooltip::before,
 .intel-native-tooltip::after {

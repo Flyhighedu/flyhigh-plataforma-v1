@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Flame, Map as MapIcon } from 'lucide-react';
 import { registerShapeMarker } from './ShapeMarker';
+import { formatMXN, calculateCapacity, estimateSchoolOps, contarTurnosQueCalifican, renderTurnoPillHTML } from '../lib/filters';
 
 // @2x tiles for larger, more readable city labels
 const DARK_TILE = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png';
@@ -73,23 +74,149 @@ const NIVEL_COLOR_MAP = {
 function streetViewUrl(lat, lng) {
   return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
 }
+function renderMunicipioChipHTML(municipio) {
+  if (!municipio) return '';
+  return `<span class="intel-tooltip-municipio-chip">📍 ${municipio}</span>`;
+}
+
 function streetViewLink(lat, lng) {
   if (!lat || !lng) return '';
   return `
     <a href="${streetViewUrl(lat, lng)}" target="_blank" rel="noopener noreferrer" class="intel-tooltip-streetview">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M12 12v8"/><path d="M8 16l4 4 4-4"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
       Ver en Street View
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
     </a>
   `;
 }
 
-function buildSchoolTooltip(school, routeSet = new Set()) {
+function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0) {
+  const nombre = turnoGroup[0]?.nombre || 'Locación';
+  const municipio = turnoGroup[0]?.municipio || '';
+  const order = { 'MATUTINO': 0, 'VESPERTINO': 1, 'NOCTURNO': 2 };
+  const sorted = [...turnoGroup].sort((a, b) => (order[(a.turno||'').toUpperCase()] ?? 9) - (order[(b.turno||'').toUpperCase()] ?? 9));
+  const calif = sorted.filter(s => visibleCcts.has(s.cct)).length;
+
+  const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+
+  const turnoIcon = (t) => { const u=(t||'').toUpperCase(); return u==='MATUTINO'?'☀️':u==='VESPERTINO'?'🌙':u==='NOCTURNO'?'🌑':'🕐'; };
+
+  // Ingreso por turno (al vuelo, así calcula también los que NO pasan el filtro)
+  const ops = new Map();
+  if (capacity && prices) {
+    for (const s of sorted) ops.set(s.cct, estimateSchoolOps(s, capacity, prices));
+  }
+
+  // Totales: solo los turnos que pasan el filtro
+  let passAlumnos = 0, passIngreso = 0, missAlumnos = 0;
+  for (const s of sorted) {
+    const o = ops.get(s.cct);
+    if (!o) continue;
+    if (visibleCcts.has(s.cct)) { passAlumnos += o.alumnos; passIngreso += o.ingreso; }
+    else missAlumnos += o.alumnos;
+  }
+
+  // Días: solo los turnos que pasan el filtro (son los que vas a hacer)
+  let maxDias = 0;
+  const _ninosDia = capacity && sorted.find(s => visibleCcts.has(s.cct))
+    ? (sorted.find(s => visibleCcts.has(s.cct)).isPrivada ? capacity.ninosPorDiaPriv : capacity.ninosPorDiaPub)
+    : 0;
+  if (_ninosDia > 0) {
+    const byTurno = {};
+    for (const s of sorted) {
+      if (!visibleCcts.has(s.cct)) continue;
+      const t = s.turno || 'OTRO';
+      byTurno[t] = (byTurno[t] || 0) + (s.alumnos || 0);
+    }
+    for (const t in byTurno) maxDias = Math.max(maxDias, Math.ceil(byTurno[t] / _ninosDia));
+  }
+  const passDias = maxDias > 0 ? Math.max(1, maxDias) : 0;
+
+  const rows = sorted.map(s => {
+    const ok = visibleCcts.has(s.cct);
+    const inRoute = routeSet.has(s.cct);
+    const o = ops.get(s.cct);
+    // Keep showing info but dim if it doesn't pass filters. Don't show money if it doesn't pass.
+    const moneyStr = (o && o.ingreso > 0) ? formatMXN(o.ingreso) : '';
+    const money = moneyStr ? (ok ? `<span style="color:#34D399">${moneyStr}</span>` : `<span style="color:#FFFFFF; opacity:0.6">${moneyStr}</span>`) : '';
+
+    return `
+      <div class="intel-tooltip-row ${ok ? '' : 'intel-tooltip-row-inactive'}">
+        <div class="intel-tooltip-row-top">
+          ${renderTurnoPillHTML(s.turno)}
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-name">${(s.alumnos||0).toLocaleString()} alumnos ${inRoute ? '· <span style="color:#34D399">en ruta</span>' : ''}</span>
+            <span class="intel-tooltip-row-meta">${s.cct}</span>
+          </div>
+        </div>
+        <div class="intel-tooltip-row-right">
+          ${money}
+        </div>
+      </div>`;
+  }).join('');
+
+  const headerColor = sorted.length >= 2 ? '#34D399' : (turnoGroup[0]?.isPrivada ? '#C084FC' : '#60A5FA');
+  const headerLabel = sorted.length >= 2 ? 'DOBLE TURNO · 2 JORNADAS, 1 VISITA' : `${sorted.length} turno en esta locación`;
+
+  // Resumen: solo los turnos que pasan el filtro
+  let totalBlock = '';
+  if (passIngreso > 0) {
+    const _ingDia = passDias > 0 ? passIngreso / passDias : 0;
+    const _filtroNote = missAlumnos > 0
+      ? `<div style="margin-top:4px;font-size:9px;color:#94A3B8">* ${missAlumnos.toLocaleString()} alumnos en turnos que no pasan filtros</div>`
+      : '';
+    totalBlock = `
+      <div class="intel-tooltip-summary">
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">ALUMNOS</span>
+          <span class="intel-tooltip-row-name" style="font-size:13px">${passAlumnos.toLocaleString()}</span>
+        </div>
+        ${passDias > 0 ? `
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
+          <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${passDias}</span>
+        </div>
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">ING. / DÍA</span>
+          <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (_ingDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(_ingDia)}</span>
+        </div>` : ''}
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">TOTAL</span>
+          <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(passIngreso)}</span>
+        </div>
+        ${_filtroNote}
+      </div>`;
+  } else {
+    totalBlock = `
+      <div class="intel-tooltip-summary" style="border-top-color:rgba(251,191,36,0.15)">
+        <span class="intel-tooltip-row-meta" style="color:#FBBF24">Ningún turno pasa el filtro</span>
+      </div>`;
+  }
+
+  // Add-to-route buttons per qualifying shift
+  let routeBtns = '';
+  const addables = sorted.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
+  if (addables.length) {
+    const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
+    routeBtns = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar ${addables.length > 1 ? 'ambos turnos' : 'turno'} a Mi Ruta</button>`;
+  }
+
+  return `
+    <div class="intel-tooltip-card relative">
+      ${closeBtn}
+      <div class="intel-tooltip-name pr-6">${nombre}</div>
+      ${renderMunicipioChipHTML(municipio)}
+      <div class="intel-tooltip-campus-label" style="color:${headerColor};margin-bottom:10px">${headerLabel}</div>
+      ${rows}
+      ${totalBlock}
+      ${streetViewLink(turnoGroup[0]?.latitud, turnoGroup[0]?.longitud)}
+      ${routeBtns}
+    </div>
+  `;
+}
+
+function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPorDia = 0) {
   const tipo = school.isPrivada ? 'Privada' : 'Pública';
-  const tipoColor = school.isPrivada ? '#FBBF24' : '#60A5FA';
-  const tipoBg = school.isPrivada ? 'rgba(251,191,36,0.12)' : 'rgba(96,165,250,0.12)';
   const nivel = school.nivelEducativo || '';
-  const nivelColor = NIVEL_COLOR_MAP[nivel.toUpperCase()] || '#9CA3AF';
 
   const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
 
@@ -101,51 +228,111 @@ function buildSchoolTooltip(school, routeSet = new Set()) {
     routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${school.cct}'], event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar a Mi Ruta</button>`;
   }
 
+  let opsBlock = '';
+  if (profit) {
+    const pc = profit.get(school.cct);
+    if (pc) {
+      opsBlock = `
+        <div class="intel-tooltip-summary">
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-meta">ALUMNOS</span>
+            <span class="intel-tooltip-row-name" style="font-size:13px">${(school.alumnos || 0).toLocaleString()}</span>
+          </div>
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
+            <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${pc.dias}</span>
+          </div>
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-meta">ING. / DÍA</span>
+            <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (pc.ingresoPorDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(pc.ingresoPorDia)}</span>
+          </div>
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-meta">TOTAL</span>
+            <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(pc.ingreso)}</span>
+          </div>
+        </div>`;
+    } else {
+      opsBlock = `
+        <div class="intel-tooltip-summary" style="border-top-color:rgba(148,163,184,0.15)">
+          <span class="intel-tooltip-row-meta" style="color:#94A3B8">Sin matrícula para estimar operación</span>
+        </div>`;
+    }
+  }
+
   return `
     <div class="intel-tooltip-card relative">
       ${closeBtn}
-      <div class="intel-tooltip-name pr-6">${school.nombre || 'Sin nombre'}</div>
-      <div class="intel-tooltip-badges">
-        ${nivel ? `<span class="intel-tooltip-badge" style="color:${nivelColor};background:${nivelColor}18;border-color:${nivelColor}30">${nivel}</span>` : ''}
-        <span class="intel-tooltip-badge" style="color:${tipoColor};background:${tipoBg};border-color:${tipoColor}30">${tipo}</span>
+      <div class="intel-tooltip-campus-header pr-6">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="intel-tooltip-campus-label" style="color:#60A5FA">${school.nombre || 'Sin nombre'}</span>
       </div>
-      <div class="intel-tooltip-stats">
-        <div class="intel-tooltip-stat">
-          <span class="intel-tooltip-stat-label">Alumnos</span>
-          <span class="intel-tooltip-stat-value">${(school.alumnos || 0).toLocaleString()}</span>
+      ${renderMunicipioChipHTML(school.municipio)}
+
+      <div class="intel-tooltip-row">
+        <div class="intel-tooltip-row-top">
+          ${renderTurnoPillHTML(school.turno)}
+          <div class="intel-tooltip-row-left">
+            <span class="intel-tooltip-row-name" style="max-width:140px">${nivel} · ${tipo}</span>
+            <span class="intel-tooltip-row-meta">${school.cct}</span>
+          </div>
         </div>
-        ${school.turno ? `<div class="intel-tooltip-stat"><span class="intel-tooltip-stat-label">Turno</span><span class="intel-tooltip-stat-value">${school.turno}</span></div>` : ''}
-        ${school.municipio ? `<div class="intel-tooltip-stat"><span class="intel-tooltip-stat-label">Municipio</span><span class="intel-tooltip-stat-value">${school.municipio}</span></div>` : ''}
       </div>
-      <div class="intel-tooltip-cct">CCT: ${school.cct || '—'}</div>
+      
+      ${opsBlock}
       ${streetViewLink(school.latitud, school.longitud)}
       ${routeBtn}
     </div>
   `;
 }
 
-function buildCampusTooltip(campusGroup, routeSet = new Set()) {
-  // Group by nivel educativo
+function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0) {
   const byNivel = {};
-  let totalAlumnos = 0;
-  const allTurnos = new Set();
   for (const s of campusGroup) {
     const nivel = (s.nivelEducativo || 'OTRO').toUpperCase();
     if (!byNivel[nivel]) byNivel[nivel] = [];
     byNivel[nivel].push(s);
-    totalAlumnos += s.alumnos || 0;
-    if (s.turno) allTurnos.add(s.turno);
   }
-
   const niveles = Object.keys(byNivel).sort();
   const municipio = campusGroup[0]?.municipio || '';
+
+  // Ops per school — same approach as buildTurnoTooltip
+  const ops = new Map();
+  if (capacity && prices) {
+    for (const s of campusGroup) ops.set(s.cct, estimateSchoolOps(s, capacity, prices));
+  }
+
+  let passAlumnos = 0, passIngreso = 0, missIngreso = 0, missAlumnos = 0;
+  for (const s of campusGroup) {
+    const o = ops.get(s.cct);
+    if (!o) continue;
+    if (visibleCcts.has(s.cct)) { passAlumnos += o.alumnos; passIngreso += o.ingreso; }
+    else { missIngreso += o.ingreso; missAlumnos += o.alumnos; }
+  }
+  // Días reales: fotógrafos operan turnos concurrentemente el mismo día. Agrupamos por turno y sacamos el máximo de días.
+  let maxDias = 0;
+  const _firstPass = campusGroup.find(s => visibleCcts.has(s.cct));
+  const _ninosDia = capacity && _firstPass ? (_firstPass.isPrivada ? capacity.ninosPorDiaPriv : capacity.ninosPorDiaPub) : 0;
+  if (_ninosDia > 0) {
+    const byTurno = {};
+    for (const s of campusGroup) {
+      if (!visibleCcts.has(s.cct)) continue;
+      const t = s.turno || 'OTRO';
+      byTurno[t] = (byTurno[t] || 0) + (s.alumnos || 0);
+    }
+    for (const t in byTurno) {
+      const diasT = Math.ceil(byTurno[t] / _ninosDia);
+      if (diasT > maxDias) maxDias = diasT;
+    }
+  }
+  const passDias = maxDias > 0 ? Math.max(1, maxDias) : 0;
+
+  const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
 
   let nivelSections = '';
   for (const nivel of niveles) {
     const schools = byNivel[nivel];
     const nivelColor = NIVEL_COLOR_MAP[nivel] || '#9CA3AF';
     const nivelAlumnos = schools.reduce((sum, s) => sum + (s.alumnos || 0), 0);
-
     nivelSections += `
       <div class="intel-tooltip-nivel">
         <div class="intel-tooltip-nivel-header" style="color:${nivelColor}">
@@ -154,27 +341,69 @@ function buildCampusTooltip(campusGroup, routeSet = new Set()) {
           <span class="intel-tooltip-nivel-count">${nivelAlumnos.toLocaleString()} alumnos</span>
         </div>
         ${schools.map(s => {
-          const turnoShort = (s.turno || '').replace('MATUTINO','Mat.').replace('VESPERTINO','Vesp.').replace('NOCTURNO','Noct.').replace('DISCONTINUO','Disc.').replace('CONTINUO','Cont.');
+          const ok = visibleCcts.has(s.cct);
+          const inRoute = routeSet.has(s.cct);
+          const o = ops.get(s.cct);
+          const moneyStr = (o && o.ingreso > 0) ? formatMXN(o.ingreso) : '';
+          const money = moneyStr ? (ok ? `<span style="color:#34D399">${moneyStr}</span>` : `<span style="color:#FFFFFF; opacity:0.6">${moneyStr}</span>`) : '';
+
           return `
-          <div class="intel-tooltip-nivel-school">
-            <span class="intel-tooltip-nivel-name">${s.nombre || 'Sin nombre'}</span>
-            <span class="intel-tooltip-nivel-meta">${(s.alumnos || 0).toLocaleString()} al. · ${turnoShort} · ${s.isPrivada ? 'Priv.' : 'Púb.'} · ${s.cct}</span>
-          </div>
-        `;
+          <div class="intel-tooltip-row ${ok ? '' : 'intel-tooltip-row-inactive'}">
+            <div class="intel-tooltip-row-top">
+              ${renderTurnoPillHTML(s.turno)}
+              <div class="intel-tooltip-row-left">
+                <span class="intel-tooltip-row-name" style="max-width:140px">${s.nombre || 'Sin nombre'} ${inRoute ? '· <span style="color:#34D399">en ruta</span>' : ''}</span>
+                <span class="intel-tooltip-row-meta">${(s.alumnos || 0).toLocaleString()} al. · ${s.isPrivada ? 'Priv.' : 'Púb.'} · ${s.cct}</span>
+              </div>
+            </div>
+            <div class="intel-tooltip-row-right">
+              ${money}
+            </div>
+          </div>`;
         }).join('')}
-      </div>
-    `;
+      </div>`;
   }
 
-  const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
+  // Resumen Operativo Minimalista
+  let totalBlock = '';
+  if (passIngreso > 0) {
+    totalBlock = `
+      <div class="intel-tooltip-summary">
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">ALUMNOS</span>
+          <span class="intel-tooltip-row-name" style="font-size:13px">${passAlumnos.toLocaleString()}</span>
+        </div>
+        ${passDias > 0 ? `
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
+          <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${passDias}</span>
+        </div>
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">ING. / DÍA</span>
+          <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (passIngreso/passDias >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(passIngreso / passDias)}</span>
+        </div>` : ''}
+        <div class="intel-tooltip-row-left">
+          <span class="intel-tooltip-row-meta">TOTAL</span>
+          <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(passIngreso)}</span>
+        </div>
+      </div>`;
+  } else if (missIngreso > 0) {
+    totalBlock = `
+      <div class="intel-tooltip-summary" style="border-top-color:rgba(251,191,36,0.15)">
+        <span class="intel-tooltip-row-meta" style="color:#FBBF24">Ninguna escuela pasa el filtro</span>
+      </div>`;
+  }
 
   const isInRoute = campusGroup.some(s => routeSet.has(s.cct));
   let routeBtn = '';
   if (isInRoute) {
     routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
   } else {
-    const cctListStr = JSON.stringify(campusGroup.map(s => s.cct)).replace(/"/g, "'");
-    routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a Mi Ruta</button>`;
+    const addables = campusGroup.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
+    if (addables.length > 0) {
+      const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
+      routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a Mi Ruta</button>`;
+    }
   }
 
   return `
@@ -182,23 +411,11 @@ function buildCampusTooltip(campusGroup, routeSet = new Set()) {
       ${closeBtn}
       <div class="intel-tooltip-campus-header pr-6">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C084FC" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/></svg>
-        <span class="intel-tooltip-campus-label">CAMPUS · ${niveles.length} niveles · ${campusGroup.length} CCTs</span>
+        <span class="intel-tooltip-campus-label">CAMPUS · ${niveles.length} nivel${niveles.length !== 1 ? 'es' : ''} · ${campusGroup.length} CCTs</span>
       </div>
-      ${allTurnos.size > 1 ? `<div class="intel-tooltip-campus-turnos">Turnos: ${[...allTurnos].join(', ')}</div>` : ''}
-
+      ${renderMunicipioChipHTML(municipio)}
       ${nivelSections}
-
-      <div class="intel-tooltip-campus-total">
-        <div class="intel-tooltip-stat">
-          <span class="intel-tooltip-stat-label">Total Campus</span>
-          <span class="intel-tooltip-stat-value">${totalAlumnos.toLocaleString()} alumnos</span>
-        </div>
-        <div class="intel-tooltip-stat">
-          <span class="intel-tooltip-stat-label">Escuelas</span>
-          <span class="intel-tooltip-stat-value">${campusGroup.length} CCTs</span>
-        </div>
-        ${municipio ? `<div class="intel-tooltip-stat"><span class="intel-tooltip-stat-label">Municipio</span><span class="intel-tooltip-stat-value">${municipio}</span></div>` : ''}
-      </div>
+      ${totalBlock}
       ${streetViewLink(campusGroup[0]?.latitud, campusGroup[0]?.longitud)}
       ${routeBtn}
     </div>
@@ -239,6 +456,10 @@ function renderShapeToString(shape, fill, stroke) {
 
 export default function IntelMap({
   schools = [],
+  routes = [],
+  activeRouteId = null,
+  onRouteSelect,
+  onRoutesChange,
   routeCCTs = [],
   onSchoolClick,
   onMapReady,
@@ -248,12 +469,18 @@ export default function IntelMap({
   focusedSchoolKey,
   onClearFocus,
   onAddToRoute,
+  profitColors = null,
+  turnoMap = null,
+  prices = null,
+  capacityConfig = null,
+  metaPorDia = 0,
+  bottomInset = 0,
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const routeSetRef = useRef(new Set());
+  const polylinesRef = useRef({}); // Track multiple polylines by route id
   const markersLayerRef = useRef(null);
-  const polylineRef = useRef(null);
-  const heatLayerRef = useRef(null);
   const tooltipRef = useRef(null);
   const hideTimeoutRef = useRef(null);
   const focusedMarkerLayerRef = useRef(null);
@@ -263,12 +490,26 @@ export default function IntelMap({
   const [heatmapActive, setHeatmapActive] = useState(false);
   const [heatPluginLoaded, setHeatPluginLoaded] = useState(false);
 
-  const routeSetRef = useRef(new Set(routeCCTs));
   const focusedSchoolKeyRef = useRef(focusedSchoolKey);
+  useEffect(() => {
+    focusedSchoolKeyRef.current = focusedSchoolKey;
+  }, [focusedSchoolKey]);
+  const profitColorsRef = useRef(profitColors);
+  useEffect(() => { profitColorsRef.current = profitColors; }, [profitColors]);
+  const turnoMapRef = useRef(turnoMap);
+  useEffect(() => { turnoMapRef.current = turnoMap; }, [turnoMap]);
+  const capacityRef = useRef(capacityConfig ? calculateCapacity(capacityConfig) : null);
+  useEffect(() => { capacityRef.current = capacityConfig ? calculateCapacity(capacityConfig) : null; }, [capacityConfig]);
+  const pricesRef = useRef(prices);
+  useEffect(() => { pricesRef.current = prices; }, [prices]);
+  const metaPorDiaRef = useRef(metaPorDia);
+  useEffect(() => { metaPorDiaRef.current = metaPorDia; }, [metaPorDia]);
 
   useEffect(() => {
-    routeSetRef.current = new Set(routeCCTs);
-  }, [routeCCTs]);
+    const ccts = new Set();
+    routes.forEach(r => r.ccts.forEach(cct => ccts.add(cct)));
+    routeSetRef.current = ccts;
+  }, [routes]);
 
   // Keep schools ref fresh for tooltip callbacks
   useEffect(() => {
@@ -440,6 +681,7 @@ export default function IntelMap({
 
     const bounds = L.latLngBounds([]);
     const drawnCampuses = new Set();
+    const drawnTurnos = new Set();
 
     schools.forEach(school => {
       if (school.latitud == null || school.longitud == null) return;
@@ -454,14 +696,40 @@ export default function IntelMap({
         drawnCampuses.add(coordKey);
       }
 
+      // Doble turno: una locación con 2+ turnos → un solo marcador por coord.
+      const turnoGroupAll = (!isCampus && turnoMapRef.current) ? turnoMapRef.current.get(coordKey) : null;
+      const isTurno = !!turnoGroupAll;
+      if (isTurno) {
+        if (drawnTurnos.has(coordKey)) return;
+        drawnTurnos.add(coordKey);
+      }
+
       // Si es campus, está "en ruta" si alguna de sus escuelas está en ruta
-      const isInRoute = isCampus 
+      const isInRoute = isCampus
         ? campusGroup.some(s => routeSetRef.current.has(s.cct))
-        : routeSetRef.current.has(school.cct);
-        
+        : isTurno
+          ? turnoGroupAll.some(s => routeSetRef.current.has(s.cct))
+          : routeSetRef.current.has(school.cct);
+
       const style = getMarkerStyle(school, isInRoute, isCampus);
 
-      const markerKey = isCampus ? `${school.latitud},${school.longitud}_cmp` : school.cct;
+      // Anillo verde = esta ubicación tiene 2+ turnos que pasan los filtros activos.
+      // Misma regla para turno Y campus (helper compartido = fuente única de verdad).
+      const visibleCcts = new Set(schools.map(s => s.cct));
+      if (!isInRoute) {
+        const group = isTurno ? turnoGroupAll : isCampus ? campusGroup : null;
+        if (contarTurnosQueCalifican(group, visibleCcts) >= 2) {
+          style.weight = 3;
+          style.color = '#34D399'; // borde esmeralda = doble oportunidad
+          style.radius = Math.max(style.radius, 8);
+        }
+      }
+
+      const markerKey = isCampus
+        ? `${school.latitud},${school.longitud}_cmp`
+        : isTurno
+          ? `${school.latitud},${school.longitud}_trn`
+          : school.cct;
 
       // ShapeMarker renders on Canvas — zero DOM overhead per point
       const marker = L.shapeMarker([school.latitud, school.longitud], {
@@ -474,6 +742,8 @@ export default function IntelMap({
         _school: school,
         _markerKey: markerKey,
         _isCampus: isCampus,
+        _isTurno: isTurno,
+        _turnoGroup: turnoGroupAll,
       });
 
       marker.on('click', () => {
@@ -490,9 +760,11 @@ export default function IntelMap({
 
         // Build tooltip HTML
         if (isCampus) {
-          tooltip.innerHTML = buildCampusTooltip(campusGroup, routeSetRef.current);
+          tooltip.innerHTML = buildCampusTooltip(campusGroup, new Set(schools.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current);
+        } else if (isTurno) {
+          tooltip.innerHTML = buildTurnoTooltip(turnoGroupAll, new Set(schools.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current);
         } else {
-          tooltip.innerHTML = buildSchoolTooltip(school, routeSetRef.current);
+          tooltip.innerHTML = buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current);
         }
 
         tooltip.style.display = 'block';
@@ -537,7 +809,7 @@ export default function IntelMap({
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       isFirstLoad.current = false;
     }
-  }, [schools, routeCCTs, onSchoolClick, campusMap]);
+  }, [schools, onSchoolClick, campusMap, profitColors, turnoMap]);
 
   // ═══ Sync focused school (Pop & Elevate) ═══
   useEffect(() => {
@@ -567,6 +839,8 @@ export default function IntelMap({
     if (targetMarker) {
       const school = targetMarker.options._school;
       const isCampus = targetMarker.options._isCampus;
+      const isTurno = targetMarker.options._isTurno;
+      const turnoGroup = targetMarker.options._turnoGroup;
       const campusGroup = isCampus ? campusMap?.get(focusedSchoolKey.replace('_cmp', '')) : null;
       const style = getMarkerStyle(school, routeSetRef.current.has(school.cct), isCampus);
 
@@ -599,7 +873,11 @@ export default function IntelMap({
       });
 
       // Native Leaflet Tooltip for physical anchoring
-      const tooltipContent = isCampus ? buildCampusTooltip(campusGroup || [school], routeSetRef.current) : buildSchoolTooltip(school, routeSetRef.current);
+      const tooltipContent = isCampus
+        ? buildCampusTooltip(campusGroup || [school], new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current)
+        : isTurno && turnoGroup
+          ? buildTurnoTooltip(turnoGroup, new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current)
+          : buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current);
       
       focusedMarkerLayerRef.current.bindTooltip(tooltipContent, {
         permanent: true,
@@ -621,38 +899,45 @@ export default function IntelMap({
         }
       };
     }
-  }, [focusedSchoolKey, campusMap]);
+  }, [focusedSchoolKey, campusMap, profitColors]);
 
-  // ═══ Route polyline ═══
+  // ═══ Route polylines ═══
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (polylineRef.current) {
-      map.removeLayer(polylineRef.current);
-      polylineRef.current = null;
-    }
-
-    if (routeCCTs.length < 2) return;
+    // Clear all existing polylines
+    Object.values(polylinesRef.current).forEach(line => {
+      map.removeLayer(line);
+    });
+    polylinesRef.current = {};
 
     const schoolMap = new Map();
     schools.forEach(s => schoolMap.set(s.cct, s));
 
-    const latlngs = routeCCTs
-      .map(cct => schoolMap.get(cct))
-      .filter(s => s && s.latitud && s.longitud)
-      .map(s => [s.latitud, s.longitud]);
+    // Render each visible route
+    routes.forEach(route => {
+      if (!route.visible || route.ccts.length < 2) return;
 
-    if (latlngs.length >= 2) {
-      polylineRef.current = L.polyline(latlngs, {
-        color: '#10B981',
-        weight: 3,
-        dashArray: '8 6',
-        opacity: 0.8,
-        lineCap: 'round',
-      }).addTo(map);
-    }
-  }, [schools, routeCCTs]);
+      const latlngs = route.ccts
+        .map(cct => schoolMap.get(cct))
+        .filter(s => s && s.latitud && s.longitud)
+        .map(s => [s.latitud, s.longitud]);
+
+      if (latlngs.length >= 2) {
+        const isActive = route.id === activeRouteId;
+        const line = L.polyline(latlngs, {
+          color: route.color || '#10B981',
+          weight: isActive ? 4 : 2,
+          dashArray: isActive ? '8 6' : '4 8',
+          opacity: isActive ? 1 : 0.4,
+          lineCap: 'round',
+        }).addTo(map);
+        
+        polylinesRef.current[route.id] = line;
+      }
+    });
+  }, [schools, routes, activeRouteId]);
 
   // ═══ Heatmap layer ═══
   const toggleHeatmap = useCallback(async () => {
@@ -700,7 +985,7 @@ export default function IntelMap({
   }, [heatmapActive, heatPluginLoaded, schools]);
 
   return (
-    <div className="relative flex-1 h-full intel-map">
+    <div className="relative flex-1 h-full intel-map" style={{ '--intel-map-bottom-inset': `${bottomInset}px` }}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {/* Floating controls */}
@@ -728,24 +1013,25 @@ export default function IntelMap({
 
       {/* Map legend */}
       {schools.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-[1000]">
-          <div className="intel-glass rounded-xl px-3 py-2.5 space-y-1">
+        <div className="absolute left-4 bottom-4 z-[1000]">
+          <div className="intel-glass rounded-xl px-3 py-2.5 w-48 space-y-1.5">
             <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Leyenda</p>
 
             {/* Nivel shapes — only show niveles present in data */}
             {Object.entries(NIVEL_SHAPES)
               .filter(([key]) => schools.some(s => (s.nivelEducativo || '').toUpperCase() === key))
               .map(([key, shape]) => (
-                <div key={key} className="space-y-0.5">
-                  {/* Pública variant */}
-                  <div className="flex items-center gap-2">
-                    <LegendShape shape={shape} fill={PUBLICA_COLOR.fill} stroke={PUBLICA_COLOR.stroke} />
-                    <span className="text-[10px] text-gray-300 font-medium">{key} <span className="text-gray-500">Púb.</span></span>
-                  </div>
-                  {/* Privada variant */}
-                  <div className="flex items-center gap-2">
-                    <LegendShape shape={shape} fill={PRIVADA_COLOR.fill} stroke={PRIVADA_COLOR.stroke} />
-                    <span className="text-[10px] text-gray-300 font-medium">{key} <span className="text-gray-500">Priv.</span></span>
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <span className="text-[9px] text-gray-300 font-bold truncate flex-1" title={key}>{key}</span>
+                  <div className="flex gap-2">
+                    <div className="flex items-center gap-1" title="Pública">
+                      <LegendShape shape={shape} fill={PUBLICA_COLOR.fill} stroke={PUBLICA_COLOR.stroke} />
+                      <span className="text-[8px] text-gray-500">Púb</span>
+                    </div>
+                    <div className="flex items-center gap-1" title="Privada">
+                      <LegendShape shape={shape} fill={PRIVADA_COLOR.fill} stroke={PRIVADA_COLOR.stroke} />
+                      <span className="text-[8px] text-gray-500">Priv</span>
+                    </div>
                   </div>
                 </div>
               ))
@@ -753,9 +1039,20 @@ export default function IntelMap({
 
             {/* Campus */}
             {campusMap && campusMap.size > 0 && (
-              <div className="flex items-center gap-2 pt-1 border-t border-white/[0.05]">
+              <div className="flex items-center gap-2 pt-1.5 border-t border-white/[0.05]">
                 <LegendShape shape="star" fill={CAMPUS_COLOR.fill} stroke={CAMPUS_COLOR.stroke} />
-                <span className="text-[10px] text-gray-300 font-medium">Campus <span className="text-gray-500">({campusMap.size})</span></span>
+                <span className="text-[9px] text-gray-300 font-medium">Campus <span className="text-gray-500">({campusMap.size})</span></span>
+              </div>
+            )}
+
+            {/* Doble turno */}
+            {turnoMap && turnoMap.size > 0 && (
+              <div className="flex items-start gap-2 pt-1.5 border-t border-white/[0.05]">
+                <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full shrink-0 mt-0.5" style={{ border: '2px solid #34D399' }} />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-gray-300 font-medium">Doble turno</span>
+                  <span className="text-[8px] text-gray-500 leading-tight">2+ turnos que pasan filtros en esta locación.</span>
+                </div>
               </div>
             )}
           </div>

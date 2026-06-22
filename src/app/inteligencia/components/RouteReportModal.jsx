@@ -1,28 +1,32 @@
 'use client';
 
 import { useMemo } from 'react';
-import { X, FileBarChart, MapPin, Users, DollarSign, School, Download } from 'lucide-react';
+import { X, FileText, MapPin, Users, DollarSign, School, Download, Calendar } from 'lucide-react';
 import { calculateRouteMetrics, formatMXN, formatNumber } from '../lib/filters';
 
 export default function RouteReportModal({
   projectName,
   schools,
-  routeCCTs,
+  routes,
+  activeRouteId,
   prices,
   onClose,
 }) {
+  const activeRoute = useMemo(() => {
+    return routes?.find(r => r.id === activeRouteId) || routes?.[0] || {};
+  }, [routes, activeRouteId]);
+
   const routeSchools = useMemo(() => {
     const schoolMap = new Map();
     schools.forEach(s => schoolMap.set(s.cct, s));
-    return routeCCTs.map(cct => schoolMap.get(cct)).filter(Boolean);
-  }, [schools, routeCCTs]);
+    return (activeRoute?.ccts || []).map(cct => schoolMap.get(cct)).filter(Boolean);
+  }, [schools, activeRoute]);
 
   const metrics = useMemo(
     () => calculateRouteMetrics(routeSchools, prices),
     [routeSchools, prices]
   );
 
-  // Donut chart proportions
   const publicPct = metrics.totalSchools > 0
     ? Math.round((metrics.publicSchools / metrics.totalSchools) * 100)
     : 0;
@@ -32,139 +36,155 @@ export default function RouteReportModal({
   });
 
   return (
-    <div className="intel-modal-backdrop animate-intel-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-intel-fade-in" onClick={onClose}>
       <div
-        className="w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col animate-intel-scale-in"
+        className="w-full max-w-5xl h-full max-h-[90vh] flex flex-col bg-[#F8FAFC] rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-intel-scale-in overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="intel-glass rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-          {/* Header */}
-          <div className="px-8 py-6 border-b border-white/[0.06] shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30">
-                <FileBarChart size={20} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-white">{projectName || 'Reporte de Ruta'}</h1>
-                <p className="text-xs text-gray-500 mt-0.5">Generado el {now}</p>
-              </div>
+        {/* Decorative Top Border */}
+        <div className="h-2 w-full shrink-0" style={{ backgroundColor: activeRoute?.color || '#10B981' }} />
+        
+        {/* Header - White Paper Header */}
+        <div className="bg-white px-6 md:px-10 py-6 md:py-8 flex items-center justify-between border-b border-gray-200 shrink-0">
+          <div className="flex items-center gap-4 md:gap-5">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center bg-gray-50 border border-gray-200 shrink-0">
+              <FileText size={28} style={{ color: activeRoute?.color || '#374151' }} />
             </div>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-8">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="intel-metric-card intel-metric-card-emerald p-5 text-center animate-intel-slide-up stagger-1">
-                <div className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center bg-emerald-500/15">
-                  <MapPin size={18} className="text-emerald-400" />
-                </div>
-                <p className="text-3xl font-black text-white">{metrics.totalSchools}</p>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1">Escuelas en Ruta</p>
-              </div>
-
-              <div className="intel-metric-card intel-metric-card-blue p-5 text-center animate-intel-slide-up stagger-2">
-                <div className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center bg-blue-500/15">
-                  <Users size={18} className="text-blue-400" />
-                </div>
-                <p className="text-3xl font-black text-white">{formatNumber(metrics.totalStudents)}</p>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1">Alumnos Impactados</p>
-              </div>
-
-              <div className="intel-metric-card intel-metric-card-gold p-5 text-center animate-intel-slide-up stagger-3">
-                <div className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center bg-amber-500/15">
-                  <DollarSign size={18} className="text-amber-400" />
-                </div>
-                <p className="text-2xl font-black text-amber-400">{formatMXN(metrics.totalValue)}</p>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1">Presupuesto Bruto</p>
-              </div>
-
-              <div className="intel-metric-card p-5 text-center animate-intel-slide-up stagger-4">
-                <div className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center bg-purple-500/15">
-                  <School size={18} className="text-purple-400" />
-                </div>
-                {/* Mini donut via CSS conic-gradient */}
-                <div className="w-16 h-16 rounded-full mx-auto mb-2 relative"
-                  style={{
-                    background: `conic-gradient(
-                      #3B82F6 0% ${publicPct}%,
-                      #F59E0B ${publicPct}% 100%
-                    )`,
-                  }}
-                >
-                  <div className="absolute inset-2 rounded-full bg-[var(--intel-surface)] flex items-center justify-center">
-                    <span className="text-[10px] font-bold text-gray-400">
-                      {metrics.publicSchools}/{metrics.privateSchools}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                  <span className="text-blue-400">Públicas</span> / <span className="text-amber-400">Privadas</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Student breakdown */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/[0.02] rounded-xl p-4 border border-white/[0.04]">
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Alumnos en Escuelas Públicas</p>
-                <p className="text-xl font-black text-blue-400">{formatNumber(metrics.publicStudents)}</p>
-              </div>
-              <div className="bg-white/[0.02] rounded-xl p-4 border border-white/[0.04]">
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Alumnos en Escuelas Privadas</p>
-                <p className="text-xl font-black text-amber-400">{formatNumber(metrics.privateStudents)}</p>
-              </div>
-            </div>
-
-            {/* Route table */}
             <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                Cronograma de Visitas ({routeSchools.length})
-              </h3>
-              <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-white/[0.03]">
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">#</th>
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">Escuela</th>
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">CCT</th>
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">Municipio</th>
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">Turno</th>
-                      <th className="text-left px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
-                      <th className="text-right px-4 py-3 font-bold text-gray-500 uppercase tracking-wider">Alumnos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {routeSchools.map((school, i) => (
-                      <tr key={school.cct} className="border-t border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                        <td className="px-4 py-2.5">
-                          <span className="w-5 h-5 rounded-md inline-flex items-center justify-center bg-emerald-500/15 text-emerald-400 text-[10px] font-black">
-                            {i + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-semibold text-white max-w-[200px] truncate">{school.nombre || '—'}</td>
-                        <td className="px-4 py-2.5 text-gray-500 font-mono">{school.cct}</td>
-                        <td className="px-4 py-2.5 text-gray-400">{school.municipio || '—'}</td>
-                        <td className="px-4 py-2.5 text-gray-400">{school.turno || '—'}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`intel-badge ${school.isPrivada ? 'intel-badge-gold' : 'intel-badge-blue'}`}>
-                            {school.isPrivada ? 'Privada' : 'Pública'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-bold text-gray-300">{formatNumber(school.alumnos)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <p className="text-[10px] md:text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">{projectName || 'Proyecto sin nombre'}</p>
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-none">Reporte: {activeRoute?.name || 'Ruta'}</h1>
+              <p className="text-xs md:text-sm text-gray-500 mt-2 font-medium flex items-center gap-2">
+                <Calendar size={14} />
+                Generado el {now}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content - Paper Body */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#F8FAFC]">
+          
+          {/* Executive Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            {/* Revenue Card */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <DollarSign size={20} className="text-amber-600" />
+                  </div>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Presupuesto Bruto</h3>
+                </div>
+                <p className="text-4xl font-black text-gray-900">{formatMXN(metrics.totalValue)}</p>
+              </div>
+            </div>
+
+            {/* Students Card */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Users size={20} className="text-blue-600" />
+                  </div>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Alumnos Impactados</h3>
+                </div>
+                <p className="text-4xl font-black text-gray-900">{formatNumber(metrics.totalStudents)}</p>
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-xs font-medium text-gray-600"><strong className="text-gray-900">{formatNumber(metrics.publicStudents)}</strong> Pub</span>
+                  <span className="text-xs font-medium text-gray-600"><strong className="text-gray-900">{formatNumber(metrics.privateStudents)}</strong> Priv</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Schools Card */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <MapPin size={20} className="text-emerald-600" />
+                  </div>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Paradas en Ruta</h3>
+                </div>
+                <p className="text-4xl font-black text-gray-900">{metrics.totalSchools}</p>
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-xs font-medium text-gray-600"><strong className="text-gray-900">{formatNumber(metrics.publicSchools)}</strong> Pub</span>
+                  <span className="text-xs font-medium text-gray-600"><strong className="text-gray-900">{formatNumber(metrics.privateSchools)}</strong> Priv</span>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Timeline / Itinerary */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Itinerario de Visitas</h3>
+            </div>
+            <div className="p-0 overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-white text-gray-400 text-xs uppercase font-bold border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4 font-bold tracking-wider">Orden</th>
+                    <th className="px-6 py-4 font-bold tracking-wider">Institución</th>
+                    <th className="px-6 py-4 font-bold tracking-wider">CCT</th>
+                    <th className="px-6 py-4 font-bold tracking-wider">Municipio</th>
+                    <th className="px-6 py-4 font-bold tracking-wider">Sostenimiento</th>
+                    <th className="px-6 py-4 font-bold tracking-wider text-right">Alumnos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {routeSchools.map((school, i) => (
+                    <tr key={school.cct} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white"
+                          style={{ backgroundColor: activeRoute?.color || '#10B981' }}
+                        >
+                          {i + 1}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 min-w-[250px]">
+                        <p className="font-bold text-gray-900 leading-tight">{school.nombre || '—'}</p>
+                        <p className="text-xs text-gray-500 font-medium mt-1">{school.nivelEducativo || '—'} • {school.turno || '—'}</p>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-gray-500 text-xs">{school.cct}</td>
+                      <td className="px-6 py-4 font-medium text-gray-700">
+                        {school.municipio ? (
+                          <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-blue-700">
+                            {school.municipio}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${school.isPrivada ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                          {school.isPrivada ? 'Privada' : 'Pública'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-black text-gray-900">
+                        {formatNumber(school.alumnos)}
+                      </td>
+                    </tr>
+                  ))}
+                  {routeSchools.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-12 text-center text-gray-400 font-medium">
+                        Aún no has agregado escuelas a esta ruta.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

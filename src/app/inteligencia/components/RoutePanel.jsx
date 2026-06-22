@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import { Route, X, Save, FileBarChart, GripVertical, Trash2, MapPin, Users, DollarSign, Star } from 'lucide-react';
-import { calculateRouteMetrics, formatMXN, formatNumber } from '../lib/filters';
+import { calculateRouteMetrics, formatMXN, formatNumber, getTurnoStyles } from '../lib/filters';
 
 export default function RoutePanel({
   schools,          // all parsed schools (for lookup)
@@ -16,6 +16,15 @@ export default function RoutePanel({
   campusMap,
   collapsed,
 }) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  useEffect(() => {
+    if (confirmDeleteId !== null) {
+      const timer = setTimeout(() => setConfirmDeleteId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [confirmDeleteId]);
+
   // Build the ordered route schools from CCTs
   const routeSchools = useMemo(() => {
     const schoolMap = new Map();
@@ -112,12 +121,21 @@ export default function RoutePanel({
           </div>
           {routeSchools.length > 0 && (
             <button
-              onClick={onClearRoute}
-              className="text-[10px] font-bold text-gray-500 hover:text-red-400 transition-colors flex items-center gap-1 uppercase tracking-wider"
-              title="Limpiar ruta"
+              onClick={() => {
+                if (confirmDeleteId === 'ALL') {
+                  onClearRoute();
+                  setConfirmDeleteId(null);
+                } else {
+                  setConfirmDeleteId('ALL');
+                }
+              }}
+              className={`text-[10px] font-bold transition-colors flex items-center gap-1 uppercase tracking-wider ${
+                confirmDeleteId === 'ALL' ? 'text-red-500 bg-red-500/10 px-2 py-1 rounded' : 'text-gray-500 hover:text-red-400'
+              }`}
+              title="Limpiar ruta completa"
             >
               <Trash2 size={11} />
-              Limpiar
+              {confirmDeleteId === 'ALL' ? '¿Confirmar?' : 'Limpiar'}
             </button>
           )}
         </div>
@@ -140,6 +158,8 @@ export default function RoutePanel({
             if (group.type === 'campus') {
               const totalValue = group.schools.reduce((sum, s) => sum + getSchoolValue(s), 0);
               const totalStudents = group.schools.reduce((sum, s) => sum + (s.alumnos || 0), 0);
+              const municipios = [...new Set(group.schools.map(s => s.municipio).filter(Boolean))];
+              const municipioLabel = municipios.length === 1 ? municipios[0] : municipios.length > 1 ? `${municipios.length} municipios` : '';
               
               return (
                 <div
@@ -163,13 +183,30 @@ export default function RoutePanel({
                     <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
                       <Star fill="currentColor" size={12} className="text-[#A855F7]" />
                       CAMPUS
+                      {municipioLabel && (
+                        <span className="intel-municipio-chip-sm normal-case" title={municipioLabel}>
+                          <MapPin size={8} /> {municipioLabel}
+                        </span>
+                      )}
                     </p>
                     <div className="flex flex-wrap items-center gap-1 mt-1">
-                      {group.schools.map((s, i) => (
-                        <span key={i} className="px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded bg-white/5 text-gray-400">
-                          {s.nivelEducativo?.substring(0,3)} ({s.alumnos})
-                        </span>
-                      ))}
+                      {group.schools.map((s, i) => {
+                        const st = s.turno ? getTurnoStyles(s.turno) : null;
+                        const Icon = st ? st.IconComponent : null;
+                        return (
+                          <div key={i} className="flex items-center gap-1">
+                            {st && (
+                              <span className={`inline-flex items-center gap-1 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded border ${st.gradientClass} ${st.textClass} ${st.borderClass} ${st.shadowClass}`} style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.2)' }}>
+                                <Icon size={8} strokeWidth={2.5} />
+                                {st.short}
+                              </span>
+                            )}
+                            <span className="px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded bg-white/5 text-gray-400">
+                              {s.nivelEducativo?.substring(0,3)} ({s.alumnos})
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                   
@@ -183,12 +220,20 @@ export default function RoutePanel({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const newRoute = routeCCTs.filter(c => !group.ccts.includes(c));
-                      onReorderRoute(newRoute);
+                      if (confirmDeleteId === `group-${index}`) {
+                        const newRoute = routeCCTs.filter(c => !group.ccts.includes(c));
+                        onReorderRoute(newRoute);
+                        setConfirmDeleteId(null);
+                      } else {
+                        setConfirmDeleteId(`group-${index}`);
+                      }
                     }}
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                      confirmDeleteId === `group-${index}` ? 'bg-red-500 text-white shadow-lg' : 'text-gray-600 hover:text-red-400 hover:bg-red-500/10'
+                    }`}
+                    title="Eliminar grupo"
                   >
-                    <X size={12} />
+                    {confirmDeleteId === `group-${index}` ? <Trash2 size={12} /> : <X size={12} />}
                   </button>
                 </div>
               );
@@ -216,20 +261,35 @@ export default function RoutePanel({
                 <div className="w-6 h-6 rounded-md flex items-center justify-center bg-emerald-500/15 text-emerald-400 text-[10px] font-black shrink-0">
                   {index + 1}
                 </div>
-
                 {/* School info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white truncate">{school.nombre || 'Sin nombre'}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-gray-500 font-mono">{school.cct}</span>
-                    <span className={`intel-badge ${school.isPrivada ? 'intel-badge-gold' : 'intel-badge-blue'}`}>
-                      {school.isPrivada ? 'Priv' : 'Pub'}
+                <div className="flex-1 min-w-0 pr-2">
+                  <p className="text-[13px] font-bold text-white leading-tight mb-1">{school.nombre || 'Sin nombre'}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    {(() => {
+                      if (!school.turno) return null;
+                      const st = getTurnoStyles(school.turno);
+                      const Icon = st.IconComponent;
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded border ${st.gradientClass} ${st.textClass} ${st.borderClass} ${st.shadowClass}`} style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.2)' }}>
+                          <Icon size={9} strokeWidth={2.5} />
+                          {st.short}
+                        </span>
+                      );
+                    })()}
+                    {school.municipio && (
+                      <span className="intel-municipio-chip-sm bg-white/5 border-white/10" title={school.municipio}>
+                        <MapPin size={9} /> {school.municipio}
+                      </span>
+                    )}
+                    <span className="text-[9px] text-gray-400 font-mono tracking-wider bg-black/20 px-1.5 py-0.5 rounded">{school.cct}</span>
+                    <span className={`px-1.5 py-0.5 text-[8px] font-black tracking-widest rounded uppercase ${school.isPrivada ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
+                      {school.isPrivada ? 'PRIV' : 'PUB'}
                     </span>
                   </div>
                 </div>
 
-                {/* Value + student count */}
-                <div className="text-right shrink-0">
+                {/* Value & Students */}
+                <div className="text-right shrink-0 flex flex-col items-end justify-center pl-2 border-l border-white/5">
                   <p className={`text-xs font-black ${school.isPrivada ? 'text-amber-400' : 'text-blue-400'}`}>
                     {formatMXN(schoolValue)}
                   </p>
@@ -240,11 +300,19 @@ export default function RoutePanel({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onRemoveFromRoute(school.cct);
+                    if (confirmDeleteId === `school-${index}`) {
+                      onRemoveFromRoute(school.cct);
+                      setConfirmDeleteId(null);
+                    } else {
+                      setConfirmDeleteId(`school-${index}`);
+                    }
                   }}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+                  className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                    confirmDeleteId === `school-${index}` ? 'bg-red-500 text-white shadow-lg' : 'text-gray-600 hover:text-red-400 hover:bg-red-500/10'
+                  }`}
+                  title="Eliminar ubicación"
                 >
-                  <X size={12} />
+                  {confirmDeleteId === `school-${index}` ? <Trash2 size={12} /> : <X size={12} />}
                 </button>
               </div>
             );

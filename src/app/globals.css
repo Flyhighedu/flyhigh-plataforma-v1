@@ -438,4 +438,9 @@ body {
   html {
     @apply font-sans;
   }
+
+  /* Fix for Leaflet tile grid lines (seams) on dark maps */
+  .leaflet-container {
+    background: #0B1120 !important;
+  }
 }

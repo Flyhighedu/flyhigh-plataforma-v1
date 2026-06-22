@@ -136,7 +136,7 @@ export async function saveProject(project) {
   const projectRow = {
     name: project.name || 'Sin nombre',
     file_name: project.fileName || '',
-    filters: project.filters || {},
+    filters: { ...(project.filters || {}), routes: project.routes },
     prices: project.prices || { premium: 200, base: 80 },
     som_percent: project.somPercent ?? 30,
     route_ccts: project.route || [],
@@ -203,7 +203,13 @@ export async function saveProjectMeta(projectId, meta) {
     updated_at: new Date().toISOString(),
   };
 
-  if (meta.filters !== undefined) update.filters = meta.filters;
+  if (meta.filters !== undefined) {
+    update.filters = { ...meta.filters };
+    if (meta.routes !== undefined) update.filters.routes = meta.routes;
+  } else if (meta.routes !== undefined) {
+    // If filters wasn't provided but routes was, we need to merge it with existing filters via RPC or just ignore it.
+    // Actually, saveProjectMeta in page.jsx always passes both filters and routes now.
+  }
   if (meta.prices !== undefined) update.prices = meta.prices;
   if (meta.somPercent !== undefined) update.som_percent = meta.somPercent;
   if (meta.route !== undefined) update.route_ccts = meta.route;
@@ -354,6 +360,7 @@ export async function loadProject(id) {
       prices: project.prices || { premium: 200, base: 80 },
       somPercent: project.som_percent ?? 30,
       route: project.route_ccts || [],
+      routes: project.filters?.routes,
       schools: allSchoolRows.map(rowToSchool),
       owner: project.owner || 'Anónimo',
       pin: project.pin,

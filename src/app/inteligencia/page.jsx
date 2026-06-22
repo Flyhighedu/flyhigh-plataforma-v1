@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Rocket, Plus, BarChart3, MapPin, X } from 'lucide-react';
+import { FolderOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Rocket, Plus, BarChart3, MapPin, X, Eye, EyeOff, ArrowLeftRight, Undo2 } from 'lucide-react';
 
 import WelcomeModal from './components/WelcomeModal';
 import CommandPanel from './components/CommandPanel';
+import DistribucionPanel from './components/DistribucionPanel';
 import RightSidebar from './components/RightSidebar';
+import AnimatedCounter from './components/AnimatedCounter';
+import { supabase } from '@/utils/supabase/client';
 import RouteReportModal from './components/RouteReportModal';
 import ProjectSwitcher from './components/ProjectSwitcher';
 import MunicipioRanking from './components/MunicipioRanking';
 import AddConcentradoModal from './components/AddConcentradoModal';
 import MissingSchoolsPanel from './components/MissingSchoolsPanel';
-import { applyFilters, getStudentRange, getStudentRangeByType, getUniqueNiveles } from './lib/filters';
+import { applyFilters, getStudentRange, getStudentRangeByType, getUniqueNiveles, CAPACITY_DEFAULTS, calculateCapacity, buildProfitabilityColors, formatNumber } from './lib/filters';
 import { saveProject, saveProjectMeta, loadProject, getLastProjectId, setLastProjectId, addSchoolsToProject } from './lib/storage';
 
 // Dynamic import for map (Leaflet requires window)
@@ -22,7 +25,7 @@ export default function InteligenciaPage() {
   // ─── Core state ───
   const [schools, setSchools] = useState([]);
   const [projectMeta, setProjectMeta] = useState({ id: null, name: '', fileName: '' });
-  const [filters, setFilters] = useState({
+  const [filters, _setFilters] = useState({
     municipio: '__all__',
     sostenimiento: 'todas',
     turno: '__all__',
@@ -33,9 +36,71 @@ export default function InteligenciaPage() {
     revenueMaxPub: null,
     revenueMinPriv: null,
     revenueMaxPriv: null,
+    revenueMinPubVesp: null,
+    revenueMinPrivVesp: null,
   });
-  const [prices, setPrices] = useState({ premium: 200, base: 80 });
-  const [routeCCTs, setRouteCCTs] = useState([]);
+  const [prices, _setPrices] = useState({ premium: 200, base: 80 });
+  const [routes, _setRoutes] = useState([{ id: 'r1', name: 'Ruta 1', color: '#10B981', visible: true, ccts: [] }]);
+  const [activeRouteId, setActiveRouteId] = useState('r1');
+
+  // ─── Undo System (Ctrl+Z) ───
+  const [capacityConfig, _setCapacityConfig] = useState(CAPACITY_DEFAULTS);
+  const historyRef = useRef([]);
+  const isUndoingRef = useRef(false);
+  const currentStateRef = useRef({ filters, prices, capacityConfig, routes });
+
+  useEffect(() => {
+    currentStateRef.current = { filters, prices, capacityConfig, routes };
+  }, [filters, prices, capacityConfig, routes]);
+
+  const saveHistoryState = useCallback(() => {
+    if (isUndoingRef.current) return;
+    historyRef.current.push(JSON.parse(JSON.stringify(currentStateRef.current)));
+    if (historyRef.current.length > 50) historyRef.current.shift();
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    isUndoingRef.current = true;
+    const prevState = historyRef.current.pop();
+    _setFilters(prevState.filters);
+    _setPrices(prevState.prices);
+    _setCapacityConfig(prevState.capacityConfig);
+    _setRoutes(prevState.routes);
+    
+    // Unlock history saving shortly after state settles
+    setTimeout(() => { isUndoingRef.current = false; }, 100);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo]);
+
+  // Wrapper setters
+  const setFilters = useCallback((val) => { saveHistoryState(); _setFilters(val); }, [saveHistoryState]);
+  const setPrices = useCallback((val) => { saveHistoryState(); _setPrices(val); }, [saveHistoryState]);
+  const setCapacityConfig = useCallback((val) => { saveHistoryState(); _setCapacityConfig(val); }, [saveHistoryState]);
+  const setRoutes = useCallback((val) => { saveHistoryState(); _setRoutes(val); }, [saveHistoryState]);
+
+  const routeCCTs = useMemo(() => {
+    const active = routes.find(r => r.id === activeRouteId);
+    return active ? active.ccts : [];
+  }, [routes, activeRouteId]);
+
+  const setRouteCCTs = useCallback((updater) => {
+    setRoutes(prev => prev.map(r => {
+      if (r.id !== activeRouteId) return r;
+      const nextCCTs = typeof updater === 'function' ? updater(r.ccts) : updater;
+      return { ...r, ccts: nextCCTs };
+    }));
+  }, [activeRouteId]);
 
   // ─── UI state ───
   const [showWelcome, setShowWelcome] = useState(false);
@@ -44,10 +109,20 @@ export default function InteligenciaPage() {
   const [showReport, setShowReport] = useState(false);
   const [showAddConcentrado, setShowAddConcentrado] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
+  const [metaPorDia, setMetaPorDia] = useState(0);
   const [focusedSchoolKey, setFocusedSchoolKey] = useState(null);
   const [showMissingSchools, setShowMissingSchools] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
+  const [distributionCollapsed, setDistributionCollapsed] = useState(true);
+  const [swappedWidgets, setSwappedWidgets] = useState(false);
+  
+  // Height Logic & Memory
+  const [distributionHeight, setDistributionHeight] = useState(360);
+  const [distUserResized, setDistUserResized] = useState(false);
+  const distributionResizeRef = useRef({ active: false, startY: 0, startHeight: 360 });
+  const [pulseDrawer, setPulseDrawer] = useState(false);
+  const prevFilteredCountRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
@@ -60,6 +135,7 @@ export default function InteligenciaPage() {
   const missingSchools = useMemo(() => {
     return schools.filter(s => s.latitud == null || s.longitud == null);
   }, [schools]);
+
 
   // Campus detection — 3-tier validation:
   // 1. Same name (fuzzy) + same coords + 2+ levels → CAMPUS (certain)
@@ -179,7 +255,45 @@ export default function InteligenciaPage() {
     return applyFilters(schools, filters, prices, campusCCTs, campusTotals);
   }, [schools, filters, prices, campusCCTs, campusTotals]);
 
+  useEffect(() => {
+    if (hasLoadedRef.current && distributionCollapsed && prevFilteredCountRef.current !== filteredSchools.length) {
+      setPulseDrawer(true);
+      const t = setTimeout(() => setPulseDrawer(false), 2000);
+      prevFilteredCountRef.current = filteredSchools.length;
+      return () => clearTimeout(t);
+    }
+    prevFilteredCountRef.current = filteredSchools.length;
+  }, [filteredSchools.length, distributionCollapsed]);
+
+  // ─── Double-shift detection ───
+  // Same coordinates + 2+ distinct turnos = one physical site, several shifts.
+  // We use ALL schools (not filtered) so the tooltip can "confess" shifts that
+  // don't pass the filters. Campus coords are excluded (campus is by levels).
+  const turnoMap = useMemo(() => {
+    const byCoord = new Map();
+    for (const s of schools) {
+      if (s.latitud == null || s.longitud == null) continue;
+      const key = `${s.latitud},${s.longitud}`;
+      if (campusMap.has(key)) continue; // campus handled separately
+      if (!byCoord.has(key)) byCoord.set(key, []);
+      byCoord.get(key).push(s);
+    }
+    const result = new Map();
+    for (const [key, group] of byCoord) {
+      if (group.length < 2) continue;
+      const turnos = new Set(group.map(s => (s.turno || '').toUpperCase()).filter(Boolean));
+      if (turnos.size >= 2) result.set(key, group);
+    }
+    return result;
+  }, [schools, campusMap]);
+
   const routeSet = useMemo(() => new Set(routeCCTs), [routeCCTs]);
+
+  // Profitability view: calculates metrics (ops/days) based on capacity config
+  const profitColors = useMemo(() => {
+    const capacity = calculateCapacity(capacityConfig);
+    return buildProfitabilityColors(filteredSchools, capacity, prices, campusCCTs, campusTotals);
+  }, [capacityConfig, filteredSchools, prices, campusCCTs, campusTotals]);
 
   // ─── Initialization: load last project or show welcome ───
   useEffect(() => {
@@ -213,7 +327,9 @@ export default function InteligenciaPage() {
       pin: project.pin || null,
       stats: project.stats || null,
     });
-    setRouteCCTs(project.route || []);
+    const loadedRoutes = project.routes || [{ id: 'r1', name: 'Ruta 1', color: '#10B981', visible: true, ccts: project.route || [] }];
+    setRoutes(loadedRoutes);
+    setActiveRouteId(loadedRoutes[0]?.id || 'r1');
     if (project.filters) setFilters(project.filters);
     if (project.prices) setPrices(project.prices);
 
@@ -236,7 +352,8 @@ export default function InteligenciaPage() {
     const ranges = getStudentRangeByType(parsedSchools);
     setSchools(parsedSchools);
     setProjectMeta({ id: null, name, fileName: meta.fileName, owner, pin, stats });
-    setRouteCCTs([]);
+    setRoutes([{ id: 'r1', name: 'Ruta 1', color: '#10B981', visible: true, ccts: [] }]);
+    setActiveRouteId('r1');
     setFilters({
       municipio: '__all__',
       sostenimiento: 'todas',
@@ -251,7 +368,6 @@ export default function InteligenciaPage() {
       revenueMaxPriv: null,
     });
     setPrices({ premium: 200, base: 80 });
-    setSomPercent(30);
     setShowWelcome(false);
 
     // Auto-save initial state
@@ -264,6 +380,7 @@ export default function InteligenciaPage() {
         stats,
         schools: parsedSchools,
         route: [],
+        routes: [{ id: 'r1', name: 'Ruta 1', color: '#10B981', visible: true, ccts: [] }],
         filters: {
           municipio: '__all__',
           sostenimiento: 'todas',
@@ -303,6 +420,7 @@ export default function InteligenciaPage() {
           filters,
           prices,
           route: routeCCTs,
+          routes: routes,
         });
       } else {
         // New project — full save with schools
@@ -314,6 +432,7 @@ export default function InteligenciaPage() {
           stats: projectMeta.stats,
           schools,
           route: routeCCTs,
+          routes: routes,
           filters,
           prices,
         });
@@ -326,7 +445,7 @@ export default function InteligenciaPage() {
     } finally {
       setSaving(false);
     }
-  }, [projectMeta, schools, routeCCTs, filters, prices]);
+  }, [projectMeta, schools, routes, routeCCTs, filters, prices]);
 
   // ─── Auto-save debounced effect ───
   useEffect(() => {
@@ -339,6 +458,7 @@ export default function InteligenciaPage() {
           filters,
           prices,
           route: routeCCTs,
+          routes: routes,
         });
         console.log('[Intel] Auto-saved');
       } catch (err) {
@@ -347,11 +467,47 @@ export default function InteligenciaPage() {
     }, 2000);
 
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [filters, prices, routeCCTs, projectMeta.id]);
+  }, [filters, prices, routes, projectMeta.id]);
 
   // ─── Route operations ───
   const handleSchoolClick = useCallback((school, isCampus, markerKey) => {
     setFocusedSchoolKey(prev => prev === (markerKey || school.cct) ? null : (markerKey || school.cct));
+  }, []);
+
+  const handleFocusSchoolKey = useCallback((key) => {
+    setFocusedSchoolKey(key);
+  }, []);
+
+  const handleFocusCity = useCallback((city) => {
+    if (leafletMapRef.current && city?.lats?.length) {
+      const p = 0.01;
+      leafletMapRef.current.flyToBounds(
+        [
+          [Math.min(...city.lats) - p, Math.min(...city.lngs) - p],
+          [Math.max(...city.lats) + p, Math.max(...city.lngs) + p],
+        ],
+        { paddingTopLeft: [50, 50], paddingBottomRight: [50, distributionCollapsed ? 70 : distributionHeight + 80], duration: 0.8 }
+      );
+    }
+  }, [distributionCollapsed, distributionHeight]);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!distributionResizeRef.current.active) return;
+      const delta = distributionResizeRef.current.startY - e.clientY;
+      const newHeight = Math.min(window.innerHeight - 100, Math.max(150, distributionResizeRef.current.startHeight + delta));
+      setDistributionHeight(newHeight);
+      setDistUserResized(true);
+    };
+    const onUp = () => {
+      distributionResizeRef.current.active = false;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', onUp);
+    };
   }, []);
 
   const handleAddToRoute = useCallback((cctsToAdd) => {
@@ -505,6 +661,16 @@ export default function InteligenciaPage() {
             </span>
           )}
 
+          {/* Undo Button */}
+          <button
+            onClick={undo}
+            className="intel-btn intel-btn-ghost text-xs flex items-center gap-1.5 mr-2"
+            title="Deshacer último cambio (Ctrl+Z)"
+          >
+            <Undo2 size={13} />
+            Deshacer
+          </button>
+
           {/* Panel toggles */}
           <button
             onClick={() => setLeftCollapsed(!leftCollapsed)}
@@ -561,12 +727,20 @@ export default function InteligenciaPage() {
           onToggleCollapse={() => setLeftCollapsed(!leftCollapsed)}
           campusCount={campusMap.size}
           onOpenMissingSchools={() => setShowMissingSchools(true)}
+          capacityConfig={capacityConfig}
+          onConfigChange={setCapacityConfig}
+          metaPorDia={metaPorDia}
+          onMetaChange={setMetaPorDia}
         />
 
-        {/* Center: Map + floating filter chips */}
-        <div className="flex-1 relative">
+        {/* Center: Map + floating distribution drawer */}
+        <div className="flex-1 min-w-0 relative">
           <IntelMap
             schools={filteredSchools}
+            routes={routes}
+            activeRouteId={activeRouteId}
+            onRouteSelect={setActiveRouteId}
+            onRoutesChange={setRoutes}
             routeCCTs={routeCCTs}
             onSchoolClick={handleSchoolClick}
             mapInstanceRef={leafletMapRef}
@@ -574,6 +748,12 @@ export default function InteligenciaPage() {
             focusedSchoolKey={focusedSchoolKey}
             onClearFocus={() => setFocusedSchoolKey(null)}
             onAddToRoute={handleAddToRoute}
+            profitColors={profitColors}
+            turnoMap={turnoMap}
+            prices={prices}
+            metaPorDia={metaPorDia}
+            capacityConfig={capacityConfig}
+            bottomInset={distributionCollapsed ? 56 : distributionHeight + 24}
           >
             {/* Ranking trigger — just a button, modal renders at page root */}
             <button
@@ -585,6 +765,67 @@ export default function InteligenciaPage() {
               Ranking
             </button>
           </IntelMap>
+
+          {/* Distribución: drawer inferior premium, sobre el mapa */}
+          <div
+            className={`intel-distribution-drawer ${distributionCollapsed ? 'is-collapsed cursor-pointer' : ''} ${pulseDrawer && distributionCollapsed ? 'animate-intel-pulse-glow' : ''}`}
+            style={{ 
+              height: distributionCollapsed ? 56 : (distUserResized ? distributionHeight : 'calc(100% - 32px)'), 
+              right: swappedWidgets ? '8px' : '384px' 
+            }}
+          >
+            <div
+              className="intel-distribution-drawer-handle"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                distributionResizeRef.current = { 
+                  active: true, 
+                  startY: e.clientY, 
+                  startHeight: e.currentTarget.parentElement.clientHeight 
+                };
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div 
+              className={`intel-distribution-drawer-header cursor-pointer ${distributionCollapsed ? 'hover:bg-white/5 transition-colors' : ''}`}
+              onClick={() => setDistributionCollapsed(!distributionCollapsed)}
+            >
+              <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                <MapPin size={16} className="text-purple-400 shrink-0" />
+                <span className="font-black text-white text-sm truncate">Distribución</span>
+                <span className="text-[11px] text-gray-400 ml-2">
+                  <AnimatedCounter value={filteredSchools.length} /> escuelas
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDistributionCollapsed(v => !v);
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-wider text-gray-500 hover:text-white transition-colors"
+                  title={distributionCollapsed ? 'Abrir distribución' : 'Minimizar distribución'}
+                >
+                  {distributionCollapsed ? 'Abrir' : 'Minimizar'}
+                </button>
+              </div>
+            </div>
+            {!distributionCollapsed && (
+              <div className="intel-distribution-drawer-body">
+                <DistribucionPanel
+                  variant="drawer"
+                  filteredSchools={filteredSchools}
+                  prices={prices}
+                  campusMap={campusMap}
+                  turnoMap={turnoMap}
+                  capacityConfig={capacityConfig}
+                  metaPorDia={metaPorDia}
+                  onFocusCity={handleFocusCity}
+                  onFocusSchoolKey={handleFocusSchoolKey}
+                />
+              </div>
+            )}
+          </div>
 
           {/* ═══ Active filter chips — floating on top of map ═══ */}
           {(filters.municipio && filters.municipio !== '__all__') ||
@@ -657,40 +898,38 @@ export default function InteligenciaPage() {
               </button>
             </div>
           ) : null}
-        </div>
 
-        {/* Right Sidebar: Distribution + Route Tabs */}
-        <RightSidebar
-          collapsed={rightCollapsed}
-          onToggleCollapse={() => setRightCollapsed(!rightCollapsed)}
-          
-          /* Route Props */
-          schools={schools}
-          routeCCTs={routeCCTs}
-          prices={prices}
-          onRemoveFromRoute={handleRemoveFromRoute}
-          onClearRoute={handleClearRoute}
-          onReorderRoute={handleReorderRoute}
-          onSaveProject={handleSave}
-          onViewReport={() => setShowReport(true)}
-          
-          /* Distribution Props */
-          filteredSchools={filteredSchools}
-          campusMap={campusMap}
-          onFocusSchoolKey={setFocusedSchoolKey}
-          onFocusCity={(city) => {
-            if (leafletMapRef.current && city.lats.length) {
-              const p = 0.01;
-              leafletMapRef.current.flyToBounds(
-                [
-                  [Math.min(...city.lats) - p, Math.min(...city.lngs) - p],
-                  [Math.max(...city.lats) + p, Math.max(...city.lngs) + p]
-                ],
-                { duration: 1.2, maxZoom: 14 }
-              );
-            }
-          }}
-        />
+          {/* ═══ CENTRAL SWAP BUTTON (FAB) ═══ */}
+          <button
+            onClick={() => setSwappedWidgets(v => !v)}
+            className="absolute z-[1200] bottom-5 w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 hover:text-white flex items-center justify-center transition-all shadow-lg hover:scale-110 active:scale-95"
+            style={{ right: '376px', transform: 'translateX(50%)' }}
+            title="Intercambiar Paneles"
+          >
+            <ArrowLeftRight size={18} strokeWidth={2.5} />
+          </button>
+
+          {/* Right Sidebar Widget (now floating over map) */}
+          <RightSidebar
+            collapsed={rightCollapsed}
+            onToggleCollapse={() => setRightCollapsed(!rightCollapsed)}
+            isSwapped={swappedWidgets}
+            onSwap={() => setSwappedWidgets(v => !v)}
+            schools={schools}
+            routes={routes}
+            activeRouteId={activeRouteId}
+            onRouteSelect={setActiveRouteId}
+            onRoutesChange={setRoutes}
+            routeCCTs={routeCCTs}
+            prices={prices}
+            campusMap={campusMap}
+            onRemoveFromRoute={handleRemoveFromRoute}
+            onClearRoute={handleClearRoute}
+            onReorderRoute={handleReorderRoute}
+            onSaveProject={handleSave}
+            onViewReport={() => setShowReport(true)}
+          />
+        </div>
       </div>
 
       {/* ═══ MODALS ═══ */}
@@ -702,10 +941,12 @@ export default function InteligenciaPage() {
         />
       )}
 
-      {showReport && routeCCTs.length > 0 && (
+      {showReport && routes.some(r => r.ccts.length > 0) && (
         <RouteReportModal
           projectName={projectMeta.name}
           schools={schools}
+          routes={routes}
+          activeRouteId={activeRouteId}
           routeCCTs={routeCCTs}
           prices={prices}
           onClose={() => setShowReport(false)}
