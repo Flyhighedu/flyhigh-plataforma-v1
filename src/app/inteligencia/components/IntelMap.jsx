@@ -89,7 +89,7 @@ function streetViewLink(lat, lng) {
   `;
 }
 
-function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0) {
+function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0, activeRouteName = 'Mi Ruta') {
   const nombre = turnoGroup[0]?.nombre || 'Locación';
   const municipio = turnoGroup[0]?.municipio || '';
   const order = { 'MATUTINO': 0, 'VESPERTINO': 1, 'NOCTURNO': 2 };
@@ -197,7 +197,7 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
   const addables = sorted.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
   if (addables.length) {
     const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
-    routeBtns = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar ${addables.length > 1 ? 'ambos turnos' : 'turno'} a Mi Ruta</button>`;
+    routeBtns = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar ${addables.length > 1 ? 'ambos a' : 'a'} <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
   }
 
   return `
@@ -214,7 +214,7 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
   `;
 }
 
-function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPorDia = 0) {
+function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPorDia = 0, activeRouteName = 'Mi Ruta') {
   const tipo = school.isPrivada ? 'Privada' : 'Pública';
   const nivel = school.nivelEducativo || '';
 
@@ -225,7 +225,7 @@ function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPor
   if (isInRoute) {
     routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
   } else {
-    routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${school.cct}'], event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar a Mi Ruta</button>`;
+    routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${school.cct}'], event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar a <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
   }
 
   let opsBlock = '';
@@ -285,7 +285,7 @@ function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPor
   `;
 }
 
-function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0) {
+function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new Set(), capacity = null, prices = null, metaPorDia = 0, activeRouteName = 'Mi Ruta') {
   const byNivel = {};
   for (const s of campusGroup) {
     const nivel = (s.nivelEducativo || 'OTRO').toUpperCase();
@@ -402,7 +402,7 @@ function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new
     const addables = campusGroup.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
     if (addables.length > 0) {
       const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
-      routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a Mi Ruta</button>`;
+      routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-4 py-2.5 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
     }
   }
 
@@ -873,11 +873,12 @@ export default function IntelMap({
       });
 
       // Native Leaflet Tooltip for physical anchoring
+      const activeName = routes.find(r => r.id === activeRouteId)?.name || 'Mi Ruta';
       const tooltipContent = isCampus
-        ? buildCampusTooltip(campusGroup || [school], new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current)
+        ? buildCampusTooltip(campusGroup || [school], new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
         : isTurno && turnoGroup
-          ? buildTurnoTooltip(turnoGroup, new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current)
-          : buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current);
+          ? buildTurnoTooltip(turnoGroup, new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
+          : buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current, activeName);
       
       focusedMarkerLayerRef.current.bindTooltip(tooltipContent, {
         permanent: true,
@@ -899,7 +900,7 @@ export default function IntelMap({
         }
       };
     }
-  }, [focusedSchoolKey, campusMap, profitColors]);
+  }, [focusedSchoolKey, campusMap, profitColors, activeRouteId, routes]);
 
   // ═══ Route polylines ═══
   useEffect(() => {

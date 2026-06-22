@@ -141,13 +141,36 @@ export default function CommandPanel({
     });
   };
 
-  if (collapsed) return null;
-
   return (
     <div
-      className="relative h-full flex flex-col bg-[var(--intel-surface)] border-r border-[var(--intel-border)] shrink-0 overflow-hidden"
-      style={{ width: panelWidth }}
+      className={`relative h-full flex flex-col bg-[var(--intel-surface)] border-r border-[var(--intel-border)] shrink-0 transition-[width] duration-300 ease-in-out ${collapsed ? 'border-r-0' : ''}`}
+      style={{ 
+        width: collapsed ? 0 : panelWidth, 
+        maxWidth: collapsed ? 0 : 'var(--intel-command-width)' 
+      }}
     >
+      {/* ═══ TACTILE HANDLE (Pestaña) ═══ */}
+      <button
+        onClick={onToggleCollapse}
+        className="absolute z-[1000] flex items-center justify-center bg-gray-800 border border-gray-600 hover:bg-gray-700 text-gray-300 transition-colors shadow-lg"
+        style={{
+          width: '24px',
+          height: '60px',
+          right: '-24px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          borderRadius: '0 8px 8px 0',
+          borderLeftColor: 'transparent',
+        }}
+        title={collapsed ? "Desplegar Filtros" : "Ocultar Filtros"}
+      >
+        <span className="transform transition-transform text-gray-400">
+          {collapsed ? '▶' : '◀'}
+        </span>
+      </button>
+
+      {/* ═══ CONTENT WRAPPER ═══ */}
+      <div className="flex-1 w-full flex flex-col overflow-hidden min-w-[280px]">
       {/* ═══ Resize Handle (right edge) ═══ */}
       <div
         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500/30 active:bg-blue-500/50 transition-colors z-20"
@@ -822,6 +845,7 @@ export default function CommandPanel({
           </div>
         </section>
         </div>
+      </div>
       </div>
     </div>
   );

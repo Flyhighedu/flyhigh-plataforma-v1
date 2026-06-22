@@ -345,6 +345,11 @@ export default function InteligenciaPage() {
         alumnosMaxPriv: project.filters?.alumnosMaxPriv ?? ranges.priv.max,
       }));
     }
+    
+    // Restore metaPorDia
+    if (project.filters?.metaPorDia !== undefined) {
+      setMetaPorDia(project.filters.metaPorDia);
+    }
   }, []);
 
   // ─── Handle new project from WelcomeModal ───
@@ -393,6 +398,7 @@ export default function InteligenciaPage() {
           revenueMaxPub: null,
           revenueMinPriv: null,
           revenueMaxPriv: null,
+          metaPorDia: 0,
         },
         prices: { premium: 200, base: 80 },
         somPercent: 30,
@@ -417,8 +423,9 @@ export default function InteligenciaPage() {
       if (projectMeta.id) {
         // Existing project — save metadata only (lightweight)
         await saveProjectMeta(projectMeta.id, {
-          filters,
+          filters: { ...filters, metaPorDia },
           prices,
+          somPercent: 30,
           route: routeCCTs,
           routes: routes,
         });
@@ -433,8 +440,9 @@ export default function InteligenciaPage() {
           schools,
           route: routeCCTs,
           routes: routes,
-          filters,
+          filters: { ...filters, metaPorDia },
           prices,
+          somPercent: 30,
         });
         setProjectMeta(prev => ({ ...prev, id }));
       }
@@ -445,7 +453,7 @@ export default function InteligenciaPage() {
     } finally {
       setSaving(false);
     }
-  }, [projectMeta, schools, routes, routeCCTs, filters, prices]);
+  }, [projectMeta, schools, routes, routeCCTs, filters, prices, metaPorDia]);
 
   // ─── Auto-save debounced effect ───
   useEffect(() => {
@@ -453,21 +461,21 @@ export default function InteligenciaPage() {
     
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
-      try {
-        await saveProjectMeta(projectMeta.id, {
-          filters,
+      if (hasLoadedRef.current && prevFilteredCountRef.current > 0) {
+        saveProjectMeta(projectMeta.id, {
+          filters: { ...filters, metaPorDia },
           prices,
+          somPercent: 30,
           route: routeCCTs,
-          routes: routes,
+          routes
+        }).catch(err => {
+          console.error('[Intel] Auto-save meta failed:', err);
         });
-        console.log('[Intel] Auto-saved');
-      } catch (err) {
-        console.error('[Intel] Auto-save error:', err);
       }
     }, 2000);
 
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [filters, prices, routes, projectMeta.id]);
+  }, [filters, prices, routes, projectMeta.id, metaPorDia]);
 
   // ─── Route operations ───
   const handleSchoolClick = useCallback((school, isCampus, markerKey) => {
@@ -516,19 +524,19 @@ export default function InteligenciaPage() {
       cctsToAdd.forEach(cct => newSet.add(cct));
       return Array.from(newSet);
     });
-  }, []);
+  }, [setRouteCCTs]);
 
   const handleRemoveFromRoute = useCallback((cct) => {
     setRouteCCTs(prev => prev.filter(c => c !== cct));
-  }, []);
+  }, [setRouteCCTs]);
 
   const handleClearRoute = useCallback(() => {
     setRouteCCTs([]);
-  }, []);
+  }, [setRouteCCTs]);
 
   const handleReorderRoute = useCallback((newOrder) => {
     setRouteCCTs(newOrder);
-  }, []);
+  }, [setRouteCCTs]);
 
   // ─── Project switching ───
   const handleSelectProject = useCallback(async (id, readOnly = false, enteredPin = null) => {
@@ -616,28 +624,29 @@ export default function InteligenciaPage() {
           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600">
             <Rocket size={14} className="text-white" />
           </div>
-          <div className="flex items-center">
-            <div>
+          <div className="flex items-center min-w-0">
+            <div className="min-w-0">
               <h1 className="text-sm font-bold text-white flex items-center gap-2">
-                {projectMeta.name || 'Proyecto sin título'}
+                <span className="truncate">{projectMeta.name || 'Proyecto sin título'}</span>
                 {isReadOnly && (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-slate-500/30">
+                  <span className="shrink-0 px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-slate-500/30">
                     Solo Lectura
                   </span>
                 )}
               </h1>
-              <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-2">
+              <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-2 truncate">
                 {schools.length} escuelas en total
                 {projectMeta.owner && (
                   <span className="flex items-center gap-1 before:content-['·'] before:text-gray-600">
-                    <span className="text-gray-500">Por {projectMeta.owner}</span>
+                    <span className="text-gray-500 truncate">Por {projectMeta.owner}</span>
                   </span>
                 )}
               </p>
             </div>
             {/* Nivel educativo badges */}
-            {getUniqueNiveles(schools).map(nivel => (
-              <span
+            <div className="hidden lg:flex items-center gap-1 ml-4">
+              {getUniqueNiveles(schools).map(nivel => (
+                <span
                 key={nivel}
                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                   nivel === 'PRIMARIA' ? 'bg-blue-500/15 text-blue-400' :
@@ -652,6 +661,7 @@ export default function InteligenciaPage() {
             ))}
           </div>
         </div>
+      </div>
 
         <div className="flex items-center gap-2">
           {/* Save toast */}
@@ -771,7 +781,9 @@ export default function InteligenciaPage() {
             className={`intel-distribution-drawer ${distributionCollapsed ? 'is-collapsed cursor-pointer' : ''} ${pulseDrawer && distributionCollapsed ? 'animate-intel-pulse-glow' : ''}`}
             style={{ 
               height: distributionCollapsed ? 56 : (distUserResized ? distributionHeight : 'calc(100% - 32px)'), 
-              right: swappedWidgets ? '8px' : '384px' 
+              right: swappedWidgets 
+                ? 'var(--intel-widget-margin)' 
+                : 'calc(var(--intel-widget-margin) + var(--intel-widget-width) + var(--intel-widget-gap))' 
             }}
           >
             <div
@@ -903,7 +915,10 @@ export default function InteligenciaPage() {
           <button
             onClick={() => setSwappedWidgets(v => !v)}
             className="absolute z-[1200] bottom-5 w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 hover:text-white flex items-center justify-center transition-all shadow-lg hover:scale-110 active:scale-95"
-            style={{ right: '376px', transform: 'translateX(50%)' }}
+            style={{ 
+              right: 'calc(var(--intel-widget-margin) + var(--intel-widget-width) + (var(--intel-widget-gap) / 2))', 
+              transform: 'translateX(50%)' 
+            }}
             title="Intercambiar Paneles"
           >
             <ArrowLeftRight size={18} strokeWidth={2.5} />

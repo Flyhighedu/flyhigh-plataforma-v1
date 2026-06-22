@@ -90,7 +90,9 @@ export default function RightSidebar({
       className={`intel-distribution-drawer ${collapsed ? 'is-collapsed cursor-pointer' : ''}`}
       style={{ 
         height: collapsed ? 56 : (routeUserResized ? panelHeight : 'calc(100% - 32px)'), 
-        right: isSwapped ? '384px' : '8px' 
+        right: isSwapped 
+          ? 'calc(var(--intel-widget-margin) + var(--intel-widget-width) + var(--intel-widget-gap))' 
+          : 'var(--intel-widget-margin)'
       }}
       onClick={() => {
         if (collapsed) onToggleCollapse();

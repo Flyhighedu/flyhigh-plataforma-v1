@@ -9,6 +9,14 @@
   --intel-surface: #111827;
   --intel-surface-2: #1F2937;
   --intel-surface-3: #374151;
+  --intel-divider: rgba(255, 255, 255, 0.08);
+  
+  /* Responsive Layout Variables */
+  --intel-widget-width: 360px;
+  --intel-widget-gap: 16px;
+  --intel-widget-margin: 8px;
+  --intel-command-width: 320px;
+  
   --intel-border: rgba(255, 255, 255, 0.06);
   --intel-border-hover: rgba(255, 255, 255, 0.12);
   --intel-text: #F9FAFB;
@@ -1400,7 +1408,7 @@
 /* ═══ Distribution Drawer ═══ */
 .intel-distribution-drawer {
   position: absolute;
-  width: 360px;
+  width: var(--intel-widget-width);
   right: 16px;
   bottom: 16px;
   z-index: 1100;
