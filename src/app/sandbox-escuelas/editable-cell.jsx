@@ -9,11 +9,14 @@ export function EditableCell({ getValue, row, column, table }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef(null);
+  const savingRef = useRef(false); // Guard against double-save (Enter + Blur)
 
-  // Sync with external updates (e.g. after refetch)
+  // Sync with external updates — but ONLY when NOT editing (anti-clobber)
   useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
+    if (!isEditing) {
+      setValue(initialValue);
+    }
+  }, [initialValue, isEditing]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -23,9 +26,15 @@ export function EditableCell({ getValue, row, column, table }) {
   }, [isEditing]);
 
   const onSave = async () => {
+    // Double-save guard: prevent Enter + Blur from firing twice
+    if (savingRef.current) return;
     setIsEditing(false);
-    if (value === initialValue) return;
 
+    // Loose comparison: "250" == 250 → no phantom save
+    // eslint-disable-next-line eqeqeq
+    if (value == initialValue || (value === "" && initialValue == null)) return;
+
+    savingRef.current = true;
     setIsSaving(true);
     try {
       await table.options.meta?.updateData(
@@ -38,6 +47,7 @@ export function EditableCell({ getValue, row, column, table }) {
       setValue(initialValue);
     } finally {
       setIsSaving(false);
+      savingRef.current = false;
     }
   };
 
@@ -58,7 +68,7 @@ export function EditableCell({ getValue, row, column, table }) {
         onChange={(e) => setValue(e.target.value)}
         onBlur={onSave}
         onKeyDown={(e) => {
-          if (e.key === "Enter") onSave();
+          if (e.key === "Enter") { e.target.blur(); }
           if (e.key === "Escape") onCancel();
         }}
         className="h-8 w-full min-w-[60px] text-sm"

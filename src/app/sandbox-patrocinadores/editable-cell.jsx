@@ -9,11 +9,14 @@ export function EditableCell({ getValue, row, column, table }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef(null);
+  const savingRef = useRef(false);
 
-  // Sync with external updates (e.g. after refetch)
+  // Sync with external updates — but ONLY when NOT editing (anti-clobber)
   useEffect(() => {
-    setValue(initialValue);
-  }, [initialValue]);
+    if (!isEditing) {
+      setValue(initialValue);
+    }
+  }, [initialValue, isEditing]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -23,9 +26,13 @@ export function EditableCell({ getValue, row, column, table }) {
   }, [isEditing]);
 
   const onSave = async () => {
+    if (savingRef.current) return;
     setIsEditing(false);
-    if (value === initialValue) return;
 
+    // eslint-disable-next-line eqeqeq
+    if (value == initialValue || (value === "" && initialValue == null)) return;
+
+    savingRef.current = true;
     setIsSaving(true);
     try {
       await table.options.meta?.updateData(
@@ -38,6 +45,7 @@ export function EditableCell({ getValue, row, column, table }) {
       setValue(initialValue);
     } finally {
       setIsSaving(false);
+      savingRef.current = false;
     }
   };
 
@@ -47,19 +55,18 @@ export function EditableCell({ getValue, row, column, table }) {
   };
 
   // Determine input type based on column
-  const isNumeric = ["tarifa_base", "cuota_alumno", "subsidio_patrocinador"].includes(column.id);
-  const isDate = column.id === "fecha_programada";
+  const isNumeric = ["aportacion_total"].includes(column.id);
 
   if (isEditing) {
     return (
       <Input
         ref={inputRef}
-        type={isNumeric ? "number" : isDate ? "date" : "text"}
+        type={isNumeric ? "number" : "text"}
         value={value ?? ""}
         onChange={(e) => setValue(e.target.value)}
         onBlur={onSave}
         onKeyDown={(e) => {
-          if (e.key === "Enter") onSave();
+          if (e.key === "Enter") { e.target.blur(); }
           if (e.key === "Escape") onCancel();
         }}
         className="h-8 w-full min-w-[60px] text-sm"
@@ -82,3 +89,4 @@ export function EditableCell({ getValue, row, column, table }) {
     </div>
   );
 }
+

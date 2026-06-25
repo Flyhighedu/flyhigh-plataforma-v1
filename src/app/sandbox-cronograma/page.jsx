@@ -40,51 +40,47 @@ export default function SandboxCronogramaPage() {
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
-  // Smart Polling (RLS Bypass Fallback)
-  // Ensures realtime updates happen inside the Admin Sandbox safely without exposing Service Role keys.
+  // ─── Realtime: subscribe to proximas_escuelas changes ──────────────────────
   useEffect(() => {
-    let unmounted = false;
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch("/api/sandbox-cronograma", { cache: "no-store", headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-        const json = await res.json();
-        if (unmounted || !json.data) return;
-        const incoming = json.data.filter(s => s.estatus !== 'completada' && s.estatus !== 'en_progreso');
+    const supabase = createClient();
 
-        setData(prev => {
-          let hasChange = false;
-          // Look for deletes
-          const incomingIds = new Set(incoming.map(s => s.id));
-          if (prev.some(p => p.id && !incomingIds.has(p.id))) hasChange = true;
-          
-          if (!hasChange) {
-            // Look for inserts or modifications using deep compare
-            for (const inc of incoming) {
-              const existing = prev.find(p => p.id === inc.id);
-              if (!existing || JSON.stringify(existing) !== JSON.stringify(inc)) {
-                 hasChange = true; break;
-              }
-            }
+    const channel = supabase
+      .channel('sandbox-cronograma-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'proximas_escuelas',
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const row = payload.new;
+          if (!row?.id) return;
+          // Only add if it matches the active filter (not completada/en_progreso)
+          if (row.estatus === 'completada' || row.estatus === 'en_progreso') return;
+          setData((prev) => {
+            if (prev.some((s) => s.id === row.id)) return prev;
+            return [row, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new;
+          if (!row?.id) return;
+          // If status changed to completada/en_progreso, remove from view
+          if (row.estatus === 'completada' || row.estatus === 'en_progreso') {
+            setData((prev) => prev.filter((s) => s.id !== row.id));
+            return;
           }
-
-          if (hasChange) {
-             return incoming.map(inc => {
-                const existing = prev.find(p => p.id === inc.id);
-                // Return original reference if identical, avoiding input focus loss in EditableCell
-                return (existing && JSON.stringify(existing) === JSON.stringify(inc)) ? existing : inc;
-             });
-          }
-          return prev;
-        });
-
-      } catch (e) {
-        // Silently fail on network disruption
-      }
-    }, 2000); // 2-second fast poll simulates realtime
+          setData((prev) =>
+            prev.map((s) => (s.id === row.id ? { ...s, ...row } : s))
+          );
+        } else if (payload.eventType === 'DELETE') {
+          const oldRow = payload.old;
+          if (!oldRow?.id) return;
+          setData((prev) => prev.filter((s) => s.id !== oldRow.id));
+        }
+      })
+      .subscribe();
 
     return () => {
-      unmounted = true;
-      clearInterval(timer);
+      supabase.removeChannel(channel);
     };
   }, []);
 

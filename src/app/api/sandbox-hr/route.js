@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseService = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Server-side Supabase client with Service Role Key — bypasses RLS
+function getAdminSupabase() {
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+}
 
 export async function GET() {
     try {
-        const { data, error } = await supabaseService
+        const supabase = getAdminSupabase();
+        const { data, error } = await supabase
             .from('staff_profiles')
             .select('*')
             .order('full_name', { ascending: true });
@@ -39,7 +43,8 @@ export async function POST(req) {
             phone: phone || null,
         };
 
-        const { data, error } = await supabaseService
+        const supabase = getAdminSupabase();
+        const { data, error } = await supabase
             .from('staff_profiles')
             .insert(payload)
             .select()
@@ -61,7 +66,8 @@ export async function PATCH(req) {
             return NextResponse.json({ error: 'Faltan parámetros de actualización (id, field)' }, { status: 400 });
         }
 
-        const { error } = await supabaseService
+        const supabase = getAdminSupabase();
+        const { error } = await supabase
             .from('staff_profiles')
             .update({ [field]: value })
             .eq('user_id', id);
@@ -82,7 +88,8 @@ export async function DELETE(req) {
             return NextResponse.json({ error: 'ID es requerido para eliminación' }, { status: 400 });
         }
 
-        const { error } = await supabaseService
+        const supabase = getAdminSupabase();
+        const { error } = await supabase
             .from('staff_profiles')
             .delete()
             .eq('user_id', id);

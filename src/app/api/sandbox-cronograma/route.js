@@ -132,7 +132,7 @@ export async function PATCH(request) {
         const supabase = getAdminSupabase();
         
         let castValue = value;
-        if (['cuota_alumno', 'tarifa_base', 'subsidio_patrocinador'].includes(field)) {
+        if (['cuota_alumno', 'tarifa_base', 'subsidio_patrocinador', 'numero_ninos'].includes(field)) {
             castValue = value === '' || value === null ? null : parseFloat(value);
             if (castValue !== null && isNaN(castValue)) {
                 return NextResponse.json({ error: 'Valor numérico inválido' }, { status: 400 });

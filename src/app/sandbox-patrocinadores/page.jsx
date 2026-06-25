@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { patrocinadoresColumns } from "./patrocinadores-columns";
 import { DataTable } from "./data-table";
 import { toast } from "sonner";
+import { createClient } from "@/utils/supabase/client";
 
 export default function SandboxPatrocinadoresPage() {
   const [data, setData] = useState([]);
@@ -30,55 +31,44 @@ export default function SandboxPatrocinadoresPage() {
     fetchData();
   }, [fetchData]);
 
-  // Realtime updates
+  // Ref for rollback in error handlers
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
-  // Smart Polling (RLS Bypass Fallback)
-  // Ensures realtime updates happen inside the Admin Sandbox safely without exposing Service Role keys.
+  // ─── Realtime: subscribe to patrocinadores changes ──────────────────────
   useEffect(() => {
-    let unmounted = false;
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch("/api/sandbox-patrocinadores", { cache: "no-store", headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
-        const json = await res.json();
-        if (unmounted || !json.data) return;
-        const incoming = json.data;
+    const supabase = createClient();
 
-        setData(prev => {
-          let hasChange = false;
-          // Look for deletes
-          const incomingIds = new Set(incoming.map(s => s.id));
-          if (prev.some(p => p.id && !incomingIds.has(p.id))) hasChange = true;
-          
-          if (!hasChange) {
-            // Look for inserts or modifications using deep compare
-            for (const inc of incoming) {
-              const existing = prev.find(p => p.id === inc.id);
-              if (!existing || JSON.stringify(existing) !== JSON.stringify(inc)) {
-                 hasChange = true; break;
-              }
-            }
-          }
-
-          if (hasChange) {
-             return incoming.map(inc => {
-                const existing = prev.find(p => p.id === inc.id);
-                // Return original reference if identical, avoiding input focus loss in EditableCell
-                return (existing && JSON.stringify(existing) === JSON.stringify(inc)) ? existing : inc;
-             });
-          }
-          return prev;
-        });
-
-      } catch (e) {
-        // Silently fail on network disruption
-      }
-    }, 2000); // 2-second fast poll simulates realtime
+    const channel = supabase
+      .channel('sandbox-patrocinadores-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'patrocinadores',
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const row = payload.new;
+          if (!row?.id) return;
+          setData((prev) => {
+            if (prev.some((s) => s.id === row.id)) return prev;
+            return [row, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const row = payload.new;
+          if (!row?.id) return;
+          setData((prev) =>
+            prev.map((s) => (s.id === row.id ? { ...s, ...row } : s))
+          );
+        } else if (payload.eventType === 'DELETE') {
+          const oldRow = payload.old;
+          if (!oldRow?.id) return;
+          setData((prev) => prev.filter((s) => s.id !== oldRow.id));
+        }
+      })
+      .subscribe();
 
     return () => {
-      unmounted = true;
-      clearInterval(timer);
+      supabase.removeChannel(channel);
     };
   }, []);
 
