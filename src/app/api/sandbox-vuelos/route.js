@@ -124,6 +124,8 @@ export async function GET(request) {
                 total_students: cierre ? (cierre.total_students ?? 0) : liveStudents,
                 total_flights:  cierre ? (cierre.total_flights ?? 0)  : liveFlights,
                 becados:        cierre?.becados ?? 0,
+                _has_cierre: !!cierre,  // Flag: does this row have a sealed cierre?
+                _is_orphan: false,      // Normal journey rows are NOT orphans
             };
         });
 
@@ -205,7 +207,7 @@ export async function PATCH(request) {
             const safeValue = Math.round(numValue); // Students/flights/becados are always integers
 
             if (isOrphanEdit) {
-                // Orphan: update cierres_mision directly by cierre ID
+                // Orphan with 'orphan-' prefix: update cierres_mision directly by cierre ID
                 const cierreId = id.replace(/^orphan[-_]/, '');
                 const { error: upErr } = await supabase
                     .from('cierres_mision')
@@ -215,14 +217,25 @@ export async function PATCH(request) {
                 return NextResponse.json({ data: { id, [field]: safeValue, status: 'closed' } });
             }
 
-            // Get journey data for cierre fields
+            // Try to get journey data — use .maybeSingle() to avoid crash when journey was deleted
             const { data: journey, error: jErr } = await supabase
                 .from('staff_journeys')
                 .select('id, school_id, school_name, date, status')
                 .eq('id', id)
-                .single();
+                .maybeSingle();
 
             if (jErr) throw jErr;
+
+            // ── ORPHAN WITH VALID UUID: journey was deleted but cierre still references it ──
+            // This is the key fix: if the journey doesn't exist, update cierre directly by journey_id
+            if (!journey) {
+                const { error: upErr } = await supabase
+                    .from('cierres_mision')
+                    .update({ [field]: safeValue })
+                    .eq('journey_id', id);
+                if (upErr) throw upErr;
+                return NextResponse.json({ data: { id, [field]: safeValue, status: 'closed' } });
+            }
 
             // Resolve school name
             let schoolName = journey.school_name;
@@ -231,19 +244,23 @@ export async function PATCH(request) {
                     .from('proximas_escuelas')
                     .select('nombre_escuela')
                     .eq('id', journey.school_id)
-                    .single();
+                    .maybeSingle();
                 schoolName = school?.nombre_escuela || null;
             }
 
-            // Check if cierre already exists
-            const { data: existing } = await supabase
+            // Check if cierre already exists — use .limit(1) instead of .maybeSingle()
+            // to handle duplicate cierres gracefully without crashing
+            const { data: existingArr } = await supabase
                 .from('cierres_mision')
                 .select('id, total_students, total_flights, becados')
                 .eq('journey_id', id)
-                .maybeSingle();
+                .limit(1);
+
+            const existing = existingArr?.[0] || null;
 
             if (existing) {
-                // UPDATE existing cierre — only touch the single field being edited
+                // UPDATE existing cierre(s) — only touch the single field being edited
+                // Using .eq('journey_id', id) updates ALL duplicates (if any), which is correct
                 const { error: upErr } = await supabase
                     .from('cierres_mision')
                     .update({ [field]: safeValue })
@@ -275,6 +292,7 @@ export async function PATCH(request) {
         }
 
         // ── ORPHAN: For non-cierre fields on orphan records, update cierres_mision directly ──
+        // This handles BOTH 'orphan-' prefixed IDs AND valid UUIDs whose journey was deleted
         if (isOrphanEdit) {
             const cierreId = id.replace(/^orphan[-_]/, '');
             // Only allow updating fields that exist on cierres_mision
@@ -313,6 +331,7 @@ export async function PATCH(request) {
             );
         }
 
+        // Before updating, verify the row exists (guards against orphan UUIDs reaching here)
         const { data, error } = await supabase
             .from(targetTable)
             .update({ [field]: value })
@@ -320,6 +339,23 @@ export async function PATCH(request) {
             .select();
 
         if (error) throw error;
+
+        // If no rows were updated, this ID might be an orphan with a valid UUID
+        if (!data || data.length === 0) {
+            // Try to update cierre directly for school_name field
+            if (field === 'school_name') {
+                const { error: cErr } = await supabase
+                    .from('cierres_mision')
+                    .update({ school_name_snapshot: value })
+                    .eq('journey_id', id);
+                if (cErr) console.warn('[API] orphan school_name update failed:', cErr);
+                return NextResponse.json({ data: { id, [field]: value } });
+            }
+            return NextResponse.json(
+                { error: `No se encontró el registro con id "${id}" en ${targetTable}. Puede ser un registro huérfano.` },
+                { status: 404 }
+            );
+        }
 
         // Sync school_name → cierres_mision.school_name_snapshot
         if (targetTable === 'staff_journeys' && field === 'school_name' && value) {

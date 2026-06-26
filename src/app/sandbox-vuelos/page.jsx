@@ -120,6 +120,8 @@ export default function SandboxVuelosPage() {
         });
       })
       // ── bitacora_vuelos INSERT: live student count accumulation ──
+      // ONLY accumulate for rows that DON'T have a sealed cierre.
+      // Rows with cierre get their totals from cierres_mision, not live sums.
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -132,6 +134,14 @@ export default function SandboxVuelosPage() {
         setData((prev) =>
           prev.map((j) => {
             if (j.id !== row.journey_id) return j;
+            // Skip live accumulation if this row has a sealed cierre —
+            // the cierre values are the source of truth for these rows
+            if (j._has_cierre) {
+              return {
+                ...j,
+                vuelo_count: (Number(j.vuelo_count) || 0) + 1,
+              };
+            }
             return {
               ...j,
               total_students: (Number(j.total_students) || 0) + addedStudents,
