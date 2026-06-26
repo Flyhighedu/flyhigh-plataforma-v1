@@ -40,6 +40,10 @@ export default function SandboxVuelosPage() {
   const dataRef = useRef(data);
   useEffect(() => { dataRef.current = data; }, [data]);
 
+  // Track fields that are currently being saved to prevent realtime from clobbering
+  // optimistic updates. Key format: "journeyId::fieldName"
+  const savingFieldsRef = useRef(new Set());
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -57,12 +61,18 @@ export default function SandboxVuelosPage() {
         setData((prev) =>
           prev.map((j) => {
             if (j.id !== row.journey_id) return j;
-            return {
-              ...j,
-              total_students: row.total_students ?? j.total_students,
-              total_flights:  row.total_flights  ?? j.total_flights,
-              becados:        row.becados        ?? j.becados,
-            };
+            // Only apply fields that are NOT currently being saved (anti-clobber)
+            const updated = { ...j };
+            if (row.total_students != null && !savingFieldsRef.current.has(`${j.id}::total_students`)) {
+              updated.total_students = row.total_students;
+            }
+            if (row.total_flights != null && !savingFieldsRef.current.has(`${j.id}::total_flights`)) {
+              updated.total_flights = row.total_flights;
+            }
+            if (row.becados != null && !savingFieldsRef.current.has(`${j.id}::becados`)) {
+              updated.becados = row.becados;
+            }
+            return updated;
           })
         );
       })
@@ -152,6 +162,10 @@ export default function SandboxVuelosPage() {
         }
       }
 
+      // Mark this field as saving to prevent realtime from clobbering
+      const savingKey = `${rowId}::${columnId}`;
+      savingFieldsRef.current.add(savingKey);
+
       // Optimistic update
       setData((prev) =>
         prev.map((row) => {
@@ -175,6 +189,10 @@ export default function SandboxVuelosPage() {
         toast.error("Error al guardar", { description: err.message });
         await fetchData();
         throw err;
+      } finally {
+        // Allow realtime to update this field again after a short delay
+        // (gives the realtime event time to arrive and be ignored)
+        setTimeout(() => savingFieldsRef.current.delete(savingKey), 2000);
       }
     },
     [fetchData]

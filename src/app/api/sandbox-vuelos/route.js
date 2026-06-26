@@ -107,7 +107,7 @@ export async function GET(request) {
         }
 
         // Enrich journeys: resolve school_name via COALESCE logic + add vuelo_count
-        // Priority: cierre (sealed) > bitacora sum (live) > 0
+        // Priority: cierre (sealed/manual) ALWAYS wins over live bitacora when present
         const journeyIdSet = new Set((rawJourneys || []).map(j => j.id));
         const enriched = (rawJourneys || []).map(j => {
             const school = schoolMap[j.school_id];
@@ -119,10 +119,11 @@ export async function GET(request) {
                 school_name: j.school_name || (school?.nombre_escuela) || null,
                 colonia: school?.colonia || null,
                 vuelo_count: liveFlights,
-                // SSoT: Live bitacora is the strict source of truth. Only use cierre if NO flights exist.
-                total_students: liveFlights > 0 ? liveStudents : (cierre?.total_students ?? liveStudents),
-                total_flights: liveFlights > 0 ? liveFlights : (cierre?.total_flights ?? liveFlights),
-                becados: cierre?.becados || 0,
+                // SSoT: cierre (manual edits) ALWAYS takes priority when it exists.
+                // Only fall back to live bitacora sums when there is no cierre record.
+                total_students: cierre ? (cierre.total_students ?? 0) : liveStudents,
+                total_flights:  cierre ? (cierre.total_flights ?? 0)  : liveFlights,
+                becados:        cierre?.becados ?? 0,
             };
         });
 
@@ -152,9 +153,9 @@ export async function GET(request) {
                         created_at: c.created_at,
                         colonia: school?.colonia || null,
                         vuelo_count: 0,
-                        total_students: c.total_students || 0,
-                        total_flights: c.total_flights || 0,
-                        becados: c.becados || 0,
+                        total_students: c.total_students ?? 0,
+                        total_flights: c.total_flights ?? 0,
+                        becados: c.becados ?? 0,
                         _is_orphan: true, // Flag for UI (optional)
                     });
                 }
@@ -187,11 +188,32 @@ export async function PATCH(request) {
 
         const supabase = getAdminSupabase();
 
+        // ── ORPHAN HANDLING: If the ID starts with 'orphan-', this row only exists in cierres_mision ──
+        const isOrphanEdit = id.startsWith('orphan-') || id.startsWith('orphan_');
+
         // Special path: Niños/Vuelos/Becados → UPSERT cierres_mision ONLY
         // ⚠️ Does NOT change journey status — that should only happen from the PWA
         // when staff actually closes the operation in the field.
         if (targetTable === 'staff_journeys' && ['total_students', 'total_flights', 'becados'].includes(field)) {
-            const numValue = parseInt(value) || 0;
+            const numValue = Number(value);
+            if (!Number.isFinite(numValue) || numValue < 0) {
+                return NextResponse.json(
+                    { error: `Valor inválido: "${value}" no es un número válido.` },
+                    { status: 400 }
+                );
+            }
+            const safeValue = Math.round(numValue); // Students/flights/becados are always integers
+
+            if (isOrphanEdit) {
+                // Orphan: update cierres_mision directly by cierre ID
+                const cierreId = id.replace(/^orphan[-_]/, '');
+                const { error: upErr } = await supabase
+                    .from('cierres_mision')
+                    .update({ [field]: safeValue })
+                    .eq('id', cierreId);
+                if (upErr) throw upErr;
+                return NextResponse.json({ data: { id, [field]: safeValue, status: 'closed' } });
+            }
 
             // Get journey data for cierre fields
             const { data: journey, error: jErr } = await supabase
@@ -216,19 +238,21 @@ export async function PATCH(request) {
             // Check if cierre already exists
             const { data: existing } = await supabase
                 .from('cierres_mision')
-                .select('id')
+                .select('id, total_students, total_flights, becados')
                 .eq('journey_id', id)
                 .maybeSingle();
 
             if (existing) {
-                // UPDATE existing cierre
+                // UPDATE existing cierre — only touch the single field being edited
                 const { error: upErr } = await supabase
                     .from('cierres_mision')
-                    .update({ [field]: numValue })
+                    .update({ [field]: safeValue })
                     .eq('journey_id', id);
                 if (upErr) throw upErr;
             } else {
-                // INSERT new cierre
+                // INSERT new cierre — initialize ALL 3 numeric fields to 0,
+                // then override the one being edited. This prevents the bug where
+                // editing one field would leave the others as null.
                 const { error: insErr } = await supabase
                     .from('cierres_mision')
                     .insert({
@@ -236,9 +260,10 @@ export async function PATCH(request) {
                         mission_id: journey.school_id ? String(journey.school_id) : null,
                         school_name_snapshot: schoolName,
                         school_id: journey.school_id,
-                        [field]: numValue,
-                        // Set the other field to 0 so they don't start null
-                        ...(field === 'total_students' ? { total_flights: 0 } : { total_students: 0 }),
+                        total_students: 0,
+                        total_flights: 0,
+                        becados: 0,
+                        [field]: safeValue, // Override the specific field being edited
                         checklist_verified: false,
                         end_time: new Date().toISOString(),
                     });
@@ -246,7 +271,32 @@ export async function PATCH(request) {
             }
 
             // ✅ Return current status — do NOT change it
-            return NextResponse.json({ data: { id, [field]: numValue, status: journey.status } });
+            return NextResponse.json({ data: { id, [field]: safeValue, status: journey.status } });
+        }
+
+        // ── ORPHAN: For non-cierre fields on orphan records, update cierres_mision directly ──
+        if (isOrphanEdit) {
+            const cierreId = id.replace(/^orphan[-_]/, '');
+            // Only allow updating fields that exist on cierres_mision
+            const cierreEditableFields = ['school_name_snapshot'];
+            // Map staff_journeys field names to cierres_mision equivalents
+            const fieldMap = { school_name: 'school_name_snapshot' };
+            const cierreField = fieldMap[field] || field;
+
+            if (cierreEditableFields.includes(cierreField)) {
+                const { error: upErr } = await supabase
+                    .from('cierres_mision')
+                    .update({ [cierreField]: value })
+                    .eq('id', cierreId);
+                if (upErr) throw upErr;
+                return NextResponse.json({ data: { id, [field]: value } });
+            } else {
+                // Field not editable on orphan records — return graceful message
+                return NextResponse.json(
+                    { error: `El campo "${field}" no se puede editar en registros huérfanos. Este registro solo existe en cierres_mision.` },
+                    { status: 400 }
+                );
+            }
         }
 
         // Standard path: update a field on the target table

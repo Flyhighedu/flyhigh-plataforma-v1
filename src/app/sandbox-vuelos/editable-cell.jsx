@@ -27,12 +27,15 @@ export function EditableCell({ getValue, row, column, table }) {
 
   const onSave = async () => {
     if (savingRef.current) return;
+    savingRef.current = true; // Lock immediately to prevent double-fire
     setIsEditing(false);
 
     // eslint-disable-next-line eqeqeq
-    if (value == initialValue || (value === "" && initialValue == null)) return;
+    if (value == initialValue || (value === "" && initialValue == null)) {
+      savingRef.current = false;
+      return;
+    }
 
-    savingRef.current = true;
     setIsSaving(true);
     try {
       await table.options.meta?.updateData(
