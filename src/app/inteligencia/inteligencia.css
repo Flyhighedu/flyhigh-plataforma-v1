@@ -1383,11 +1383,134 @@
   color: #9CA3AF;
   font-weight: 600;
 }
-.intel-tooltip-row-right {
-  font-size: 12px;
+/* Tarjeta del Turno / Escuela Individual */
+.intel-tooltip-row-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+.intel-tooltip-row-inactive {
+  opacity: 0.45;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Encabezado de la Tarjeta */
+.intel-tooltip-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.intel-tooltip-row-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.intel-tooltip-row-meta-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.intel-tooltip-row-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #E2E8F0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.intel-tooltip-row-meta-cct {
+  font-size: 9px;
+  color: #9CA3AF;
+  font-family: monospace;
+  margin-top: 1px;
+}
+
+/* Ganancia financiera */
+.intel-tooltip-row-money {
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  color: #34D399 !important;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+/* Contenedor del Botón de Acción */
+.intel-tooltip-row-action {
+  width: 100%;
+}
+
+/* Botón de Acción de Tarjeta (Full-Width) */
+.intel-tooltip-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 9px;
   font-weight: 800;
-  color: #34D399;
-  text-align: right;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.intel-tooltip-card-btn:active {
+  transform: scale(0.98);
+}
+.intel-tooltip-card-btn svg {
+  flex-shrink: 0;
+}
+
+/* Variación Agregar (Azul) */
+.intel-tooltip-card-btn-add {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+.intel-tooltip-card-btn-add:hover {
+  background: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.45);
+  transform: translateY(-0.5px);
+}
+
+/* Variación Agregado (Verde / Hover Rojo) */
+.intel-tooltip-card-btn-added {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+.intel-tooltip-card-btn-added .btn-text-remove {
+  display: none;
+}
+.intel-tooltip-card-btn-added .btn-text-added {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.intel-tooltip-card-btn-added:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+.intel-tooltip-card-btn-added:hover .btn-text-added {
+  display: none;
+}
+.intel-tooltip-card-btn-added:hover .btn-text-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Minimalist Footer */
@@ -1401,8 +1524,62 @@
   align-items: end;
   text-align: center;
 }
-.intel-tooltip-summary .intel-tooltip-row-left {
-  align-items: center !important;
+/* Filas de Campus Compactas */
+.intel-tooltip-campus-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  margin-bottom: 5px;
+  transition: all 0.2s ease;
+}
+.intel-tooltip-campus-row.is-in-route {
+  border-color: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.03);
+}
+.intel-tooltip-campus-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.intel-tooltip-campus-row-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.intel-tooltip-campus-row-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #E2E8F0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.intel-tooltip-campus-row-cct {
+  font-size: 9px;
+  color: #9CA3AF;
+  margin-top: 1px;
+}
+.intel-tooltip-campus-row-money {
+  font-size: 12px;
+  font-weight: 800;
+  color: #34D399;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+/* Valores de Resumen Operativo */
+.intel-tooltip-summary-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #F3F4F6;
+  margin-top: 2px;
 }
 
 /* ═══ Distribution Drawer ═══ */

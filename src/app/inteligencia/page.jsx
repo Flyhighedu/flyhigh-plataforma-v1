@@ -526,8 +526,14 @@ export default function InteligenciaPage() {
     });
   }, [setRouteCCTs]);
 
-  const handleRemoveFromRoute = useCallback((cct) => {
-    setRouteCCTs(prev => prev.filter(c => c !== cct));
+  const handleRemoveFromRoute = useCallback((cctOrCcts) => {
+    setRouteCCTs(prev => {
+      if (Array.isArray(cctOrCcts)) {
+        const toRemove = new Set(cctOrCcts);
+        return prev.filter(c => !toRemove.has(c));
+      }
+      return prev.filter(c => c !== cctOrCcts);
+    });
   }, [setRouteCCTs]);
 
   const handleClearRoute = useCallback(() => {
@@ -758,6 +764,7 @@ export default function InteligenciaPage() {
             focusedSchoolKey={focusedSchoolKey}
             onClearFocus={() => setFocusedSchoolKey(null)}
             onAddToRoute={handleAddToRoute}
+            onRemoveFromRoute={handleRemoveFromRoute}
             profitColors={profitColors}
             turnoMap={turnoMap}
             prices={prices}

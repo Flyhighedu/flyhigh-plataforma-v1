@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useCallback, useState, useEffect } from 'react';
-import { Route, X, Save, FileBarChart, GripVertical, Trash2, MapPin, Users, DollarSign, Star } from 'lucide-react';
+import { Route, X, Save, FileBarChart, GripVertical, Trash2, MapPin, Users, DollarSign, Star, Search } from 'lucide-react';
 import { calculateRouteMetrics, formatMXN, formatNumber, getTurnoStyles } from '../lib/filters';
 
 export default function RoutePanel({
@@ -17,6 +17,7 @@ export default function RoutePanel({
   collapsed,
 }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (confirmDeleteId !== null) {
@@ -67,6 +68,18 @@ export default function RoutePanel({
     return groups;
   }, [routeSchools, campusMap, routeCCTs]);
 
+  const filteredRouteGroups = useMemo(() => {
+    if (!searchTerm.trim()) return routeGroups;
+    const q = searchTerm.toLowerCase().trim();
+    return routeGroups.filter(g => 
+      g.schools.some(s => 
+        (s.nombre || '').toLowerCase().includes(q) ||
+        (s.cct || '').toLowerCase().includes(q) ||
+        (s.municipio || '').toLowerCase().includes(q)
+      )
+    );
+  }, [routeGroups, searchTerm]);
+
   const metrics = useMemo(
     () => calculateRouteMetrics(routeSchools, prices),
     [routeSchools, prices]
@@ -78,19 +91,30 @@ export default function RoutePanel({
     return school.alumnos * pricePerStudent;
   }, [prices]);
 
+
+
+  // Disable dragging if filter is active
+  const isFilterActive = searchTerm.trim().length > 0;
+
   // Simple reorder by dragging (HTML5 DnD)
   const handleDragStart = (e, index) => {
+    if (isFilterActive) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('text/plain', index.toString());
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
+    if (isFilterActive) return;
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e, targetIndex) => {
     e.preventDefault();
+    if (isFilterActive) return;
     const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
 
@@ -141,6 +165,30 @@ export default function RoutePanel({
         </div>
       </div>
 
+      {/* Search Bar */}
+      {routeGroups.length > 0 && (
+        <div className="px-5 pb-3 shrink-0">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar escuela en ruta..."
+              className="w-full bg-gray-950/40 border border-white/5 text-white text-xs rounded-xl pl-9 pr-8 py-2 outline-none focus:border-emerald-500/50 hover:border-white/10 transition-all placeholder:text-gray-600"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-0.5 rounded-md transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Route list */}
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-2">
         {routeGroups.length === 0 ? (
@@ -153,8 +201,25 @@ export default function RoutePanel({
               Haz clic en los pines del mapa para agregar escuelas a tu ruta de visitas
             </p>
           </div>
+        ) : filteredRouteGroups.length === 0 ? (
+          <div className="intel-empty-state py-16">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/[0.02] mb-3">
+              <Search size={20} className="text-gray-600" />
+            </div>
+            <p className="text-xs font-bold text-gray-500">Sin coincidencias en la ruta</p>
+            <button
+              onClick={() => setSearchTerm('')}
+              className="mt-2 text-[10px] font-black uppercase tracking-wider text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Limpiar búsqueda
+            </button>
+          </div>
         ) : (
-          routeGroups.map((group, index) => {
+          filteredRouteGroups.map((group, index) => {
+            // Find real index in full routeGroups to maintain numbering
+            const realIndex = routeGroups.findIndex(rg => rg.id === group.id);
+            const displayIndex = realIndex !== -1 ? realIndex : index;
+
             if (group.type === 'campus') {
               const totalValue = group.schools.reduce((sum, s) => sum + getSchoolValue(s), 0);
               const totalStudents = group.schools.reduce((sum, s) => sum + (s.alumnos || 0), 0);
@@ -166,17 +231,17 @@ export default function RoutePanel({
                   key={group.id}
                   className="intel-route-item animate-intel-drop-in bg-[#A855F7]/10 border-[#A855F7]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
                   style={{ animationDelay: `${index * 30}ms` }}
-                  draggable
+                  draggable={!isFilterActive}
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                 >
-                  <div className="text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
+                  <div className={`text-gray-600 shrink-0 ${isFilterActive ? 'opacity-30 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}>
                     <GripVertical size={14} />
                   </div>
                   
                   <div className="w-6 h-6 rounded-md flex items-center justify-center bg-purple-500/20 text-purple-400 text-[10px] font-black shrink-0">
-                    {index + 1}
+                    {displayIndex + 1}
                   </div>
                   
                   <div className="flex-1 min-w-0">
@@ -247,19 +312,19 @@ export default function RoutePanel({
                 key={school.cct}
                 className="intel-route-item animate-intel-drop-in"
                 style={{ animationDelay: `${index * 30}ms` }}
-                draggable
+                draggable={!isFilterActive}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, index)}
               >
                 {/* Drag handle */}
-                <div className="text-gray-600 cursor-grab active:cursor-grabbing shrink-0">
+                <div className={`text-gray-600 shrink-0 ${isFilterActive ? 'opacity-30 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}>
                   <GripVertical size={14} />
                 </div>
 
                 {/* Order number */}
                 <div className="w-6 h-6 rounded-md flex items-center justify-center bg-emerald-500/15 text-emerald-400 text-[10px] font-black shrink-0">
-                  {index + 1}
+                  {displayIndex + 1}
                 </div>
                 {/* School info */}
                 <div className="flex-1 min-w-0 pr-2">

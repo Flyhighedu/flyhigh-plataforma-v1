@@ -54,6 +54,18 @@ export function registerShapeMarker(L) {
 
       ctx.closePath();
       this._renderer._fillStroke(ctx, this);
+
+      // Draw route number if present (white text with dark border for absolute legibility)
+      if (this.options.routeNumber) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.max(13, Math.floor(r * 1.55))}px Inter, system-ui, -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'rgba(11, 17, 32, 0.9)';
+        ctx.lineWidth = 3.5;
+        ctx.strokeText(this.options.routeNumber.toString(), p.x, p.y);
+        ctx.fillText(this.options.routeNumber.toString(), p.x, p.y);
+      }
     },
   });
 

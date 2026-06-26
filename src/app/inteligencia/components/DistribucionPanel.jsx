@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Building2, Users, DollarSign, ChevronDown, ChevronUp, MapPin, Search, Star, Calendar, LineChart } from 'lucide-react';
+import { Building2, Users, DollarSign, ChevronDown, ChevronUp, MapPin, Search, Star, Calendar, LineChart, X } from 'lucide-react';
 import { formatNumber, formatMXN, calculateCapacity, getTurnoStyles } from '../lib/filters';
 
 export default function DistribucionPanel({
@@ -19,6 +19,7 @@ export default function DistribucionPanel({
   const [filterSost, setFilterSost] = useState('todas'); // 'todas' | 'publicas' | 'privadas'
   const [expandedCity, setExpandedCity] = useState(null);
   const [localSortBy, setLocalSortBy] = useState({}); // { cityName: 'alumnos' | 'ingresos' }
+  const [localSearchTerms, setLocalSearchTerms] = useState({}); // { cityName: 'searchTerm' }
   
   // Row hover/click state for map connection
   const [hoveredRowKey, setHoveredRowKey] = useState(null);
@@ -124,17 +125,38 @@ export default function DistribucionPanel({
       }
     }
 
+    const q = searchTerm ? searchTerm.toLowerCase().trim() : '';
+
     let list = Array.from(map.values()).map(city => {
       const schoolsArray = Array.from(city.schoolsMap.values());
-      let totalSchools = schoolsArray.length;
+      
+      const filteredSchoolsForCity = q
+        ? (city.name.toLowerCase().includes(q)
+            ? schoolsArray
+            : schoolsArray.filter(s => 
+                (s.nombre || '').toLowerCase().includes(q) ||
+                (s.ccts || []).some(cct => cct.toLowerCase().includes(q))
+              ))
+        : schoolsArray;
+
+      if (filteredSchoolsForCity.length === 0 && q && !city.name.toLowerCase().includes(q)) {
+        return null;
+      }
+
+      let totalSchools = filteredSchoolsForCity.length;
       let pubSchools = 0;
       let privSchools = 0;
       let campusSchools = 0;
+      let totalStudents = 0;
+      let totalValue = 0;
       
-      for (const gs of schoolsArray) {
+      for (const gs of filteredSchoolsForCity) {
         if (gs.isPrivada) privSchools++;
         else pubSchools++;
         if (gs.isCampus) campusSchools++;
+
+        totalStudents += gs.alumnos || 0;
+        totalValue += gs.computedValue || 0;
 
         const ninosPorDia = gs.isPrivada ? capacity.ninosPorDiaPriv : capacity.ninosPorDiaPub;
         let dias = 0;
@@ -159,8 +181,8 @@ export default function DistribucionPanel({
       }
 
       const citySort = localSortBy[city.name] || 'alumnos';
-      const cityDias = schoolsArray.reduce((acc, gs) => acc + (gs.diasReales || 0), 0);
-      const cityIngresoPorDia = cityDias > 0 ? city.totalValue / cityDias : 0;
+      const cityDias = filteredSchoolsForCity.reduce((acc, gs) => acc + (gs.diasReales || 0), 0);
+      const cityIngresoPorDia = cityDias > 0 ? totalValue / cityDias : 0;
 
       return {
         ...city,
@@ -168,21 +190,18 @@ export default function DistribucionPanel({
         pubSchools,
         privSchools,
         campusSchools,
+        totalStudents,
+        totalValue,
         totalDias: cityDias,
         ingresoPorDia: cityIngresoPorDia,
-        schools: schoolsArray.sort((a,b) => {
+        schools: filteredSchoolsForCity.sort((a,b) => {
           if (citySort === 'alumnos') return b.alumnos - a.alumnos;
           if (citySort === 'ingresos') return b.computedValue - a.computedValue;
           if (citySort === 'ingreso_dia') return b.ingresoPorDia - a.ingresoPorDia;
           return 0;
         })
       };
-    });
-
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q));
-    }
+    }).filter(Boolean);
 
     list.sort((a, b) => {
       if (sortBy === 'escuelas') return b.totalSchools - a.totalSchools;
@@ -215,7 +234,7 @@ export default function DistribucionPanel({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar municipio..."
+              placeholder="Buscar municipio o escuela..."
               className="w-full bg-gray-950/50 border border-white/5 text-white text-xs rounded-xl pl-9 pr-4 py-2.5 outline-none focus:border-blue-500/50 transition-colors"
             />
           </div>
@@ -269,7 +288,14 @@ export default function DistribucionPanel({
             No hay municipios que coincidan con los filtros.
           </div>
         ) : cityData.map((city, idx) => {
-          const isExpanded = expandedCity === city.name;
+          const isExpanded = (searchTerm && searchTerm.trim().length > 0) ? true : (expandedCity === city.name);
+          const localQ = (localSearchTerms[city.name] || '').toLowerCase().trim();
+          const filteredSchoolsInCity = localQ
+            ? city.schools.filter(s => 
+                (s.nombre || '').toLowerCase().includes(localQ) ||
+                (s.ccts || []).some(cct => cct.toLowerCase().includes(localQ))
+              )
+            : city.schools;
           let currentMetricValue = 0;
           if (sortBy === 'escuelas') currentMetricValue = city.totalSchools;
           if (sortBy === 'alumnos') currentMetricValue = city.totalStudents;
@@ -370,122 +396,153 @@ export default function DistribucionPanel({
                     </div>
                   </div>
                   
+                  {/* Buscador local */}
+                  <div className="p-2 border-b border-white/5 bg-gray-950/20 shrink-0">
+                    <div className="relative">
+                      <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                      <input
+                        type="text"
+                        value={localSearchTerms[city.name] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLocalSearchTerms(prev => ({ ...prev, [city.name]: val }));
+                        }}
+                        placeholder="Buscar escuela en esta ciudad..."
+                        className="w-full bg-gray-950/30 border border-white/5 text-white text-[11px] rounded-lg pl-8 pr-7 py-1.5 outline-none focus:border-blue-500/50 hover:border-white/10 transition-all placeholder:text-gray-600"
+                      />
+                      {(localSearchTerms[city.name] || '') && (
+                        <button
+                          onClick={() => setLocalSearchTerms(prev => ({ ...prev, [city.name]: '' }))}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-0.5 rounded transition-colors"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className={`${isDrawer ? 'max-h-[260px]' : 'max-h-[550px]'} overflow-y-auto custom-scrollbar`}>
-                  {city.schools.map((school) => {
-                    const isHovered = hoveredRowKey === school.schoolKey;
-                    const isClicked = clickedRowKey === school.schoolKey;
-                    const isActive = isHovered || isClicked;
+                  {filteredSchoolsInCity.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 text-xs font-bold uppercase tracking-wider">
+                      Sin coincidencias en esta ciudad
+                    </div>
+                  ) : (
+                    filteredSchoolsInCity.map((school) => {
+                      const isHovered = hoveredRowKey === school.schoolKey;
+                      const isClicked = clickedRowKey === school.schoolKey;
+                      const isActive = isHovered || isClicked;
 
-                    return (
-                      <div 
-                        key={school.schoolKey}
-                        className={`p-3 border-b border-white/5 last:border-0 hover:bg-gray-800/80 transition-colors cursor-pointer group flex items-start gap-3 ${
-                          isActive ? 'bg-blue-500/10' : ''
-                        }`}
-                        onMouseEnter={() => setHoveredRowKey(school.schoolKey)}
-                        onMouseLeave={() => setHoveredRowKey(null)}
-                        onClick={() => setClickedRowKey(prev => prev === school.schoolKey ? null : school.schoolKey)}
-                      >
-                        <div className="mt-0.5 shrink-0 flex items-center justify-center w-7 h-7">
-                          {school.isCampus ? (
-                            <Star fill="currentColor" size={16} className="text-[#A855F7] drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" strokeWidth={1} stroke="#9333EA" />
-                          ) : school.isTurno ? (
-                            <div className="relative flex items-center justify-center w-4 h-4">
-                              <div className="absolute w-full h-full rounded-full border-[2px] border-emerald-400/80 shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
-                              <div className={`w-2.5 h-2.5 rounded-full ${school.isPrivada ? 'bg-[#F59E0B]' : 'bg-[#3B82F6]'}`} />
-                            </div>
-                          ) : school.isPrivada ? (
-                            <div className="w-3.5 h-3.5 rounded-full bg-[#F59E0B] border-[1.5px] border-[#D97706] shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
-                          ) : (
-                            <div className="w-3.5 h-3.5 rounded-full bg-[#3B82F6] border-[1.5px] border-[#2563EB] shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0 flex flex-col gap-2">
-                          {/* 1. Header (Nombre y Etiqueta Principal) */}
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className={`text-sm font-bold leading-tight ${school.isCampus ? 'text-[#A855F7]' : school.isTurno ? 'text-emerald-400' : school.isPrivada ? 'text-amber-400/90' : 'text-blue-400/90'}`}>
-                              {school.nombre}
-                            </h4>
-                            <span className="shrink-0 text-[9px] font-bold text-gray-500 uppercase tracking-wider bg-white/5 px-1.5 py-0.5 rounded">
-                              {school.isCampus ? 'Campus' : school.isTurno ? 'Doble Turno' : school.ccts[0]}
-                            </span>
-                          </div>
-
-                          {/* 2. Contexto (Pastillas de Turnos y Niveles) */}
-                          <div className="flex flex-wrap gap-1">
-                            {school.municipio && (
-                              <span className="intel-municipio-chip-sm" title={school.municipio}>
-                                <MapPin size={9} /> {school.municipio}
-                              </span>
-                            )}
-                            {(() => {
-                              const turnosDistintos = [...new Set(
-                                (school.turnos || []).map(t => (t.turno || '').toUpperCase()).filter(Boolean)
-                              )];
-                              return turnosDistintos.map((t, i) => {
-                                const st = getTurnoStyles(t);
-                                const Icon = st.IconComponent;
-                                return (
-                                  <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded border ${st.gradientClass} ${st.textClass} ${st.borderClass} ${st.shadowClass}`} style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.2)' }}>
-                                    <Icon size={10} strokeWidth={2.5} />
-                                    {st.short}
-                                  </span>
-                                );
-                              });
-                            })()}
-                            {school.isCampus && school.niveles.map((n, i) => (
-                              <span key={i} className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-white/5 text-gray-400">
-                                {n.nivel} ({n.alumnos})
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* 3. Grid de Métricas */}
-                          {(() => {
-                            const dias = school.diasReales || 0;
-                            const ingPorDia = school.ingresoPorDia || 0;
-                            const diaColor = metaPorDia > 0
-                              ? (ingPorDia >= metaPorDia ? '#34D399' : '#f87171')
-                              : undefined;
-
-                            return (
-                              <div className="grid grid-cols-4 gap-2 mt-1 p-2 bg-gray-950/30 rounded-lg border border-white/5">
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider">Alumnos</span>
-                                  <span className="text-xs font-bold text-gray-300">{formatNumber(school.alumnos)}</span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider">Días Op.</span>
-                                  <span className="text-xs font-bold text-purple-400">{dias}</span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider">Total</span>
-                                  <span className="text-xs font-bold text-amber-400">{formatMXN(school.computedValue)}</span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider">Ing/Día</span>
-                                  <span 
-                                    className="text-xs font-bold px-1 rounded w-fit"
-                                    style={{ 
-                                      color: diaColor ?? '#34D399', 
-                                      background: diaColor ? `${diaColor}18` : 'rgba(52,211,153,0.1)',
-                                    }}
-                                  >
-                                    {formatMXN(ingPorDia)}
-                                  </span>
-                                </div>
+                      return (
+                        <div 
+                          key={school.schoolKey}
+                          className={`p-3 border-b border-white/5 last:border-0 hover:bg-gray-800/80 transition-colors cursor-pointer group flex items-start gap-3 ${
+                            isActive ? 'bg-blue-500/10' : ''
+                          }`}
+                          onMouseEnter={() => setHoveredRowKey(school.schoolKey)}
+                          onMouseLeave={() => setHoveredRowKey(null)}
+                          onClick={() => setClickedRowKey(prev => prev === school.schoolKey ? null : school.schoolKey)}
+                        >
+                          <div className="mt-0.5 shrink-0 flex items-center justify-center w-7 h-7">
+                            {school.isCampus ? (
+                              <Star fill="currentColor" size={16} className="text-[#A855F7] drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" strokeWidth={1} stroke="#9333EA" />
+                            ) : school.isTurno ? (
+                              <div className="relative flex items-center justify-center w-4 h-4">
+                                <div className="absolute w-full h-full rounded-full border-[2px] border-emerald-400/80 shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
+                                <div className={`w-2.5 h-2.5 rounded-full ${school.isPrivada ? 'bg-[#F59E0B]' : 'bg-[#3B82F6]'}`} />
                               </div>
-                            );
-                          })()}
+                            ) : school.isPrivada ? (
+                              <div className="w-3.5 h-3.5 rounded-full bg-[#F59E0B] border-[1.5px] border-[#D97706] shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                            ) : (
+                              <div className="w-3.5 h-3.5 rounded-full bg-[#3B82F6] border-[1.5px] border-[#2563EB] shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0 flex flex-col gap-2">
+                            {/* 1. Header (Nombre y Etiqueta Principal) */}
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className={`text-sm font-bold leading-tight ${school.isCampus ? 'text-[#A855F7]' : school.isTurno ? 'text-emerald-400' : school.isPrivada ? 'text-amber-400/90' : 'text-blue-400/90'}`}>
+                                {school.nombre}
+                              </h4>
+                              <span className="shrink-0 text-[9px] font-bold text-gray-500 uppercase tracking-wider bg-white/5 px-1.5 py-0.5 rounded">
+                                {school.isCampus ? 'Campus' : school.isTurno ? 'Doble Turno' : school.ccts[0]}
+                              </span>
+                            </div>
+
+                            {/* 2. Contexto (Pastillas de Turnos y Niveles) */}
+                            <div className="flex flex-wrap gap-1">
+                              {school.municipio && (
+                                <span className="intel-municipio-chip-sm" title={school.municipio}>
+                                  <MapPin size={9} /> {school.municipio}
+                                </span>
+                              )}
+                              {(() => {
+                                const turnosDistintos = [...new Set(
+                                  (school.turnos || []).map(t => (t.turno || '').toUpperCase()).filter(Boolean)
+                                )];
+                                return turnosDistintos.map((t, i) => {
+                                  const st = getTurnoStyles(t);
+                                  const Icon = st.IconComponent;
+                                  return (
+                                    <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded border ${st.gradientClass} ${st.textClass} ${st.borderClass} ${st.shadowClass}`} style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.2)' }}>
+                                      <Icon size={10} strokeWidth={2.5} />
+                                      {st.short}
+                                    </span>
+                                  );
+                                });
+                              })()}
+                              {school.isCampus && school.niveles.map((n, i) => (
+                                <span key={i} className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-white/5 text-gray-400">
+                                  {n.nivel} ({n.alumnos})
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* 3. Grid de Métricas */}
+                            {(() => {
+                              const dias = school.diasReales || 0;
+                              const ingPorDia = school.ingresoPorDia || 0;
+                              const diaColor = metaPorDia > 0
+                                ? (ingPorDia >= metaPorDia ? '#34D399' : '#f87171')
+                                : undefined;
+
+                              return (
+                                <div className="grid grid-cols-4 gap-2 mt-1 p-2 bg-gray-950/30 rounded-lg border border-white/5">
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase tracking-wider">Alumnos</span>
+                                    <span className="text-xs font-bold text-gray-300">{formatNumber(school.alumnos)}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase tracking-wider">Días Op.</span>
+                                    <span className="text-xs font-bold text-purple-400">{dias}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase tracking-wider">Total</span>
+                                    <span className="text-xs font-bold text-amber-400">{formatMXN(school.computedValue)}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase tracking-wider">Ing/Día</span>
+                                    <span 
+                                      className="text-xs font-bold px-1 rounded w-fit"
+                                      style={{ 
+                                        color: diaColor ?? '#34D399', 
+                                        background: diaColor ? `${diaColor}18` : 'rgba(52,211,153,0.1)',
+                                      }}
+                                    >
+                                      {formatMXN(ingPorDia)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          
+                          <div className="shrink-0 flex items-center h-full text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MapPin size={14} />
+                          </div>
                         </div>
-                        
-                        <div className="shrink-0 flex items-center h-full text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MapPin size={14} />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                   </div>
                 </div>
               )}

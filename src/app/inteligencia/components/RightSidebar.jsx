@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Route, Eye, EyeOff, Plus, Maximize2, ArrowLeftRight } from 'lucide-react';
+import { Route, Eye, EyeOff, Plus, Maximize2, ArrowLeftRight, Pencil } from 'lucide-react';
 import RoutePanel from './RoutePanel';
 
 const ROUTE_COLORS = [
@@ -34,6 +34,8 @@ export default function RightSidebar({
 }) {
   const [panelHeight, setPanelHeight] = useState(400);
   const [routeUserResized, setRouteUserResized] = useState(false);
+  const [editingRouteId, setEditingRouteId] = useState(null);
+  const [editingName, setEditingName] = useState('');
   const isResizing = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(400);
@@ -133,10 +135,21 @@ export default function RightSidebar({
           <div className="flex shrink-0 border-b border-[var(--intel-border)] bg-[#0B1120] overflow-x-auto custom-scrollbar">
             {routes.map(route => {
               const isActive = route.id === activeRouteId;
+              const isEditing = editingRouteId === route.id;
+
+              const handleRenameRoute = (newName) => {
+                if (!newName.trim()) {
+                  setEditingRouteId(null);
+                  return;
+                }
+                onRoutesChange(routes.map(r => r.id === route.id ? { ...r, name: newName.trim() } : r));
+                setEditingRouteId(null);
+              };
+
               return (
                 <div
                   key={route.id}
-                  className={`group flex items-center justify-between gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider transition-all min-w-[150px] whitespace-nowrap cursor-pointer select-none ${
+                  className={`group flex items-center justify-between gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-wider transition-all min-w-[175px] whitespace-nowrap cursor-pointer select-none ${
                     isActive
                       ? 'bg-white/5 border-b-2'
                       : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 border-b-2 border-transparent'
@@ -145,34 +158,83 @@ export default function RightSidebar({
                     borderColor: isActive ? route.color : 'transparent',
                     color: isActive ? route.color : undefined
                   }}
-                  onClick={() => onRouteSelect(route.id)}
+                  onClick={() => !isEditing && onRouteSelect(route.id)}
+                  onDoubleClick={() => {
+                    if (isActive && !isEditing) {
+                      setEditingRouteId(route.id);
+                      setEditingName(route.name);
+                    }
+                  }}
+                  title={isActive && !isEditing ? "Doble clic para editar nombre" : undefined}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: route.color }} />
-                    <span>{route.name}</span>
-                    <span className="opacity-60 text-[9px] ml-1">({route.ccts.length})</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={(e) => handleToggleVisible(e, route.id)}
-                      className="p-1 hover:bg-white/10 rounded transition-colors"
-                      title={route.visible ? "Ocultar en mapa" : "Mostrar en mapa"}
-                    >
-                      {route.visible ? <Eye size={14} /> : <EyeOff size={14} className="text-gray-600" />}
-                    </button>
-                    {isActive && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewReport();
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: route.color }} />
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => handleRenameRoute(editingName)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameRoute(editingName);
+                          else if (e.key === 'Escape') setEditingRouteId(null);
                         }}
-                        className="p-1 hover:bg-white/10 rounded transition-colors text-white"
-                        title="Maximizar Reporte"
+                        ref={(input) => {
+                          if (input) {
+                            input.focus();
+                            if (input.selectionStart === 0 && input.selectionEnd === 0) {
+                              input.select();
+                            }
+                          }
+                        }}
+                        className="bg-gray-950/60 border text-white text-[11px] font-bold uppercase tracking-wider rounded-md px-1.5 py-0.5 outline-none w-28 placeholder:text-gray-700"
+                        style={{ borderColor: route.color }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: route.color }} />
+                      <span className="truncate">{route.name}</span>
+                      {isActive && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingRouteId(route.id);
+                            setEditingName(route.name);
+                          }}
+                          className="p-0.5 hover:bg-white/10 rounded transition-colors text-white opacity-40 hover:opacity-100 cursor-pointer ml-0.5"
+                          title="Editar nombre"
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      )}
+                      <span className="opacity-60 text-[9px]">({route.ccts.length})</span>
+                    </div>
+                  )}
+                  
+                  {!isEditing && (
+                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => handleToggleVisible(e, route.id)}
+                        className="p-1 hover:bg-white/10 rounded transition-colors"
+                        title={route.visible ? "Ocultar en mapa" : "Mostrar en mapa"}
                       >
-                        <Maximize2 size={14} />
+                        {route.visible ? <Eye size={14} /> : <EyeOff size={14} className="text-gray-600" />}
                       </button>
-                    )}
-                  </div>
+                      {isActive && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewReport();
+                          }}
+                          className="p-1 hover:bg-white/10 rounded transition-colors text-white"
+                          title="Maximizar Reporte"
+                        >
+                          <Maximize2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

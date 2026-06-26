@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Flame, Map as MapIcon } from 'lucide-react';
@@ -40,18 +40,18 @@ function getMarkerStyle(school, isInRoute, isCampus) {
   let colors = school.isPrivada ? PRIVADA_COLOR : PUBLICA_COLOR;
   if (isCampus) colors = CAMPUS_COLOR;
 
-  let radius = 6;
-  let weight = 1.5;
+  let radius = 8;
+  let weight = 1.8;
   let fillOpacity = 0.85;
 
   // Large schools get slightly bigger
-  if (school.alumnos > 300) radius = 7;
+  if (school.alumnos > 300) radius = 10;
 
   // Route override
   if (isInRoute) {
     colors = ROUTE_COLOR;
-    weight = 2.5;
-    radius = 9;
+    weight = 3.0;
+    radius = 13;
     fillOpacity = 0.95;
   }
 
@@ -135,22 +135,53 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
     const ok = visibleCcts.has(s.cct);
     const inRoute = routeSet.has(s.cct);
     const o = ops.get(s.cct);
-    // Keep showing info but dim if it doesn't pass filters. Don't show money if it doesn't pass.
     const moneyStr = (o && o.ingreso > 0) ? formatMXN(o.ingreso) : '';
     const money = moneyStr ? (ok ? `<span style="color:#34D399">${moneyStr}</span>` : `<span style="color:#FFFFFF; opacity:0.6">${moneyStr}</span>`) : '';
 
+    let actionBtnHtml = '';
+    if (ok) {
+      if (inRoute) {
+        actionBtnHtml = `
+          <button onclick="event.stopPropagation(); window.__intelRemoveFromRoute && window.__intelRemoveFromRoute('${s.cct}', event)" class="intel-tooltip-card-btn intel-tooltip-card-btn-added">
+            <span class="btn-text-added">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+               EN ${activeRouteName.toUpperCase()}
+            </span>
+            <span class="btn-text-remove">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+               REMOVER DE ${activeRouteName.toUpperCase()}
+            </span>
+          </button>
+        `;
+      } else {
+        actionBtnHtml = `
+          <button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${s.cct}'], event)" class="intel-tooltip-card-btn intel-tooltip-card-btn-add">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+             AGREGAR A ${activeRouteName.toUpperCase()}
+          </button>
+        `;
+      }
+    }
+
     return `
-      <div class="intel-tooltip-row ${ok ? '' : 'intel-tooltip-row-inactive'}">
-        <div class="intel-tooltip-row-top">
-          ${renderTurnoPillHTML(s.turno)}
-          <div class="intel-tooltip-row-left">
-            <span class="intel-tooltip-row-name">${(s.alumnos||0).toLocaleString()} alumnos ${inRoute ? '· <span style="color:#34D399">en ruta</span>' : ''}</span>
-            <span class="intel-tooltip-row-meta">${s.cct}</span>
+      <div class="intel-tooltip-row-card ${ok ? '' : 'intel-tooltip-row-inactive'}">
+        <div class="intel-tooltip-row-header">
+          <div class="intel-tooltip-row-header-left">
+            ${renderTurnoPillHTML(s.turno)}
+            <div class="intel-tooltip-row-meta-block">
+              <span class="intel-tooltip-row-name">${(s.alumnos||0).toLocaleString()} alumnos</span>
+              <span class="intel-tooltip-row-meta-cct">${s.cct}</span>
+            </div>
+          </div>
+          <div class="intel-tooltip-row-money">
+            ${money}
           </div>
         </div>
-        <div class="intel-tooltip-row-right">
-          ${money}
-        </div>
+        ${ok ? `
+          <div class="intel-tooltip-row-action">
+            ${actionBtnHtml}
+          </div>
+        ` : ''}
       </div>`;
   }).join('');
 
@@ -168,20 +199,20 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
       <div class="intel-tooltip-summary">
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">ALUMNOS</span>
-          <span class="intel-tooltip-row-name" style="font-size:13px">${passAlumnos.toLocaleString()}</span>
+          <span class="intel-tooltip-summary-value">${passAlumnos.toLocaleString()}</span>
         </div>
         ${passDias > 0 ? `
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
-          <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${passDias}</span>
+          <span class="intel-tooltip-summary-value" style="color:#C084FC">${passDias}</span>
         </div>
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">ING. / DÍA</span>
-          <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (_ingDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(_ingDia)}</span>
+          <span class="intel-tooltip-summary-value" style="font-weight:900;color:${metaPorDia > 0 ? (_ingDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(_ingDia)}</span>
         </div>` : ''}
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">TOTAL</span>
-          <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(passIngreso)}</span>
+          <span class="intel-tooltip-summary-value" style="font-size:14px;font-weight:900;color:#34D399">${formatMXN(passIngreso)}</span>
         </div>
         ${_filtroNote}
       </div>`;
@@ -190,14 +221,6 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
       <div class="intel-tooltip-summary" style="border-top-color:rgba(251,191,36,0.15)">
         <span class="intel-tooltip-row-meta" style="color:#FBBF24">Ningún turno pasa el filtro</span>
       </div>`;
-  }
-
-  // Add-to-route buttons per qualifying shift
-  let routeBtns = '';
-  const addables = sorted.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
-  if (addables.length) {
-    const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
-    routeBtns = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar ${addables.length > 1 ? 'ambos a' : 'a'} <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
   }
 
   return `
@@ -209,7 +232,6 @@ function buildTurnoTooltip(turnoGroup, visibleCcts, routeSet = new Set(), capaci
       ${rows}
       ${totalBlock}
       ${streetViewLink(turnoGroup[0]?.latitud, turnoGroup[0]?.longitud)}
-      ${routeBtns}
     </div>
   `;
 }
@@ -223,7 +245,7 @@ function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPor
   const isInRoute = routeSet.has(school.cct);
   let routeBtn = '';
   if (isInRoute) {
-    routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
+    routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En <span class="bg-emerald-500/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
   } else {
     routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(['${school.cct}'], event)" class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] cursor-pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar a <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
   }
@@ -236,19 +258,19 @@ function buildSchoolTooltip(school, routeSet = new Set(), profit = null, metaPor
         <div class="intel-tooltip-summary">
           <div class="intel-tooltip-row-left">
             <span class="intel-tooltip-row-meta">ALUMNOS</span>
-            <span class="intel-tooltip-row-name" style="font-size:13px">${(school.alumnos || 0).toLocaleString()}</span>
+            <span class="intel-tooltip-summary-value">${(school.alumnos || 0).toLocaleString()}</span>
           </div>
           <div class="intel-tooltip-row-left">
             <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
-            <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${pc.dias}</span>
+            <span class="intel-tooltip-summary-value" style="color:#C084FC">${pc.dias}</span>
           </div>
           <div class="intel-tooltip-row-left">
             <span class="intel-tooltip-row-meta">ING. / DÍA</span>
-            <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (pc.ingresoPorDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(pc.ingresoPorDia)}</span>
+            <span class="intel-tooltip-summary-value" style="font-weight:900;color:${metaPorDia > 0 ? (pc.ingresoPorDia >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(pc.ingresoPorDia)}</span>
           </div>
           <div class="intel-tooltip-row-left">
             <span class="intel-tooltip-row-meta">TOTAL</span>
-            <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(pc.ingreso)}</span>
+            <span class="intel-tooltip-summary-value" style="font-size:14px;font-weight:900;color:#34D399">${formatMXN(pc.ingreso)}</span>
           </div>
         </div>`;
     } else {
@@ -328,6 +350,36 @@ function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new
 
   const closeBtn = `<button onclick="event.stopPropagation(); window.__intelClearFocus && window.__intelClearFocus()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-[100] cursor-pointer" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`;
 
+  const campusCcts = campusGroup.map(s => s.cct);
+  const campusCctsVisible = campusGroup.filter(s => visibleCcts.has(s.cct)).map(s => s.cct);
+  const isCampusInRoute = campusGroup.some(s => routeSet.has(s.cct));
+
+  let routeBtn = '';
+  if (campusCctsVisible.length > 0) {
+    if (isCampusInRoute) {
+      const removableCcts = campusGroup.filter(s => routeSet.has(s.cct)).map(s => s.cct);
+      routeBtn = `
+        <button onclick="event.stopPropagation(); window.__intelRemoveFromRoute && window.__intelRemoveFromRoute(${JSON.stringify(removableCcts)}, event)" class="intel-tooltip-card-btn intel-tooltip-card-btn-added mt-3">
+          <span class="btn-text-added">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+             EN ${activeRouteName.toUpperCase()}
+          </span>
+          <span class="btn-text-remove">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+             REMOVER DE ${activeRouteName.toUpperCase()}
+          </span>
+        </button>
+      `;
+    } else {
+      routeBtn = `
+        <button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${JSON.stringify(campusCctsVisible)}, event)" class="intel-tooltip-card-btn intel-tooltip-card-btn-add mt-3">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+           AGREGAR A ${activeRouteName.toUpperCase()}
+        </button>
+      `;
+    }
+  }
+
   let nivelSections = '';
   for (const nivel of niveles) {
     const schools = byNivel[nivel];
@@ -348,15 +400,15 @@ function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new
           const money = moneyStr ? (ok ? `<span style="color:#34D399">${moneyStr}</span>` : `<span style="color:#FFFFFF; opacity:0.6">${moneyStr}</span>`) : '';
 
           return `
-          <div class="intel-tooltip-row ${ok ? '' : 'intel-tooltip-row-inactive'}">
-            <div class="intel-tooltip-row-top">
+          <div class="intel-tooltip-campus-row ${ok ? '' : 'intel-tooltip-row-inactive'} ${inRoute ? 'is-in-route' : ''}">
+            <div class="intel-tooltip-campus-row-left">
               ${renderTurnoPillHTML(s.turno)}
-              <div class="intel-tooltip-row-left">
-                <span class="intel-tooltip-row-name" style="max-width:140px">${s.nombre || 'Sin nombre'} ${inRoute ? '· <span style="color:#34D399">en ruta</span>' : ''}</span>
-                <span class="intel-tooltip-row-meta">${(s.alumnos || 0).toLocaleString()} al. · ${s.isPrivada ? 'Priv.' : 'Púb.'} · ${s.cct}</span>
+              <div class="intel-tooltip-campus-row-meta">
+                <span class="intel-tooltip-campus-row-name" style="max-width:140px">${s.nombre || 'Sin nombre'}</span>
+                <span class="intel-tooltip-campus-row-cct">${(s.alumnos || 0).toLocaleString()} al. · ${s.isPrivada ? 'Priv.' : 'Púb.'} · ${s.cct}</span>
               </div>
             </div>
-            <div class="intel-tooltip-row-right">
+            <div class="intel-tooltip-campus-row-money">
               ${money}
             </div>
           </div>`;
@@ -367,24 +419,25 @@ function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new
   // Resumen Operativo Minimalista
   let totalBlock = '';
   if (passIngreso > 0) {
+    const _ingDia = passDias > 0 ? passIngreso / passDias : 0;
     totalBlock = `
       <div class="intel-tooltip-summary">
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">ALUMNOS</span>
-          <span class="intel-tooltip-row-name" style="font-size:13px">${passAlumnos.toLocaleString()}</span>
+          <span class="intel-tooltip-summary-value">${passAlumnos.toLocaleString()}</span>
         </div>
         ${passDias > 0 ? `
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">DÍAS DE OP.</span>
-          <span class="intel-tooltip-row-name" style="font-size:13px;color:#C084FC">${passDias}</span>
+          <span class="intel-tooltip-summary-value" style="color:#C084FC">${passDias}</span>
         </div>
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">ING. / DÍA</span>
-          <span class="intel-tooltip-row-right" style="font-size:13px;color:${metaPorDia > 0 ? (passIngreso/passDias >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(passIngreso / passDias)}</span>
+          <span class="intel-tooltip-summary-value" style="font-weight:900;color:${metaPorDia > 0 ? (passIngreso/passDias >= metaPorDia ? '#34D399' : '#f87171') : '#e5e7eb'}">${formatMXN(passIngreso / passDias)}</span>
         </div>` : ''}
         <div class="intel-tooltip-row-left">
           <span class="intel-tooltip-row-meta">TOTAL</span>
-          <span class="intel-tooltip-row-right" style="font-size:14px">${formatMXN(passIngreso)}</span>
+          <span class="intel-tooltip-summary-value" style="font-size:14px;font-weight:900;color:#34D399">${formatMXN(passIngreso)}</span>
         </div>
       </div>`;
   } else if (missIngreso > 0) {
@@ -392,18 +445,6 @@ function buildCampusTooltip(campusGroup, visibleCcts = new Set(), routeSet = new
       <div class="intel-tooltip-summary" style="border-top-color:rgba(251,191,36,0.15)">
         <span class="intel-tooltip-row-meta" style="color:#FBBF24">Ninguna escuela pasa el filtro</span>
       </div>`;
-  }
-
-  const isInRoute = campusGroup.some(s => routeSet.has(s.cct));
-  let routeBtn = '';
-  if (isInRoute) {
-    routeBtn = `<button disabled class="w-full mt-3 py-2 flex justify-center items-center gap-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase tracking-wider cursor-not-allowed border border-emerald-500/30"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> En Ruta</button>`;
-  } else {
-    const addables = campusGroup.filter(s => visibleCcts.has(s.cct) && !routeSet.has(s.cct));
-    if (addables.length > 0) {
-      const cctListStr = JSON.stringify(addables.map(s => s.cct)).replace(/"/g, "'");
-      routeBtn = `<button onclick="event.stopPropagation(); window.__intelAddToRoute && window.__intelAddToRoute(${cctListStr}, event)" class="w-full mt-4 py-2.5 flex justify-center items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar Campus a <span class="bg-white/20 px-1.5 py-0.5 rounded text-[11px] ml-0.5">${activeRouteName}</span></button>`;
-    }
   }
 
   return `
@@ -442,15 +483,16 @@ function LegendShape({ shape, fill, stroke }) {
   }
 }
 
-function renderShapeToString(shape, fill, stroke) {
-  const props = `width="24" height="24" viewBox="0 0 14 14" style="display:block;margin:auto;"`;
+function renderShapeToString(shape, fill, stroke, strokeWidth = null) {
+  const props = `width="32" height="32" viewBox="0 0 14 14" style="display:block;margin:auto;"`;
+  const sw = strokeWidth ?? (shape === 'star' ? 0.8 : 1.2);
   switch (shape) {
-    case 'triangle': return `<svg ${props}><polygon points="7,1 13,12 1,12" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
-    case 'square':   return `<svg ${props}><rect x="2" y="2" width="10" height="10" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
-    case 'diamond':  return `<svg ${props}><polygon points="7,1 13,7 7,13 1,7" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
-    case 'hexagon':  return `<svg ${props}><polygon points="7,1 12.5,4 12.5,10 7,13 1.5,10 1.5,4" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
-    case 'star':     return `<svg ${props}><polygon points="7,1 8.8,5.2 13,5.6 9.8,8.4 10.8,13 7,10.6 3.2,13 4.2,8.4 1,5.6 5.2,5.2" fill="${fill}" stroke="${stroke}" stroke-width="0.8" /></svg>`;
-    default:         return `<svg ${props}><circle cx="7" cy="7" r="5.5" fill="${fill}" stroke="${stroke}" stroke-width="1.2" /></svg>`;
+    case 'triangle': return `<svg ${props}><polygon points="7,1 13,12 1,12" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
+    case 'square':   return `<svg ${props}><rect x="2" y="2" width="10" height="10" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
+    case 'diamond':  return `<svg ${props}><polygon points="7,1 13,7 7,13 1,7" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
+    case 'hexagon':  return `<svg ${props}><polygon points="7,1 12.5,4 12.5,10 7,13 1.5,10 1.5,4" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
+    case 'star':     return `<svg ${props}><polygon points="7,1 8.8,5.2 13,5.6 9.8,8.4 10.8,13 7,10.6 3.2,13 4.2,8.4 1,5.6 5.2,5.2" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
+    default:         return `<svg ${props}><circle cx="7" cy="7" r="5.5" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" /></svg>`;
   }
 }
 
@@ -469,6 +511,7 @@ export default function IntelMap({
   focusedSchoolKey,
   onClearFocus,
   onAddToRoute,
+  onRemoveFromRoute,
   profitColors = null,
   turnoMap = null,
   prices = null,
@@ -479,6 +522,7 @@ export default function IntelMap({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const routeSetRef = useRef(new Set());
+  const activeRouteSetRef = useRef(new Set());
   const polylinesRef = useRef({}); // Track multiple polylines by route id
   const markersLayerRef = useRef(null);
   const tooltipRef = useRef(null);
@@ -486,6 +530,7 @@ export default function IntelMap({
   const focusedMarkerLayerRef = useRef(null);
   const schoolsRef = useRef(schools);
   const isFirstLoad = useRef(true);
+  const heatLayerRef = useRef(null);
 
   const [heatmapActive, setHeatmapActive] = useState(false);
   const [heatPluginLoaded, setHeatPluginLoaded] = useState(false);
@@ -504,12 +549,17 @@ export default function IntelMap({
   useEffect(() => { pricesRef.current = prices; }, [prices]);
   const metaPorDiaRef = useRef(metaPorDia);
   useEffect(() => { metaPorDiaRef.current = metaPorDia; }, [metaPorDia]);
+  const activeRouteNameRef = useRef('Mi Ruta');
 
   useEffect(() => {
     const ccts = new Set();
     routes.forEach(r => r.ccts.forEach(cct => ccts.add(cct)));
     routeSetRef.current = ccts;
-  }, [routes]);
+    // Active route set — only the CCTs belonging to the currently active route
+    const activeRoute = routes.find(r => r.id === activeRouteId);
+    activeRouteSetRef.current = new Set(activeRoute ? activeRoute.ccts : []);
+    activeRouteNameRef.current = activeRoute?.name || 'Mi Ruta';
+  }, [routes, activeRouteId]);
 
   // Keep schools ref fresh for tooltip callbacks
   useEffect(() => {
@@ -564,12 +614,26 @@ export default function IntelMap({
       // Llamar al handler original
       onAddToRoute?.(ccts);
     };
+    window.__intelRemoveFromRoute = (cct, e) => {
+      if (e) e.stopPropagation();
+      onRemoveFromRoute?.(cct);
+    };
+    window.__intelToggleRoute = (cct, inRoute, e) => {
+      if (e) e.stopPropagation();
+      if (inRoute) {
+        onRemoveFromRoute?.(cct);
+      } else {
+        window.__intelAddToRoute?.([cct], e);
+      }
+    };
 
     return () => {
       delete window.__intelClearFocus;
       delete window.__intelAddToRoute;
+      delete window.__intelRemoveFromRoute;
+      delete window.__intelToggleRoute;
     };
-  }, [onClearFocus, onAddToRoute]);
+  }, [onClearFocus, onAddToRoute, onRemoveFromRoute]);
 
   // ═══ Initialize map ═══
   useEffect(() => {
@@ -669,6 +733,44 @@ export default function IntelMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Map CCTs and coordinate keys to their 1-based index in the active route's list of location groups
+  const routeNumberMap = useMemo(() => {
+    const map = new Map(); // coordKey -> number
+    const activeRoute = routes.find(r => r.id === activeRouteId);
+    if (!activeRoute || !activeRoute.ccts || activeRoute.ccts.length === 0) return map;
+
+    const schoolMap = new Map();
+    // Use all schools from ref to guarantee we find coord even if filtered out
+    schoolsRef.current.forEach(s => schoolMap.set(s.cct, s));
+    const activeRouteSchools = activeRoute.ccts.map(cct => schoolMap.get(cct)).filter(Boolean);
+
+    let groupIndex = 1;
+    const campusHandled = new Set();
+
+    activeRouteSchools.forEach((school) => {
+      const coordKey = `${school.latitud},${school.longitud}`;
+      const campusGroup = campusMap?.get(coordKey);
+
+      if (campusGroup && campusGroup.length >= 2) {
+        const campusKey = `${coordKey}_cmp`;
+        if (campusHandled.has(campusKey)) return;
+        if (!map.has(coordKey)) {
+          map.set(coordKey, groupIndex);
+        }
+        campusHandled.add(campusKey);
+        groupIndex++;
+      } else {
+        if (!map.has(coordKey)) {
+          map.set(coordKey, groupIndex);
+        }
+        map.set(school.cct, groupIndex);
+        groupIndex++;
+      }
+    });
+
+    return map;
+  }, [routes, activeRouteId, campusMap]);
+
   // ═══ Sync markers (using Canvas CircleMarkers for performance) ═══
   useEffect(() => {
     const map = mapRef.current;
@@ -719,9 +821,9 @@ export default function IntelMap({
       if (!isInRoute) {
         const group = isTurno ? turnoGroupAll : isCampus ? campusGroup : null;
         if (contarTurnosQueCalifican(group, visibleCcts) >= 2) {
-          style.weight = 3;
+          style.weight = 3.5;
           style.color = '#34D399'; // borde esmeralda = doble oportunidad
-          style.radius = Math.max(style.radius, 8);
+          style.radius = Math.max(style.radius, 11);
         }
       }
 
@@ -731,6 +833,8 @@ export default function IntelMap({
           ? `${school.latitud},${school.longitud}_trn`
           : school.cct;
 
+      const routeNumber = routeNumberMap.get(coordKey) || null;
+
       // ShapeMarker renders on Canvas — zero DOM overhead per point
       const marker = L.shapeMarker([school.latitud, school.longitud], {
         shape: style.shape,
@@ -739,6 +843,7 @@ export default function IntelMap({
         fillColor: style.fillColor,
         fillOpacity: style.fillOpacity,
         weight: style.weight,
+        routeNumber: routeNumber,
         _school: school,
         _markerKey: markerKey,
         _isCampus: isCampus,
@@ -759,12 +864,13 @@ export default function IntelMap({
         if (!tooltip) return;
 
         // Build tooltip HTML
+        const _routeName = activeRouteNameRef.current;
         if (isCampus) {
-          tooltip.innerHTML = buildCampusTooltip(campusGroup, new Set(schools.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current);
+          tooltip.innerHTML = buildCampusTooltip(campusGroup, new Set(schools.map(s => s.cct)), activeRouteSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, _routeName);
         } else if (isTurno) {
-          tooltip.innerHTML = buildTurnoTooltip(turnoGroupAll, new Set(schools.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current);
+          tooltip.innerHTML = buildTurnoTooltip(turnoGroupAll, new Set(schools.map(s => s.cct)), activeRouteSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, _routeName);
         } else {
-          tooltip.innerHTML = buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current);
+          tooltip.innerHTML = buildSchoolTooltip(school, activeRouteSetRef.current, profitColorsRef.current, metaPorDiaRef.current, _routeName);
         }
 
         tooltip.style.display = 'block';
@@ -809,7 +915,7 @@ export default function IntelMap({
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
       isFirstLoad.current = false;
     }
-  }, [schools, onSchoolClick, campusMap, profitColors, turnoMap]);
+  }, [schools, onSchoolClick, campusMap, profitColors, turnoMap, routeNumberMap]);
 
   // ═══ Sync focused school (Pop & Elevate) ═══
   useEffect(() => {
@@ -842,21 +948,45 @@ export default function IntelMap({
       const isTurno = targetMarker.options._isTurno;
       const turnoGroup = targetMarker.options._turnoGroup;
       const campusGroup = isCampus ? campusMap?.get(focusedSchoolKey.replace('_cmp', '')) : null;
-      const style = getMarkerStyle(school, routeSetRef.current.has(school.cct), isCampus);
+      const isInRoute = isTurno
+        ? turnoGroup.some(s => routeSetRef.current.has(s.cct))
+        : isCampus
+          ? (campusGroup || []).some(s => routeSetRef.current.has(s.cct))
+          : routeSetRef.current.has(school.cct);
+      const style = getMarkerStyle(school, isInRoute, isCampus);
+
+      // Replicate the emerald green border for double-opportunity locations
+      // (same logic as the canvas marker sync effect)
+      if (!isInRoute) {
+        const visibleCcts = new Set(schoolsRef.current.map(s => s.cct));
+        const group = isTurno ? turnoGroup : isCampus ? campusGroup : null;
+        if (contarTurnosQueCalifican(group, visibleCcts) >= 2) {
+          style.weight = 3.5;
+          style.color = '#34D399'; // borde esmeralda = doble oportunidad
+          style.radius = Math.max(style.radius, 11);
+        }
+      }
 
       // Ocultar temporalmente el marcador original del canvas para que no se asome por debajo
       if (targetMarker && targetMarker.setStyle) {
         targetMarker.setStyle({ opacity: 0, fillOpacity: 0, weight: 0 });
       }
 
-      const svgHtml = renderShapeToString(style.shape, style.fillColor, style.color);
+      // Scale the stroke-width for the SVG (viewBox 14x14 maps roughly to canvas pixels)
+      const svgStrokeWidth = style.weight > 2 ? style.weight * 0.7 : null;
+      const svgHtml = renderShapeToString(style.shape, style.fillColor, style.color, svgStrokeWidth);
+      const coordKey = `${school.latitud},${school.longitud}`;
+      const routeNumber = routeNumberMap.get(coordKey) || null;
+      const numberOverlay = routeNumber
+        ? `<span class="absolute inset-0 flex items-center justify-center font-black text-white text-[15px]" style="text-shadow: 0 1.5px 2px rgba(0,0,0,0.8)">${routeNumber}</span>`
+        : '';
       
       // Iniciamos en escala 1 para que la animación CSS se note fluidamente
       const divIcon = L.divIcon({
         className: 'intel-focused-marker',
-        html: `<div class="intel-focused-marker-inner" style="filter: drop-shadow(0 10px 15px rgba(0,0,0,0.8)) drop-shadow(0 4px 6px rgba(0,0,0,0.6)); transform: scale(1) translateY(0px); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: bottom center;">${svgHtml}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12] // Center the SVG over the point
+        html: `<div class="intel-focused-marker-inner relative" style="filter: drop-shadow(0 10px 15px rgba(0,0,0,0.8)) drop-shadow(0 4px 6px rgba(0,0,0,0.6)); transform: scale(1) translateY(0px); transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: bottom center;">${svgHtml}${numberOverlay}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16] // Center the SVG over the point
       });
 
       focusedMarkerLayerRef.current = L.marker([school.latitud, school.longitud], { icon: divIcon, interactive: false });
@@ -875,10 +1005,10 @@ export default function IntelMap({
       // Native Leaflet Tooltip for physical anchoring
       const activeName = routes.find(r => r.id === activeRouteId)?.name || 'Mi Ruta';
       const tooltipContent = isCampus
-        ? buildCampusTooltip(campusGroup || [school], new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
+        ? buildCampusTooltip(campusGroup || [school], new Set(schoolsRef.current.map(s => s.cct)), activeRouteSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
         : isTurno && turnoGroup
-          ? buildTurnoTooltip(turnoGroup, new Set(schoolsRef.current.map(s => s.cct)), routeSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
-          : buildSchoolTooltip(school, routeSetRef.current, profitColorsRef.current, metaPorDiaRef.current, activeName);
+          ? buildTurnoTooltip(turnoGroup, new Set(schoolsRef.current.map(s => s.cct)), activeRouteSetRef.current, capacityRef.current, pricesRef.current, metaPorDiaRef.current, activeName)
+          : buildSchoolTooltip(school, activeRouteSetRef.current, profitColorsRef.current, metaPorDiaRef.current, activeName);
       
       focusedMarkerLayerRef.current.bindTooltip(tooltipContent, {
         permanent: true,
@@ -900,7 +1030,7 @@ export default function IntelMap({
         }
       };
     }
-  }, [focusedSchoolKey, campusMap, profitColors, activeRouteId, routes]);
+  }, [focusedSchoolKey, campusMap, profitColors, activeRouteId, routes, routeNumberMap]);
 
   // ═══ Route polylines ═══
   useEffect(() => {
