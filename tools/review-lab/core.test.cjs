@@ -41,6 +41,12 @@ test('Next process cannot inherit integration secrets or backfill them from .env
     assert.equal(env.FLYHIGH_REVIEW_LAB, '1');
   } finally { for (const name of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, name)); fs.rmdirSync(dir); }
 });
+
+test('review environment only forwards the optional public map credential', () => {
+  const env = cleanEnvironment(__dirname, { ...config, NEXT_PUBLIC_ARCGIS_API_KEY: 'review-map-key' }, { SECRET_TOKEN: 'do-not-forward' });
+  assert.equal(env.NEXT_PUBLIC_ARCGIS_API_KEY, 'review-map-key');
+  assert.equal(env.SECRET_TOKEN, undefined);
+});
 test('notes only expose pathname and remain explicitly unverified', () => {
   assert.equal(safePath('http://localhost:3100/staff?token=secret#private'), '/staff');
   assert.match(reportMarkdown([{ title: 'Prueba', role: 'Piloto', pathname: '/staff', at: 'today', expected: 'a', observed: 'b' }]), /Por revisar/);

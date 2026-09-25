@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowDown, ArrowUp, Check, ChevronRight, Headphones, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, Gamepad2, Headphones, MapPin, Plus, Trash2 } from 'lucide-react';
 import { coordinates, distanceKm, durationLabel, MAX_SEQUENCE_ITEMS, moveItem, sequenceChanged, snapshot, usableAudio, visitLabel } from '@/lib/narration-preparation.mjs';
 import { PreparationShell, LoadingPreparation, Notice, usePreparationData, primary, secondary, card } from './PreparationUI';
 import NarrationLibrary, { PreparationDialog } from './NarrationLibrary';
@@ -72,6 +73,9 @@ function VisitEditor({ visit, data }) {
 
         <section className={`${card} space-y-3`}>
             <button className={`${secondary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved'} onClick={() => { audio.stop(); setRehearsing(true); }}><Headphones size={18} />Ensayar secuencia</button>
+            {process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB === '1' && (schoolLocation
+                ? <Link href={`/staff/visitas/${visit.id}/simulacion`} onClick={audio.stop} className={`${secondary} w-full !border-cyan-200 !bg-cyan-50 !text-cyan-900`}><Gamepad2 size={18} />Probar simulador de vuelo</Link>
+                : <button disabled className={`${secondary} w-full`}><Gamepad2 size={18} />Simulador requiere ubicación</button>)}
             <button className={`${primary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved' || ready} onClick={() => plan.save('ready')}><Check size={18} />{ready ? 'Secuencia lista' : 'Dejar lista la secuencia'}</button>
             <p className="text-center text-xs leading-relaxed text-slate-500">{ready ? 'El orden está confirmado. Puedes reutilizarlo con los grupos de esta visita. Si lo modificas, volverá a borrador.' : 'Guardar conserva tus cambios. Confirmar deja preparado el orden que utilizarás.'}</p>
         </section>

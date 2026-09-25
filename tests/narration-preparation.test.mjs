@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel } from '../src/lib/narration-preparation.mjs';
+import { advanceFlight, closestPoi, distanceMeters, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
 
 const catalog = [
     { id: 'official_a', name: 'Museo', audio_url: 'https://example.test/a.wav', narrative_script: 'Museo original' },
@@ -39,6 +40,28 @@ test('Missing coordinates never turn into a real map marker at zero', () => {
     assert.deepEqual(coordinates(0, 0), [0, 0]);
     assert.equal(distanceKm(null, [1, 1]), null);
     assert.ok(Math.abs(distanceKm([0, 0], [0, 1]) - 111.195) < 0.01);
+});
+
+test('Mode 3 controls move, rotate and climb without exceeding flight limits', () => {
+    const start = { latitude: 19.4326, longitude: -99.1332, altitude: 24, heading: 0 };
+    const moved = advanceFlight(start, { forward: 1, strafe: 0, climb: 1, yaw: 1 }, 1);
+    assert.ok(moved.latitude > start.latitude);
+    assert.ok(moved.altitude > start.altitude);
+    assert.ok(moved.heading > start.heading);
+    const limited = advanceFlight({ ...start, altitude: 119.9 }, { climb: 1 }, 1);
+    assert.equal(limited.altitude, 120);
+    assert.equal(normalizeHeading(-10), 350);
+});
+
+test('The nearest POI is derived without mutating the flight state', () => {
+    const position = { latitude: 19.4326, longitude: -99.1332 };
+    const pois = [
+        { id: 'far', latitude: 19.45, longitude: -99.15 },
+        { id: 'near', latitude: 19.4327, longitude: -99.1332 },
+    ];
+    assert.ok(distanceMeters(position, pois[1]) < 20);
+    assert.equal(closestPoi(position, pois, 100)?.poi.id, 'near');
+    assert.equal(closestPoi(position, pois, 5), null);
 });
 test('Duration distinguishes unknown from a playable length', () => {
     assert.equal(durationLabel(null), 'Duración por confirmar');

@@ -7,6 +7,7 @@
 - `/staff/visitas/[id]`: contexto de la visita, secuencia numerada, agregar narraciones, subir/bajar/quitar, reutilizar preparaciones, guardar borrador, ensayar y confirmar.
 - `/staff/narraciones`: biblioteca de lugares y temas generales, búsqueda, escucha previa y guion. El acceso a creación/edición reutiliza el mapa y la fábrica existentes.
 - El entorno de la escuela muestra puntos con audio a 10 km, por distancia geográfica en línea recta. No calcula ni aprueba una ruta de vuelo.
+- La Mesa de revisión habilita `/staff/visitas/[id]/simulacion`: un ensayo experimental y efímero con controles Modo 3, cámara inclinable y POIs a 10 km. No está expuesto fuera de `FLYHIGH_REVIEW_LAB=1`, no guarda telemetría ni controla una aeronave.
 
 ## Secuencia y guardado
 
@@ -27,6 +28,8 @@ La API `/api/staff/preparation` autentica al usuario y requiere perfil activo de
 Migración de producción preparada, **no aplicada a producción**: `supabase/migrations/20260925120000_visit_narration_plans.sql`. Aplicarla antes de desplegar estas pantallas con el procedimiento de migraciones autorizado del proyecto. No ejecutar el conjunto de migraciones antiguas a ciegas.
 
 La mesa de revisión aplica exactamente esa migración mediante `tools/review-lab/migrate-preparations.cjs`, con destino fijo local y validación previa. También se aplica al conectar mediante `setup-local.cjs`. El contenido oficial mantiene la sincronización unidireccional existente. No hay cambios de datos en producción.
+
+La simulación usa MapLibre. Si `.env.review.local` contiene `NEXT_PUBLIC_ARCGIS_API_KEY`, carga ArcGIS World Imagery; la clave debe limitarse a mapas y a los orígenes autorizados. Sin clave muestra OpenStreetMap como respaldo de revisión y señala que la vista satelital no está activa. `review:setup` conserva esa variable opcional al regenerar las claves locales.
 
 La API lleva `private, no-store` y el service worker usa solo red para este endpoint. No se comparten cachés de preparaciones entre cuentas.
 

@@ -74,6 +74,8 @@ async function ensureStack(onProgress = () => {}) {
   if (!response.ok) throw new Error('Auth local todavía no responde.');
   validateEnvironment(input, readEnv(path.join(root, '.env.local')));
   const file = path.join(root, '.env.review.local');
+  const previous = readEnv(file);
+  if (previous.NEXT_PUBLIC_ARCGIS_API_KEY) input.NEXT_PUBLIC_ARCGIS_API_KEY = previous.NEXT_PUBLIC_ARCGIS_API_KEY;
   fs.writeFileSync(file, Object.entries(input).map(([key, value]) => `${key}=${value}`).join('\n') + '\n', { mode: 0o600 });
   return input;
 }
