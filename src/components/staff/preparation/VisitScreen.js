@@ -13,14 +13,14 @@ import useSequencePlan from './useSequencePlan';
 
 const PreparationMap = dynamic(() => import('./PreparationMap'), { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-2xl bg-slate-200" /> });
 
-export default function VisitScreen({ visitId }) {
+export default function VisitScreen({ visitId, flightRehearsalEnabled = false }) {
     const { data, loading, error, retry } = usePreparationData(visitId);
     return <PreparationShell title="Preparar visita" subtitle="Elige qué contar, define el orden y déjalo preparado." back="/staff/cronograma" backLabel="Cronograma">
-        {loading ? <LoadingPreparation /> : error ? <Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice> : <VisitEditor key={`${visitId}:${data.userId}`} visit={data.visits[0]} data={data} />}
+        {loading ? <LoadingPreparation /> : error ? <Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice> : <VisitEditor key={`${visitId}:${data.userId}`} visit={data.visits[0]} data={data} flightRehearsalEnabled={flightRehearsalEnabled} />}
     </PreparationShell>;
 }
 
-function VisitEditor({ visit, data }) {
+function VisitEditor({ visit, data, flightRehearsalEnabled }) {
     const initialPlan = data.plans.find(p => p.visit_id === visit.id);
     const plan = useSequencePlan({ visit, userId: data.userId, initialPlan });
     const catalog = useMemo(() => data.catalog.map(source => ({ ...source, ...plan.savedSources.find(item => item.id === String(source.id)) })), [data.catalog, plan.savedSources]);
@@ -54,6 +54,13 @@ function VisitEditor({ visit, data }) {
             <p className="mt-3 flex items-start gap-2 text-sm text-slate-500"><MapPin size={17} className="shrink-0" />{visit.colonia || 'Dirección por confirmar'}</p>
         </section>
 
+        {flightRehearsalEnabled && <section className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-blue-50 p-5 shadow-[0_12px_36px_-28px_rgba(7,26,51,0.35)]">
+            <div className="flex items-start gap-3"><span className="rounded-2xl bg-cyan-600 p-3 text-white"><Gamepad2 size={22} /></span><div><h2 className="font-extrabold text-cyan-950">Ensayo de vuelo</h2><p className="mt-1 text-sm leading-relaxed text-cyan-900/70">Explora el entorno con controles Modo 3 y visualiza tus puntos de interés.</p></div></div>
+            {schoolLocation
+                ? <Link href={`/staff/visitas/${visit.id}/simulacion`} onClick={audio.stop} className={`${primary} mt-4 w-full !bg-cyan-700 hover:!bg-cyan-800`}><Gamepad2 size={18} />Abrir simulador</Link>
+                : <button disabled className={`${secondary} mt-4 w-full`}><MapPin size={18} />Requiere ubicación confirmada</button>}
+        </section>}
+
         <section className={card} aria-labelledby="sequence-heading">
             <div className="flex items-start justify-between gap-3"><div><h2 id="sequence-heading" className="text-xl font-extrabold">Tu secuencia</h2><p className="mt-1 text-sm text-slate-500">Se reproducirá en este orden.</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${ready ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{ready ? 'Lista' : 'Borrador'}</span></div>
             <p role="status" aria-live="polite" className="mt-3 text-xs text-slate-500">{plan.saveState === 'saving' ? 'Guardando…' : plan.saveState === 'pending' ? 'Cambios pendientes de guardar…' : plan.saveState === 'error' || plan.saveState === 'conflict' ? 'No se han guardado los cambios' : plan.revision ? 'Guardado' : 'Aún no has preparado esta visita'}</p>
@@ -73,9 +80,6 @@ function VisitEditor({ visit, data }) {
 
         <section className={`${card} space-y-3`}>
             <button className={`${secondary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved'} onClick={() => { audio.stop(); setRehearsing(true); }}><Headphones size={18} />Ensayar secuencia</button>
-            {process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB === '1' && (schoolLocation
-                ? <Link href={`/staff/visitas/${visit.id}/simulacion`} onClick={audio.stop} className={`${secondary} w-full !border-cyan-200 !bg-cyan-50 !text-cyan-900`}><Gamepad2 size={18} />Probar simulador de vuelo</Link>
-                : <button disabled className={`${secondary} w-full`}><Gamepad2 size={18} />Simulador requiere ubicación</button>)}
             <button className={`${primary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved' || ready} onClick={() => plan.save('ready')}><Check size={18} />{ready ? 'Secuencia lista' : 'Dejar lista la secuencia'}</button>
             <p className="text-center text-xs leading-relaxed text-slate-500">{ready ? 'El orden está confirmado. Puedes reutilizarlo con los grupos de esta visita. Si lo modificas, volverá a borrador.' : 'Guardar conserva tus cambios. Confirmar deja preparado el orden que utilizarás.'}</p>
         </section>
