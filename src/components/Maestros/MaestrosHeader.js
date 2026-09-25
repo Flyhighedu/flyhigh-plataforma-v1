@@ -75,9 +75,9 @@ export default function MaestrosHeader() {
                         <span>URUAPAN</span>
                     </div>
                     <div className="meta-col">
-                        <span>// EDUCACIÓN</span>
-                        <span>// FUTURO</span>
-                        <span>// VUELO</span>
+                        <span>{'// EDUCACIÓN'}</span>
+                        <span>{'// FUTURO'}</span>
+                        <span>{'// VUELO'}</span>
                     </div>
                 </div>
 

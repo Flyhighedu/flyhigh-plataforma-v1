@@ -6627,7 +6627,7 @@ export default function SupervisorDashboard() {
                             </div>
                             <h3 className="text-lg font-black text-white mb-1">¿Forzar Cierre de Misión?</h3>
                             <p className="text-xs text-slate-400 mb-5">
-                                Esta acción cerrará inmediatamente la operación de <span className="text-white font-bold">{forceCloseTarget.schoolName}</span> y forzará a todo el staff a salir de su jornada actual. El sistema intentará generar el reporte de vuelos y firmas en estado "SYSTEM_FORCED_CLOSE".
+                                Esta acción cerrará inmediatamente la operación de <span className="text-white font-bold">{forceCloseTarget.schoolName}</span> y forzará a todo el staff a salir de su jornada actual. El sistema intentará generar el reporte de vuelos y firmas en estado &quot;SYSTEM_FORCED_CLOSE&quot;.
                             </p>
                             
                             {forceCloseError && (

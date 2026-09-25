@@ -99,7 +99,7 @@ export default function MicCalibrator({ micGain, setMicGain, dictatedText, onClo
                         <p className={`text-center text-base font-semibold transition-colors ${
                             hasHeardVoice ? 'text-emerald-700' : 'text-slate-700'
                         }`}>
-                            "{dictatedText}"
+                            &quot;{dictatedText}&quot;
                         </p>
                     ) : (
                         <p className="text-sm text-slate-400 italic">🤫 Escuchando...</p>

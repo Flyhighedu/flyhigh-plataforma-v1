@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "review": "node tools/review-lab/launch.cjs",
+    "review:setup": "node tools/review-lab/setup-local.cjs",
+    "review:import-narrations": "node tools/review-lab/import-narrations.cjs",
+    "review:server": "node tools/review-lab/server.cjs",
+    "review:test": "node --test --test-isolation=none tools/review-lab/core.test.cjs",
+    "review:check": "node tools/review-lab/server.cjs --check",
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
@@ -74,6 +80,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
     "pg": "^8.20.0",
+    "supabase": "^2.117.0",
     "tailwindcss": "^4"
   }
 }

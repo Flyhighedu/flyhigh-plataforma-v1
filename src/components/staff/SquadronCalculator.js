@@ -207,7 +207,7 @@ export default function SquadronCalculator({ isOpen, onClose, onComplete, timerS
                                 Lee con emoción cada destino
                             </p>
                             <p style={{fontSize:17,color:'white',lineHeight:1.4,margin:0,fontWeight:800}}>
-                                "¡Escuadrón <span style={{ color: theme.themeColor }}>{squadronName || 'Ganador'}</span>, miren todos los lugares increíbles por los que vamos a volar!"
+                                &quot;¡Escuadrón <span style={{ color: theme.themeColor }}>{squadronName || 'Ganador'}</span>, miren todos los lugares increíbles por los que vamos a volar!&quot;
                             </p>
                         </div>
 
@@ -311,9 +311,9 @@ export default function SquadronCalculator({ isOpen, onClose, onComplete, timerS
                                 Pregúntales lo siguiente:
                             </p>
                             <p style={{fontSize:20,color:'white',lineHeight:1.4,margin:0,fontWeight:800}}>
-                                "¡Escuadrón <span style={{ color: '#A855F7' }}>{squadronName || 'Ganador'}</span>! 
+                                &quot;¡Escuadrón <span style={{ color: '#A855F7' }}>{squadronName || 'Ganador'}</span>!
                                 Ahora díganme... ¿a qué lugar cercano les gustaría volar? 
-                                ¡Puede ser cualquier lugar!"
+                                ¡Puede ser cualquier lugar!&quot;
                             </p>
                         </div>
 

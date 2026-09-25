@@ -1,0 +1,3479 @@
+{
+  "columns": [
+    {
+      "column": "updated_at",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "duration_seconds",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "student_count",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "staff_count",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "start_time",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "end_time",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "incidents",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "created_by",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "created_at",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "journey_id",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "sort_order",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "is_terminal",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "created_at",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "id",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "bot_paused",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "last_message_at",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "created_at",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "updated_at",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "reminder_at",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "id",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "conversation_id",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "metadata",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "created_at",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "id",
+      "table": "intel_projects"
+    },
+    {
+      "column": "filters",
+      "table": "intel_projects"
+    },
+    {
+      "column": "prices",
+      "table": "intel_projects"
+    },
+    {
+      "column": "som_percent",
+      "table": "intel_projects"
+    },
+    {
+      "column": "school_count",
+      "table": "intel_projects"
+    },
+    {
+      "column": "created_at",
+      "table": "intel_projects"
+    },
+    {
+      "column": "updated_at",
+      "table": "intel_projects"
+    },
+    {
+      "column": "stats",
+      "table": "intel_projects"
+    },
+    {
+      "column": "id",
+      "table": "intel_schools"
+    },
+    {
+      "column": "project_id",
+      "table": "intel_schools"
+    },
+    {
+      "column": "is_privada",
+      "table": "intel_schools"
+    },
+    {
+      "column": "alumnos",
+      "table": "intel_schools"
+    },
+    {
+      "column": "latitud",
+      "table": "intel_schools"
+    },
+    {
+      "column": "longitud",
+      "table": "intel_schools"
+    },
+    {
+      "column": "extra_data",
+      "table": "intel_schools"
+    },
+    {
+      "column": "id",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "patrocinador_id",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "monto_asignado",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "monto_consumido",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "created_at",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "id",
+      "table": "video_markers"
+    },
+    {
+      "column": "journey_id",
+      "table": "video_markers"
+    },
+    {
+      "column": "device_timestamp",
+      "table": "video_markers"
+    },
+    {
+      "column": "synced_at",
+      "table": "video_markers"
+    },
+    {
+      "column": "user_id",
+      "table": "video_markers"
+    },
+    {
+      "column": "id",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "start_time",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "end_time",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "maintenance_checklist",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "resume_checklist",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "created_by",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "created_at",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "id",
+      "table": "stats"
+    },
+    {
+      "column": "total_sponsored_kids",
+      "table": "stats"
+    },
+    {
+      "column": "id",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "usage_count",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "monthly_limit",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "last_used_at",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "updated_at",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "user_id",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "is_active",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "created_at",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "updated_at",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "avatar_config",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "id",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "total_flights",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "total_students",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "checklist_verified",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "start_time",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "end_time",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "created_by",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "created_at",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "school_id",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "mission_datetime",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "becados",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "id",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "journey_id",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "user_id",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "payload",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "created_at",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "id",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "date",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "school_id",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "created_at",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "updated_at",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "created_by",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "route_started_at",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "route_started_by",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "arrival_photo_taken_at",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "arrival_photo_taken_by",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "reset_nonce",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "meta",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "tarifa_base",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "cuota_alumno",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "subsidio_patrocinador",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "id",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "date",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "required_checkin_time",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "created_by",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "created_at",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "id",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "journey_id",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "user_id",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "created_at",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "id",
+      "table": "hr_documents"
+    },
+    {
+      "column": "user_id",
+      "table": "hr_documents"
+    },
+    {
+      "column": "expires_at",
+      "table": "hr_documents"
+    },
+    {
+      "column": "validated_at",
+      "table": "hr_documents"
+    },
+    {
+      "column": "validated_by",
+      "table": "hr_documents"
+    },
+    {
+      "column": "created_at",
+      "table": "hr_documents"
+    },
+    {
+      "column": "updated_at",
+      "table": "hr_documents"
+    },
+    {
+      "column": "id",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "user_id",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "start_date",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "end_date",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "reviewed_by",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "reviewed_at",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "created_at",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "id",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "user_id",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "period_start",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "period_end",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "amount",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "created_by",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "created_at",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "id",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "fecha_programada",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "created_at",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "is_archived",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "archived_at",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "cuota_alumno",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "tarifa_base",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "subsidio_patrocinador",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "ubicacion_lat",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "ubicacion_lng",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "numero_ninos",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "ninos",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "visitada",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "id",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "precio",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "created_at",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "destacado",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "id",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "file_size_bytes",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "duration_seconds",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "sort_order",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "is_active",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "created_at",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "updated_at",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "id",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "user_id",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "latitude",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "longitude",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "is_favorite",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "created_at",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "updated_at",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "audio_duration_seconds",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "audio_generated_at",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "is_general_topic",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "id",
+      "table": "training_modules"
+    },
+    {
+      "column": "created_by",
+      "table": "training_modules"
+    },
+    {
+      "column": "created_at",
+      "table": "training_modules"
+    },
+    {
+      "column": "updated_at",
+      "table": "training_modules"
+    },
+    {
+      "column": "id",
+      "table": "training_cards"
+    },
+    {
+      "column": "module_id",
+      "table": "training_cards"
+    },
+    {
+      "column": "difficulty",
+      "table": "training_cards"
+    },
+    {
+      "column": "sort_order",
+      "table": "training_cards"
+    },
+    {
+      "column": "created_at",
+      "table": "training_cards"
+    },
+    {
+      "column": "id",
+      "table": "master_routes"
+    },
+    {
+      "column": "sort_order",
+      "table": "master_routes"
+    },
+    {
+      "column": "created_at",
+      "table": "master_routes"
+    },
+    {
+      "column": "updated_at",
+      "table": "master_routes"
+    },
+    {
+      "column": "published_at",
+      "table": "master_routes"
+    },
+    {
+      "column": "id",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "user_id",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "route_id",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "poi_id",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "completed",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "confidence_level",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "completed_at",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "created_at",
+      "table": "pilot_route_progress"
+    },
+    {
+      "column": "id",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "route_id",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "lat",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "lng",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "ai_context",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "sort_order",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "created_at",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "updated_at",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "audio_duration_seconds",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "audio_generated_at",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "is_general_topic",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "id",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "fecha_hora",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "duracion_min",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "recordatorio_48h",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "recordatorio_24h",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "recordatorio_2h",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "created_at",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "updated_at",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "id",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "created_at",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "reminder_at",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "last_interaction_at",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "created_at",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "id",
+      "table": "escuelas_extras"
+    },
+    {
+      "column": "created_at",
+      "table": "escuelas_extras"
+    },
+    {
+      "column": "id",
+      "table": "sponsors"
+    },
+    {
+      "column": "created_at",
+      "table": "sponsors"
+    },
+    {
+      "column": "id",
+      "table": "impacto_global"
+    },
+    {
+      "column": "ninos_totales_meta",
+      "table": "impacto_global"
+    },
+    {
+      "column": "ninos_volados_acumulado",
+      "table": "impacto_global"
+    },
+    {
+      "column": "escuelas_visitadas_total",
+      "table": "impacto_global"
+    },
+    {
+      "column": "vuelo_en_vivo",
+      "table": "impacto_global"
+    },
+    {
+      "column": "ultima_actualizacion",
+      "table": "impacto_global"
+    },
+    {
+      "column": "id",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "ninos_sesion",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "fecha",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "id",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "collected_data",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "proxima_escuela_id",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "last_message_at",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "created_at",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "updated_at",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "nudge_sent",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "nudge_level",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "id",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "fecha",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "cupo_maximo",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "cupo_usado",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "activa",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "created_at",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "matutino_bloqueado",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "vespertino_bloqueado",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "id",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "created_at",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "aportacion_total",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "mantener_logo_original",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "id",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "journey_id",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "user_id",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "flight_number",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "audio_duration_seconds",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "score",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "menciona_nombre_equipo",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "menciona_destino",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "dinamica_sube_sube",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "participacion_ninos_audible",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "raw_response",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "analyzed_at",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "created_at",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "energia_positiva",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "target_amount",
+      "table": "presentations"
+    },
+    {
+      "column": "base_confirmed",
+      "table": "presentations"
+    },
+    {
+      "column": "created_at",
+      "table": "presentations"
+    },
+    {
+      "column": "id",
+      "table": "pledges"
+    },
+    {
+      "column": "amount",
+      "table": "pledges"
+    },
+    {
+      "column": "status",
+      "table": "pledges"
+    },
+    {
+      "column": "created_at",
+      "table": "pledges"
+    },
+    {
+      "column": "config",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "created_at",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "updated_at",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "id",
+      "table": "poi_locations"
+    },
+    {
+      "column": "lat",
+      "table": "poi_locations"
+    },
+    {
+      "column": "lng",
+      "table": "poi_locations"
+    },
+    {
+      "column": "is_active",
+      "table": "poi_locations"
+    },
+    {
+      "column": "created_by",
+      "table": "poi_locations"
+    },
+    {
+      "column": "created_at",
+      "table": "poi_locations"
+    },
+    {
+      "column": "updated_at",
+      "table": "poi_locations"
+    },
+    {
+      "column": "id",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "created_at",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "children_flown",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "schools_visited",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "children_goal",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "last_update",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "id",
+      "table": "staff_events"
+    },
+    {
+      "column": "journey_id",
+      "table": "staff_events"
+    },
+    {
+      "column": "actor_user_id",
+      "table": "staff_events"
+    },
+    {
+      "column": "payload",
+      "table": "staff_events"
+    },
+    {
+      "column": "created_at",
+      "table": "staff_events"
+    },
+    {
+      "column": "user_id",
+      "table": "staff_presence"
+    },
+    {
+      "column": "journey_id",
+      "table": "staff_presence"
+    },
+    {
+      "column": "last_seen_at",
+      "table": "staff_presence"
+    },
+    {
+      "column": "is_online",
+      "table": "staff_presence"
+    },
+    {
+      "column": "id",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "mission_data",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "nombre",
+      "table": "escuelas_extras"
+    },
+    {
+      "column": "reason",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "cct",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "empresa_nombre",
+      "table": "sponsors"
+    },
+    {
+      "column": "logo_url",
+      "table": "sponsors"
+    },
+    {
+      "column": "usuario",
+      "table": "sponsors"
+    },
+    {
+      "column": "password_hash",
+      "table": "sponsors"
+    },
+    {
+      "column": "nombre_director",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "telefono_director",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "answer",
+      "table": "training_cards"
+    },
+    {
+      "column": "card_type",
+      "table": "training_cards"
+    },
+    {
+      "column": "pregunta_estudio_3",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "status",
+      "table": "training_cards"
+    },
+    {
+      "column": "pregunta_interaccion",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "numero_zona",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "nombre_escuela",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "month_key",
+      "table": "tavily_usage"
+    },
+    {
+      "column": "colonia",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "acta_url",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "foto_url",
+      "table": "historial_vuelos"
+    },
+    {
+      "column": "numero_sector",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "nombre_maestro_delegado",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "phone_number",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "contact_name",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "conversation_state",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "telefono_maestro_delegado",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "cct_identificado",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "column": "registrado_via",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "notas",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "full_name",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "role",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "turno",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "estado",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "cct",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "initial_password",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "codigo_postal",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "phone",
+      "table": "staff_profiles"
+    },
+    {
+      "column": "nombre_escuela",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "notas",
+      "table": "fechas_disponibles"
+    },
+    {
+      "column": "mission_id",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "turno",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "tipo",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "estado_nuevo",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "nombre",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "email",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "password",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "signature_url",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "group_photo_url",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "logo_url",
+      "table": "patrocinadores"
+    },
+    {
+      "column": "title",
+      "table": "master_routes"
+    },
+    {
+      "column": "estado_pipeline",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "nivel_educativo",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "column": "description",
+      "table": "master_routes"
+    },
+    {
+      "column": "tipo_escuela",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "source",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "audio_url",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "school_name_snapshot",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "status",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "emoji",
+      "table": "master_routes"
+    },
+    {
+      "column": "journey_id",
+      "table": "cierres_mision"
+    },
+    {
+      "column": "nombre_equipo_detectado",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "status",
+      "table": "master_routes"
+    },
+    {
+      "column": "destino_detectado",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "cambiado_por",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "energia_interaccion",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "descripcion",
+      "table": "precios_cuotas"
+    },
+    {
+      "column": "feedback_para_isa",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "resumen_supervisor",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "reminder_note",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "model_used",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "error_message",
+      "table": "audio_quality_audits"
+    },
+    {
+      "column": "event_type",
+      "table": "staff_prep_events"
+    },
+    {
+      "column": "title",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "artist",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "id",
+      "table": "presentations"
+    },
+    {
+      "column": "track_type",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "storage_path",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "public_url",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "school_name",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "presentation_id",
+      "table": "pledges"
+    },
+    {
+      "column": "status",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "name",
+      "table": "pledges"
+    },
+    {
+      "column": "org",
+      "table": "pledges"
+    },
+    {
+      "column": "narrative_script",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "mime_type",
+      "table": "official_soundtracks"
+    },
+    {
+      "column": "id",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "source_id",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "html_content",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "column": "audio_url",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "mission_state",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "cct",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "notas",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "name",
+      "table": "poi_locations"
+    },
+    {
+      "column": "emoji",
+      "table": "poi_locations"
+    },
+    {
+      "column": "research_article",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "assigned_to",
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "column": "arrival_photo_url",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "trigger_keywords",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "created_by_name",
+      "table": "poi_locations"
+    },
+    {
+      "column": "cct",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "tipo_escuela",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "cct",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "direccion",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "name",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "description",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "cct",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "nombre_director",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "observations",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "column": "telefono_director",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "numero_sector",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "type",
+      "table": "staff_events"
+    },
+    {
+      "column": "numero_zona",
+      "table": "staff_journeys"
+    },
+    {
+      "column": "titulo",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "category",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "nombre_escuela",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "note",
+      "table": "hr_schedule_config"
+    },
+    {
+      "column": "estado_anterior",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "column": "role",
+      "table": "staff_presence"
+    },
+    {
+      "column": "name",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "dato_clave_1",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "mission_id",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "column": "dato_clave_2",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "pregunta_interaccion",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "file_path",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "research_article",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "item_id",
+      "table": "staff_prep_photos"
+    },
+    {
+      "column": "pregunta_estudio",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "image_url",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "doc_type",
+      "table": "hr_documents"
+    },
+    {
+      "column": "file_url",
+      "table": "hr_documents"
+    },
+    {
+      "column": "file_name",
+      "table": "hr_documents"
+    },
+    {
+      "column": "id",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "label",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "color",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "icon",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "column": "pregunta_estudio_1",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "status",
+      "table": "hr_documents"
+    },
+    {
+      "column": "pregunta_estudio_2",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "dato_clave_3",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "phone_number",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "contact_name",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "cct",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "pipeline_stage",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "rejection_reason",
+      "table": "hr_documents"
+    },
+    {
+      "column": "assigned_to",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "notes",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "pregunta_estudio_3",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "narrative_script",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "audio_url",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "lead_status",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "description",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "reminder_note",
+      "table": "crm_contacts"
+    },
+    {
+      "column": "type",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "image_url",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "phone_number",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "direction",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "sender_type",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "message_type",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "content",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "responsable",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "wa_message_id",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "status",
+      "table": "whatsapp_messages"
+    },
+    {
+      "column": "reason",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "evidence_url",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "name",
+      "table": "intel_projects"
+    },
+    {
+      "column": "file_name",
+      "table": "intel_projects"
+    },
+    {
+      "column": "status",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "trigger_keywords",
+      "table": "pilot_pois"
+    },
+    {
+      "column": "notas",
+      "table": "crm_citas_venta"
+    },
+    {
+      "column": "route_ccts",
+      "table": "intel_projects"
+    },
+    {
+      "column": "reviewer_note",
+      "table": "hr_time_off"
+    },
+    {
+      "column": "title",
+      "table": "training_modules"
+    },
+    {
+      "column": "description",
+      "table": "training_modules"
+    },
+    {
+      "column": "owner",
+      "table": "intel_projects"
+    },
+    {
+      "column": "pin",
+      "table": "intel_projects"
+    },
+    {
+      "column": "source_text",
+      "table": "training_modules"
+    },
+    {
+      "column": "period_label",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "icon",
+      "table": "training_modules"
+    },
+    {
+      "column": "cct",
+      "table": "intel_schools"
+    },
+    {
+      "column": "nombre",
+      "table": "intel_schools"
+    },
+    {
+      "column": "municipio",
+      "table": "intel_schools"
+    },
+    {
+      "column": "sostenimiento",
+      "table": "intel_schools"
+    },
+    {
+      "column": "color",
+      "table": "training_modules"
+    },
+    {
+      "column": "status",
+      "table": "training_modules"
+    },
+    {
+      "column": "concept",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "payment_method",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "turno",
+      "table": "intel_schools"
+    },
+    {
+      "column": "notes",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "nivel_educativo",
+      "table": "intel_schools"
+    },
+    {
+      "column": "pdf_url",
+      "table": "hr_payslips"
+    },
+    {
+      "column": "target_roles",
+      "table": "training_modules"
+    },
+    {
+      "column": "categoria",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "dato_clave_1",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "dato_clave_2",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "periodo",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "column": "nombre_escuela",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "colonia",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "dato_clave_3",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "estatus",
+      "table": "proximas_escuelas"
+    },
+    {
+      "column": "marker_type",
+      "table": "video_markers"
+    },
+    {
+      "column": "pregunta_estudio_1",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "pregunta_estudio_2",
+      "table": "master_route_pois"
+    },
+    {
+      "column": "cct",
+      "table": "video_markers"
+    },
+    {
+      "column": "school_name_snapshot",
+      "table": "video_markers"
+    },
+    {
+      "column": "tag",
+      "table": "video_markers"
+    },
+    {
+      "column": "question",
+      "table": "training_cards"
+    },
+    {
+      "column": "mission_id",
+      "table": "bitacora_pausas"
+    },
+    {
+      "column": "pause_type",
+      "table": "bitacora_pausas"
+    }
+  ],
+  "functions": [
+    "fuzzy_search_school",
+    "get_active_staff_profiles_for_test",
+    "get_expired_storage_objects",
+    "gin_extract_query_trgm",
+    "gin_extract_value_trgm",
+    "gin_trgm_consistent",
+    "gin_trgm_triconsistent",
+    "gtrgm_compress",
+    "gtrgm_consistent",
+    "gtrgm_decompress",
+    "gtrgm_distance",
+    "gtrgm_in",
+    "gtrgm_options",
+    "gtrgm_out",
+    "gtrgm_penalty",
+    "gtrgm_picksplit",
+    "gtrgm_same",
+    "gtrgm_union",
+    "increment_counter",
+    "increment_cupo",
+    "is_admin",
+    "mark_school_en_progreso_on_checkin",
+    "set_limit",
+    "show_limit",
+    "show_trgm",
+    "similarity",
+    "similarity_dist",
+    "similarity_op",
+    "strict_word_similarity",
+    "strict_word_similarity_commutator_op",
+    "strict_word_similarity_dist_commutator_op",
+    "strict_word_similarity_dist_op",
+    "strict_word_similarity_op",
+    "sync_catalogo_pipeline_from_journey",
+    "sync_catalogo_visitada",
+    "sync_journey_closure_to_cronograma",
+    "unaccent",
+    "unaccent",
+    "unaccent_init",
+    "unaccent_lexize",
+    "update_custom_flyers_modtime",
+    "word_similarity",
+    "word_similarity_commutator_op",
+    "word_similarity_dist_commutator_op",
+    "word_similarity_dist_op",
+    "word_similarity_op"
+  ],
+  "indexes": [
+    {
+      "name": "escuelas_extras_pkey",
+      "table": "escuelas_extras"
+    },
+    {
+      "name": "escuelas_extras_nombre_key",
+      "table": "escuelas_extras"
+    },
+    {
+      "name": "sponsors_pkey",
+      "table": "sponsors"
+    },
+    {
+      "name": "sponsors_usuario_key",
+      "table": "sponsors"
+    },
+    {
+      "name": "impacto_global_pkey",
+      "table": "impacto_global"
+    },
+    {
+      "name": "historial_vuelos_pkey",
+      "table": "historial_vuelos"
+    },
+    {
+      "name": "whatsapp_conversations_pkey",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "name": "idx_whatsapp_phone",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "name": "idx_whatsapp_active",
+      "table": "whatsapp_conversations"
+    },
+    {
+      "name": "fechas_disponibles_pkey",
+      "table": "fechas_disponibles"
+    },
+    {
+      "name": "fechas_disponibles_fecha_key",
+      "table": "fechas_disponibles"
+    },
+    {
+      "name": "idx_fechas_activas",
+      "table": "fechas_disponibles"
+    },
+    {
+      "name": "patrocinadores_pkey",
+      "table": "patrocinadores"
+    },
+    {
+      "name": "patrocinadores_email_key",
+      "table": "patrocinadores"
+    },
+    {
+      "name": "audio_quality_audits_pkey",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "idx_aqa_journey",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "idx_aqa_user",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "idx_aqa_status",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "idx_aqa_created",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "idx_aqa_score",
+      "table": "audio_quality_audits"
+    },
+    {
+      "name": "presentations_pkey",
+      "table": "presentations"
+    },
+    {
+      "name": "pledges_pkey",
+      "table": "pledges"
+    },
+    {
+      "name": "pledges_presentation_status_idx",
+      "table": "pledges"
+    },
+    {
+      "name": "admin_custom_flyers_pkey",
+      "table": "admin_custom_flyers"
+    },
+    {
+      "name": "poi_locations_pkey",
+      "table": "poi_locations"
+    },
+    {
+      "name": "idx_poi_locations_active",
+      "table": "poi_locations"
+    },
+    {
+      "name": "sponsor_dashboard_stats_pkey",
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "name": "staff_events_pkey",
+      "table": "staff_events"
+    },
+    {
+      "name": "staff_presence_pkey",
+      "table": "staff_presence"
+    },
+    {
+      "name": "bitacora_vuelos_pkey",
+      "table": "bitacora_vuelos"
+    },
+    {
+      "name": "crm_pipeline_stages_pkey",
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "name": "idx_contacts_status",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "crm_contacts_pkey",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "crm_contacts_phone_number_key",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "idx_contacts_pipeline",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "idx_contacts_phone",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "idx_contacts_bot_paused",
+      "table": "crm_contacts"
+    },
+    {
+      "name": "whatsapp_messages_pkey",
+      "table": "whatsapp_messages"
+    },
+    {
+      "name": "unique_wa_message",
+      "table": "whatsapp_messages"
+    },
+    {
+      "name": "idx_messages_conversation",
+      "table": "whatsapp_messages"
+    },
+    {
+      "name": "idx_messages_phone",
+      "table": "whatsapp_messages"
+    },
+    {
+      "name": "idx_messages_created",
+      "table": "whatsapp_messages"
+    },
+    {
+      "name": "intel_projects_pkey",
+      "table": "intel_projects"
+    },
+    {
+      "name": "idx_intel_projects_updated",
+      "table": "intel_projects"
+    },
+    {
+      "name": "intel_schools_pkey",
+      "table": "intel_schools"
+    },
+    {
+      "name": "idx_intel_schools_project",
+      "table": "intel_schools"
+    },
+    {
+      "name": "idx_intel_schools_cct",
+      "table": "intel_schools"
+    },
+    {
+      "name": "fondo_patrocinadores_pkey",
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "name": "video_markers_pkey",
+      "table": "video_markers"
+    },
+    {
+      "name": "bitacora_pausas_pkey",
+      "table": "bitacora_pausas"
+    },
+    {
+      "name": "idx_pausas_mission",
+      "table": "bitacora_pausas"
+    },
+    {
+      "name": "stats_pkey",
+      "table": "stats"
+    },
+    {
+      "name": "tavily_usage_pkey",
+      "table": "tavily_usage"
+    },
+    {
+      "name": "staff_profiles_pkey",
+      "table": "staff_profiles"
+    },
+    {
+      "name": "cierres_mision_pkey",
+      "table": "cierres_mision"
+    },
+    {
+      "name": "idx_cierres_mision_school_id",
+      "table": "cierres_mision"
+    },
+    {
+      "name": "idx_cierres_mision_mission_datetime",
+      "table": "cierres_mision"
+    },
+    {
+      "name": "staff_prep_events_pkey",
+      "table": "staff_prep_events"
+    },
+    {
+      "name": "staff_journeys_pkey",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "staff_journeys_date_school_id_key",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "hr_schedule_config_pkey",
+      "table": "hr_schedule_config"
+    },
+    {
+      "name": "hr_schedule_config_date_key",
+      "table": "hr_schedule_config"
+    },
+    {
+      "name": "idx_hr_schedule_date",
+      "table": "hr_schedule_config"
+    },
+    {
+      "name": "staff_prep_photos_pkey",
+      "table": "staff_prep_photos"
+    },
+    {
+      "name": "hr_documents_pkey",
+      "table": "hr_documents"
+    },
+    {
+      "name": "idx_hr_documents_user",
+      "table": "hr_documents"
+    },
+    {
+      "name": "idx_hr_documents_status",
+      "table": "hr_documents"
+    },
+    {
+      "name": "idx_hr_documents_expires",
+      "table": "hr_documents"
+    },
+    {
+      "name": "hr_time_off_pkey",
+      "table": "hr_time_off"
+    },
+    {
+      "name": "idx_hr_time_off_user",
+      "table": "hr_time_off"
+    },
+    {
+      "name": "idx_hr_time_off_status",
+      "table": "hr_time_off"
+    },
+    {
+      "name": "hr_payslips_pkey",
+      "table": "hr_payslips"
+    },
+    {
+      "name": "idx_hr_payslips_user",
+      "table": "hr_payslips"
+    },
+    {
+      "name": "idx_hr_payslips_period",
+      "table": "hr_payslips"
+    },
+    {
+      "name": "proximas_escuelas_pkey",
+      "table": "proximas_escuelas"
+    },
+    {
+      "name": "idx_proximas_escuelas_is_archived",
+      "table": "proximas_escuelas"
+    },
+    {
+      "name": "catalogo_escuelas_pkey",
+      "table": "catalogo_escuelas"
+    },
+    {
+      "name": "precios_cuotas_pkey",
+      "table": "precios_cuotas"
+    },
+    {
+      "name": "official_soundtracks_pkey",
+      "table": "official_soundtracks"
+    },
+    {
+      "name": "idx_soundtracks_type_active",
+      "table": "official_soundtracks"
+    },
+    {
+      "name": "idx_soundtracks_sort",
+      "table": "official_soundtracks"
+    },
+    {
+      "name": "idx_pilot_pois_general_topic",
+      "table": "pilot_pois"
+    },
+    {
+      "name": "idx_pilot_pois_keywords",
+      "table": "pilot_pois"
+    },
+    {
+      "name": "pilot_pois_pkey",
+      "table": "pilot_pois"
+    },
+    {
+      "name": "idx_pilot_pois_user",
+      "table": "pilot_pois"
+    },
+    {
+      "name": "idx_pilot_pois_category",
+      "table": "pilot_pois"
+    },
+    {
+      "name": "training_modules_pkey",
+      "table": "training_modules"
+    },
+    {
+      "name": "idx_training_modules_status",
+      "table": "training_modules"
+    },
+    {
+      "name": "training_cards_pkey",
+      "table": "training_cards"
+    },
+    {
+      "name": "idx_training_cards_module_id",
+      "table": "training_cards"
+    },
+    {
+      "name": "master_routes_pkey",
+      "table": "master_routes"
+    },
+    {
+      "name": "idx_master_routes_status",
+      "table": "master_routes"
+    },
+    {
+      "name": "pilot_route_progress_pkey",
+      "table": "pilot_route_progress"
+    },
+    {
+      "name": "pilot_route_progress_user_id_poi_id_key",
+      "table": "pilot_route_progress"
+    },
+    {
+      "name": "idx_pilot_route_progress_user",
+      "table": "pilot_route_progress"
+    },
+    {
+      "name": "idx_pilot_route_progress_route",
+      "table": "pilot_route_progress"
+    },
+    {
+      "name": "idx_master_route_pois_general_topic",
+      "table": "master_route_pois"
+    },
+    {
+      "name": "idx_master_route_pois_keywords",
+      "table": "master_route_pois"
+    },
+    {
+      "name": "master_route_pois_pkey",
+      "table": "master_route_pois"
+    },
+    {
+      "name": "idx_master_route_pois_route",
+      "table": "master_route_pois"
+    },
+    {
+      "name": "crm_citas_venta_pkey",
+      "table": "crm_citas_venta"
+    },
+    {
+      "name": "idx_citas_fecha",
+      "table": "crm_citas_venta"
+    },
+    {
+      "name": "idx_citas_cct",
+      "table": "crm_citas_venta"
+    },
+    {
+      "name": "crm_pipeline_log_pkey",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "name": "idx_pipeline_log_cct",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "name": "idx_pipeline_log_created",
+      "table": "crm_pipeline_log"
+    },
+    {
+      "name": "crm_escuelas_detalles_pkey",
+      "table": "crm_escuelas_detalles"
+    }
+  ],
+  "policies": [
+    {
+      "command": "SELECT",
+      "name": "presentations_read_public",
+      "roles": [
+        "public"
+      ],
+      "table": "presentations"
+    },
+    {
+      "command": "INSERT",
+      "name": "pledges_insert_public",
+      "roles": [
+        "anon"
+      ],
+      "table": "pledges"
+    },
+    {
+      "command": "SELECT",
+      "name": "pledges_read_public",
+      "roles": [
+        "public"
+      ],
+      "table": "pledges"
+    },
+    {
+      "command": "SELECT",
+      "name": "Enable read access for all users",
+      "roles": [
+        "public"
+      ],
+      "table": "pledges"
+    },
+    {
+      "command": "SELECT",
+      "name": "Enable read access for all users",
+      "roles": [
+        "public"
+      ],
+      "table": "sponsor_dashboard_stats"
+    },
+    {
+      "command": "INSERT",
+      "name": "Permitir subidas públicas a5a7jn_0",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Permitir subidas públicas a5a7jn_1",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Permitir subidas públicas 4xts0b_0",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Permitir subidas públicas 4xts0b_1",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public Read",
+      "roles": [
+        "public"
+      ],
+      "table": "escuelas_extras"
+    },
+    {
+      "command": "INSERT",
+      "name": "Public Insert",
+      "roles": [
+        "public"
+      ],
+      "table": "escuelas_extras"
+    },
+    {
+      "command": "DELETE",
+      "name": "Public Delete",
+      "roles": [
+        "public"
+      ],
+      "table": "escuelas_extras"
+    },
+    {
+      "command": "INSERT",
+      "name": "Staff can insert flights",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_vuelos"
+    },
+    {
+      "command": "INSERT",
+      "name": "Staff can insert closure",
+      "roles": [
+        "public"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_profiles_admin_insert",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_profiles"
+    },
+    {
+      "command": "UPDATE",
+      "name": "staff_profiles_admin_update",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_profiles"
+    },
+    {
+      "command": "INSERT",
+      "name": "Staff can upload evidence",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Staff can view evidence",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Staff can upload signatures",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Staff can view signatures",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Staff can insert pauses",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_pausas"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Staff can update own pauses",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_pausas"
+    },
+    {
+      "command": "SELECT",
+      "name": "Staff can view own pauses",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_pausas"
+    },
+    {
+      "command": "DELETE",
+      "name": "Staff can delete own pausas",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_pausas"
+    },
+    {
+      "command": "DELETE",
+      "name": "Staff can delete vuelos",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_vuelos"
+    },
+    {
+      "command": "DELETE",
+      "name": "Staff can delete cierres",
+      "roles": [
+        "public"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "SELECT",
+      "name": "Users can view own payslips",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_payslips"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_journeys_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_journeys"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_prep_events_insert_own",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_prep_events"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_prep_photos_select",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_prep_photos"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_prep_photos_insert_own",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_prep_photos"
+    },
+    {
+      "command": "INSERT",
+      "name": "prep_evidence_insert_auth",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "prep_evidence_select_public",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "proximas_escuelas_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "proximas_escuelas"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_view_proximas_escuelas",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "proximas_escuelas"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_insert_proximas_escuelas",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "proximas_escuelas"
+    },
+    {
+      "command": "UPDATE",
+      "name": "staff_update_proximas_escuelas",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "proximas_escuelas"
+    },
+    {
+      "command": "DELETE",
+      "name": "staff_delete_proximas_escuelas",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "proximas_escuelas"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public Access",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Authenticated Upload",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Allow staff upload arrival",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow public read arrival",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Staff can view all closures",
+      "roles": [
+        "public"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "SELECT",
+      "name": "Staff can view all flights",
+      "roles": [
+        "public"
+      ],
+      "table": "bitacora_vuelos"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_profiles_select_own",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_profiles"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_profiles_admin_select",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_profiles"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_presence_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_presence"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_presence_insert_own",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_presence"
+    },
+    {
+      "command": "UPDATE",
+      "name": "staff_presence_update_own",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_presence"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_prep_events_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_prep_events"
+    },
+    {
+      "command": "INSERT",
+      "name": "staff_journeys_insert_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_journeys"
+    },
+    {
+      "command": "SELECT",
+      "name": "Enable read access for all authenticated users",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_profiles"
+    },
+    {
+      "command": "UPDATE",
+      "name": "staff_journeys_update_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_journeys"
+    },
+    {
+      "command": "ALL",
+      "name": "Allow read/write all authenticated staff",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_events"
+    },
+    {
+      "command": "ALL",
+      "name": "Enable read/write for all authenticated users",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_events"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_events_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_events"
+    },
+    {
+      "command": "ALL",
+      "name": "Allow read/write all authenticated staff",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_presence"
+    },
+    {
+      "command": "ALL",
+      "name": "Enable read/write for all authenticated users",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "staff_presence"
+    },
+    {
+      "command": "UPDATE",
+      "name": "staff_storage_update_auth",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Enable insert for authenticated users",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "video_markers"
+    },
+    {
+      "command": "SELECT",
+      "name": "Enable select for authenticated users",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "video_markers"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow anon to read video_markers",
+      "roles": [
+        "anon"
+      ],
+      "table": "video_markers"
+    },
+    {
+      "command": "SELECT",
+      "name": "staff_journeys_select_anon",
+      "roles": [
+        "anon"
+      ],
+      "table": "staff_journeys"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow public read fondo_patrocinadores",
+      "roles": [
+        "public"
+      ],
+      "table": "fondo_patrocinadores"
+    },
+    {
+      "command": "SELECT",
+      "name": "Users can view own documents",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_documents"
+    },
+    {
+      "command": "INSERT",
+      "name": "Users can insert own documents",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_documents"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Users can update own documents",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_documents"
+    },
+    {
+      "command": "SELECT",
+      "name": "Users can view own time off",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_time_off"
+    },
+    {
+      "command": "INSERT",
+      "name": "Users can insert own time off",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_time_off"
+    },
+    {
+      "command": "SELECT",
+      "name": "Authenticated users can read schedule",
+      "roles": [
+        "public"
+      ],
+      "table": "hr_schedule_config"
+    },
+    {
+      "command": "INSERT",
+      "name": "Users can upload own HR docs",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Users can view own HR docs",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Users can update own HR docs",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Allow authenticated insert",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Allow authenticated update",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow authenticated select",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "INSERT",
+      "name": "Allow anon insert",
+      "roles": [
+        "anon"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Allow anon update",
+      "roles": [
+        "anon"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow anon select",
+      "roles": [
+        "anon"
+      ],
+      "table": "cierres_mision"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public Access for sponsor-logos",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Auth Upload for sponsor-logos",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Auth Update for sponsor-logos",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "DELETE",
+      "name": "Auth Delete for sponsor-logos",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public read pipeline_stages",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "command": "ALL",
+      "name": "Service write pipeline_stages",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_pipeline_stages"
+    },
+    {
+      "command": "ALL",
+      "name": "Service role full access crm_contacts",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_contacts"
+    },
+    {
+      "command": "ALL",
+      "name": "Service role full access whatsapp_messages",
+      "roles": [
+        "public"
+      ],
+      "table": "whatsapp_messages"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public read crm_contacts",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_contacts"
+    },
+    {
+      "command": "SELECT",
+      "name": "Public read whatsapp_messages",
+      "roles": [
+        "public"
+      ],
+      "table": "whatsapp_messages"
+    },
+    {
+      "command": "ALL",
+      "name": "Allow authenticated users full access to crm_escuelas_detalles",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "crm_escuelas_detalles"
+    },
+    {
+      "command": "SELECT",
+      "name": "Users can view own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "INSERT",
+      "name": "Users can insert own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Users can update own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "DELETE",
+      "name": "Users can delete own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "ALL",
+      "name": "Allow authenticated users to manage custom flyers",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "admin_custom_flyers"
+    },
+    {
+      "command": "SELECT",
+      "name": "poi_locations_select_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "poi_locations"
+    },
+    {
+      "command": "INSERT",
+      "name": "poi_locations_insert_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "poi_locations"
+    },
+    {
+      "command": "UPDATE",
+      "name": "poi_locations_update_authenticated",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "poi_locations"
+    },
+    {
+      "command": "SELECT",
+      "name": "tavily_usage_read_all",
+      "roles": [
+        "public"
+      ],
+      "table": "tavily_usage"
+    },
+    {
+      "command": "ALL",
+      "name": "tavily_usage_service_only",
+      "roles": [
+        "public"
+      ],
+      "table": "tavily_usage"
+    },
+    {
+      "command": "SELECT",
+      "name": "Authenticated can read published routes",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "master_routes"
+    },
+    {
+      "command": "SELECT",
+      "name": "Authenticated can read route POIs",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "master_route_pois"
+    },
+    {
+      "command": "ALL",
+      "name": "Users can manage own progress",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "pilot_route_progress"
+    },
+    {
+      "command": "ALL",
+      "name": "Service role full access citas",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_citas_venta"
+    },
+    {
+      "command": "ALL",
+      "name": "Service role full access pipeline_log",
+      "roles": [
+        "public"
+      ],
+      "table": "crm_pipeline_log"
+    },
+    {
+      "command": "SELECT",
+      "name": "Authenticated users can read audits",
+      "roles": [
+        "authenticated"
+      ],
+      "table": "audio_quality_audits"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow public read poi-narratives",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Allow authenticated upload poi-narratives",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "SELECT",
+      "name": "pilot_pois_select_own",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "INSERT",
+      "name": "pilot_pois_insert_own",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "UPDATE",
+      "name": "pilot_pois_update_own",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "DELETE",
+      "name": "pilot_pois_delete_own",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "INSERT",
+      "name": "Users can insert their own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Users can update their own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "DELETE",
+      "name": "Users can delete their own POIs",
+      "roles": [
+        "public"
+      ],
+      "table": "pilot_pois"
+    },
+    {
+      "command": "SELECT",
+      "name": "anon_read_soundtracks",
+      "roles": [
+        "anon",
+        "authenticated"
+      ],
+      "table": "official_soundtracks"
+    },
+    {
+      "command": "SELECT",
+      "name": "Allow public read official_soundtracks",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "INSERT",
+      "name": "Allow authenticated upload official_soundtracks",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "UPDATE",
+      "name": "Allow authenticated update official_soundtracks",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "DELETE",
+      "name": "Allow authenticated delete official_soundtracks",
+      "roles": [
+        "public"
+      ],
+      "table": "objects"
+    },
+    {
+      "command": "ALL",
+      "name": "intel_projects_anon_all",
+      "roles": [
+        "public"
+      ],
+      "table": "intel_projects"
+    },
+    {
+      "command": "ALL",
+      "name": "intel_schools_anon_all",
+      "roles": [
+        "public"
+      ],
+      "table": "intel_schools"
+    }
+  ],
+  "triggers": [
+    {
+      "name": "trg_sync_catalogo_visitada",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "trg_sync_catalogo_visitada",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "trigger_sync_journey_closure",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "trg_checkin_marks_en_progreso",
+      "table": "staff_prep_events"
+    },
+    {
+      "name": "trg_sync_catalogo_pipeline",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "trg_sync_catalogo_pipeline",
+      "table": "staff_journeys"
+    },
+    {
+      "name": "trg_admin_custom_flyers_updated_at",
+      "table": "admin_custom_flyers"
+    }
+  ]
+}

@@ -375,7 +375,7 @@ const TestimonialCard = memo(({ testimonial, index, progress, velocity, onOpen, 
                     {/* Bloque Sólido */}
                     <div className={`${theme.solidBg} px-6 pb-6 pt-2 text-center flex flex-col items-center`}>
                         <h3 className="text-[1.1rem] font-black text-white leading-tight tracking-tight drop-shadow-sm mb-4">
-                            "{testimonial.quote}"
+                            &quot;{testimonial.quote}&quot;
                         </h3>
 
                         {/* Botón Píldora "Ver Momento" */}
@@ -478,7 +478,7 @@ const MobileFlyPlayer = ({ isOpen, onClose, testimonial, onNext, onPrev, hasNext
                         </div>
                         <h2 className="text-3xl font-black text-white leading-none tracking-tighter uppercase italic drop-shadow-lg antialiased">@{testimonial.author.replace('Mtra. ', '').toLowerCase()}</h2>
                         <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4">
-                            <p className="text-white text-sm font-medium leading-tight antialiased">"{testimonial.quote.toLowerCase()}"</p>
+                            <p className="text-white text-sm font-medium leading-tight antialiased">&quot;{testimonial.quote.toLowerCase()}&quot;</p>
                             <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-2">{testimonial.school}</p>
                         </div>
                     </div>

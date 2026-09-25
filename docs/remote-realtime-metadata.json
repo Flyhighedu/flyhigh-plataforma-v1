@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "energy_columns": [
+      {
+        "column": "energia_positiva",
+        "table": "audio_quality_audits"
+      },
+      {
+        "column": "energia_interaccion",
+        "table": "audio_quality_audits"
+      }
+    ],
+    "realtime": [
+      "pledges",
+      "stats",
+      "proximas_escuelas",
+      "bitacora_vuelos",
+      "cierres_mision",
+      "staff_profiles",
+      "staff_journeys",
+      "staff_prep_events",
+      "staff_prep_photos",
+      "staff_events",
+      "staff_presence",
+      "catalogo_escuelas",
+      "crm_contacts",
+      "whatsapp_messages",
+      "crm_pipeline_log"
+    ]
+  }
+}

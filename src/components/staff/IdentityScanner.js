@@ -119,7 +119,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                     <div>
                         <p style={{fontSize:12,color:NEON_GREEN,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.15em',marginBottom:16}}>Instrucción para Supervisor</p>
                         <p style={{fontSize:24,color:'white',fontWeight:800,lineHeight:1.4}}>
-                            "¡Hola! Bienvenidos a su misión. El día de hoy ustedes ya son tripulantes oficiales de FlyHigh. ¿Están listos para volar?"
+                            &quot;¡Hola! Bienvenidos a su misión. El día de hoy ustedes ya son tripulantes oficiales de FlyHigh. ¿Están listos para volar?&quot;
                         </p>
                     </div>
                     <button onClick={() => { setPhase('radar'); try { navigator.vibrate?.(100); } catch (_e) {} }} style={{
@@ -150,8 +150,8 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                         </p>
                         
                         <p style={{fontSize:22,color:'white',fontWeight:800,lineHeight:1.4,margin:0}}>
-                            "¡Atención tripulación! ¿Cómo quieren que se llame su equipo? Les voy a dar dos opciones:<br/><br/>
-                            ¿<span style={{color:TEAM_A_COLOR,textShadow:`0 0 20px ${TEAM_A_COLOR}88`}}>{nameA}</span> o <span style={{color:TEAM_B_COLOR,textShadow:`0 0 20px ${TEAM_B_COLOR}88`}}>{nameB}</span>?"
+                            &quot;¡Atención tripulación! ¿Cómo quieren que se llame su equipo? Les voy a dar dos opciones:<br/><br/>
+                            ¿<span style={{color:TEAM_A_COLOR,textShadow:`0 0 20px ${TEAM_A_COLOR}88`}}>{nameA}</span> o <span style={{color:TEAM_B_COLOR,textShadow:`0 0 20px ${TEAM_B_COLOR}88`}}>{nameB}</span>?&quot;
                         </p>
 
                         <div style={{
@@ -166,7 +166,7 @@ export default function IdentityScanner({ isOpen, onResult, onClose, usedNames =
                         </div>
 
                         <p style={{fontSize:22,color:'white',fontWeight:800,lineHeight:1.4,margin:0}}>
-                            "Bueno chicos, ¡vamos a elegirlo levantando la mano!"
+                            &quot;Bueno chicos, ¡vamos a elegirlo levantando la mano!&quot;
                         </p>
                     </div>
 

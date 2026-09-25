@@ -469,7 +469,7 @@ export default function AuxVehicleChecklist({ journeyId, userId, onComplete, pre
                                 Confirmar acción
                             </h3>
                             <p style={{ fontSize: 15, color: '#64748b', margin: 0, maxWidth: '80%' }}>
-                                ¿Confirmas que has verificado: <br /><strong>"{confirmModalItem.label}"</strong>?
+                                ¿Confirmas que has verificado: <br /><strong>&quot;{confirmModalItem.label}&quot;</strong>?
                             </p>
                         </div>
 

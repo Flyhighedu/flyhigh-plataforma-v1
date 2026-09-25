@@ -34,10 +34,13 @@ const NAV_STEPS = [
     { id: 'reporte', label: 'REPORTE', icon: 'description', status: 'pending' }
 ];
 
-export default function PrepChecklist({ role = 'pilot', journeyId, userId, onComplete, preview = false, missionInfo }) {
-    if (role === 'pilot') {
-        return <PilotPrepChecklist journeyId={journeyId} userId={userId} onComplete={onComplete} preview={preview} missionInfo={missionInfo} />;
-    }
+export default function PrepChecklist(props) {
+    return (props.role ?? 'pilot') === 'pilot'
+        ? <PilotPrepChecklist {...props} />
+        : <RolePrepChecklist {...props} />;
+}
+
+function RolePrepChecklist({ role = 'pilot', journeyId, userId, onComplete, preview = false, missionInfo }) {
 
     const config = PREP_CHECKLISTS[role] || PREP_CHECKLISTS.assistant;
     const colors = ROLE_COLORS[role] || ROLE_COLORS.assistant;
@@ -885,7 +888,7 @@ export default function PrepChecklist({ role = 'pilot', journeyId, userId, onCom
                                 Confirmar acción
                             </h3>
                             <p style={{ fontSize: 15, color: '#64748b', margin: 0, maxWidth: '80%' }}>
-                                ¿Confirmas que has verificado: <br /><strong>"{confirmModalItem.label}"</strong>?
+                                ¿Confirmas que has verificado: <br /><strong>&quot;{confirmModalItem.label}&quot;</strong>?
                             </p>
                         </div>
 

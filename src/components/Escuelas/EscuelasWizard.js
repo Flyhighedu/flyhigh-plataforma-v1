@@ -210,7 +210,7 @@ export default function EscuelasWizard() {
 
                         {/* GARANTÍA */}
                         <div className="black-card">
-                            <div className="bc-title"><i className="fa-solid fa-shield-heart" style={{ color: 'var(--gold)' }}></i> Garantía "Ningún Niño en Tierra"</div>
+                            <div className="bc-title"><i className="fa-solid fa-shield-heart" style={{ color: 'var(--gold)' }}></i> Garantía &quot;Ningún Niño en Tierra&quot;</div>
                             <p className="bc-text">
                                 Sabemos que, aunque la cuota sea baja (<span>${budget}</span>), siempre hay alumnos que pasan por momentos difíciles.
                                 <br /><strong>¿Tienes alumnos que necesiten una Beca del 100% para no quedarse fuera?</strong>

@@ -144,7 +144,7 @@ const EscuelasCalculator = () => {
                                 <h3 className="text-2xl font-black text-slate-900 leading-none uppercase tracking-tighter">Su criterio es la guía</h3>
                             </div>
                             <p className="text-sm text-slate-600 font-medium leading-relaxed italic text-center">
-                                "El recurso de esta campaña es limitado y queremos que llegue a todos. Como líder de su comunidad, le pedimos definir una aportación justa y consciente; su honestidad es la pieza clave para que este patrocinio alcance para todos los niños de Uruapan."
+                                &quot;El recurso de esta campaña es limitado y queremos que llegue a todos. Como líder de su comunidad, le pedimos definir una aportación justa y consciente; su honestidad es la pieza clave para que este patrocinio alcance para todos los niños de Uruapan.&quot;
                             </p>
                             <button
                                 onClick={() => setShowInspiringModal(false)}

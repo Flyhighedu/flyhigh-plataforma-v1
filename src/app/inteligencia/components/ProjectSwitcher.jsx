@@ -123,7 +123,7 @@ export default function ProjectSwitcher({ onSelectProject, onNewProject, onClose
             
             <h3 className="text-lg font-bold text-white mb-1">Proyecto Protegido</h3>
             <p className="text-sm text-gray-400 mb-6">
-              Ingresa el PIN para editar "<span className="text-white">{pinPromptProject.name}</span>".
+              Ingresa el PIN para editar &quot;<span className="text-white">{pinPromptProject.name}</span>&quot;.
             </p>
 
             <div className="space-y-4">

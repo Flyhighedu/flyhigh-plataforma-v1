@@ -1,0 +1,8 @@
+{
+  "name": "flyhigh-review-lab",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.cjs",
+  "description": "Local workbench with four isolated persistent browser sessions",
+  "devDependencies": { "electron": "44.4.5" }
+}

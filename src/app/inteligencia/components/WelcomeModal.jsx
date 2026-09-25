@@ -211,7 +211,7 @@ export default function WelcomeModal({ onProjectReady, onSelectProject, onClose 
               </button>
             </div>
             <h3 className="text-lg font-bold text-white mb-1">Proyecto Protegido</h3>
-            <p className="text-sm text-gray-400 mb-6">Ingresa el PIN para abrir "<span className="text-white">{pinPromptProject.name}</span>".</p>
+            <p className="text-sm text-gray-400 mb-6">Ingresa el PIN para abrir &quot;<span className="text-white">{pinPromptProject.name}</span>&quot;.</p>
             <div className="space-y-4">
               <div>
                 <input

@@ -14,6 +14,7 @@ const withSerwist = withSerwistInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: process.env.FLYHIGH_REVIEW_LAB === '1' ? '.next-review' : '.next',
   productionBrowserSourceMaps: true,
   turbopack: {},
   images: {

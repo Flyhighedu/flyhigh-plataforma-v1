@@ -37,7 +37,7 @@ export default function EscuelasMission() {
                                 Por eso, hemos forjado una <strong className="text-white">Alianza de Titanes</strong>. Empresas líderes de Uruapan que han decidido invertir en el futuro, <span className="text-fuchsia-400">subsidiando masivamente</span> el costo de esta experiencia tecnológica.
                             </p>
                             <p className="border-l-4 border-fuchsia-500 pl-6 italic text-white/80">
-                                "El dinero nunca será una barrera. Si un niño quiere volar, nosotros le damos las alas."
+                                &quot;El dinero nunca será una barrera. Si un niño quiere volar, nosotros le damos las alas.&quot;
                             </p>
                         </div>
 

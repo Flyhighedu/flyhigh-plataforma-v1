@@ -3,6 +3,17 @@ import { NextResponse } from 'next/server'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
 export async function middleware(request) {
+    // Account administration must be authorized before a route uses the service-role key.
+    const adminAccountRoutes = [
+        '/api/staff/create-user', '/api/staff/edit-user',
+        '/api/staff/reset-password', '/api/staff/set-active', '/api/staff/list',
+    ];
+    if (adminAccountRoutes.includes(request.nextUrl.pathname.replace(/\/$/, ''))) {
+        const token = request.cookies.get('flyhigh_admin_auth')?.value;
+        if (!await verifyAdminToken(token)) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+    }
     if (request.nextUrl.pathname.startsWith('/api/')) {
         return NextResponse.next();
     }
@@ -79,7 +90,7 @@ export async function middleware(request) {
         !request.nextUrl.pathname.startsWith('/staff/login') &&
         !request.nextUrl.pathname.startsWith('/staff/preview')) {
 
-        const isTestMode = request.cookies.get('flyhigh_test_mode')?.value === 'true';
+        const isTestMode = process.env.FLYHIGH_REVIEW_LAB !== '1' && request.cookies.get('flyhigh_test_mode')?.value === 'true';
 
         if (!user && !isTestMode) {
             return NextResponse.redirect(new URL('/staff/login', request.url))
@@ -88,7 +99,7 @@ export async function middleware(request) {
 
     // Proteger rutas /supervisor (misma lógica que /staff)
     if (request.nextUrl.pathname.startsWith('/supervisor')) {
-        const isTestMode = request.cookies.get('flyhigh_test_mode')?.value === 'true';
+        const isTestMode = process.env.FLYHIGH_REVIEW_LAB !== '1' && request.cookies.get('flyhigh_test_mode')?.value === 'true';
 
         if (!user && !isTestMode) {
             return NextResponse.redirect(new URL('/staff/login', request.url))

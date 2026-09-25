@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { Loader2, AlertCircle, Plane, Download, Share } from 'lucide-react';
+import { Loader2, AlertCircle, Plane, Eye, EyeOff, Share } from 'lucide-react';
 import usePWAInstall from '@/hooks/usePWAInstall';
 
 export default function StaffLoginPage() {
@@ -12,8 +13,11 @@ export default function StaffLoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showTestModal, setShowTestModal] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [reviewReady, setReviewReady] = useState(false);
     const router = useRouter();
-    const { canInstall, isInstalled, isIOS, install, showIOSGuide, dismissIOSGuide } = usePWAInstall();
+    const { canInstall, isInstalled, install, showIOSGuide, dismissIOSGuide } = usePWAInstall();
+    useEffect(() => { setReviewReady(true); }, []);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -102,104 +106,151 @@ export default function StaffLoginPage() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
-            <div className="w-full max-w-sm space-y-8">
-                <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-2xl shadow-lg shadow-blue-500/30 mb-4">
-                        <Plane className="w-8 h-8 text-white" />
-                    </div>
-                    <h1 className="text-3xl font-extrabold text-slate-900">
-                        FlyHigh<span className="text-blue-500">Ops</span>
-                    </h1>
-                    <p className="mt-2 text-sm text-slate-500">Identifícate para iniciar operaciones.</p>
-                </div>
+        <div className="relative min-h-[100svh] overflow-x-hidden bg-[#031426] text-white">
+            <div className="fixed inset-0" aria-hidden="true">
+                <Image
+                    src="/img/staff-login-school.png"
+                    alt=""
+                    fill
+                    priority
+                    sizes="100vw"
+                    className="object-cover object-[50%_42%] sm:object-[50%_40%]"
+                />
+            </div>
+            <div className="fixed inset-0 bg-gradient-to-b from-[#031426]/5 via-[#031426]/10 to-[#031426]" aria-hidden="true" />
+            <div className="fixed inset-x-0 bottom-0 h-[58%] bg-gradient-to-b from-transparent via-[#031b35]/85 to-[#031426]" aria-hidden="true" />
 
-                <form className="mt-8 space-y-5" onSubmit={handleLogin}>
-                    <div className="space-y-4">
+            <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-md flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] sm:px-8">
+                <header className="flex flex-col items-center text-center drop-shadow-[0_2px_12px_rgba(0,20,50,0.4)]">
+                    <div className="flex items-center justify-center gap-2.5">
+                        <Plane className="h-8 w-8 text-white" strokeWidth={1.8} aria-hidden="true" />
+                        <h1 className="text-[1.9rem] font-extrabold tracking-[-0.04em] text-white">
+                            FlyHigh<span className="text-cyan-300">Ops</span>
+                        </h1>
+                    </div>
+                    <p className="mt-1.5 text-[0.68rem] font-bold uppercase tracking-[0.28em] text-cyan-200/90">
+                        Acceso de operaciones
+                    </p>
+                </header>
+
+                <div className="min-h-[clamp(9rem,28svh,18rem)] flex-1" aria-hidden="true" />
+
+                <main className="w-full">
+                    <div className="mb-5">
+                        <h2 className="text-4xl font-extrabold tracking-[-0.045em] text-white drop-shadow-sm sm:text-[2.6rem]">
+                            Inicia sesión
+                        </h2>
+                        <p className="mt-1.5 text-sm leading-relaxed text-slate-200 sm:text-base">
+                            Identifícate para iniciar operaciones.
+                        </p>
+                    </div>
+
+                    <form className="space-y-4" data-review-ready={reviewReady ? 'true' : 'false'} onSubmit={handleLogin}>
                         <div>
-                            <label htmlFor="staff-email" className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                            <label htmlFor="staff-email" className="block text-sm font-semibold text-white">
+                                Correo electrónico
+                            </label>
                             <input
                                 id="staff-email"
                                 name="email"
                                 type="email"
+                                inputMode="email"
                                 autoComplete="email"
+                                autoCapitalize="none"
+                                spellCheck={false}
                                 required
-                                className="block w-full px-4 py-3.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                                aria-invalid={Boolean(error)}
+                                className="mt-1 block w-full border-0 border-b border-cyan-300/80 bg-transparent px-0 py-2.5 text-base text-white outline-none transition-colors placeholder:text-slate-300/65 focus:border-cyan-200 focus:ring-0"
                                 placeholder="tu@email.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
-                        <div>
-                            <label htmlFor="staff-password" className="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
-                            <input
-                                id="staff-password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="block w-full px-4 py-3.5 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
-                    </div>
 
-                    {error && (
-                        <div className="rounded-xl bg-red-50 p-4 border border-red-200">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-red-700">{error}</p>
+                        <div>
+                            <label htmlFor="staff-password" className="block text-sm font-semibold text-white">
+                                Contraseña
+                            </label>
+                            <div className="relative mt-1 border-b border-cyan-300/80 transition-colors focus-within:border-cyan-200">
+                                <input
+                                    id="staff-password"
+                                    name="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    required
+                                    aria-invalid={Boolean(error)}
+                                    className="block w-full border-0 bg-transparent px-0 py-2.5 pr-11 text-base text-white outline-none placeholder:text-slate-300/65 focus:ring-0"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((visible) => !visible)}
+                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-end text-slate-300 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                    aria-pressed={showPassword}
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
                             </div>
+                        </div>
+
+                        {error && (
+                            <div className="rounded-xl border border-red-300/35 bg-red-950/55 px-3.5 py-3 backdrop-blur-sm" role="alert">
+                                <div className="flex items-start gap-2.5">
+                                    <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-200" />
+                                    <p className="text-sm leading-relaxed text-red-50">{error}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-base font-bold text-white shadow-[0_10px_30px_rgba(0,102,255,0.24)] transition-all hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#031426] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {loading ? (
+                                <><Loader2 className="-ml-1 mr-2 h-5 w-5 animate-spin" /> Ingresando...</>
+                            ) : (
+                                'Iniciar sesión'
+                            )}
+                        </button>
+                    </form>
+
+                    <p className="mt-4 text-center text-xs leading-relaxed text-slate-300">
+                        Tu cuenta la crea el administrador.<br />
+                        Si no tienes acceso, contacta a tu coordinador.
+                    </p>
+
+                    {canInstall && !isInstalled && (
+                        <div className="mt-3 flex justify-center">
+                            <button
+                                type="button"
+                                onClick={install}
+                                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-medium text-slate-200 backdrop-blur-sm transition-all hover:border-cyan-200/50 hover:bg-white/15 hover:text-white active:scale-[0.97]"
+                            >
+                                <Image src="/img/app-icon.png" alt="" width={16} height={16} className="h-4 w-4 rounded" />
+                                Instalar app
+                                <span className="text-slate-400">›</span>
+                            </button>
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-blue-500/20 text-base font-bold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
-                    >
-                        {loading ? (
-                            <><Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5" /> Ingresando...</>
-                        ) : (
-                            'Iniciar Sesión'
-                        )}
-                    </button>
-                </form>
-
-                <p className="text-center text-xs text-slate-400 pt-4">
-                    Tu cuenta la crea el administrador.<br />
-                    Si no tienes acceso, contacta a tu coordinador.
-                </p>
-
-                {/* ─── PWA Install — Subtle Chip ─── */}
-                {canInstall && !isInstalled && (
-                    <div className="flex justify-center pt-1">
-                        <button
-                            type="button"
-                            onClick={install}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100/80 border border-slate-200/60 text-slate-500 text-xs font-medium hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 active:scale-[0.97] transition-all"
-                        >
-                            <img src="/img/app-icon.png" alt="" className="w-4 h-4 rounded" />
-                            Instalar app
-                            <span className="text-slate-300">›</span>
-                        </button>
-                    </div>
-                )}
-
-                {/* Test Mode Button */}
-                <div className="pt-6 border-t border-slate-100 mt-6">
-                    <button
-                        type="button"
-                        onClick={() => setShowTestModal(true)}
-                        className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-700 text-xs font-bold rounded-xl transition-colors border border-slate-200 border-dashed flex items-center justify-center gap-2"
-                    >
-                        <span>🛠️</span> Entrar en modo test
-                    </button>
-                </div>
+                    {process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB !== '1' && (
+                        <div className="mt-4 border-t border-white/10 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowTestModal(true)}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-300 transition-colors hover:border-white/30 hover:bg-white/10 hover:text-white"
+                            >
+                                <span>🛠️</span> Entrar en modo test
+                            </button>
+                        </div>
+                    )}
+                </main>
             </div>
 
-            {showTestModal && <TestModeModal onClose={() => setShowTestModal(false)} />}
+            {process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB !== '1' && showTestModal && <TestModeModal onClose={() => setShowTestModal(false)} />}
 
             {/* ─── iOS Install Guide Overlay ─── */}
             {showIOSGuide && (

@@ -83,6 +83,7 @@ export default function AcademiaLobbyPage() {
     
     // Inline audio playback
     const [playingPoiId, setPlayingPoiId] = useState(null);
+    const [audioPlaybackError, setAudioPlaybackError] = useState('');
     const audioRef = useRef(null);
     
     // Tutorial state
@@ -598,6 +599,24 @@ export default function AcademiaLobbyPage() {
     // ═══════════════════════════════════════════════════════════
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
+            {audioPlaybackError && (
+                <div className="fixed inset-x-4 bottom-5 z-[120] mx-auto max-w-sm rounded-2xl border border-red-200 bg-white px-4 py-3 shadow-2xl" role="alert">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="m-0 text-sm font-extrabold text-red-700">No pudimos reproducir este audio</p>
+                            <p className="m-0 mt-1 text-xs font-medium leading-relaxed text-slate-500">{audioPlaybackError}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setAudioPlaybackError('')}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                            aria-label="Cerrar aviso"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                </div>
+            )}
             <PilotDashboardHeader 
                 userName={userName}
                 avatarConfig={userAvatarConfig}
@@ -792,6 +811,7 @@ export default function AcademiaLobbyPage() {
                                 
                                 const handlePlayPause = (e) => {
                                     e.stopPropagation();
+                                    setAudioPlaybackError('');
                                     if (isPlaying) {
                                         audioRef.current?.pause();
                                         setPlayingPoiId(null);
@@ -801,10 +821,17 @@ export default function AcademiaLobbyPage() {
                                         }
                                         const audio = new Audio(poi.audio_url);
                                         audioRef.current = audio;
-                                        audio.play();
-                                        setPlayingPoiId(poi.id);
+                                        audio.play()
+                                            .then(() => setPlayingPoiId(poi.id))
+                                            .catch(() => {
+                                                setPlayingPoiId(null);
+                                                setAudioPlaybackError('Verifica que el archivo esté disponible e inténtalo nuevamente.');
+                                            });
                                         audio.onended = () => setPlayingPoiId(null);
-                                        audio.onerror = () => setPlayingPoiId(null);
+                                        audio.onerror = () => {
+                                            setPlayingPoiId(null);
+                                            setAudioPlaybackError('El archivo no está disponible en un formato reproducible.');
+                                        };
                                     }
                                 };
                                 

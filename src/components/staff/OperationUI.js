@@ -827,7 +827,7 @@ export default function OperationUI({
                                         </span>
                                     </span>
                                     <span className="block mt-1 text-xs font-medium text-slate-500">
-                                        Solo 1 MB, ahorra batería, palabra clave fija ("go").
+                                        Solo 1 MB, ahorra batería, palabra clave fija (&quot;go&quot;).
                                     </span>
                                 </button>
                             </div>

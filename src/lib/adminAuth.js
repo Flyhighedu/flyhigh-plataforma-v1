@@ -1,46 +1,35 @@
-const AUTH_SECRET = process.env.ADMIN_AUTH_SECRET || 'flyhigh_admin_secret_2026_do_not_share';
-
-// Convert secret string to CryptoKey
-async function getCryptoKey(secret) {
-    const enc = new TextEncoder();
-    return await crypto.subtle.importKey(
-        "raw",
-        enc.encode(secret),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign", "verify"]
+// Shared by the login route and Edge middleware. Never use a default secret.
+async function getSigningKey() {
+    const secret = process.env.ADMIN_AUTH_SECRET;
+    if (!secret) return null;
+    return crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']
     );
 }
 
-// Convert ArrayBuffer to Hex string
-function bufferToHex(buffer) {
-    return Array.from(new Uint8Array(buffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+export async function signAdminToken(payload) {
+    const key = await getSigningKey();
+    if (!key) throw new Error('Admin authentication is not configured');
+    const data = JSON.stringify(payload);
+    const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+    const signature = Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+    return btoa(JSON.stringify({ data, signature }));
 }
 
-/**
- * Verify a signed admin auth token from cookie.
- * Returns the payload if valid, null if invalid/expired.
- */
 export async function verifyAdminToken(token) {
     if (!token) return null;
     try {
+        const key = await getSigningKey();
+        if (!key) return null;
         const { data, signature } = JSON.parse(atob(token));
-        const key = await getCryptoKey(AUTH_SECRET);
-        const enc = new TextEncoder();
-        const signatureBuffer = await crypto.subtle.sign(
-            "HMAC",
-            key,
-            enc.encode(data)
-        );
-        const expected = bufferToHex(signatureBuffer);
-        
-        if (signature !== expected) return null;
+        if (typeof data !== 'string' || typeof signature !== 'string' || !/^[a-f0-9]{64}$/.test(signature)) return null;
+        const bytes = Uint8Array.from(signature.match(/../g), byte => parseInt(byte, 16));
+        if (!await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(data))) return null;
         const payload = JSON.parse(data);
-        if (payload.exp && Date.now() > payload.exp) return null;
+        if (payload.role !== 'admin' || !Number.isFinite(payload.exp) || payload.exp <= Date.now()) return null;
         return payload;
-    } catch (_e) {
+    } catch {
         return null;
     }
 }

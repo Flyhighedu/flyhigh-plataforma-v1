@@ -1,0 +1,2570 @@
+{
+  "scope": "src",
+  "errors": 87,
+  "warnings": 167,
+  "files": 448,
+  "diagnostics": [
+    {
+      "file": "src/app/admin/crm-escuelas/page.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 79,
+          "column": 6,
+          "message": "React Hook useEffect has a missing dependency: 'selectedSchool'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 596,
+          "column": 92,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/app/admin/cronograma/page.jsx",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1501,
+          "column": 53,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1660,
+          "column": 61,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "jsx-a11y/alt-text",
+          "severity": 1,
+          "line": 2275,
+          "column": 61,
+          "message": "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images."
+        }
+      ]
+    },
+    {
+      "file": "src/app/admin/imprimibles/page.jsx",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 338,
+          "column": 6,
+          "message": "React Hook useCallback has missing dependencies: 'customAIFlyers' and 'refMap'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 440,
+          "column": 9,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        }
+      ]
+    },
+    {
+      "file": "src/app/admin/operativos/page.jsx",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1476,
+          "column": 53,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1635,
+          "column": 61,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "jsx-a11y/alt-text",
+          "severity": 1,
+          "line": 2211,
+          "column": 61,
+          "message": "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images."
+        }
+      ]
+    },
+    {
+      "file": "src/app/admin/patrocinadores/page.jsx",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1476,
+          "column": 53,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1635,
+          "column": 61,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "jsx-a11y/alt-text",
+          "severity": 1,
+          "line": 2211,
+          "column": 61,
+          "message": "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images."
+        }
+      ]
+    },
+    {
+      "file": "src/app/dashboard/page.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 1076,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'previewMode'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 1282,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/inteligencia/components/AnimatedCounter.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 10,
+          "column": 5,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 34,
+          "column": 6,
+          "message": "React Hook useEffect has a missing dependency: 'displayValue'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/inteligencia/components/ProjectSwitcher.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 21,
+          "column": 5,
+          "message": "Error: Cannot access variable before it is declared"
+        }
+      ]
+    },
+    {
+      "file": "src/app/inteligencia/page.jsx",
+      "errors": 0,
+      "warnings": 5,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 103,
+          "column": 6,
+          "message": "React Hook useCallback has a missing dependency: 'setRoutes'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 317,
+          "column": 6,
+          "message": "React Hook useEffect has a missing dependency: 'restoreProject'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 353,
+          "column": 6,
+          "message": "React Hook useCallback has missing dependencies: 'setFilters', 'setPrices', and 'setRoutes'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 417,
+          "column": 6,
+          "message": "React Hook useCallback has missing dependencies: 'setFilters', 'setPrices', and 'setRoutes'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 478,
+          "column": 6,
+          "message": "React Hook useEffect has missing dependencies: 'isReadOnly' and 'routeCCTs'. Either include them or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/layout.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 58,
+          "column": 17,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        },
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 59,
+          "column": 17,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        }
+      ]
+    },
+    {
+      "file": "src/app/maestros/page.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 40,
+          "column": 13,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-crm/inbox-panel.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 50,
+          "column": 6,
+          "message": "React Hook useEffect has a missing dependency: 'contact'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-crm/inbox-view.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 85,
+          "column": 34,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-crm/page.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 20,
+          "column": 5,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 403,
+          "column": 6,
+          "message": "React Hook useMemo has a missing dependency: 'viewMode'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-cronograma/cronograma-columns.jsx",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 153,
+          "column": 57,
+          "message": "React Hook useEffect has a missing dependency: 'getValue'. Either include it or remove the dependency array. If 'getValue' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 153,
+          "column": 58,
+          "message": "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-cronograma/editable-cell.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": null,
+          "severity": 1,
+          "line": 32,
+          "column": 5,
+          "message": "Unused eslint-disable directive (no problems were reported from 'eqeqeq')."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-dashboards/page.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 148,
+          "column": 21,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-escuelas/editable-cell.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": null,
+          "severity": 1,
+          "line": 34,
+          "column": 5,
+          "message": "Unused eslint-disable directive (no problems were reported from 'eqeqeq')."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-escuelas/escuelas-columns.jsx",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 164,
+          "column": 59,
+          "message": "React Hook useEffect has a missing dependency: 'getValue'. Either include it or remove the dependency array. If 'getValue' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 164,
+          "column": 60,
+          "message": "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-escuelas/page.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 41,
+          "column": 6,
+          "message": "React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-hr/data-table.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/incompatible-library",
+          "severity": 1,
+          "line": 31,
+          "column": 17,
+          "message": "Compilation Skipped: Use of incompatible library"
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-hr/editable-cell.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": null,
+          "severity": 1,
+          "line": 32,
+          "column": 5,
+          "message": "Unused eslint-disable directive (no problems were reported from 'eqeqeq')."
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 151,
+          "column": 19,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-patrocinadores/editable-cell.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": null,
+          "severity": 1,
+          "line": 32,
+          "column": 5,
+          "message": "Unused eslint-disable directive (no problems were reported from 'eqeqeq')."
+        }
+      ]
+    },
+    {
+      "file": "src/app/sandbox-vuelos/editable-cell.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": null,
+          "severity": 1,
+          "line": 33,
+          "column": 5,
+          "message": "Unused eslint-disable directive (no problems were reported from 'eqeqeq')."
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff-v2/closure/page.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 40,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 162,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff-v2/dashboard/page.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 211,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'journeyId'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 432,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'todaySchool?.id'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff/academia/page.js",
+      "errors": 1,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 165,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'ROLE_LABELS'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react/jsx-no-duplicate-props",
+          "severity": 2,
+          "line": 458,
+          "column": 29,
+          "message": "No duplicate props allowed"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 486,
+          "column": 49,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 848,
+          "column": 57,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff/dashboard/page.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 984,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'selectMission'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 1375,
+          "column": 8,
+          "message": "React Hook useCallback has missing dependencies: 'journeyId' and 'showBrief'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 1842,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'todaySchool?.id'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff/id-studio/page.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 157,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 273,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/staff/login/page.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 183,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/supervisor/dashboard/page.js",
+      "errors": 0,
+      "warnings": 6,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 4961,
+          "column": 81,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 5086,
+          "column": 37,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 5425,
+          "column": 73,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 5784,
+          "column": 85,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 5809,
+          "column": 85,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 5830,
+          "column": 85,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/app/supervisor/layout.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 10,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/AlliesSection.js",
+      "errors": 0,
+      "warnings": 6,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 130,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 140,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 150,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 160,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 170,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 195,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/CustomSplashScreen.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 15,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 62,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Donation/DonationModal.js",
+      "errors": 6,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 49,
+          "column": 43,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 50,
+          "column": 24,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 59,
+          "column": 42,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 59,
+          "column": 74,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 152,
+          "column": 8,
+          "message": "React Hook useEffect has missing dependencies: 'id' and 'onComplete'. Either include them or remove the dependency array. If 'onComplete' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 155,
+          "column": 42,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 465,
+          "column": 113,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Escuelas/EscuelasAllies.js",
+      "errors": 0,
+      "warnings": 4,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 128,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 154,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 171,
+          "column": 45,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 193,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Escuelas/EscuelasBenefits.js",
+      "errors": 4,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 234,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'spawnPiece'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 266,
+          "column": 37,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 291,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 308,
+          "column": 30,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 316,
+          "column": 38,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 326,
+          "column": 39,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 329,
+          "column": 36,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Escuelas/EscuelasCalculator.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 67,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 546,
+          "column": 17,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Escuelas/EscuelasHero.js",
+      "errors": 0,
+      "warnings": 6,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 67,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 86,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 91,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 96,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 101,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 106,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Escuelas/EscuelasMission.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 70,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/ExperienciaInmersiva.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 86,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/FlyHighTestimonialGallery.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 134,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 155,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Hero.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 39,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/HorizontalGallery.js",
+      "errors": 2,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/refs",
+          "severity": 2,
+          "line": 216,
+          "column": 18,
+          "message": "Error: Cannot access refs during render"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 232,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 347,
+          "column": 17,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 424,
+          "column": 29,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 569,
+          "column": 8,
+          "message": "React Hook useLayoutEffect has missing dependencies: 'bgRefs.circle', 'bgRefs.line1', and 'bgRefs.line2'. Either include them or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/ImpactEngineGoldenMaster.js",
+      "errors": 8,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 47,
+          "column": 43,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 48,
+          "column": 24,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 57,
+          "column": 42,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 57,
+          "column": 74,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 250,
+          "column": 52,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 294,
+          "column": 113,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 328,
+          "column": 8,
+          "message": "React Hook useEffect has missing dependencies: 'id' and 'onComplete'. Either include them or remove the dependency array. If 'onComplete' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 331,
+          "column": 42,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 554,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Maestros/MaestrosHero.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 72,
+          "column": 13,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Manifiesto.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 9,
+          "column": 17,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/MobileGallery.js",
+      "errors": 2,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 351,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 587,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/preserve-manual-memoization",
+          "severity": 2,
+          "line": 658,
+          "column": 36,
+          "message": "Compilation Skipped: Existing memoization could not be preserved"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 685,
+          "column": 8,
+          "message": "React Hook useCallback has missing dependencies: 'playerOpen', 'snapPoints', and 'totalPoints'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 730,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'totalPoints'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/Navbar.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 18,
+          "column": 5,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 67,
+          "column": 15,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Patrocinadores/FloatingButton.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 80,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Patrocinadores/PatrocinadoresAllies.js",
+      "errors": 0,
+      "warnings": 4,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 18,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 25,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 32,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 39,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Patrocinadores/PatrocinadoresHero.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 122,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Patrocinadores/SponsorsGrid.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 167,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/PlanVuelo.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 292,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 324,
+          "column": 45,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/Trailer.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 91,
+          "column": 17,
+          "message": "Error: Cannot access variable before it is declared"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 150,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/AdminAlarms.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 41,
+          "column": 8,
+          "message": "React Hook useEffect has missing dependencies: 'alarms' and 'dismissedIDs'. Either include them or remove the dependency array. You can also do a functional update 'setAlarms(a => ...)' if you only need 'alarms' in the 'setAlarms' call."
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/AdminLayout.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 27,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/AdminPWAPrompt.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 21,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/MasterRouteStudio.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 213,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'addPoiFromMap'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 219,
+          "column": 12,
+          "message": "React Hook useCallback has a missing dependency: 'addPoiFromMap'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 362,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'addPoiFromMap'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/flyers/CertificadoEscuela.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 89,
+          "column": 11,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 261,
+          "column": 19,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 325,
+          "column": 13,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/flyers/CircularDigital.js",
+      "errors": 7,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 100,
+          "column": 7,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 133,
+          "column": 16,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 149,
+          "column": 112,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 156,
+          "column": 112,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 169,
+          "column": 15,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 178,
+          "column": 14,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 224,
+          "column": 20,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 229,
+          "column": 18,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "react-hooks/static-components",
+          "severity": 2,
+          "line": 236,
+          "column": 16,
+          "message": "Error: Cannot create components during render"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 247,
+          "column": 15,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/flyers/FlyerDownloadModal.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-page-custom-font",
+          "severity": 1,
+          "line": 81,
+          "column": 7,
+          "message": "Custom fonts not added in `pages/_document.js` will only load for a single page. This is discouraged. See: https://nextjs.org/docs/messages/no-page-custom-font"
+        }
+      ]
+    },
+    {
+      "file": "src/components/flyers/FlyerNinos.js",
+      "errors": 0,
+      "warnings": 9,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 64,
+          "column": 11,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 250,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 251,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 252,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 253,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 254,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 255,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 256,
+          "column": 9,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 266,
+          "column": 13,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/flyers/FlyerPadres.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 65,
+          "column": 11,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 202,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/sales/SponsorLegitimacyGrid.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 36,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 53,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/shared/SharedNarrativeFactory.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 478,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/ArrivalPhotoCapture.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 244,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/AuxVehicleChecklist.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 426,
+          "column": 53,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "jsx-a11y/alt-text",
+          "severity": 1,
+          "line": 426,
+          "column": 53,
+          "message": "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/AuxWaitingScreen.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 48,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 65,
+          "column": 38,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/ClosureLegacy.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 44,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 163,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/IncidentReporter.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 77,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/MissionBrief.js",
+      "errors": 1,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 80,
+          "column": 13,
+          "message": "Error: Cannot access variable before it is declared"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 194,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 289,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/PauseActiveOverlay.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 15,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/PrepChecklist.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 389,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 661,
+          "column": 61,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/StaffOperationLegacy.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 39,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/SyncHeader.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 266,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/TeacherTeamChecklist.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 67,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'onUpdate'. Either include it or remove the dependency array. If 'onUpdate' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 249,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/TeacherWaitingScreen.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/refs",
+          "severity": 2,
+          "line": 230,
+          "column": 168,
+          "message": "Error: Cannot access refs during render"
+        },
+        {
+          "rule": "react-hooks/refs",
+          "severity": 2,
+          "line": 241,
+          "column": 53,
+          "message": "Error: Cannot access refs during render"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff-v2/WaitingAuxLoad.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 48,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 65,
+          "column": 38,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/ArrivalPhotoCapture.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 240,
+          "column": 21,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/AuxOperationReadyScreen.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 517,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/AuxVehicleChecklist.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 400,
+          "column": 53,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "jsx-a11y/alt-text",
+          "severity": 1,
+          "line": 400,
+          "column": 53,
+          "message": "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/AuxWaitingScreen.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 49,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 66,
+          "column": 38,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/ClosureLegacy.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 44,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 163,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/DailyImpactReport.js",
+      "errors": 0,
+      "warnings": 4,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 206,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'journeyId'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 385,
+          "column": 45,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 409,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 420,
+          "column": 41,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/IdentityScanner.js",
+      "errors": 6,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 337,
+          "column": 47,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 339,
+          "column": 46,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 340,
+          "column": 47,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 343,
+          "column": 50,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 344,
+          "column": 65,
+          "message": "Error: Cannot call impure function during render"
+        },
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 344,
+          "column": 94,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/IncidentReporter.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 77,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/MicCalibrator.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 27,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/MissionBrief.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 147,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'startWatchingLocation'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 313,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'dynamicSchool'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/OperationUI.js",
+      "errors": 6,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 178,
+          "column": 17,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 609,
+          "column": 34,
+          "message": "Error: Cannot modify local variables after render completes"
+        },
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 652,
+          "column": 46,
+          "message": "Error: Cannot modify local variables after render completes"
+        },
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 674,
+          "column": 50,
+          "message": "Error: Cannot modify local variables after render completes"
+        },
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 675,
+          "column": 48,
+          "message": "Error: Cannot modify local variables after render completes"
+        },
+        {
+          "rule": "react-hooks/immutability",
+          "severity": 2,
+          "line": 701,
+          "column": 42,
+          "message": "Error: Cannot modify local variables after render completes"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/POIFormModal.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 44,
+          "column": 17,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/PWAInstallBanner.js",
+      "errors": 1,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 25,
+          "column": 17,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 48,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/PauseActiveOverlay.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 15,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/PerformanceReportModal.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 46,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/PrepChecklist.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 662,
+          "column": 61,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/SimulationContainer.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/purity",
+          "severity": 2,
+          "line": 54,
+          "column": 29,
+          "message": "Error: Cannot call impure function during render"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/SquadronCalculator.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 55,
+          "column": 22,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/StaffOperationLegacy.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 350,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'sharedMic'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/SupervisorBitacoraScreen.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 194,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'uploadTelemetry'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 342,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'WIZARD_STEPS'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 347,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'WIZARD_STEPS'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/TacticalMapScreen.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 83,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'radarTexts.length'. Either include it or remove the dependency array."
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/TeacherTeamChecklist.js",
+      "errors": 0,
+      "warnings": 2,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 67,
+          "column": 8,
+          "message": "React Hook useEffect has a missing dependency: 'onUpdate'. Either include it or remove the dependency array. If 'onUpdate' changes too often, find the parent component that defines it and wrap that definition in useCallback."
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 249,
+          "column": 25,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/UnloadScreen.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 441,
+          "column": 33,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/VoiceSimulatorWidget.js",
+      "errors": 2,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 32,
+          "column": 23,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 119,
+          "column": 5,
+          "message": "React Hook useEffect contains a call to 'setContentHeight'. Without a list of dependencies, this can lead to an infinite chain of updates. To fix this, pass [contentHeight] as a second argument to the useEffect Hook."
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 137,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/staff/WaitingAuxLoad.js",
+      "errors": 2,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 90,
+          "column": 9,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        },
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 107,
+          "column": 38,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/components/supervisor/EvidenceViewerModal.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 67,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/supervisor/V2MissionDetails.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 541,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 551,
+          "column": 29,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        },
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 605,
+          "column": 45,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/components/ui/MiniAvatar.js",
+      "errors": 0,
+      "warnings": 1,
+      "messages": [
+        {
+          "rule": "@next/next/no-img-element",
+          "severity": 1,
+          "line": 37,
+          "column": 13,
+          "message": "Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useAudioRecorder.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 73,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useElapsedTimer.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 37,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/usePWAInstall.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 31,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useSharedMicrophone.js",
+      "errors": 1,
+      "warnings": 0,
+      "messages": [
+        {
+          "rule": "react-hooks/set-state-in-effect",
+          "severity": 2,
+          "line": 54,
+          "column": 13,
+          "message": "Error: Calling setState synchronously within an effect can trigger cascading renders"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useVoiceCopilot.js",
+      "errors": 0,
+      "warnings": 3,
+      "messages": [
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 798,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'closeMicrophone'. Either include it or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 1087,
+          "column": 8,
+          "message": "React Hook useCallback has missing dependencies: 'closeMicrophone' and 'initMicrophone'. Either include them or remove the dependency array."
+        },
+        {
+          "rule": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "line": 1422,
+          "column": 8,
+          "message": "React Hook useCallback has a missing dependency: 'initMicrophone'. Either include it or remove the dependency array."
+        }
+      ]
+    }
+  ]
+}

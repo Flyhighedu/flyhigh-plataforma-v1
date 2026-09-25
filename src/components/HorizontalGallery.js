@@ -192,7 +192,7 @@ const getStyles = (type) => {
 };
 
 // --- COMPONENT: FILM GRAIN ---
-const FilmGrain = memo(() => (
+const FilmGrain = memo(function FilmGrain() { return (
     <svg className="film-grain w-full h-full pointer-events-none fixed inset-0 z-[100] opacity-[0.04]" style={{ willChange: 'opacity', backfaceVisibility: 'hidden', transform: 'translate3d(0,0,0)' }}>
         <filter id="noise">
             <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" stitchTiles="stitch" />
@@ -200,7 +200,7 @@ const FilmGrain = memo(() => (
         </filter>
         <rect width="100%" height="100%" filter="url(#noise)" />
     </svg>
-));
+); });
 
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -363,7 +363,7 @@ const MuralMedia = memo(forwardRef(({ item, onOpen, handleMediaHover }, ref) => 
                 </div>
             )}
             <div className="absolute -top-6 left-2 font-mono text-[8px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity duration-500 tracking-tighter uppercase whitespace-nowrap antialiased" style={{ backfaceVisibility: 'hidden' }}>
-                {item.serial} // LATERAL: {item.location}
+                {item.serial}{' // LATERAL: '}{item.location}
             </div>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ backfaceVisibility: 'hidden' }}>
                 <div className="relative flex flex-col items-center animate-pulse duration-[3000ms]">

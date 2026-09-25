@@ -1,0 +1,234 @@
+[
+  {
+    "name": "create_staff_operations_schema",
+    "version": "20260120074958"
+  },
+  {
+    "name": "create_bitacora_pausas",
+    "version": "20260121044145"
+  },
+  {
+    "name": "add_delete_policies",
+    "version": "20260121162005"
+  },
+  {
+    "name": "staff_v1_tables",
+    "version": "20260210053402"
+  },
+  {
+    "name": "fix_staff_profiles_recursion",
+    "version": "20260210081508"
+  },
+  {
+    "name": "add_mission_state_to_staff_journeys",
+    "version": "20260211062807"
+  },
+  {
+    "name": "create_get_active_staff_profiles_rpc",
+    "version": "20260211073339"
+  },
+  {
+    "name": "002_staff_en_ruta",
+    "version": "20260212004817"
+  },
+  {
+    "name": "002_staff_en_ruta",
+    "version": "20260212010011"
+  },
+  {
+    "name": "add_reset_nonce_to_journeys",
+    "version": "20260212065109"
+  },
+  {
+    "name": "003_staff_journey_meta",
+    "version": "20260214050716"
+  },
+  {
+    "name": "004_history_snapshot_and_soft_delete",
+    "version": "20260220053202"
+  },
+  {
+    "name": "005_widen_history_select_policies",
+    "version": "20260220054337"
+  },
+  {
+    "name": "005_add_supervisor_role",
+    "version": "20260220061951"
+  },
+  {
+    "name": "006_add_initial_password_column",
+    "version": "20260220062433"
+  },
+  {
+    "name": "restrictive_rls_and_privacy",
+    "version": "20260310012912"
+  },
+  {
+    "name": "add_journey_id_to_cierres_mision",
+    "version": "20260311200230"
+  },
+  {
+    "name": "add_costo_por_nino_and_tipo_escuela_to_staff_journeys",
+    "version": "20260313202908"
+  },
+  {
+    "name": "add_becados_column_to_cierres_mision",
+    "version": "20260314064603"
+  },
+  {
+    "name": "add_bi_columns_to_staff_journeys",
+    "version": "20260316181302"
+  },
+  {
+    "name": "rename_colonia_add_director_consolidate_cuota",
+    "version": "20260316192549"
+  },
+  {
+    "name": "add_sector_zona_to_staff_journeys",
+    "version": "20260318185525"
+  },
+  {
+    "name": "create_catalogo_escuelas",
+    "version": "20260319192326"
+  },
+  {
+    "name": "add_visitada_column",
+    "version": "20260319195857"
+  },
+  {
+    "name": "create_visitada_trigger",
+    "version": "20260319200630"
+  },
+  {
+    "name": "add_cct_to_proximas_escuelas",
+    "version": "20260320060225"
+  },
+  {
+    "name": "add_anon_select_policy_video_markers",
+    "version": "20260321211212"
+  },
+  {
+    "name": "add_context_columns_to_video_markers",
+    "version": "20260322055814"
+  },
+  {
+    "name": "add_tag_column_to_video_markers",
+    "version": "20260322082137"
+  },
+  {
+    "name": "allow_anon_select_staff_journeys",
+    "version": "20260323060200"
+  },
+  {
+    "name": "create_fondo_patrocinadores",
+    "version": "20260324185124"
+  },
+  {
+    "name": "standardize_estatus_values",
+    "version": "20260325064303"
+  },
+  {
+    "name": "add_columns_proximas_escuelas",
+    "version": "20260325064815"
+  },
+  {
+    "name": "add_estado_pipeline_catalogo",
+    "version": "20260325064816"
+  },
+  {
+    "name": "create_whatsapp_tables",
+    "version": "20260325064905"
+  },
+  {
+    "name": "archive_test_data",
+    "version": "20260325064916"
+  },
+  {
+    "name": "hr_module_phase1_tables",
+    "version": "20260327224825"
+  },
+  {
+    "name": "hr_module_phase1_rls",
+    "version": "20260327224845"
+  },
+  {
+    "name": "add_logo_url_to_patrocinadores",
+    "version": "20260331215049"
+  },
+  {
+    "name": "add_checkin_marks_en_progreso_trigger",
+    "version": "20260331221751"
+  },
+  {
+    "name": "add_mantener_logo_original_to_patrocinadores",
+    "version": "20260331224753"
+  },
+  {
+    "name": "fix_fechas_disponibles_and_create_increment_cupo",
+    "version": "20260404230115"
+  },
+  {
+    "name": "add_turno_bloqueado_columns",
+    "version": "20260404232353"
+  },
+  {
+    "name": "expand_estado_pipeline_and_trigger",
+    "version": "20260408060941"
+  },
+  {
+    "name": "add_crm_reminders",
+    "version": "20260409070655"
+  },
+  {
+    "name": "create_precios_cuotas_table",
+    "version": "20260410231942"
+  },
+  {
+    "name": "add_destacado_to_precios",
+    "version": "20260411005012"
+  },
+  {
+    "name": "enable_pg_trgm",
+    "version": "20260411011306"
+  },
+  {
+    "name": "create_fuzzy_search_rpc",
+    "version": "20260411011333"
+  },
+  {
+    "name": "add_avatar_config_and_phone_to_staff_profiles",
+    "version": "20260414190159"
+  },
+  {
+    "name": "add_nudge_sent_column",
+    "version": "20260417211517"
+  },
+  {
+    "name": "add_nudge_level",
+    "version": "20260418185558"
+  },
+  {
+    "name": "setup_nudge_cron",
+    "version": "20260418192353"
+  },
+  {
+    "name": "update_whatsapp_conversations_fkey_delete_rule",
+    "version": "20260419200553"
+  },
+  {
+    "name": "add_numero_ninos_to_proximas_escuelas",
+    "version": "20260421102209"
+  },
+  {
+    "name": "006_expand_pipeline_states",
+    "version": "20260423180337"
+  },
+  {
+    "name": "007_add_cita_ventas_state",
+    "version": "20260424053415"
+  },
+  {
+    "name": "create_intel_tables",
+    "version": "20260618194519"
+  }
+]

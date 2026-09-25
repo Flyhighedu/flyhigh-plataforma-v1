@@ -1,0 +1,1316 @@
+[
+  {
+    "file": "AdWallDismantleScreen.js",
+    "lines": 74,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "ApoyoBodegaScreen.js",
+    "lines": 109,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "ArrivalNotificationScreen.js",
+    "lines": 36,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "ArrivalPhotoCapture.js",
+    "lines": 293,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "AuxAdWallInstallScreen.js",
+    "lines": 687,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "aux_ad_wall_checks",
+      "aux_ad_wall_evidence_url",
+      "aux_ad_wall_done",
+      "aux_ad_wall_done_by_name"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "AuxCivicEvidenceParallelScreen.js",
+    "lines": 250,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "AuxOperationReadyScreen.js",
+    "lines": 664,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "pilot_music_ambience_done",
+      "teacher_operation_ready",
+      "aux_operation_ready",
+      "aux_operation_stand_photo_url",
+      "aux_operation_ready_by_name",
+      "operation_start_bridge_at"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "AuxParkingVehicleScreen.js",
+    "lines": 632,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "aux_vehicle_evidence_url",
+      "aux_ready_seat_deployment"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "AuxRecordingChargingScreen.js",
+    "lines": 97,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "AuxVehicleChecklist.js",
+    "lines": 490,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "AuxWaitingScreen.js",
+    "lines": 421,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "ChargingStationScreen.js",
+    "lines": 79,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "CheckInFallback.js",
+    "lines": 102,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "CheckInFooterBar.js",
+    "lines": 56,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "CheckoutScreen.js",
+    "lines": 1259,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "auxiliar",
+      "pilot",
+      "teacher",
+      "assistant"
+    ],
+    "flags": [
+      "closure_checkout_done",
+      "closure_checkout_team",
+      "closure_checkout_pilot_done",
+      "checkout_pilot_done",
+      "closure_checkout_teacher_done",
+      "checkout_teacher_done",
+      "closure_checkout_assistant_done",
+      "checkout_assistant_done",
+      "checkout_comments"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "ClosureLegacy.js",
+    "lines": 194,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "ClosureTaskScreen.js",
+    "lines": 1130,
+    "dashboardImport": false,
+    "screenNamed": true,
+    "roles": [
+      "auxiliar",
+      "pilot"
+    ],
+    "flags": [
+      "closure_step"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "ContainerLoadingScreen.js",
+    "lines": 37,
+    "dashboardImport": false,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "ContingencyBypassMenu.js",
+    "lines": 247,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "CopilotOrbUI.js",
+    "lines": 309,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "CounterData.js",
+    "lines": 82,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "DailyImpactReport.js",
+    "lines": 495,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "DependencyTransitionOverlay.js",
+    "lines": 222,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "DroneStorageScreen.js",
+    "lines": 30,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "DropzoneActionScreen.js",
+    "lines": 410,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "unload_access",
+      "unload_note",
+      "unload_voice_url",
+      "unload_voice_duration"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "DropzoneWaitingScreen.js",
+    "lines": 326,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "pilot"
+    ],
+    "flags": [
+      "unload_access",
+      "unload_note",
+      "unload_voice_url",
+      "unload_voice_duration"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "EmotionRatingModal.js",
+    "lines": 272,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "EnRutaScreen.js",
+    "lines": 255,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "EnRutaStitchLayout.js",
+    "lines": 300,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "teacher"
+    ],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "EquipmentUnloadScreen.js",
+    "lines": 48,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "EscuadronBriefingOverlay.js",
+    "lines": 281,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "EscuadronDebriefModal.js",
+    "lines": 256,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "FinalParkingScreen.js",
+    "lines": 323,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar"
+    ],
+    "flags": [
+      "aux_final_parking_checklist_done",
+      "aux_final_parking_done",
+      "closure_final_parking_done",
+      "aux_key_drop_done",
+      "closure_key_drop_done"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "FlightLogger.js",
+    "lines": 617,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "FlightMiniPlayer.js",
+    "lines": 131,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "FlightPathView.js",
+    "lines": 386,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "GlassesSetupScreen.js",
+    "lines": 1169,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "pilot"
+    ],
+    "flags": [
+      "global_glasses_station_count",
+      "global_glasses_checks",
+      "global_glasses_control_mode",
+      "global_glasses_controller_name",
+      "global_glasses_controller_role",
+      "global_glasses_controller_user_id",
+      "global_glasses_done",
+      "global_glasses_done_by_name",
+      "global_glasses_functional_count"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "GlassesStorageScreen.js",
+    "lines": 30,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "GlobalLoadingScreen.js",
+    "lines": 261,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar",
+      "teacher",
+      "pilot"
+    ],
+    "flags": [
+      "global_equipment_loaded",
+      "global_container_loading_done",
+      "pilot_containers_loaded"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "HeaderHamburgerMenu.js",
+    "lines": 477,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [
+      "teacher",
+      "pilot"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "HeaderOperativo.js",
+    "lines": 424,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "HeadphonesSetupScreen.js",
+    "lines": 837,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "pilot"
+    ],
+    "flags": [
+      "global_headphones_control_mode",
+      "global_headphones_controller_name",
+      "global_headphones_controller_role",
+      "global_headphones_controller_user_id",
+      "global_headphones_checks",
+      "global_headphones_done",
+      "global_headphones_done_by_name",
+      "global_glasses_station_count",
+      "global_glasses_checks",
+      "global_glasses_done",
+      "global_glasses_done_at",
+      "global_glasses_done_by",
+      "global_glasses_done_by_name",
+      "global_glasses_functional_count"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "HeadphonesStorageScreen.js",
+    "lines": 79,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "IdentityScanner.js",
+    "lines": 413,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "IncidentReporter.js",
+    "lines": 126,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "KeyDropModal.js",
+    "lines": 120,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "LoadingValidationModal.js",
+    "lines": 211,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "LocationStatusCard.js",
+    "lines": 124,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "MapPreviewModal.js",
+    "lines": 68,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "MicCalibrator.js",
+    "lines": 220,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "MissionBrief.js",
+    "lines": 599,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [
+      "assistant"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "MissionBriefUI.js",
+    "lines": 611,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "pilot",
+      "teacher",
+      "assistant"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "MissionSelector.js",
+    "lines": 183,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "MomentoDeCargarScreen.js",
+    "lines": 163,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "aux_vehicle_positioned",
+      "closure_vehicle_positioning_done"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "OperationPanelConstructionScreen.js",
+    "lines": 682,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "OperationStartBridgeScreen.js",
+    "lines": 208,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "operation_start_bridge_at",
+      "operation_started_at"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "OperationUI.js",
+    "lines": 886,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "pilot"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PauseActiveOverlay.js",
+    "lines": 107,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PauseMenu.js",
+    "lines": 204,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PendingSyncBanner.js",
+    "lines": 81,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "PerformanceReportModal.js",
+    "lines": 284,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "pilot",
+      "teacher"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PilotDashboardHeader.js",
+    "lines": 111,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PilotMusicAmbienceScreen.js",
+    "lines": 602,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "pilot_music_ambience_done",
+      "teacher_operation_ready",
+      "aux_operation_ready",
+      "aux_operation_stand_photo_url",
+      "pilot_music_ambience_checks",
+      "pilot_music_ambience_done_by_name",
+      "operation_start_bridge_at"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "PilotOperationalWaitScreen.js",
+    "lines": 97,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "aux_ready_seat_deployment",
+      "teacher_civic_notified"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "PilotPrepareFlightScreen.js",
+    "lines": 1842,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "pilot_spot_set_at",
+      "pilot_prep_complete_at",
+      "pilot_pois_selected_at",
+      "pilot_controller_connected_at",
+      "pilot_audio_configured_at",
+      "pilot_controller_connected",
+      "pilot_pois_selected",
+      "pilot_audio_configured",
+      "pilot_prep_checks",
+      "pilot_audio_checks",
+      "pilot_spot_photo_url",
+      "pilot_spot_note"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "PilotPrepChecklist.js",
+    "lines": 543,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "POIDetailModal.js",
+    "lines": 318,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "POIFormModal.js",
+    "lines": 286,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "POIMapEditor.js",
+    "lines": 345,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "PrepChecklist.js",
+    "lines": 950,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [
+      "pilot",
+      "assistant",
+      "teacher"
+    ],
+    "flags": [
+      "totalSlots"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "PWAInstallBanner.js",
+    "lines": 105,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "QrSyncScanner.js",
+    "lines": 152,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "ResetProcessButton.js",
+    "lines": 220,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "ResumeProtocolModal.js",
+    "lines": 107,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "ReturnInventoryScreen.js",
+    "lines": 204,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "pilot"
+    ],
+    "flags": [],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "ReturnRouteScreen.js",
+    "lines": 246,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar",
+      "teacher",
+      "pilot"
+    ],
+    "flags": [
+      "aux_arrival_notified",
+      "arrival_notified",
+      "closure_arrival_notification_done",
+      "aux_arrival_notified_by_name",
+      "arrival_notified_by_name",
+      "closure_arrival_notification_done_by_name"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "SeatDeploymentScreen.js",
+    "lines": 430,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "global_seat_deployment_done",
+      "global_seat_deployment_done_by_name",
+      "global_headphones_done",
+      "global_headphones_done_at",
+      "global_headphones_done_by",
+      "global_headphones_done_by_name",
+      "global_headphones_checks",
+      "global_glasses_station_count",
+      "global_glasses_checks",
+      "global_glasses_done",
+      "global_glasses_done_at",
+      "global_glasses_done_by",
+      "global_glasses_done_by_name",
+      "global_glasses_functional_count"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "SeatFoldingScreen.js",
+    "lines": 488,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar",
+      "teacher",
+      "pilot"
+    ],
+    "flags": [
+      "global_seats_folded",
+      "global_seat_folding_done",
+      "global_seats_folded_by_name",
+      "global_seat_folding_done_by_name"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "SignaturePad.js",
+    "lines": 107,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "SimulationContainer.js",
+    "lines": 324,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "SquadronBitacoraModal.js",
+    "lines": 387,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "SquadronCalculator.js",
+    "lines": 392,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "StaffOperationLegacy.js",
+    "lines": 2054,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [
+      "assistant",
+      "auxiliar",
+      "teacher",
+      "pilot"
+    ],
+    "flags": [
+      "aux_operation_started_at"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "StartDemoFab.js",
+    "lines": 194,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "SupervisorBitacoraScreen.js",
+    "lines": 1124,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "escuadron_bitacora_history"
+    ],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "SyncHeader.js",
+    "lines": 1310,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "pilot",
+      "assistant",
+      "teacher"
+    ],
+    "flags": [
+      "global_seat_deployment_done",
+      "global_headphones_done",
+      "global_glasses_done"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "TacticalMapLeaflet.js",
+    "lines": 370,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "TacticalMapScreen.js",
+    "lines": 935,
+    "dashboardImport": false,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "TaskErrorBoundary.js",
+    "lines": 91,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "TeacherCivicNotificationScreen.js",
+    "lines": 563,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "teacher_civic_notified",
+      "teacher_civic_decision"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "TeacherCivicParallelScreen.js",
+    "lines": 719,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "global_seat_deployment_done",
+      "global_headphones_done",
+      "global_glasses_done",
+      "civic_parallel_teacher_stage_lock",
+      "civic_parallel_status",
+      "civic_parallel_teacher_audio_status",
+      "civic_parallel_teacher_audio_error",
+      "civic_parallel_teacher_done_at",
+      "civic_parallel_teacher_done_by",
+      "civic_parallel_teacher_audio_duration_sec",
+      "civic_parallel_started_at",
+      "civic_parallel_started_by",
+      "civic_parallel_aux_status",
+      "civic_parallel_teacher_done_by_name"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "TeacherOperationReadyScreen.js",
+    "lines": 644,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "pilot_music_ambience_done",
+      "teacher_operation_ready",
+      "aux_operation_ready",
+      "aux_operation_stand_photo_url",
+      "teacher_operation_ready_checks",
+      "teacher_operation_ready_by_name",
+      "operation_start_bridge_at"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "TeacherTeamChecklist.js",
+    "lines": 369,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "TeacherWaitingScreen.js",
+    "lines": 556,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "aux_load_cta_by",
+      "aux_load_cta_at"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "TeamStatusCard.js",
+    "lines": 64,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [
+      "pilot",
+      "teacher"
+    ],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "TFCalibratorModal.js",
+    "lines": 170,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "TodayFlightList.js",
+    "lines": 312,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "UnloadAssignmentActionScreen.js",
+    "lines": 535,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "UnloadScreen.js",
+    "lines": 572,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "pilot",
+      "teacher",
+      "assistant"
+    ],
+    "flags": [
+      "unload_access",
+      "unload_note",
+      "unload_voice_url",
+      "pilot_spot_photo_url",
+      "unload_voice_duration",
+      "pilot_spot_note"
+    ],
+    "waiting": false,
+    "writes": true
+  },
+  {
+    "file": "UpcomingMissionsList.js",
+    "lines": 114,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "VehiclePositioningScreen.js",
+    "lines": 388,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [
+      "assistant",
+      "auxiliar",
+      "teacher",
+      "pilot"
+    ],
+    "flags": [
+      "aux_vehicle_positioned",
+      "closure_vehicle_positioning_done",
+      "aux_vehicle_positioned_by_name",
+      "closure_vehicle_positioning_done_by_name"
+    ],
+    "waiting": true,
+    "writes": true
+  },
+  {
+    "file": "VoiceSimulatorWidget.js",
+    "lines": 526,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  },
+  {
+    "file": "WaitingAuxLoad.js",
+    "lines": 686,
+    "dashboardImport": true,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [
+      "aux_load_cta_by",
+      "aux_load_cta_at"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "WaitingUnloadAssignmentScreen.js",
+    "lines": 266,
+    "dashboardImport": true,
+    "screenNamed": true,
+    "roles": [],
+    "flags": [
+      "unload_access",
+      "unload_note"
+    ],
+    "waiting": true,
+    "writes": false
+  },
+  {
+    "file": "WelcomeTransition.js",
+    "lines": 65,
+    "dashboardImport": false,
+    "screenNamed": false,
+    "roles": [],
+    "flags": [],
+    "waiting": false,
+    "writes": false
+  }
+]

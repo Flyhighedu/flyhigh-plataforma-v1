@@ -98,7 +98,7 @@ export default function AdminPWAPrompt() {
                             </p>
                             <p className="flex items-center gap-2 font-medium text-white">
                                 <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px]">2</span>
-                                Toca "Agregar a inicio" <PlusSquare size={14} className="ml-1 opacity-70" />
+                                Toca &quot;Agregar a inicio&quot; <PlusSquare size={14} className="ml-1 opacity-70" />
                             </p>
                         </div>
                     ) : (

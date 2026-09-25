@@ -21,14 +21,21 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
     return { minStudents: min, maxStudents: max };
   }, [schools]);
 
-  const [studentRange, setStudentRange] = useState({ min: 0, max: 10000 });
-  const [sliderMax, setSliderMax] = useState(10000);
-
-  // Initialize slider when schools load
-  useMemo(() => {
-    setStudentRange({ min: minStudents, max: maxStudents });
-    setSliderMax(maxStudents);
-  }, [minStudents, maxStudents]);
+  const [rangeSelection, setRangeSelection] = useState(null);
+  // A changed dataset resets the visible bounds without updating state during render.
+  const studentRange = useMemo(() => (
+    rangeSelection?.lowerBound === minStudents && rangeSelection?.upperBound === maxStudents
+      ? rangeSelection.value
+      : { min: minStudents, max: maxStudents }
+  ), [rangeSelection, minStudents, maxStudents]);
+  const sliderMax = maxStudents;
+  const updateStudentRange = (field, value) => {
+    setRangeSelection(previous => {
+      const range = previous?.lowerBound === minStudents && previous?.upperBound === maxStudents
+        ? previous.value : { min: minStudents, max: maxStudents };
+      return { lowerBound: minStudents, upperBound: maxStudents, value: { ...range, [field]: value } };
+    });
+  };
 
   // Apply filters and sorting
   const filteredSchools = useMemo(() => {
@@ -154,7 +161,7 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
               <input 
                 type="number" 
                 value={studentRange.min}
-                onChange={(e) => setStudentRange(p => ({ ...p, min: Number(e.target.value) }))}
+                onChange={(e) => updateStudentRange('min', Number(e.target.value))}
                 className="w-16 bg-transparent border border-gray-800 text-white text-xs px-2 py-1 rounded text-center outline-none focus:border-amber-500"
               />
             </div>
@@ -164,7 +171,7 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
               min={minStudents}
               max={sliderMax}
               value={studentRange.max}
-              onChange={(e) => setStudentRange(p => ({ ...p, max: Number(e.target.value) }))}
+              onChange={(e) => updateStudentRange('max', Number(e.target.value))}
               className="flex-1 accent-amber-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
             />
             
@@ -172,7 +179,7 @@ export default function MissingSchoolsPanel({ schools, onClose }) {
               <input 
                 type="number" 
                 value={studentRange.max}
-                onChange={(e) => setStudentRange(p => ({ ...p, max: Number(e.target.value) }))}
+                onChange={(e) => updateStudentRange('max', Number(e.target.value))}
                 className="w-16 bg-transparent border border-gray-800 text-white text-xs px-2 py-1 rounded text-center outline-none focus:border-amber-500"
               />
             </div>

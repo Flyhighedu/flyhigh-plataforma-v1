@@ -1,0 +1,49 @@
+/* The review controls stay outside each live FlyHigh screen. */
+#message { min-width: 0; min-height: 0; max-width: 34%; padding: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #526b84; font-size: 11px; background: transparent; }
+#message:empty { display: none; }
+#message.error { color: #a4312b; background: transparent; }
+.environment #grid { margin-left: 0; }
+.controls { align-items: flex-start; }
+.ratio-label { color: #637991; font-size: 10px; white-space: nowrap; }
+.more-controls { min-width: 0; }
+.more-controls summary { list-style: none; cursor: pointer; border: 1px solid #d6e0eb; border-radius: 8px; padding: 5px 8px; color: #24435f; font-size: 11px; background: #fff; white-space: nowrap; }
+.more-controls summary::-webkit-details-marker { display: none; }
+.more-controls summary::after { content: ' ▾'; }
+.more-controls[open] summary::after { content: ' ▴'; }
+.menu-actions { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 0 0; }
+.menu-actions button { white-space: nowrap; }
+
+body.fill-mode .top { min-height: 44px; padding: 5px 12px; }
+body.fill-mode h1 { font-size: 17px; }
+body.fill-mode .brand span { display: none; }
+body.fill-mode .top-actions button { padding: 5px 8px; font-size: 11px; }
+body.fill-mode .environment { min-height: 30px; padding: 3px 10px; }
+body.fill-mode footer { display: none; }
+body.fill-mode #panels { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); grid-auto-rows: minmax(0, 1fr); justify-content: stretch; align-content: stretch; gap: 4px; padding: 4px; overflow: hidden; }
+body.fill-mode #panels.all-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+body.fill-mode .panel { width: 100%; height: 100%; min-height: 0; align-items: center; }
+body.fill-mode .panel-header, body.fill-mode .controls { align-self: stretch; }
+body.fill-mode .panel-header { min-height: 30px; padding: 3px 8px; }
+body.fill-mode .panel-header h2 { font-size: 13px; }
+body.fill-mode .role-badge { width: 23px; height: 23px; }
+body.fill-mode .path { display: none; }
+body.fill-mode .controls { padding: 2px 6px 4px; gap: 3px; }
+body.fill-mode .controls button, body.fill-mode .more-controls summary { padding: 4px 6px; font-size: 10px; }
+body.fill-mode .viewport { flex: none; margin-inline: auto; max-width: 100%; }
+body.fill-mode #panels.focused { display: flex; justify-content: center; }
+body.fill-mode #panels.focused .panel { width: 100%; max-width: none; }
+
+body.dark { color: #e8eef7; background: #101721; }
+body.dark .top, body.dark .panel, body.dark dialog { background: #172331; border-color: #344459; }
+body.dark .environment { background: #111c28; border-color: #344459; }
+body.dark .brand span, body.dark .environment #target, body.dark #message, body.dark .path, body.dark footer, body.dark .pane-state, body.dark .ratio-label { color: #aebed0; }
+body.dark h1, body.dark h2, body.dark .placeholder strong { color: #f3f6fb; }
+body.dark button, body.dark .more-controls summary { background: #223247; color: #e8eef7; border-color: #40536b; }
+body.dark button:hover, body.dark .more-controls summary:hover { background: #304660; }
+body.dark button.primary { background: #2474db; border-color: #2474db; color: #fff; }
+body.dark .role-badge, body.dark .placeholder .step { background: #2d4667; color: #d9e8ff; }
+body.dark .viewport { background: #0d1620; }
+body.dark .placeholder, body.dark .hint, body.dark #note-context { color: #aebed0; }
+body.dark input, body.dark textarea { background: #101b28; color: #e8eef7; border-color: #40536b; }
+body.dark #message.error { color: #ffaaa3; }
+body.dark dialog::backdrop { background: #050b14aa; }

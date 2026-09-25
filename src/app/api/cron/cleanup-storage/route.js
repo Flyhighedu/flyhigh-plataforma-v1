@@ -12,11 +12,14 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request) {
     try {
-        // Validar token de seguridad del cron (opcional/recomendado)
+        // Require configuration and authentication before reading or deleting files.
         const authHeader = request.headers.get('authorization');
         const cronSecret = process.env.CRON_SECRET;
         
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+        if (!cronSecret) {
+            return NextResponse.json({ ok: false, error: 'Cron not configured' }, { status: 503 });
+        }
+        if (authHeader !== `Bearer ${cronSecret}`) {
             return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
         }
 

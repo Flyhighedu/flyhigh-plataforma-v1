@@ -15,7 +15,7 @@ export default function Manifiesto() {
                 <div className="absolute bottom-8 left-6 lg:bottom-16 lg:left-16 max-w-md">
                     <div className="h-1 w-10 bg-[#00C6FF] mb-3"></div>
                     <p className="text-white font-['Outfit',sans-serif] font-medium text-xl lg:text-3xl leading-tight drop-shadow-lg">
-                        "La mirada de quien descubre el mundo por primera vez."
+                        &quot;La mirada de quien descubre el mundo por primera vez.&quot;
                     </p>
                 </div>
             </div>

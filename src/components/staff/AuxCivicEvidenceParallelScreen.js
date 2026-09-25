@@ -190,7 +190,7 @@ export default function AuxCivicEvidenceParallelScreen({
                         <div className="w-full rounded-xl bg-blue-50 border border-blue-100 p-4 flex items-start gap-3">
                             <span className="material-symbols-outlined shrink-0 mt-0.5" style={{ fontSize: 18, color: '#2563EB', fontVariationSettings: "'FILL' 1, 'wght' 400" }}>info</span>
                             <p className="m-0 text-[13px] text-blue-800 leading-snug">
-                                Presiona <strong>"Finalizar"</strong> cuando {teacherName} termine el acto cívico.
+                                Presiona <strong>&quot;Finalizar&quot;</strong> cuando {teacherName} termine el acto cívico.
                             </p>
                         </div>
                     </div>

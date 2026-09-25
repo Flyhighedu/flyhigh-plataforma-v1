@@ -65,6 +65,7 @@ import CheckoutScreen from '@/components/staff/CheckoutScreen';
 import TaskErrorBoundary from '@/components/staff/TaskErrorBoundary';
 import ContingencyBypassMenu from '@/components/staff/ContingencyBypassMenu';
 import StartDemoFab from '@/components/staff/StartDemoFab';
+import PilotHomeLobby from '@/components/staff/PilotHomeLobby';
 
 import { ROLE_LABELS } from '@/config/prepChecklistConfig';
 import { ensureTestJourney, resetTestJourney, TEST_JOURNEY_ID } from '@/utils/testModeUtils';
@@ -2195,10 +2196,31 @@ export default function StaffDashboard() {
     // --- Loading / Hydration Guard ---
     if (!mounted || loading) {
         return withDependencyOverlay(
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center space-y-4">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
-                    <p className="text-slate-500 font-medium">Cargando tu jornada...</p>
+            <div className="min-h-[100svh] overflow-hidden bg-[#f3f7fb]" role="status" aria-label="Cargando tu jornada">
+                <div className="h-44 rounded-b-[2rem] bg-[#06182c] px-5 pt-[max(1.5rem,env(safe-area-inset-top))]">
+                    <div className="flex items-center gap-2.5 text-white">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-cyan-200">
+                            <Plane size={18} />
+                        </div>
+                        <div>
+                            <p className="m-0 text-[15px] font-extrabold">FlyHigh<span className="text-cyan-300">Ops</span></p>
+                            <p className="m-0 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">Preparando jornada</p>
+                        </div>
+                    </div>
+                    <div className="mt-7 flex items-center gap-3 animate-pulse" aria-hidden="true">
+                        <div className="h-12 w-12 rounded-2xl bg-white/10" />
+                        <div className="space-y-2">
+                            <div className="h-3 w-16 rounded-full bg-cyan-200/20" />
+                            <div className="h-6 w-36 rounded-full bg-white/15" />
+                        </div>
+                    </div>
+                </div>
+                <div className="mx-auto -mt-5 max-w-md space-y-4 px-4" aria-hidden="true">
+                    <div className="h-64 animate-pulse rounded-[1.75rem] border border-slate-200 bg-white shadow-sm" />
+                    <div className="h-56 animate-pulse rounded-[1.75rem] bg-blue-900/90" />
+                </div>
+                <div className="sr-only">
+                    <Loader2 className="animate-spin" /> Cargando tu jornada...
                 </div>
             </div>
         );
@@ -2378,8 +2400,21 @@ export default function StaffDashboard() {
         // renderDefaultLobby has been merged and replaced by renderUnifiedLobby
 
         return withDependencyOverlay(
-            <div className="min-h-screen bg-slate-50 p-4">
-                <div className="max-w-md mx-auto space-y-6 pt-6 pb-24">
+            <div className={`min-h-screen ${profile?.role === 'pilot' ? 'bg-[#f3f7fb]' : 'bg-slate-50 p-4'}`}>
+                <div className={profile?.role === 'pilot' ? 'mx-auto max-w-md' : 'max-w-md mx-auto space-y-6 pt-6 pb-24'}>
+                    {profile?.role === 'pilot' ? (
+                        <PilotHomeLobby
+                            profile={profile}
+                            missions={todaySchools}
+                            showAllMissions={showAllMissions}
+                            onToggleAllMissions={() => setShowAllMissions((current) => !current)}
+                            onSelectMission={selectMission}
+                            onOpenNarrations={() => router.push('/staff/academia')}
+                            onOpenProfile={() => router.push('/staff/hub')}
+                            onLogout={handleLogout}
+                        />
+                    ) : (
+                        <>
                     {/* Header */}
                     {/* Premium Profile Header & Top Bar */}
                     {profile && (
@@ -2446,6 +2481,9 @@ export default function StaffDashboard() {
                     {/* Unified Premium Rendering */}
                     {renderUnifiedLobby()}
 
+                        </>
+                    )}
+
 
 
 
@@ -2455,7 +2493,7 @@ export default function StaffDashboard() {
                     )}
 
                     {/* Demo Mode FAB */}
-                    <div className="mt-8 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                    <div className={`${profile?.role === 'pilot' ? 'mx-4 -mt-20 relative z-10 mb-24' : 'mt-8'} bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden`}>
                         <StartDemoFab
                             onDemoStarted={() => refreshMission()}
                             schoolId={todaySchool?.id}

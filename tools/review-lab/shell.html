@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>FlyHigh · Mesa de revisión</title><link rel="stylesheet" href="shell.css"><link rel="stylesheet" href="layout.css"><link rel="stylesheet" href="ui.css"></head>
+<body>
+<header class="top"><div><div class="brand">FLYHIGH <span>LABORATORIO LOCAL</span></div><h1>Mesa de revisión</h1></div><div class="top-actions"><button id="theme" title="Cambiar los colores de la mesa">Modo oscuro</button><button id="fill" title="Ajustar las cuatro pantallas a la ventana">Ocupar ventana</button><button id="guide">Guía de revisión</button><button id="findings">Mis hallazgos</button><button id="connect" class="primary">Conectar pruebas</button></div></header>
+<div class="environment"><span class="status-dot"></span><strong id="connection">Sin conectar</strong><span id="target">Cuatro sesiones independientes · producción bloqueada</span><span id="message" role="status" aria-live="polite"></span><button id="grid">Ver las cuatro</button></div>
+<main id="panels" aria-label="Perfiles de FlyHigh"></main>
+<footer><span id="footnote">Cada panel conserva su propia sesión. Entra una vez con la cuenta correspondiente.</span><span>Los cambios de localhost aparecerán aquí.</span></footer>
+<dialog id="note-dialog"><form id="note-form"><div class="dialog-head"><h2>Registrar hallazgo</h2><button type="button" id="cancel-note">Cerrar</button></div><p id="note-context"></p><label>Título<input name="title" maxlength="160" required placeholder="Ej.: cambiar de escuela reinicia la pantalla"></label><label>Qué esperabas<textarea name="expected" rows="3" maxlength="6000" required></textarea></label><label>Qué ocurrió / pasos para repetirlo<textarea name="observed" rows="4" maxlength="6000" required></textarea></label><p class="hint">Se guarda localmente como «Por revisar». Evita contraseñas y datos personales.</p><p id="note-error" role="alert"></p><button class="primary" type="submit">Guardar hallazgo</button></form></dialog>
+<script src="shell.js"></script></body></html>

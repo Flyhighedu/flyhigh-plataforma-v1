@@ -105,7 +105,7 @@ export default function SteamPlatform() {
                             </h2>
 
                             <p className="text-slate-400 text-[10px] sm:text-base mb-4 sm:mb-8 max-w-lg mx-auto md:mx-0 leading-relaxed">
-                                Reforzamos lo visto en el aire con retos digitales. Un marketplace de actividades donde los maestros se convierten en "Game Masters" y el patio en un tablero gigante.
+                                Reforzamos lo visto en el aire con retos digitales. Un marketplace de actividades donde los maestros se convierten en &quot;Game Masters&quot; y el patio en un tablero gigante.
                             </p>
 
                             <div className="flex flex-wrap gap-3 justify-center md:justify-start">

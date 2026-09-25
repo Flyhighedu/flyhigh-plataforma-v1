@@ -115,7 +115,7 @@ export default function TFCalibratorModal({
 
                     {step === 'voice' && (
                         <div className="space-y-4">
-                            <h2 className="text-2xl font-bold text-white">Di "Computadora"</h2>
+                            <h2 className="text-2xl font-bold text-white">Di &quot;Computadora&quot;</h2>
                             <p className="text-slate-300">
                                 Presiona el botón y di la palabra claramente. Faltan {3 - examplesCount.voice} repeticiones.
                             </p>

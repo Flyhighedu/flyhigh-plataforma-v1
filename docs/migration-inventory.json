@@ -1,0 +1,2116 @@
+{
+  "reviewedAt": "2026-09-22T10:10:32.957Z",
+  "project": "sbzwffqhzmlxtnjyjduk.supabase.co",
+  "scope": "Local SQL compared with authenticated migration history and PostgreSQL catalog. Name matches are candidates, not verified identical SQL. Existing effects can have been applied manually; missing effects can have been superseded.",
+  "count": 40,
+  "versionCollisions": {
+    "20260505": [
+      "web/supabase/migrations/20260505_crm_citas_log.sql",
+      "web/supabase/migrations/20260505_rutas_maestras.sql"
+    ],
+    "20260506": [
+      "web/supabase/migrations/20260506_add_pilot_narration_source.sql",
+      "web/supabase/migrations/20260506_audio_quality_audits.sql",
+      "web/supabase/migrations/20260506_pilot_narration_source.sql"
+    ],
+    "001": [
+      "web/migrations/001_crm_tables.sql",
+      "web/supabase/migrations/001_staff_v1_tables.sql"
+    ],
+    "002": [
+      "web/migrations/002_fix_realtime_rls.sql",
+      "web/supabase/migrations/002_proximas_escuelas_rls.sql",
+      "web/supabase/migrations/002_staff_en_ruta.sql"
+    ],
+    "003": [
+      "web/migrations/003_crm_kanban_revamp.sql",
+      "web/supabase/migrations/003_staff_journey_meta.sql"
+    ],
+    "004": [
+      "web/migrations/004_crm_status_architecture.sql",
+      "web/supabase/migrations/004_history_snapshot_and_soft_delete.sql"
+    ],
+    "005": [
+      "web/migrations/005_fix_legacy_pipeline_constraint.sql",
+      "web/supabase/migrations/005_bitacora_vuelos_realtime.sql"
+    ],
+    "007": [
+      "web/migrations/007_add_cita_ventas_state.sql",
+      "web/supabase/migrations/007_supervisor_event_tables_realtime.sql"
+    ],
+    "008": [
+      "web/migrations/008_create_crm_escuelas.sql",
+      "web/supabase/migrations/008_cierres_mision_realtime.sql",
+      "web/supabase/migrations/008_staff_event_schema_compat.sql"
+    ],
+    "009": [
+      "web/migrations/009_create_pilot_pois.sql",
+      "web/supabase/migrations/009_cierres_mision_rls_policies.sql"
+    ],
+    "014": [
+      "web/supabase/migrations/014_add_ficha_didactica_to_pilot_pois.sql",
+      "web/supabase/migrations/014_poi_info_cache.sql"
+    ]
+  },
+  "migrations": [
+    {
+      "file": "web/migrations/001_crm_tables.sql",
+      "version": "001",
+      "sha256": "83e347c98e20a729d71b0236ef4d46f9300d548130b53611e28a71f3f911a828",
+      "tables": [
+        "crm_pipeline_stages",
+        "crm_contacts",
+        "whatsapp_messages"
+      ],
+      "tablePresence": [
+        {
+          "name": "crm_pipeline_stages",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "crm_contacts",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "whatsapp_messages",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "crm_pipeline_stages",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "whatsapp_messages",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_contacts_pipeline",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_contacts_phone",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_contacts_bot_paused",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_messages_conversation",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_messages_phone",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_messages_created",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_pipeline_stages.Public read pipeline_stages",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_pipeline_stages.Service write pipeline_stages",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_contacts.Service role full access crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "whatsapp_messages.Service role full access whatsapp_messages",
+          "present": true
+        },
+        {
+          "kind": "realtime",
+          "name": "whatsapp_messages",
+          "present": true
+        },
+        {
+          "kind": "realtime",
+          "name": "crm_contacts",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/002_fix_realtime_rls.sql",
+      "version": "002",
+      "sha256": "a5c63ac8a282f12fd98fd31f808122cfb83803dcaa2929b8db6c28db1f23aeca",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "policy",
+          "name": "crm_contacts.Public read crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "whatsapp_messages.Public read whatsapp_messages",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/003_crm_kanban_revamp.sql",
+      "version": "003",
+      "sha256": "0289a3af34bd096cdf6db0e26b7011d03ed5c1e5e5bcd1f5b06fd1a4cd12c86e",
+      "tables": [
+        "crm_contacts"
+      ],
+      "tablePresence": [
+        {
+          "name": "crm_contacts",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_contacts.Public read crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "whatsapp_messages.Public read whatsapp_messages",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/004_crm_status_architecture.sql",
+      "version": "004",
+      "sha256": "1ea0d7a99decec5477fe78126fe0ac0d95853c5322d36e10c366af29cc58900f",
+      "tables": [
+        "crm_contacts"
+      ],
+      "tablePresence": [
+        {
+          "name": "crm_contacts",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "crm_contacts",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_contacts_status",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "crm_contacts.lead_status",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/005_fix_legacy_pipeline_constraint.sql",
+      "version": "005",
+      "sha256": "32512b269f58773f83cb0c65a294a8bf8e5baee8c7d93be5c4fe77429c82a0b7",
+      "tables": [
+        "catalogo_escuelas"
+      ],
+      "tablePresence": [
+        {
+          "name": "catalogo_escuelas",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [
+        "sync_catalogo_pipeline_from_journey"
+      ],
+      "functionPresence": [
+        {
+          "name": "sync_catalogo_pipeline_from_journey",
+          "exposedInPublicApi": false
+        }
+      ],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "catalogo_escuelas",
+          "present": true
+        },
+        {
+          "kind": "function",
+          "name": "sync_catalogo_pipeline_from_journey",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/007_add_cita_ventas_state.sql",
+      "version": "007",
+      "sha256": "82faefed685e85124708ab8c8e9d845da11d2f74a147fa40f3999d30f5314ec7",
+      "tables": [
+        "catalogo_escuelas"
+      ],
+      "tablePresence": [
+        {
+          "name": "catalogo_escuelas",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "history-name-match-content-unverified",
+      "historyCandidates": [
+        {
+          "name": "007_add_cita_ventas_state",
+          "version": "20260424053415"
+        }
+      ],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "catalogo_escuelas",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/008_create_crm_escuelas.sql",
+      "version": "008",
+      "sha256": "615eaf59ea2cb5babe46c00a4a959c760fbb4480ed66468773b35e09af7a9aa3",
+      "tables": [
+        "crm_escuelas_detalles"
+      ],
+      "tablePresence": [
+        {
+          "name": "crm_escuelas_detalles",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "crm_escuelas_detalles",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_escuelas_detalles.Allow authenticated users full access to crm_escuelas_detalles",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/009_create_pilot_pois.sql",
+      "version": "009",
+      "sha256": "123aa41f6e4d9a6f33af0b5c09e25512b3f1b47b4fd5777e4665d8be00b76adc",
+      "tables": [
+        "pilot_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "pilot_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "pilot_pois",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_pois_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_pois_category",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can view own POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can insert own POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can update own POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can delete own POIs",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/migrations/hr_module_phase1.sql",
+      "version": null,
+      "sha256": "f75dd43dba0f6b54e95db2f35a9e8b60669d1584fff6490450b3caf929fe2256",
+      "tables": [
+        "hr_documents",
+        "hr_time_off",
+        "hr_payslips",
+        "hr_schedule_config"
+      ],
+      "tablePresence": [
+        {
+          "name": "hr_documents",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "hr_time_off",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "hr_payslips",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "hr_schedule_config",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "hr_documents",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "hr_time_off",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "hr_payslips",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "hr_schedule_config",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_documents_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_documents_status",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_documents_expires",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_time_off_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_time_off_status",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_payslips_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_payslips_period",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_hr_schedule_date",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_documents.Users can view own documents",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_documents.Users can insert own documents",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_documents.Users can update own documents",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_time_off.Users can view own time off",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_time_off.Users can insert own time off",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_payslips.Users can view own payslips",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "hr_schedule_config.Authenticated users can read schedule",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/001_staff_v1_tables.sql",
+      "version": "001",
+      "sha256": "1309a2c242c43fd8a7a8418a4da4e1a9e1941ac8415e5189b50cb8f44bdb901d",
+      "tables": [
+        "staff_profiles",
+        "staff_journeys",
+        "staff_prep_events",
+        "staff_prep_photos",
+        "bitacora_vuelos"
+      ],
+      "tablePresence": [
+        {
+          "name": "staff_profiles",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_journeys",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_prep_events",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_prep_photos",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "bitacora_vuelos",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "history-name-match-content-unverified",
+      "historyCandidates": [
+        {
+          "name": "staff_v1_tables",
+          "version": "20260210053402"
+        }
+      ],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "staff_profiles",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_journeys",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_prep_events",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_prep_photos",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "bitacora_vuelos",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_profiles.staff_profiles_select_own",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_profiles.staff_profiles_admin_select",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_profiles.staff_profiles_admin_insert",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_profiles.staff_profiles_admin_update",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_journeys.staff_journeys_select_authenticated",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_journeys.staff_journeys_insert_authenticated",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_journeys.staff_journeys_update_authenticated",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_prep_events.staff_prep_events_select_own_journey",
+          "present": false
+        },
+        {
+          "kind": "policy",
+          "name": "staff_prep_events.staff_prep_events_insert_own",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_prep_photos.staff_prep_photos_select",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_prep_photos.staff_prep_photos_insert_own",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "bitacora_vuelos.journey_id",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/002_proximas_escuelas_rls.sql",
+      "version": "002",
+      "sha256": "39548559e4675bbee213e188fe28b8e112bea19d43e473d3fbfda3083c02839f",
+      "tables": [
+        "proximas_escuelas"
+      ],
+      "tablePresence": [
+        {
+          "name": "proximas_escuelas",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "proximas_escuelas.staff_view_proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "proximas_escuelas.staff_insert_proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "proximas_escuelas.staff_update_proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "proximas_escuelas.staff_delete_proximas_escuelas",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/002_staff_en_ruta.sql",
+      "version": "002",
+      "sha256": "ddbb0eaa70164f190d45e29658507d3b8087f8a4e407ee207aa92ee19d763567",
+      "tables": [
+        "staff_journeys",
+        "staff_events",
+        "staff_presence"
+      ],
+      "tablePresence": [
+        {
+          "name": "staff_journeys",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_events",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_presence",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "history-name-match-content-unverified",
+      "historyCandidates": [
+        {
+          "name": "002_staff_en_ruta",
+          "version": "20260212004817"
+        },
+        {
+          "name": "002_staff_en_ruta",
+          "version": "20260212010011"
+        }
+      ],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "staff_journeys",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_events",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_presence",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_events.Allow read/write all authenticated staff",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "staff_presence.Allow read/write all authenticated staff",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow staff upload arrival",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow public read arrival",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.route_started_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.route_started_by",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.arrival_photo_taken_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.arrival_photo_taken_by",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.arrival_photo_url",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.mission_state",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/003_staff_journey_meta.sql",
+      "version": "003",
+      "sha256": "484390e28df25b0230c188715e3418ed6cf3514091552ba1344c66b13acf3e9f",
+      "tables": [
+        "staff_journeys"
+      ],
+      "tablePresence": [
+        {
+          "name": "staff_journeys",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "history-name-match-content-unverified",
+      "historyCandidates": [
+        {
+          "name": "003_staff_journey_meta",
+          "version": "20260214050716"
+        }
+      ],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "staff_journeys",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_journeys.meta",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/004_history_snapshot_and_soft_delete.sql",
+      "version": "004",
+      "sha256": "1ebb2b03f485464a0f50368ec5889a024500d52fb92c9f17e1374b7c850d4532",
+      "tables": [
+        "cierres_mision",
+        "proximas_escuelas"
+      ],
+      "tablePresence": [
+        {
+          "name": "cierres_mision",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "proximas_escuelas",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "history-name-match-content-unverified",
+      "historyCandidates": [
+        {
+          "name": "004_history_snapshot_and_soft_delete",
+          "version": "20260220053202"
+        }
+      ],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "cierres_mision",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_cierres_mision_school_id",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_cierres_mision_mission_datetime",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_proximas_escuelas_is_archived",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "cierres_mision.school_id",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "cierres_mision.school_name_snapshot",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "cierres_mision.mission_datetime",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "proximas_escuelas.is_archived",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "proximas_escuelas.archived_at",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/005_bitacora_vuelos_realtime.sql",
+      "version": "005",
+      "sha256": "67e5442f5eb528e274127afb0c8a62d7b3991e3a73867e5a9e51b43549e0706e",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "realtime",
+          "name": "bitacora_vuelos",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/006_staff_journeys_realtime.sql",
+      "version": "006",
+      "sha256": "b7bb862df55976a4b7b5a9074e5d308f3e9381fe996f862f2454a1e5277d8944",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "realtime",
+          "name": "staff_journeys",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/007_supervisor_event_tables_realtime.sql",
+      "version": "007",
+      "sha256": "e07bb51cb3c49ea112a0151740673f00f394e423f16465689a4977718a48ac87",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "realtime",
+          "name": "staff_prep_events",
+          "present": true
+        },
+        {
+          "kind": "realtime",
+          "name": "staff_prep_photos",
+          "present": true
+        },
+        {
+          "kind": "realtime",
+          "name": "staff_events",
+          "present": true
+        },
+        {
+          "kind": "realtime",
+          "name": "staff_presence",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/008_cierres_mision_realtime.sql",
+      "version": "008",
+      "sha256": "e5c4366f648bf6e1163c64b1e67b653d1e89c36140bc7dd41fdcf7ca1b093bdc",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "realtime",
+          "name": "cierres_mision",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/008_staff_event_schema_compat.sql",
+      "version": "008",
+      "sha256": "6749267f96e742e85e5e935dada7affca45bbbe6f0a42d57fb8e9595fa974eda",
+      "tables": [
+        "staff_prep_photos",
+        "staff_prep_events"
+      ],
+      "tablePresence": [
+        {
+          "name": "staff_prep_photos",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "staff_prep_events",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "staff_prep_photos",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "staff_prep_events",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_staff_prep_events_journey_created_at",
+          "present": false
+        },
+        {
+          "kind": "index",
+          "name": "idx_staff_prep_photos_journey_created_at",
+          "present": false
+        },
+        {
+          "kind": "index",
+          "name": "idx_staff_events_journey_created_at",
+          "present": false
+        },
+        {
+          "kind": "column",
+          "name": "staff_prep_photos.item_id",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/009_cierres_mision_rls_policies.sql",
+      "version": "009",
+      "sha256": "25d80f48ab200e235d518eae55253e66b21211dec27e0c13405f1c3deae3b0b8",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow authenticated insert",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow authenticated update",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow authenticated select",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow anon insert",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow anon update",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "cierres_mision.Allow anon select",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/010_cronograma_bitacora_sync.sql",
+      "version": "010",
+      "sha256": "5cc15ffdd08934637b970e4a1c2444aa4f75365f55ffc37097db8f3e488cbd5d",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [
+        "sync_journey_closure_to_cronograma"
+      ],
+      "functionPresence": [
+        {
+          "name": "sync_journey_closure_to_cronograma",
+          "exposedInPublicApi": false
+        }
+      ],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "function",
+          "name": "sync_journey_closure_to_cronograma",
+          "present": true
+        },
+        {
+          "kind": "trigger",
+          "name": "trigger_sync_journey_closure",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/011_staff_profiles_avatar.sql",
+      "version": "011",
+      "sha256": "0c1499097d8af799050b780ef12a835032590f24b15643a7b938d2146797bec2",
+      "tables": [
+        "staff_profiles"
+      ],
+      "tablePresence": [
+        {
+          "name": "staff_profiles",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "staff_profiles",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "staff_profiles.avatar_config",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/012_add_capture_fields_to_proximas_escuelas.sql",
+      "version": "012",
+      "sha256": "b32e375fdd2c55bef0de2c7b8a1d0140f7974757ec0628bd2a6a1ef4ba02a924",
+      "tables": [
+        "proximas_escuelas"
+      ],
+      "tablePresence": [
+        {
+          "name": "proximas_escuelas",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "proximas_escuelas",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "proximas_escuelas.nombre_director",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "proximas_escuelas.numero_ninos",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/013_poi_locations.sql",
+      "version": "013",
+      "sha256": "e46dbb26f3eec064fe505316e96cdec060b730ab0ef8c7f3ad3812b4f4d64e31",
+      "tables": [
+        "poi_locations"
+      ],
+      "tablePresence": [
+        {
+          "name": "poi_locations",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "poi_locations",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_poi_locations_active",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "poi_locations.poi_locations_select_authenticated",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "poi_locations.poi_locations_insert_authenticated",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "poi_locations.poi_locations_update_authenticated",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/014_add_ficha_didactica_to_pilot_pois.sql",
+      "version": "014",
+      "sha256": "2a6a4decf2bffb047f61824e63e221f290b7807161eaba09f6d8e6dec3900b51",
+      "tables": [
+        "pilot_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "pilot_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "pilot_pois",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.dato_clave_1",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.dato_clave_2",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.pregunta_interaccion",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.research_article",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/014_poi_info_cache.sql",
+      "version": "014",
+      "sha256": "08195068b6c8e002ab638b2d6e53a553b605b2124183cf33fd967bfed70cd492",
+      "tables": [
+        "poi_info_cache"
+      ],
+      "tablePresence": [
+        {
+          "name": "poi_info_cache",
+          "visibleInPublicApi": false
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "poi_info_cache",
+          "present": false
+        },
+        {
+          "kind": "index",
+          "name": "idx_poi_cache_key",
+          "present": false
+        },
+        {
+          "kind": "policy",
+          "name": "poi_info_cache.poi_cache_public_read",
+          "present": false
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/015_tavily_odometer.sql",
+      "version": "015",
+      "sha256": "047ea8a9dab1b305bb4f8a9cfaec2bbc3fd3ad9bcc8ea4fd178e0f0b1c9df33d",
+      "tables": [
+        "tavily_usage"
+      ],
+      "tablePresence": [
+        {
+          "name": "tavily_usage",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "tavily_usage",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "tavily_usage.tavily_usage_read_all",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "tavily_usage.tavily_usage_service_only",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260501_admin_custom_flyers.sql",
+      "version": "20260501",
+      "sha256": "2448e6a8823f1390d9b8f1d1cef6251b63d4ecfd4936aeb0b4a4125032fc058e",
+      "tables": [
+        "admin_custom_flyers"
+      ],
+      "tablePresence": [
+        {
+          "name": "admin_custom_flyers",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [
+        "update_custom_flyers_modtime"
+      ],
+      "functionPresence": [
+        {
+          "name": "update_custom_flyers_modtime",
+          "exposedInPublicApi": false
+        }
+      ],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "admin_custom_flyers",
+          "present": true
+        },
+        {
+          "kind": "function",
+          "name": "update_custom_flyers_modtime",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "admin_custom_flyers.Allow authenticated users to manage custom flyers",
+          "present": true
+        },
+        {
+          "kind": "trigger",
+          "name": "trg_admin_custom_flyers_updated_at",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260505_crm_citas_log.sql",
+      "version": "20260505",
+      "sha256": "75adc772bad288000b6ad173929b6c78e8fd6d9d18c682d41b9d10c659e2ca0e",
+      "tables": [
+        "crm_citas_venta",
+        "crm_pipeline_log"
+      ],
+      "tablePresence": [
+        {
+          "name": "crm_citas_venta",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "crm_pipeline_log",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "crm_citas_venta",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "crm_pipeline_log",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_citas_fecha",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_citas_cct",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pipeline_log_cct",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pipeline_log_created",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_citas_venta.Service role full access citas",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "crm_pipeline_log.Service role full access pipeline_log",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260505_rutas_maestras.sql",
+      "version": "20260505",
+      "sha256": "98f2b05e61033f745d69b38ac63d924301dea29f3e659cd13ee6f5333f17dc6f",
+      "tables": [
+        "master_routes",
+        "master_route_pois",
+        "pilot_route_progress"
+      ],
+      "tablePresence": [
+        {
+          "name": "master_routes",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "master_route_pois",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "pilot_route_progress",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "master_routes",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "master_route_pois",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "pilot_route_progress",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_master_route_pois_route",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_route_progress_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_route_progress_route",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_master_routes_status",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "master_routes.Authenticated can read published routes",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "master_route_pois.Authenticated can read route POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_route_progress.Users can manage own progress",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260506_add_pilot_narration_source.sql",
+      "version": "20260506",
+      "sha256": "c3ef2ba72f0b11eaa36c722d2e966de7f2dfd2997c074cb122aa7d3e6078969b",
+      "tables": [
+        "audio_quality_audits"
+      ],
+      "tablePresence": [
+        {
+          "name": "audio_quality_audits",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "audio_quality_audits",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260506_audio_quality_audits.sql",
+      "version": "20260506",
+      "sha256": "505d69c407ec78e72bd297b50ddabc546927b5bbe1cccc3569362674f2626466",
+      "tables": [
+        "audio_quality_audits"
+      ],
+      "tablePresence": [
+        {
+          "name": "audio_quality_audits",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "audio_quality_audits",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_aqa_journey",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_aqa_user",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_aqa_status",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_aqa_created",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_aqa_score",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "audio_quality_audits.Authenticated users can read audits",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "web/supabase/migrations/20260506_pilot_narration_source.sql",
+      "version": "20260506",
+      "sha256": "885b36a448e2aa6f4aaf15c3bd6d51863d53969759b9e6a48e530f91843af15f",
+      "tables": [
+        "audio_quality_audits"
+      ],
+      "tablePresence": [
+        {
+          "name": "audio_quality_audits",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "audio_quality_audits",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260508071257_add_energia_positiva_column.sql",
+      "version": "20260508071257",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [],
+      "emptyFile": true
+    },
+    {
+      "file": "supabase/migrations/20260513214000_add_narrative_factory_columns.sql",
+      "version": "20260513214000",
+      "sha256": "9cb452f7ced61aecdd460c8eb1cc193c22cb43d7fd0d02fdec8b8e27af08d995",
+      "tables": [
+        "master_route_pois",
+        "pilot_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "master_route_pois",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "pilot_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "master_route_pois",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "pilot_pois",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow public read poi-narratives",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.narrative_script",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_url",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_duration_seconds",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_generated_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.research_article",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.narrative_script",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_url",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_duration_seconds",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_generated_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.research_article",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260514180000_narrative_factory_rls_fix.sql",
+      "version": "20260514180000",
+      "sha256": "cde6f251de5f02379d273ebec375d2f70e3d24773b0396de8089810b1d5f9ae3",
+      "tables": [
+        "master_route_pois",
+        "pilot_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "master_route_pois",
+          "visibleInPublicApi": true
+        },
+        {
+          "name": "pilot_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "master_route_pois",
+          "present": true
+        },
+        {
+          "kind": "table",
+          "name": "pilot_pois",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow public read poi-narratives",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow authenticated upload poi-narratives",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.pilot_pois_select_own",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.pilot_pois_insert_own",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.pilot_pois_update_own",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.pilot_pois_delete_own",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.narrative_script",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_url",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_duration_seconds",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.audio_generated_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.research_article",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.narrative_script",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_url",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_duration_seconds",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.audio_generated_at",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.research_article",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260515070000_add_general_topics.sql",
+      "version": "20260515070000",
+      "sha256": "0dadc8ba3143d930968ef79fc866b7c1422f0080b32442b53b6b4f32fdccdb09",
+      "tables": [
+        "master_route_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "master_route_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "master_route_pois",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_master_route_pois_general_topic",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_master_route_pois_keywords",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.is_general_topic",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "master_route_pois.trigger_keywords",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260515082500_add_pilot_pois_general_topics.sql",
+      "version": "20260515082500",
+      "sha256": "d6b3074c92c7e76220b2fd3150cf01eb1a2e8f1815731339fefcfa60895c468e",
+      "tables": [
+        "pilot_pois"
+      ],
+      "tablePresence": [
+        {
+          "name": "pilot_pois",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "pilot_pois",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_pois_general_topic",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_pilot_pois_keywords",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can insert their own POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can update their own POIs",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "pilot_pois.Users can delete their own POIs",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.is_general_topic",
+          "present": true
+        },
+        {
+          "kind": "column",
+          "name": "pilot_pois.trigger_keywords",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260518060000_create_official_soundtracks.sql",
+      "version": "20260518060000",
+      "sha256": "372cd303b62167278e72d438f83a4e9c8d5c9647dde97d45388271edf7440018",
+      "tables": [
+        "official_soundtracks"
+      ],
+      "tablePresence": [
+        {
+          "name": "official_soundtracks",
+          "visibleInPublicApi": true
+        }
+      ],
+      "functions": [],
+      "functionPresence": [],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "table",
+          "name": "official_soundtracks",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_soundtracks_type_active",
+          "present": true
+        },
+        {
+          "kind": "index",
+          "name": "idx_soundtracks_sort",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "official_soundtracks.anon_read_soundtracks",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow public read official_soundtracks",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow authenticated upload official_soundtracks",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow authenticated update official_soundtracks",
+          "present": true
+        },
+        {
+          "kind": "policy",
+          "name": "objects.Allow authenticated delete official_soundtracks",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    },
+    {
+      "file": "supabase/migrations/20260528000000_storage_cleanup.sql",
+      "version": "20260528000000",
+      "sha256": "e5291aa27bcfb3fcb1260bc3a14a43013b1452905b3564c498ec9a4e72234e4e",
+      "tables": [],
+      "tablePresence": [],
+      "functions": [
+        "get_expired_storage_objects"
+      ],
+      "functionPresence": [
+        {
+          "name": "get_expired_storage_objects",
+          "exposedInPublicApi": true
+        }
+      ],
+      "appliedStatus": "no-direct-history-match",
+      "historyCandidates": [],
+      "structuralEvidence": [
+        {
+          "kind": "function",
+          "name": "get_expired_storage_objects",
+          "present": true
+        }
+      ],
+      "emptyFile": false
+    }
+  ],
+  "remoteHistoryCount": 58
+}

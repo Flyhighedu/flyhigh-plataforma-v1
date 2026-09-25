@@ -356,7 +356,7 @@ export default function ImprimiblesPage() {
       const flyerRecord = customAIFlyers.find(f => f.id === id);
       const sourceId = flyerRecord?.sourceId;
 
-      const processedHtml = React.useMemo(() => {
+      const processedHtml = (() => {
         if (!sourceId || typeof window === 'undefined') return html;
         
         let props;
@@ -388,7 +388,7 @@ export default function ImprimiblesPage() {
         });
 
         return doc.body.innerHTML;
-      }, [html, configs, sourceId, overrideVariables]);
+      })();
 
       return (
         <div 

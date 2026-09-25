@@ -1,0 +1,29 @@
+/* Each WebContentsView receives the measured size of its own viewport. */
+#panels {
+  grid-template-columns: repeat(4, minmax(250px, 290px));
+  grid-template-rows: none;
+  grid-auto-rows: auto;
+  justify-content: center;
+  align-content: start;
+  overflow: auto;
+}
+.panel { height: fit-content; }
+.panel .viewport { flex: none; width: 100%; aspect-ratio: 9 / 19.5; }
+.panel[data-view="wide"] .viewport { aspect-ratio: 16 / 9; }
+.placeholder[hidden] { display: none; }
+.panel[data-view="wide"] { grid-column: span 2; }
+#panels.all-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#panels.all-wide .panel[data-view="wide"] { grid-column: auto; }
+#panels.focused {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: auto;
+}
+#panels.focused .panel { width: 100%; height: fit-content; }
+#panels.focused .panel[data-view="phone"] { max-width: 350px; }
+#panels.focused .panel[data-view="wide"] { max-width: none; }
+#panels.focused .panel.hidden { display: none; }
+@media (max-height: 800px) {
+  #panels { gap: 8px; }
+}

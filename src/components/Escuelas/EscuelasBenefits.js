@@ -458,7 +458,7 @@ const SteamExpandedContent = ({ onClose }) => {
                         El Marco <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-fuchsia-400 to-amber-400">S.T.E.A.M.</span> en Fly High
                     </h2>
                     <p className="text-lg md:text-2xl text-white/80 font-medium italic max-w-4xl mx-auto leading-relaxed text-balance">
-                        "Convertimos el cielo en el laboratorio más grande del mundo, donde cada sigla cobra vida a través de la emoción del primer vuelo."
+                        &quot;Convertimos el cielo en el laboratorio más grande del mundo, donde cada sigla cobra vida a través de la emoción del primer vuelo.&quot;
                     </p>
                 </motion.div>
 

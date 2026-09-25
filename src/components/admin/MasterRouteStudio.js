@@ -638,7 +638,7 @@ export default function MasterRouteStudio() {
                                             {hasNarrative ? (
                                                 <div className="flex-1 flex flex-col gap-3 mt-1">
                                                     <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed italic border-l-2 border-purple-200 pl-2">
-                                                        "{poi.narrative_script}"
+                                                        &quot;{poi.narrative_script}&quot;
                                                     </p>
                                                     <div className="mt-auto bg-slate-50 rounded-lg p-2 flex items-center gap-2 border border-slate-100" onClick={e => e.stopPropagation()}>
                                                         <Volume2 size={14} className="text-slate-400" />

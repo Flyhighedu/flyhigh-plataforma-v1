@@ -174,7 +174,7 @@ export default function UnifiedFlightCard({
                             <div className="flex items-start gap-1.5 mt-1 border-l-2 border-indigo-500/20 pl-2">
                                 <span className="material-symbols-outlined text-[12px] text-indigo-400/80 mt-0.5">chat</span>
                                 <p className="text-[10px] text-indigo-300/80 italic m-0 leading-relaxed font-medium whitespace-normal break-words">
-                                    "{audit.feedback_para_isa}"
+                                    &quot;{audit.feedback_para_isa}&quot;
                                 </p>
                             </div>
                         )}

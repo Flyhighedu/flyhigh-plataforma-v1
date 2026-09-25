@@ -44,7 +44,7 @@ export default function PatrocinadoresAllies() {
 
             <div className="mt-24 text-center reveal-node">
                 <p className="text-[10px] text-gray-600 italic leading-relaxed">
-                    "Porque un niño que conoce su ciudad desde el cielo, jamás permitirá que su futuro se quede en el suelo."
+                    &quot;Porque un niño que conoce su ciudad desde el cielo, jamás permitirá que su futuro se quede en el suelo.&quot;
                 </p>
                 <div className="mt-12 flex flex-col items-center opacity-30">
                     <span className="text-xs font-black tracking-tighter uppercase mb-2">FLY HIGH EDU 2025</span>

@@ -623,7 +623,7 @@ export default function SupervisorBitacoraScreen({
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <p style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    "{entry.nombreClave}"
+                                                    &quot;{entry.nombreClave}&quot;
                                                 </p>
                                                 {entry.destinoPersonalizado && (
                                                     <p style={{ fontSize: 13, color: '#7C3AED', fontWeight: 700, margin: '4px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -866,13 +866,13 @@ export default function SupervisorBitacoraScreen({
                                 </div>
 
                                 <p style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', lineHeight: 1.6, margin: '8px 0 0', textAlign: 'center' }}>
-                                    "¡<span style={{ color: '#60A5FA', fontWeight: 900, textShadow: '0 0 10px rgba(96,165,250,0.5)' }}>Escuadrón {nombreClave}</span>!
+                                    &quot;¡<span style={{ color: '#60A5FA', fontWeight: 900, textShadow: '0 0 10px rgba(96,165,250,0.5)' }}>Escuadrón {nombreClave}</span>!
                                 </p>
                                 <p style={{ fontSize: 18, fontWeight: 700, color: '#CBD5E1', lineHeight: 1.6, margin: '12px 0 0', textAlign: 'center' }}>
                                     El dron necesita de <strong style={{ color: '#F472B6', textShadow: '0 0 10px rgba(244,114,182,0.5)' }}>SU VOZ</strong> para volar.
                                 </p>
                                 <p style={{ fontSize: 18, fontWeight: 700, color: '#CBD5E1', lineHeight: 1.6, margin: '12px 0 0', textAlign: 'center' }}>
-                                    ¡Si no lo ayudan, se va a caer!"
+                                    ¡Si no lo ayudan, se va a caer!&quot;
                                 </p>
                             </div>
                         </div>
@@ -901,7 +901,7 @@ export default function SupervisorBitacoraScreen({
                                 <div>
                                     <p style={{ fontSize: 15, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Cuando escuchen:</p>
                                     <p style={{ fontSize: 22, fontWeight: 900, color: '#60A5FA', margin: '4px 0 0' }}>
-                                        "¡SUBE, SUBE, SUBE!"
+                                        &quot;¡SUBE, SUBE, SUBE!&quot;
                                     </p>
                                 </div>
                             </div>
@@ -925,7 +925,7 @@ export default function SupervisorBitacoraScreen({
                                 <div>
                                     <p style={{ fontSize: 15, fontWeight: 700, color: '#94A3B8', margin: 0 }}>Tienen que gritar:</p>
                                     <p style={{ fontSize: 26, fontWeight: 900, color: '#FBBF24', margin: '4px 0 0', textShadow: '0 0 12px rgba(245,158,11,0.5)' }}>
-                                        "¡HASTA LAS NUBES!"
+                                        &quot;¡HASTA LAS NUBES!&quot;
                                     </p>
                                 </div>
                             </div>
