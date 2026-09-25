@@ -60,7 +60,7 @@ function layout(bounds = latestBounds) {
       pane.view.setBounds({ x, y, width: paneWidth, height: paneHeight });
       // Keep a stable phone layout width while scaling its preview to the card.
       // The shell's CSS coordinates are converted to Electron's device-independent pixels.
-      const zoom = rect.mode === 'phone' ? Math.max(0.25, paneWidth / 390) : 1;
+      const zoom = rect.mode === 'phone' ? Math.max(0.25, paneWidth / 390) : role.id === 'admin' ? Math.min(1, Math.max(0.25, paneWidth / 1280)) : 1;
       if (Math.abs(pane.view.webContents.getZoomFactor() - zoom) > 0.001) pane.view.webContents.setZoomFactor(zoom);
     }
   }
@@ -151,6 +151,17 @@ async function act(roleId, action) {
 async function signInRole(roleId) {
   if (connected?.backendOrigin !== 'http://127.0.0.1:54321' && connected?.backendOrigin !== 'http://localhost:54321') {
     throw new Error('El acceso automático solo está permitido con la base local.');
+  }
+  if (roleId === 'admin') {
+    await runtimeConfig();
+    const runtime = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime.json'), 'utf8'));
+    const pane = panes.get(roleId);
+    const response = await pane.ses.fetch(connected.baseURL + '/api/review-lab/admin-session', {
+      method: 'POST', headers: { 'x-flyhigh-review-token': runtime.token }, redirect: 'error',
+    });
+    if (!response.ok) throw new Error('No se pudo abrir la sesión administrativa local. Reinicia el servidor de pruebas.');
+    await pane.view.webContents.loadURL(connected.baseURL + '/admin/cronograma');
+    return;
   }
   const accountFile = path.join(dataDir, 'test-accounts.json');
   let account;
@@ -245,7 +256,7 @@ async function createWindow() {
       throw new Error('Acción desconocida.');
     } catch (error) { return { ok: false, error: error.message }; }
   });
-  ipcMain.on('review:bounds', (event, bounds) => { assertShell(event); if (Array.isArray(bounds) && bounds.length <= 4) layout(bounds); });
+  ipcMain.on('review:bounds', (event, bounds) => { assertShell(event); if (Array.isArray(bounds) && bounds.length <= ROLES.length) layout(bounds); });
   await win.loadFile(path.join(__dirname, 'shell.html'));
   sendState();
   if (selfTest) {

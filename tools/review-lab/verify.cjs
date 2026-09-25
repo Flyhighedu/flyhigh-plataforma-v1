@@ -21,7 +21,7 @@ async function verify({ phase, attach, panes, act, addNote, win, dataDir }) {
         if (browserMessages.length < 30) browserMessages.push(String(message).slice(0, 400));
       });
       await act(role.id, 'signin');
-      const expected = role.id === 'supervisor' ? '/supervisor/dashboard' : '/staff/dashboard';
+      const expected = role.route;
       let pathname;
       for (let attempt = 0; attempt < 180; attempt++) {
         await delay(500);
@@ -89,7 +89,7 @@ async function verify({ phase, attach, panes, act, addNote, win, dataDir }) {
     }
     const pilot = panes.get('pilot').view.webContents;
     await win.webContents.executeJavaScript(`document.querySelectorAll('.panel[data-view="wide"] [data-action="view"]').forEach(button => button.click())`);
-    const dimensions = await win.webContents.executeJavaScript(`[...document.querySelectorAll('.panel')].map(panel => {
+    const dimensions = await win.webContents.executeJavaScript(`[...document.querySelectorAll('.panel:not(.hidden)')].map(panel => {
       const viewport = panel.querySelector('.viewport').getBoundingClientRect();
       return { role: panel.dataset.role, mode: panel.dataset.view, width: viewport.width, height: viewport.height };
     })`);
@@ -100,7 +100,7 @@ async function verify({ phase, attach, panes, act, addNote, win, dataDir }) {
     }
     await win.webContents.executeJavaScript('if (!document.body.classList.contains("fill-mode")) document.getElementById("fill").click()');
     await delay(100);
-    const fitted = await win.webContents.executeJavaScript(`[...document.querySelectorAll('.panel')].map(panel => {
+    const fitted = await win.webContents.executeJavaScript(`[...document.querySelectorAll('.panel:not(.hidden)')].map(panel => {
       const rect = panel.querySelector('.viewport').getBoundingClientRect();
       return { width: rect.width, height: rect.height, bottom: rect.bottom, windowHeight: innerHeight, panelBottom: panel.getBoundingClientRect().bottom, panelTop: panel.getBoundingClientRect().top, mode: document.body.className };
     })`);
@@ -137,20 +137,38 @@ async function verify({ phase, attach, panes, act, addNote, win, dataDir }) {
     await win.webContents.executeJavaScript('document.querySelector("[data-role=pilot] [data-action=view]").click()');
     await delay(100);
     assert.equal(await win.webContents.executeJavaScript('document.querySelector("[data-role=pilot]").dataset.view'), 'phone');
-    if (phase === 'write') fs.writeFileSync(path.join(dataDir, 'verification-layout.png'), await win.capturePage().then(image => image.toPNG()));
     await win.webContents.executeJavaScript('document.querySelector("[data-role=pilot] [data-action=focus]").click()');
     await delay(100);
-    assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".panel.hidden").length'), 3);
+    assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".panel.hidden").length'), 4);
     await win.webContents.executeJavaScript('document.getElementById("grid").click()');
     await delay(100);
-    assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".panel.hidden").length'), 0);
+    assert.equal(await win.webContents.executeJavaScript('document.querySelectorAll(".panel.hidden").length'), 1);
+    await win.webContents.executeJavaScript('document.querySelector("button[data-workspace=compare]").click()');
+    for (const role of ROLES.filter(role => role.id !== 'admin')) {
+      await win.webContents.executeJavaScript(`document.getElementById('compare-profile').value = ${JSON.stringify(role.id)}; document.getElementById('compare-profile').dispatchEvent(new Event('change'))`);
+      await delay(100);
+      const visible = await win.webContents.executeJavaScript('[...document.querySelectorAll(".panel:not(.hidden)")].map(p=>p.dataset.role).sort()');
+      assert.deepEqual(visible, ['admin', role.id].sort());
+      assert.equal(panes.get('admin').view.getVisible(), true);
+      assert.equal(panes.get(role.id).view.getVisible(), true);
+      assert.equal(await panes.get(role.id).view.webContents.executeJavaScript('localStorage.getItem("verification-profile")'), role.id);
+    }
+    await win.webContents.executeJavaScript('document.querySelector("button[data-workspace=admin]").click(); document.querySelector("[data-role=admin] [data-action=view]").click()');
+    await delay(100);
+    // Hidden windows do not reliably commit renderer resize frames. Assert the
+    // actual native bounds/zoom used for layout, not stale renderer innerWidth.
+    assert.ok(panes.get('admin').view.getBounds().width / panes.get('admin').view.webContents.getZoomFactor() >= 1278, 'desktop admin logical width');
+    await win.webContents.executeJavaScript('document.querySelector("[data-role=admin] [data-action=view]").click()');
+    await delay(100);
+    assert.ok(Math.abs(panes.get('admin').view.getBounds().width / panes.get('admin').view.webContents.getZoomFactor() - 390) <= 2, 'phone admin');
+    await win.webContents.executeJavaScript('document.getElementById("grid").click()');
     await win.webContents.executeJavaScript('document.querySelector("[data-role=pilot] [data-action=note]").click()');
     await delay(100);
     assert.equal(await win.webContents.executeJavaScript('document.getElementById("note-dialog").open'), true);
     assert.equal(panes.get('pilot').view.getVisible(), false);
     await win.webContents.executeJavaScript('document.getElementById("cancel-note").click()');
     await delay(100);
-    addNote({ role: 'pilot', title: 'Verificación automática del laboratorio', expected: 'Sesiones separadas', observed: 'Cuatro sesiones conservadas; datos ficticios.' });
+    addNote({ role: 'pilot', title: 'Verificación automática del laboratorio', expected: 'Sesiones separadas', observed: 'Cinco sesiones conservadas; comparación con los cuatro perfiles; datos ficticios.' });
     fs.writeFileSync(path.join(dataDir, 'verification-' + phase + '.json'), JSON.stringify({ ok: true, phase, checks: ['four partitions', 'persistent cookies', 'persistent localStorage', 'no Node or IPC in app pages', 'offline one role', 'other roles stay online', 'production requests blocked', 'reload keeps session', 'phone/wide controls', 'focus/grid', 'note dialog above views', 'local report'], at: new Date().toISOString() }, null, 2));
   } finally { server.closeAllConnections(); server.close(); }
 }

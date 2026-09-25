@@ -8,6 +8,7 @@ const ROLES = Object.freeze([
   { id: 'teacher', name: 'Maestra', route: '/staff/dashboard' },
   { id: 'assistant', name: 'Auxiliar', route: '/staff/dashboard' },
   { id: 'supervisor', name: 'Supervisión general', route: '/supervisor/dashboard' },
+  { id: 'admin', name: 'Administración', route: '/admin/cronograma' },
 ]);
 const KNOWN_PRODUCTION_HOST = 'sbzwffqhzmlxtnjyjduk.supabase.co';
 function loopback(host) { return ['localhost', '127.0.0.1', '[::1]'].includes(host); }

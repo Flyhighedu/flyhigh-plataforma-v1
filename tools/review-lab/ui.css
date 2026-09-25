@@ -47,3 +47,17 @@ body.dark .placeholder, body.dark .hint, body.dark #note-context { color: #aebed
 body.dark input, body.dark textarea { background: #101b28; color: #e8eef7; border-color: #40536b; }
 body.dark #message.error { color: #ffaaa3; }
 body.dark dialog::backdrop { background: #050b14aa; }
+/* Workspaces retain all sessions; only their native view visibility changes. */
+.workspace-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #cbd5e1; }
+.workspace-nav button[aria-pressed="true"] { background: #1d4ed8; color: white; }
+.workspace-nav select { padding: 7px; border-radius: 8px; background: inherit; color: inherit; }
+.workspace-nav label { display: flex; flex-direction: row; align-items: center; margin: 0; }
+.workspace-nav > span { margin-left: auto; font-size: 12px; opacity: .7; }
+.workspace-nav [hidden], #panels .panel.hidden { display: none !important; }
+#panels[data-workspace="admin"], body.fill-mode #panels[data-workspace="admin"] { display: flex; justify-content: center; }
+#panels[data-workspace="admin"] .panel { width: 100%; }
+#panels[data-workspace="admin"] .panel[data-view="phone"] { max-width: 390px; }
+#panels[data-workspace="compare"]:not(.focused), body.fill-mode #panels[data-workspace="compare"]:not(.focused) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 390px); grid-template-rows: none; align-items: start; }
+#panels[data-workspace="compare"] .panel { grid-column: 2; grid-row: 1; min-width: 0; }
+#panels[data-workspace="compare"] .panel[data-role="admin"] { grid-column: 1; }
+#panels[data-workspace="compare"] .panel[data-role="admin"][data-view="phone"] { max-width: 390px; justify-self: center; width: 100%; }

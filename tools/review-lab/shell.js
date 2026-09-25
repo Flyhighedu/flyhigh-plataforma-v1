@@ -2,6 +2,7 @@ const panelRoot = document.getElementById('panels');
 const message = document.getElementById('message');
 const noteDialog = document.getElementById('note-dialog');
 let state, focusRole = null, noteRole = null;
+let workspace = 'operations', compareRole = 'pilot';
 const savedTheme = localStorage.getItem('flyhigh-review-theme') === 'dark';
 const savedFill = localStorage.getItem('flyhigh-review-fill') === 'true';
 document.body.classList.toggle('dark', savedTheme);
@@ -11,8 +12,8 @@ document.getElementById('fill').textContent = savedFill ? 'Vista normal' : 'Ocup
 const viewModes = (() => {
   try {
     const saved = JSON.parse(localStorage.getItem('flyhigh-review-view-modes') || '{}');
-    return Object.fromEntries(['pilot', 'teacher', 'assistant', 'supervisor'].map(id => [id, saved[id] === 'wide' ? 'wide' : 'phone']));
-  } catch { return { pilot: 'phone', teacher: 'phone', assistant: 'phone', supervisor: 'phone' }; }
+    return Object.fromEntries(['pilot', 'teacher', 'assistant', 'supervisor', 'admin'].map(id => [id, saved[id] === 'wide' || (id === 'admin' && saved[id] !== 'phone') ? 'wide' : 'phone']));
+  } catch { return { pilot: 'phone', teacher: 'phone', assistant: 'phone', supervisor: 'phone', admin: 'wide' }; }
 })();
 function tell(text, error = false) { message.textContent = text; message.classList.toggle('error', error); }
 async function request(command, payload) { const result = await window.review.request(command, payload); if (!result.ok) tell(result.error, true); return result; }
@@ -36,11 +37,21 @@ function measure() {
 }
 function focus(id) {
   focusRole = id === focusRole ? null : id;
+  applyWorkspace();
+}
+function applyWorkspace() {
+  panelRoot.dataset.workspace = workspace;
   panelRoot.classList.toggle('focused', !!focusRole);
   document.querySelectorAll('.panel').forEach(panel => {
-    panel.classList.toggle('hidden', !!focusRole && panel.dataset.role !== focusRole);
-    panel.querySelector('[data-action="focus"]').textContent = focusRole === panel.dataset.role ? 'Ver las cuatro' : 'Enfocar';
+    const id = panel.dataset.role;
+    const visible = focusRole ? id === focusRole : workspace === 'operations' ? id !== 'admin' : workspace === 'admin' ? id === 'admin' : id === 'admin' || id === compareRole;
+    panel.classList.toggle('hidden', !visible);
+    panel.querySelector('[data-action="focus"]').textContent = focusRole === id ? 'Volver a la vista' : 'Enfocar';
   });
+  document.querySelectorAll('[data-workspace]').forEach(button => {
+    if (button.tagName === 'BUTTON') button.setAttribute('aria-pressed', String(button.dataset.workspace === workspace));
+  });
+  document.getElementById('compare-label').hidden = workspace !== 'compare';
   measure();
 }
 function toggleView(id) {
@@ -49,7 +60,7 @@ function toggleView(id) {
   panel.dataset.view = viewModes[id];
   panel.querySelector('.ratio-label').textContent = viewModes[id] === 'phone' ? '9:19,5' : '16:9';
   panel.querySelector('[data-action="view"]').textContent = viewModes[id] === 'phone' ? 'Vista amplia' : 'Vista celular';
-  panelRoot.classList.toggle('all-wide', Object.values(viewModes).every(mode => mode === 'wide'));
+  panelRoot.classList.toggle('all-wide', ['pilot', 'teacher', 'assistant', 'supervisor'].every(id => viewModes[id] === 'wide'));
   localStorage.setItem('flyhigh-review-view-modes', JSON.stringify(viewModes));
   measure();
 }
@@ -96,9 +107,9 @@ function createPanel(role, index) {
 window.review.onState(next => {
   const first = !state; state = next;
   if (first) state.roles.forEach(createPanel);
-  panelRoot.classList.toggle('all-wide', Object.values(viewModes).every(mode => mode === 'wide'));
+  panelRoot.classList.toggle('all-wide', ['pilot', 'teacher', 'assistant', 'supervisor'].every(id => viewModes[id] === 'wide'));
   document.getElementById('connection').textContent = state.connected ? 'Pruebas conectadas' : 'Sin conectar';
-  document.getElementById('target').textContent = state.connected ? 'Base local aislada · cuatro sesiones' : 'Cuatro sesiones independientes · producción bloqueada';
+  document.getElementById('target').textContent = state.connected ? 'Base local aislada · cinco sesiones' : 'Cinco sesiones independientes · producción bloqueada';
   document.querySelector('.environment').classList.toggle('connected', state.connected);
   document.getElementById('connect').disabled = state.connected;
   document.getElementById('findings').textContent = 'Mis hallazgos (' + state.notes.length + ')';
@@ -110,7 +121,7 @@ window.review.onState(next => {
     for (const action of ['signin', 'home', 'reload', 'offline', 'inspect']) panel.querySelector('[data-action="' + action + '"]').disabled = !state.connected;
     const offline = panel.querySelector('[data-action="offline"]'); offline.textContent = role.online === false ? 'Restaurar red' : 'Sin red'; offline.classList.toggle('offline', role.online === false);
   }
-  measure();
+  applyWorkspace();
 });
 document.getElementById('connect').addEventListener('click', async () => {
   const button = document.getElementById('connect'); button.disabled = true; tell('Comprobando el destino del servidor…');
@@ -118,7 +129,9 @@ document.getElementById('connect').addEventListener('click', async () => {
   if (result.ok) tell('Pruebas conectadas. Pulsa Entrar en cada perfil.');
   else button.disabled = false;
 });
-document.getElementById('grid').addEventListener('click', () => { if (focusRole) focus(focusRole); });
+document.getElementById('grid').addEventListener('click', () => { workspace = 'operations'; focusRole = null; applyWorkspace(); });
+document.querySelectorAll('button[data-workspace]').forEach(button => button.addEventListener('click', () => { workspace = button.dataset.workspace; focusRole = null; applyWorkspace(); }));
+document.getElementById('compare-profile').addEventListener('change', event => { compareRole = event.target.value; focusRole = null; applyWorkspace(); });
 document.getElementById('theme').addEventListener('click', () => {
   const dark = document.body.classList.toggle('dark');
   localStorage.setItem('flyhigh-review-theme', dark ? 'dark' : 'light');

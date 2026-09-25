@@ -21,9 +21,9 @@ test('accepts only the local backend, rejects ambiguous destinations', () => {
   }
 });
 test('separates all roles and backend identities and never allows navigation off the app origin', () => {
-  assert.equal(new Set(ROLES.map(role => partitionFor(role.id, 'env-a'))).size, 4);
+  assert.equal(new Set(ROLES.map(role => partitionFor(role.id, 'env-a'))).size, 5);
   assert.notEqual(partitionFor('pilot', 'env-a'), partitionFor('pilot', 'env-b'));
-  assert.throws(() => partitionFor('admin', 'env-a'));
+  assert.throws(() => partitionFor('unknown', 'env-a'));
   assert.equal(isNavigationAllowed('http://localhost:3100/staff/dashboard', 'http://localhost:3100'), true);
   for (const url of ['http://localhost:3000', 'https://flyhighedu.com.mx', 'file:///C:/secret', 'javascript:alert(1)', 'http://localhost:3100.evil.com']) assert.equal(isNavigationAllowed(url, 'http://localhost:3100'), false);
 });
