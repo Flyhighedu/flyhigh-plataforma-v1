@@ -46,6 +46,12 @@ export async function GET(request) {
             if (!/^\d+$/.test(visitId)) return json({ error: 'Visita inválida.' }, 400);
             query = query.eq('id', visitId);
         } else query = query.gte('fecha_programada', today).limit(300);
+        if (process.env.FLYHIGH_REVIEW_LAB === '1' && new URL(request.url).searchParams.get('metadata') === '1') {
+            const visits = await query;
+            if (visits.error) return storageError(visits.error);
+            if (visitId && !visits.data.length) return json({ error: 'Esta visita no está disponible.' }, 404);
+            return json({ visits: visits.data });
+        }
         const [visits, plans, pois] = await Promise.all([
             query, db.from('visit_narration_plans').select('*, visit:proximas_escuelas(nombre_escuela, cct)').eq('user_id', user.id), catalog(db, user.id),
         ]);

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { snapshotForNewVisit, localSchoolLocationsEnabled, locationAdminAuthorized } from '@/lib/school-locations-server';
 
 function getAdminSupabase() {
     return createClient(
@@ -161,6 +162,7 @@ export async function PATCH(request) {
 
 export async function POST(request) {
     try {
+        if (localSchoolLocationsEnabled() && !await locationAdminAuthorized(request)) return NextResponse.json({ error: 'Inicia sesión administrativa.' }, { status: 401 });
         const payload = await request.json();
         const payloadToInsert = { ...payload, registrado_via: payload.registrado_via || 'manual' };
         
@@ -168,6 +170,9 @@ export async function POST(request) {
         delete payloadToInsert.id;
 
         const supabase = getAdminSupabase();
+        if (localSchoolLocationsEnabled() && payloadToInsert.ubicacion_lat == null && payloadToInsert.ubicacion_lng == null) {
+            Object.assign(payloadToInsert, await snapshotForNewVisit(supabase, payloadToInsert.cct, payloadToInsert.turno));
+        }
         const { data, error } = await supabase
             .from('proximas_escuelas')
             .insert(payloadToInsert)

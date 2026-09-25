@@ -149,7 +149,9 @@ async function seedPreparationVisits(admin) {
 async function setup(onProgress) {
   const input = await ensureStack(onProgress);
   await require('./migrate-preparations.cjs').migratePreparations(input);
+  await require('./migrate-school-locations.cjs').migrateSchoolLocations(input);
   const seeded = await seed(input, onProgress);
+  await require('./seed-school-locations.cjs').seedSchoolLocations(input);
   return { backendOrigin: input.NEXT_PUBLIC_SUPABASE_URL, ...seeded };
 }
 if (require.main === module) {

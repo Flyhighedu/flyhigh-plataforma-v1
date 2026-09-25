@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { localSchoolLocationsEnabled, locationAdminAuthorized, snapshotForNewVisit } from '@/lib/school-locations-server';
 
 // Server-side Supabase client with Service Role Key — bypasses RLS
 function getAdminSupabase() {
@@ -12,6 +13,7 @@ function getAdminSupabase() {
 
 export async function POST(request) {
     try {
+        if (localSchoolLocationsEnabled() && !await locationAdminAuthorized(request)) return NextResponse.json({ error: 'Inicia sesión administrativa.' }, { status: 401 });
         const body = await request.json();
         const { nombre_escuela, colonia, fecha_programada, cct, turno, id, nombre_director, telefono_director, numero_ninos, precio } = body;
 
@@ -52,9 +54,10 @@ export async function POST(request) {
             result = data && data.length > 0 ? data[0] : null;
         } else {
             // INSERT new school — mark origin for traceability
+            const location = await snapshotForNewVisit(supabase, cct, turno);
             const { data, error } = await supabase
                 .from('proximas_escuelas')
-                .insert({ ...schoolData, estatus: 'pendiente', registrado_via: 'admin' })
+                .insert({ ...schoolData, ...location, estatus: 'pendiente', registrado_via: 'admin' })
                 .select();
 
             if (error) throw error;

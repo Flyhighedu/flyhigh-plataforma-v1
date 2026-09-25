@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { supabaseNew } from '@/lib/supabaseClientNew';
 import SchoolCombobox from '@/components/admin/SchoolCombobox';
+import SchoolLocationPanel from '@/components/admin/SchoolLocationPanel';
 import AdminLayout from '@/components/admin/AdminLayout';
 import AnalyticsView from '@/components/admin/AnalyticsView';
 import HRCommandCenter from '@/components/admin/HRCommandCenter';
@@ -2046,6 +2047,17 @@ export default function AdminPage() {
                                             loading={catalogoLoading}
                                         />
                                     </div>
+
+                                    {process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB === '1' && <SchoolLocationPanel
+                                        key={selectedCatalogoSchool?.cct || 'new-school'}
+                                        school={selectedCatalogoSchool}
+                                        editing={!!editingSchoolId}
+                                        onCatalogChanged={async school => {
+                                            setCatalogoEscuelas(previous => [...previous.filter(row => row.cct !== school.cct), school]);
+                                            setSelectedCatalogoSchool(school);
+                                            setNextSchoolForm(previous => ({ ...previous, cct: school.cct, nombre_escuela: school.nombre_escuela, turno: school.turno }));
+                                        }}
+                                    />}
 
                                     {!selectedCatalogoSchool && !editingSchoolId && (
                                         <div className="p-4 neu-card flex items-start gap-3 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800">

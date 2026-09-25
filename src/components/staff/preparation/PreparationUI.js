@@ -52,6 +52,26 @@ export function usePreparationData(visitId) {
             .catch(error => { if (error.name !== 'AbortError') setState({ loading: false, data: null, error: error.message }); });
         return () => controller.abort();
     }, [visitId, attempt]);
+    useEffect(() => {
+        // Metadata-only refresh for the comparison workspace. Never replace the
+        // narration editor's plan/catalog or discard a local unsaved sequence.
+        if (process.env.NEXT_PUBLIC_FLYHIGH_REVIEW_LAB !== '1') return;
+        const controller = new AbortController();
+        let running = false;
+        const refresh = async () => {
+            if (running) return;
+            running = true;
+            try {
+                const response = await fetch(`/api/staff/preparation?metadata=1${visitId ? `&visit=${encodeURIComponent(visitId)}` : ''}`, { cache: 'no-store', signal: controller.signal });
+                if (!response.ok) return;
+                const data = await response.json();
+                setState(previous => previous.data ? { ...previous, data: { ...previous.data, visits: data.visits } } : previous);
+            } catch { /* Keep the last successful data during a network interruption. */ }
+            finally { running = false; }
+        };
+        const timer = setInterval(refresh, 4000);
+        return () => { clearInterval(timer); controller.abort(); };
+    }, [visitId]);
     return { ...state, retry: () => { setState({ loading: true, data: null, error: '' }); setAttempt(n => n + 1); } };
 }
 
