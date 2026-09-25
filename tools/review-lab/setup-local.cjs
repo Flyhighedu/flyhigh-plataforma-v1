@@ -124,10 +124,29 @@ async function seed(input, onProgress = () => {}) {
     date: todayMexico(), school_id: school.id, school_name: 'ESCUELA FICTICIA · REVISIÓN LOCAL',
     status: 'prep', mission_state: 'PILOT_PREP', meta: { review_lab: true }, created_by: pilotId,
   }).select('id').single(), 'Crear jornada ficticia');
+  await seedPreparationVisits(admin);
   return { schoolId: school.id, journeyId: journey.id, accountFile: file };
+}
+
+async function seedPreparationVisits(admin) {
+  // Clearly fictional upcoming visits, only in the validated local database.
+  const { data: points } = await admin.from('master_route_pois').select('lat, lng').not('lat', 'is', null).not('lng', 'is', null).limit(1);
+  const location = points?.[0];
+  for (const [offset, suffix, name] of [[1, '0002', 'ESCUELA FICTICIA · PREPARAR VISITA'], [3, '0003', 'ESCUELA FICTICIA · SIN UBICACIÓN']]) {
+    const date = new Date(todayMexico() + 'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate() + offset);
+    const cct = 'TEST-LOCAL-' + suffix;
+    const row = { cct, nombre_escuela: name, colonia: 'Laboratorio local', fecha_programada: date.toISOString().slice(0, 10), estatus: 'pendiente', registrado_via: 'review-lab', turno: 'Matutino',
+      ubicacion_lat: offset === 1 && location ? location.lat + 0.002 : null,
+      ubicacion_lng: offset === 1 && location ? location.lng + 0.002 : null };
+    const existing = must(await admin.from('proximas_escuelas').select('id').eq('cct', cct).maybeSingle(), 'Buscar visita ficticia');
+    if (!existing) must(await admin.from('proximas_escuelas').insert(row), 'Crear visita ficticia de preparación');
+    else must(await admin.from('proximas_escuelas').update(row).eq('id', existing.id), 'Actualizar visita ficticia de preparación');
+  }
 }
 async function setup(onProgress) {
   const input = await ensureStack(onProgress);
+  await require('./migrate-preparations.cjs').migratePreparations(input);
   const seeded = await seed(input, onProgress);
   return { backendOrigin: input.NEXT_PUBLIC_SUPABASE_URL, ...seeded };
 }
@@ -137,4 +156,4 @@ if (require.main === module) {
     console.log('Cuentas de prueba guardadas en ' + result.accountFile);
   }).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { setup, parseStatus, todayMexico };
+module.exports = { setup, parseStatus, todayMexico, seedPreparationVisits };

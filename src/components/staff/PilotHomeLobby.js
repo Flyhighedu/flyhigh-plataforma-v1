@@ -2,7 +2,6 @@
 
 import {
     AudioLines,
-    ChevronDown,
     ChevronRight,
     CircleCheck,
     Clock3,
@@ -10,10 +9,17 @@ import {
     MapPin,
     Plane,
     Radio,
-    School,
     User
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/ui/MiniAvatar';
+import Link from 'next/link';
+import { planLabel, usePreparationData } from './preparation/PreparationUI';
+
+function PreparationSummary({ visitId }) {
+    const { data } = usePreparationData(visitId);
+    if (!data?.visits[0]) return null;
+    return <p className="mt-3 text-xs font-semibold text-slate-500">{planLabel(data.plans.find(p => p.visit_id === visitId), data.visits[0])}</p>;
+}
 
 function missionDateLabel(date) {
     if (!date) return '';
@@ -30,8 +36,6 @@ function isMissionToday(mission, today) {
 export default function PilotHomeLobby({
     profile,
     missions = [],
-    showAllMissions,
-    onToggleAllMissions,
     onSelectMission,
     onOpenNarrations,
     onOpenProfile,
@@ -39,7 +43,6 @@ export default function PilotHomeLobby({
 }) {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
     const nextMission = missions.find((mission) => mission.estatus === 'pendiente' || mission.estatus === 'en_progreso') || missions[0];
-    const remainingMissions = missions.filter((mission) => mission.id !== nextMission?.id);
     const isCompleted = nextMission && ['completada', 'cerrada'].includes(nextMission.estatus);
     const isNotToday = nextMission && !isMissionToday(nextMission, today);
     const missionDisabled = isCompleted || isNotToday;
@@ -119,7 +122,7 @@ export default function PilotHomeLobby({
                                     Próxima misión
                                 </p>
                                 <p className="m-0 mt-0.5 text-xs font-semibold text-slate-500">
-                                    Tu jornada de hoy
+                                    {nextMission && isMissionToday(nextMission, today) ? 'Tu jornada de hoy' : nextMission ? missionDateLabel(nextMission.fecha) : 'Consulta tus próximas visitas'}
                                 </p>
                             </div>
                         </div>
@@ -153,7 +156,12 @@ export default function PilotHomeLobby({
                                 {nextMission.colonia || 'Ubicación por confirmar'}
                             </p>
 
-                            <button
+                            <PreparationSummary visitId={nextMission.id} />
+                            <Link href={`/staff/visitas/${nextMission.id}`} className={`mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-extrabold ${isNotToday ? 'bg-blue-600 text-white' : 'border border-blue-100 bg-blue-50 text-blue-700'}`}>
+                                Preparar visita <ChevronRight size={17} />
+                            </Link>
+
+                            {!isNotToday && <button
                                 type="button"
                                 onClick={() => !missionDisabled && onSelectMission(nextMission)}
                                 disabled={missionDisabled}
@@ -165,7 +173,7 @@ export default function PilotHomeLobby({
                             >
                                 {isCompleted ? 'Misión finalizada' : isNotToday ? 'Aún no es la fecha' : 'Hacer check-in'}
                                 {!missionDisabled && <ChevronRight size={17} strokeWidth={2.8} />}
-                            </button>
+                            </button>}
                         </>
                     ) : (
                         <div className="py-7 text-center">
@@ -173,55 +181,11 @@ export default function PilotHomeLobby({
                                 <Clock3 size={21} />
                             </div>
                             <h1 className="mt-3 text-lg font-extrabold text-slate-800">Agenda despejada</h1>
-                            <p className="mt-1 text-sm text-slate-500">No tienes una misión programada para hoy.</p>
+                            <p className="mt-1 text-sm text-slate-500">No tienes próximas visitas en este momento.</p>
                         </div>
                     )}
 
-                    {remainingMissions.length > 0 && (
-                        <div className="mt-3 border-t border-slate-100 pt-3">
-                            <button
-                                type="button"
-                                onClick={onToggleAllMissions}
-                                className="flex w-full items-center justify-between rounded-xl px-1 py-2 text-xs font-bold text-slate-500 transition hover:text-slate-800"
-                                aria-expanded={showAllMissions}
-                            >
-                                <span className="flex items-center gap-2">
-                                    <School size={15} /> Otras misiones ({remainingMissions.length})
-                                </span>
-                                <ChevronDown size={15} className={`transition-transform ${showAllMissions ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {showAllMissions && (
-                                <div className="mt-2 space-y-2">
-                                    {remainingMissions.map((mission) => {
-                                        const completed = ['completada', 'cerrada'].includes(mission.estatus);
-                                        const notToday = !isMissionToday(mission, today);
-                                        const disabled = completed || notToday;
-
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={mission.id}
-                                                onClick={() => !disabled && onSelectMission(mission)}
-                                                disabled={disabled}
-                                                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 text-left transition enabled:hover:border-blue-200 enabled:hover:bg-blue-50/50 disabled:opacity-55"
-                                            >
-                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200">
-                                                    <School size={15} />
-                                                </span>
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm font-bold text-slate-800">{mission.school_name}</span>
-                                                    <span className="mt-0.5 block text-[11px] font-semibold text-slate-500">
-                                                        {notToday ? missionDateLabel(mission.fecha) : mission.colonia || 'Hoy'}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <Link href="/staff/cronograma" className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-100 pt-3 text-sm font-bold text-blue-700"><span>Ver cronograma</span><ChevronRight size={17} /></Link>
                 </section>
 
                 <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#0a2b55] via-[#0d3c78] to-[#1557a9] p-5 text-white shadow-[0_22px_50px_-28px_rgba(10,43,85,0.9)]">
@@ -243,15 +207,15 @@ export default function PilotHomeLobby({
                         </p>
                         <h2 className="mt-1 text-[1.75rem] font-black tracking-[-0.035em]">Narraciones</h2>
                         <p className="mt-2 max-w-[18rem] text-[13px] font-medium leading-relaxed text-blue-100/85">
-                            Prepara tu secuencia, escucha los audios y practica los controles antes del vuelo.
+                            Explora lugares y temas, escucha sus narraciones y conoce lo que puedes contar.
                         </p>
 
                         <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-blue-100/80">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
-                                <CircleCheck size={12} className="text-cyan-200" /> Preparar
+                                <CircleCheck size={12} className="text-cyan-200" /> Explorar
                             </span>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
-                                <CircleCheck size={12} className="text-cyan-200" /> Practicar
+                                <CircleCheck size={12} className="text-cyan-200" /> Escuchar
                             </span>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
                                 <CircleCheck size={12} className="text-cyan-200" /> Revisar

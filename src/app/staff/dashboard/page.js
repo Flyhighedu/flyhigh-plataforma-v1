@@ -2406,10 +2406,8 @@ export default function StaffDashboard() {
                         <PilotHomeLobby
                             profile={profile}
                             missions={todaySchools}
-                            showAllMissions={showAllMissions}
-                            onToggleAllMissions={() => setShowAllMissions((current) => !current)}
                             onSelectMission={selectMission}
-                            onOpenNarrations={() => router.push('/staff/academia')}
+                            onOpenNarrations={() => router.push('/staff/narraciones')}
                             onOpenProfile={() => router.push('/staff/hub')}
                             onLogout={handleLogout}
                         />
