@@ -12,6 +12,23 @@ const ROLES = Object.freeze([
 ]);
 const KNOWN_PRODUCTION_HOST = 'sbzwffqhzmlxtnjyjduk.supabase.co';
 function loopback(host) { return ['localhost', '127.0.0.1', '[::1]'].includes(host); }
+function privateIPv4(address) {
+  const parts = String(address || '').split('.').map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  return parts[0] === 10 || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168);
+}
+function lanAddresses(interfaces) {
+  const matches = [];
+  for (const [name, entries] of Object.entries(interfaces || {})) {
+    for (const entry of entries || []) {
+      if (entry.internal || !['IPv4', 4].includes(entry.family) || !privateIPv4(entry.address)) continue;
+      const normalized = name.toLowerCase();
+      const score = /wi-?fi|wlan|wireless/.test(normalized) ? 4 : /^ethernet/.test(normalized) ? 3 : /vethernet|docker|wsl|virtual|vmware|hyper-v/.test(normalized) ? 0 : 2;
+      matches.push({ address: entry.address, name, score });
+    }
+  }
+  return matches.sort((a, b) => b.score - a.score || a.address.localeCompare(b.address));
+}
 function readEnv(file) { return fs.existsSync(file) ? parseEnv(fs.readFileSync(file, 'utf8')) : {}; }
 function validateEnvironment(input, production = {}) {
   if (input.FLYHIGH_REVIEW_ENVIRONMENT !== 'isolated-test') {
@@ -66,4 +83,4 @@ function reportMarkdown(notes) {
     `## ${i + 1}. ${clean(note.title)}\n\n- Perfil: ${clean(note.role)}\n- Pantalla: ${clean(note.pathname)}\n- Fecha: ${clean(note.at)}\n- Estado: Por revisar\n\nEsperado: ${clean(note.expected)}\n\nObservado: ${clean(note.observed)}\n`
   ).join('\n');
 }
-module.exports = { ROLES, loopback, readEnv, validateEnvironment, cleanEnvironment, partitionFor, isNavigationAllowed, safePath, reportMarkdown };
+module.exports = { ROLES, loopback, privateIPv4, lanAddresses, readEnv, validateEnvironment, cleanEnvironment, partitionFor, isNavigationAllowed, safePath, reportMarkdown };

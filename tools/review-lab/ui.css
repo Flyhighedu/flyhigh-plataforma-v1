@@ -61,3 +61,14 @@ body.dark dialog::backdrop { background: #050b14aa; }
 #panels[data-workspace="compare"] .panel { grid-column: 2; grid-row: 1; min-width: 0; }
 #panels[data-workspace="compare"] .panel[data-role="admin"] { grid-column: 1; }
 #panels[data-workspace="compare"] .panel[data-role="admin"][data-view="phone"] { max-width: 390px; justify-self: center; width: 100%; }
+.mobile-dialog { width: min(520px, calc(100vw - 32px)); }
+.dialog-eyebrow { margin: 0 0 4px; color: #1960c9; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.mobile-context { margin: 14px 0; color: #526b84; font-size: 13px; }
+.qr-frame { width: fit-content; margin: 0 auto; padding: 12px; border: 1px solid #d6e0eb; border-radius: 18px; background: #fff; }
+.qr-frame img { display: block; width: min(272px, 62vw); height: auto; }
+.mobile-steps { display: grid; gap: 6px; margin: 16px 0; padding-left: 22px; color: #526b84; font-size: 12px; line-height: 1.45; }
+.mobile-dialog label { margin-bottom: 8px; }
+.mobile-dialog input { font-family: Consolas, monospace; font-size: 11px; }
+.mobile-actions { display: flex; align-items: center; gap: 10px; }
+#mobile-copy-status { color: #16836f; font-size: 11px; }
+body.dark .mobile-context, body.dark .mobile-steps { color: #aebed0; }

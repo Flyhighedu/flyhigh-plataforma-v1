@@ -17,6 +17,10 @@ Cada perfil operativo inicia en **vista celular vertical de proporción 9:19,5**
 
 **Inicio** vuelve al tablero del perfil; **Recargar** actualiza ese panel; **Sin red** simula una desconexión sólo para ese perfil; **Anotar** guarda un hallazgo local; **Inspeccionar** abre las herramientas de desarrollo. El informe se abre con **Mis hallazgos** y vive en `.review-lab/HALLAZGOS.md`.
 
+**Abrir en celular** crea un QR temporal para el perfil de ese panel, incluyendo Administración. La computadora y el teléfono deben permanecer en la misma red Wi-Fi o Ethernet, Docker y la Mesa deben seguir abiertos y Windows debe permitir Node.js en redes privadas si muestra el aviso del firewall. Al escanear, el teléfono obtiene una sesión local independiente y abre la misma pantalla que estaba mostrando el panel. El QR expira en 10 minutos; también se puede copiar su enlace local desde el diálogo. La conexión local usa HTTP: permite revisar interfaz y flujos, pero los navegadores móviles pueden reservar cámara, micrófono, GPS o instalación PWA para un contexto HTTPS.
+
+El acceso móvil no abre el puerto habitual de Next ni Supabase directamente. La Mesa crea un puente en un puerto aleatorio, con una ruta imposible de adivinar y una cookie `HttpOnly` temporal. El puente sólo reenvía la aplicación y el Supabase local validados; las peticiones sin invitación reciben 404. La dirección y el secreto cambian al reiniciar la Mesa, se guardan únicamente en `.review-lab/runtime.json` y no se envían a Internet. Esta protección es apropiada para una red privada de revisión, no para publicar el laboratorio en una Wi-Fi pública.
+
 Las cuatro pantallas comparten la misma jornada local. Así se pueden observar esperas, cambios de estado y métricas entre roles. La mesa no crea una rama paralela del código. Los cambios de estructura de base requieren migraciones revisadas para ambos entornos antes de desplegar.
 
 ## Revisión local de ubicaciones escolares
@@ -34,6 +38,8 @@ La mesa sólo acepta Supabase en `http://127.0.0.1:54321` o `http://localhost:54
 El esquema local inicial está en `tools/review-lab/backend/supabase/migrations`. Se generó a partir de metadatos estructurales públicos de PostgREST, **sin registros de negocio**; incluye las tablas que la aplicación expone, permisos de lectura/escritura para usuarios autenticados de prueba, Storage y Realtime necesarios para revisar flujos. Estos permisos locales son deliberadamente sencillos y **no certifican igualdad con las políticas, funciones, índices o restricciones de producción**. El historial remoto tiene migraciones que no están representadas exactamente por los archivos legacy del repositorio; ver `MIGRATIONS_STATUS.md`. Antes de desplegar cambios de esquema, reconciliar esa historia y verificar el esquema real.
 
 La prueba automatizada de la mesa usa un servidor sintético local, no FlyHigh: `npm run review:test` y los modos `--self-test=write` / `--self-test=read` comprueban separación y persistencia de sesiones, bloqueo de producción, desconexión individual y tamaños de vista. La prueba completa de jornadas, narraciones y métricas exige que Docker y Supabase local estén activos. Cámara, GPS y audio deben comprobarse también en teléfonos físicos.
+
+El ensayo de vuelo intenta primero el motor 3D. Si WebGL no está disponible o no termina de iniciar, cambia automáticamente al mapa compatible basado en Leaflet. En ese modo permanecen disponibles los dos joysticks, los POI, el audio y el gimbal; la inclinación del gimbal se representa mediante el nivel de acercamiento. Si ambos motores fallan, se muestra un mensaje de conexión en vez de dejar la cabina vacía.
 
 ## Estado de instalación
 

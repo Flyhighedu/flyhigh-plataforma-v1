@@ -5,7 +5,7 @@ import { locationSnapshot, normalizeCct } from './school-locations.mjs';
 export function localSchoolLocationsEnabled() {
     return process.env.NODE_ENV === 'development' && process.env.FLYHIGH_REVIEW_LAB === '1' &&
         process.env.FLYHIGH_REVIEW_ENVIRONMENT === 'isolated-test' &&
-        ['http://127.0.0.1:54321', 'http://localhost:54321'].includes(process.env.NEXT_PUBLIC_SUPABASE_URL);
+        ['http://127.0.0.1:54321', 'http://localhost:54321'].includes(process.env.FLYHIGH_REVIEW_BACKEND_ORIGIN || process.env.NEXT_PUBLIC_SUPABASE_URL);
 }
 export async function locationAdminAuthorized(request) {
     if (request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin) return false;

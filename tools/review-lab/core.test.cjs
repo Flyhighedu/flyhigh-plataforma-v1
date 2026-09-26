@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { ROLES, validateEnvironment, cleanEnvironment, partitionFor, isNavigationAllowed, safePath, reportMarkdown } = require('./core.cjs');
+const { ROLES, lanAddresses, validateEnvironment, cleanEnvironment, partitionFor, isNavigationAllowed, safePath, reportMarkdown } = require('./core.cjs');
+const { gatewayRoute } = require('./server.cjs');
 const config = { FLYHIGH_REVIEW_ENVIRONMENT: 'isolated-test', NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon', SUPABASE_SERVICE_ROLE_KEY: 'test-service' };
 test('refuses missing environment, known production, copied secrets and mismatched JWT project', () => {
   assert.throws(() => validateEnvironment({}), /Falta/);
@@ -47,6 +48,23 @@ test('review environment only forwards the optional public map credential', () =
   assert.equal(env.NEXT_PUBLIC_ARCGIS_API_KEY, 'review-map-key');
   assert.equal(env.SECRET_TOKEN, undefined);
 });
+test('mobile review chooses a real private LAN adapter before virtual networks', () => {
+  const addresses = lanAddresses({
+    'vEthernet (WSL)': [{ address: '172.28.0.1', family: 'IPv4', internal: false }],
+    'Wi-Fi': [{ address: '192.168.1.44', family: 'IPv4', internal: false }],
+    'Loopback': [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
+    'Public': [{ address: '8.8.8.8', family: 'IPv4', internal: false }],
+  });
+  assert.deepEqual(addresses.map(item => item.address), ['192.168.1.44', '172.28.0.1']);
+});
+test('mobile gateway requires its random path or established HttpOnly session', () => {
+  const token = 'random-mobile-token';
+  assert.deepEqual(gatewayRoute({ url: `/review/${token}/staff/dashboard`, headers: {} }, token), { target: 'app', path: '/staff/dashboard', establish: true });
+  assert.deepEqual(gatewayRoute({ url: `/review-backend/${token}/auth/v1/token`, headers: {} }, token), { target: 'backend', path: '/auth/v1/token', establish: false });
+  assert.deepEqual(gatewayRoute({ url: '/_next/static/chunk.js', headers: { cookie: `other=x; flyhigh_review_mobile=${token}` } }, token), { target: 'app', path: '/_next/static/chunk.js', establish: false });
+  assert.equal(gatewayRoute({ url: '/api/private', headers: {} }, token), null);
+  assert.equal(gatewayRoute({ url: '/review/wrong/staff', headers: {} }, token), null);
+});
 test('notes only expose pathname and remain explicitly unverified', () => {
   assert.equal(safePath('http://localhost:3100/staff?token=secret#private'), '/staff');
   assert.match(reportMarkdown([{ title: 'Prueba', role: 'Piloto', pathname: '/staff', at: 'today', expected: 'a', observed: 'b' }]), /Por revisar/);
@@ -54,10 +72,10 @@ test('notes only expose pathname and remain explicitly unverified', () => {
 test('handshake endpoint is disabled in production and requires exact random token', async () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../../src/app/api/review-lab/status/route.js'), 'utf8');
   const { GET } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
-  const keys = ['NODE_ENV', 'FLYHIGH_REVIEW_TOKEN', 'FLYHIGH_REVIEW_LAB', 'FLYHIGH_REVIEW_ENVIRONMENT', 'NEXT_PUBLIC_SUPABASE_URL'];
+  const keys = ['NODE_ENV', 'FLYHIGH_REVIEW_TOKEN', 'FLYHIGH_REVIEW_LAB', 'FLYHIGH_REVIEW_ENVIRONMENT', 'NEXT_PUBLIC_SUPABASE_URL', 'FLYHIGH_REVIEW_BACKEND_ORIGIN'];
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   try {
-    Object.assign(process.env, { NODE_ENV: 'development', FLYHIGH_REVIEW_TOKEN: 'random-test-token', FLYHIGH_REVIEW_LAB: '1', FLYHIGH_REVIEW_ENVIRONMENT: 'isolated-test', NEXT_PUBLIC_SUPABASE_URL: config.NEXT_PUBLIC_SUPABASE_URL });
+    Object.assign(process.env, { NODE_ENV: 'development', FLYHIGH_REVIEW_TOKEN: 'random-test-token', FLYHIGH_REVIEW_LAB: '1', FLYHIGH_REVIEW_ENVIRONMENT: 'isolated-test', NEXT_PUBLIC_SUPABASE_URL: 'http://192.168.1.44:3101/review-backend/random', FLYHIGH_REVIEW_BACKEND_ORIGIN: config.NEXT_PUBLIC_SUPABASE_URL });
     const request = token => new Request('http://localhost:3100/api/review-lab/status', { headers: { 'x-flyhigh-review-token': token } });
     assert.equal((await GET(request('wrong'))).status, 404);
     assert.equal((await GET(request('random-test-tokex'))).status, 404);

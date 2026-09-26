@@ -1,4 +1,7 @@
 const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell } = require('electron');
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
+const { QRCodeSVG } = require('qrcode.react');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -41,7 +44,7 @@ async function runtimeConfig() {
   if (!response.ok) throw new Error('El servidor no se identificó como la instancia de pruebas.');
   const identity = await response.json();
   if (identity.environment !== 'isolated-test' || identity.backendOrigin !== config.backendOrigin) throw new Error('El destino del servidor no coincide con el entorno de pruebas.');
-  return config;
+  return { ...config, mobileBaseURL: runtime.mobileBaseURL || '', publicBackendURL: runtime.publicBackendURL || config.backendOrigin, lan: runtime.lan || null, token: runtime.token };
 }
 function layout(bounds = latestBounds) {
   latestBounds = bounds;
@@ -71,9 +74,29 @@ function allowedRequest(url, config) {
     if (['data:', 'blob:'].includes(parsed.protocol)) return true;
     const normalized = parsed.origin.replace(/^ws/, 'http');
     if ([config.baseURL, config.backendOrigin].includes(normalized)) return true;
+    if (config.publicBackendURL && parsed.href.startsWith(config.publicBackendURL.replace(/^http/, parsed.protocol.slice(0, -1)))) return true;
     // Public visual/map assets only. External APIs and other Supabase projects stay blocked.
-    return parsed.protocol === 'https:' && ['fonts.googleapis.com', 'fonts.gstatic.com', 'images.unsplash.com', 'tile.openstreetmap.org', 'a.tile.openstreetmap.org', 'b.tile.openstreetmap.org', 'c.tile.openstreetmap.org'].includes(parsed.hostname);
+    return parsed.protocol === 'https:' && ['fonts.googleapis.com', 'fonts.gstatic.com', 'images.unsplash.com', 'ibasemaps-api.arcgis.com', 'tile.openstreetmap.org', 'a.tile.openstreetmap.org', 'b.tile.openstreetmap.org', 'c.tile.openstreetmap.org'].includes(parsed.hostname);
   } catch { return false; }
+}
+function qrDataURL(value) {
+  const svg = renderToStaticMarkup(React.createElement(QRCodeSVG, { value, size: 272, level: 'M', marginSize: 2, bgColor: '#ffffff', fgColor: '#071a33' }));
+  return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
+}
+async function mobileLink(roleId) {
+  const config = await runtimeConfig();
+  if (!config.mobileBaseURL) throw new Error('No se encontró una conexión Wi-Fi o Ethernet privada. Conecta la computadora y el celular a la misma red.');
+  const role = ROLES.find(item => item.id === roleId);
+  if (!role) throw new Error('Perfil desconocido.');
+  const pathname = panes.get(roleId)?.status.pathname || role.route;
+  const response = await fetch(config.baseURL + '/api/review-lab/mobile-link', {
+    method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', 'x-flyhigh-review-token': config.token },
+    body: JSON.stringify({ role: roleId, pathname }), signal: AbortSignal.timeout(5000),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.path !== 'string') throw new Error(result.error || 'No se pudo preparar el acceso móvil.');
+  const url = config.mobileBaseURL + result.path;
+  return { ok: true, url, qr: qrDataURL(url), role: role.name, network: config.lan?.name || 'red local', expiresInMinutes: 10 };
 }
 function configureSession(ses, role, config) {
   ses.webRequest.onBeforeRequest((details, callback) => callback({ cancel: panes.get(role.id)?.status.online === false || !allowedRequest(details.url, config) }));
@@ -250,6 +273,7 @@ async function createWindow() {
         return { ok: true };
       }
       if (command === 'action') { await act(payload?.role, payload?.action); return { ok: true }; }
+      if (command === 'mobile') return await mobileLink(payload?.role);
       if (command === 'note') return addNote(payload);
       if (command === 'modal') { modalOpen = payload === true; layout(); return { ok: true }; }
       if (command === 'report') { await shell.openPath(path.join(root, 'docs/ENTORNO_REVISION.md')); return { ok: true }; }

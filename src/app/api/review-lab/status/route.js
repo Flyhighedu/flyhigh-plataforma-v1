@@ -13,6 +13,6 @@ export async function GET(request) {
     }
     return Response.json({
         environment: process.env.FLYHIGH_REVIEW_ENVIRONMENT,
-        backendOrigin: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin,
+        backendOrigin: new URL(process.env.FLYHIGH_REVIEW_BACKEND_ORIGIN || process.env.NEXT_PUBLIC_SUPABASE_URL).origin,
     }, { headers: { 'Cache-Control': 'no-store' } });
 }

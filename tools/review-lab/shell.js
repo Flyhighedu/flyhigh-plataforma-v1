@@ -1,6 +1,7 @@
 const panelRoot = document.getElementById('panels');
 const message = document.getElementById('message');
 const noteDialog = document.getElementById('note-dialog');
+const mobileDialog = document.getElementById('mobile-dialog');
 let state, focusRole = null, noteRole = null;
 let workspace = 'operations', compareRole = 'pilot';
 const savedTheme = localStorage.getItem('flyhigh-review-theme') === 'dark';
@@ -72,6 +73,18 @@ async function openNote(id) {
   document.getElementById('note-error').textContent = '';
   noteDialog.showModal();
 }
+async function openMobile(id) {
+  tell('Preparando un acceso temporal para el celular…');
+  const result = await request('mobile', { role: id });
+  if (!result.ok) return;
+  await request('modal', true);
+  document.getElementById('mobile-context').textContent = `${result.role} · ${result.network} · expira en ${result.expiresInMinutes} minutos`;
+  document.getElementById('mobile-qr').src = result.qr;
+  document.getElementById('mobile-url').value = result.url;
+  document.getElementById('mobile-copy-status').textContent = '';
+  mobileDialog.showModal();
+  tell('QR listo. Mantén abierta la Mesa mientras revisas en el celular.');
+}
 function createPanel(role, index) {
   const panel = document.createElement('article'); panel.className = 'panel'; panel.dataset.role = role.id; panel.dataset.view = viewModes[role.id];
   panel.innerHTML = '<div class="panel-header"><span class="role-badge"></span><h2></h2><span class="ratio-label"></span><span class="pane-state">Sin conectar</span></div><div class="path"></div><div class="controls"></div><div class="viewport"><div class="placeholder"><span class="step"></span><strong></strong><p></p></div></div>';
@@ -90,13 +103,14 @@ function createPanel(role, index) {
     if (more.open) document.querySelectorAll('.more-controls').forEach(other => { if (other !== more) other.open = false; });
     measure();
   });
-  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar']];
+  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['mobile', 'Abrir en celular'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar']];
   for (const [action, label] of actions) {
     const button = document.createElement('button'); button.textContent = label; button.dataset.action = action;
     button.addEventListener('click', async () => {
       if (action === 'view') toggleView(role.id);
       else if (action === 'focus') focus(role.id);
       else if (action === 'note') await openNote(role.id);
+      else if (action === 'mobile') await openMobile(role.id);
       else await request('action', { role: role.id, action });
       if (more.open) more.open = false;
     }); (['view', 'focus', 'signin'].includes(action) ? controls : menu).appendChild(button);
@@ -118,7 +132,7 @@ window.review.onState(next => {
     panel.querySelector('.path').textContent = role.pathname || role.route;
     panel.querySelector('.pane-state').textContent = !state.connected ? 'Sin conectar' : role.problem || (!role.online ? 'Sin red simulada' : role.loading ? 'Cargando…' : 'Disponible');
     panel.querySelector('.placeholder').hidden = state.connected;
-    for (const action of ['signin', 'home', 'reload', 'offline', 'inspect']) panel.querySelector('[data-action="' + action + '"]').disabled = !state.connected;
+    for (const action of ['signin', 'mobile', 'home', 'reload', 'offline', 'inspect']) panel.querySelector('[data-action="' + action + '"]').disabled = !state.connected;
     const offline = panel.querySelector('[data-action="offline"]'); offline.textContent = role.online === false ? 'Restaurar red' : 'Sin red'; offline.classList.toggle('offline', role.online === false);
   }
   applyWorkspace();
@@ -148,6 +162,13 @@ document.getElementById('guide').addEventListener('click', () => request('report
 document.getElementById('findings').addEventListener('click', () => request('findings'));
 document.getElementById('cancel-note').addEventListener('click', () => noteDialog.close());
 noteDialog.addEventListener('close', () => request('modal', false));
+document.getElementById('close-mobile').addEventListener('click', () => mobileDialog.close());
+mobileDialog.addEventListener('close', () => request('modal', false));
+document.getElementById('copy-mobile').addEventListener('click', async () => {
+  const status = document.getElementById('mobile-copy-status');
+  try { await navigator.clipboard.writeText(document.getElementById('mobile-url').value); status.textContent = 'Enlace copiado'; }
+  catch { status.textContent = 'Selecciona y copia el enlace manualmente'; document.getElementById('mobile-url').select(); }
+});
 document.getElementById('note-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target; const data = Object.fromEntries(new FormData(form));
