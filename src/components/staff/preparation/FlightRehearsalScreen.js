@@ -215,6 +215,9 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
         import('maplibre-gl').then(maplibreModule => {
             if (disposed || !container.current) return;
             const maplibregl = maplibreModule.default || maplibreModule;
+            // Serve the native ESM worker and its shared module at stable URLs.
+            // Webpack cannot resolve MapLibre's dynamically constructed worker URL.
+            maplibregl.setWorkerUrl(new URL('/api/map-assets/maplibre-gl-worker.mjs', window.location.origin).href);
             const instance = new maplibregl.Map({
                 container: container.current,
                 style: mapStyle(),

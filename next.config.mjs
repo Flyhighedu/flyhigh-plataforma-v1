@@ -16,6 +16,9 @@ const withSerwist = withSerwistInit({
 const nextConfig = {
   distDir: process.env.FLYHIGH_REVIEW_LAB === '1' ? '.next-review' : '.next',
   productionBrowserSourceMaps: true,
+  outputFileTracingIncludes: {
+    '/api/map-assets/*': ['./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs', './node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs'],
+  },
   allowedDevOrigins: process.env.FLYHIGH_REVIEW_MOBILE_HOST ? [process.env.FLYHIGH_REVIEW_MOBILE_HOST] : [],
   turbopack: {},
   images: {
