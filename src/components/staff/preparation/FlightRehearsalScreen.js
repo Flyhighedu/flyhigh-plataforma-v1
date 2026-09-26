@@ -279,7 +279,10 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
     const currentDistance = currentPoi ? closestPoi(flight.current, [currentPoi])?.distance : null;
 
     return <main className="relative h-[100svh] min-h-[560px] overflow-hidden bg-[#07121e] text-white">
-        <div ref={container} className="absolute inset-0" aria-label="Mapa del ensayo de vuelo" />
+        {/* MapLibre's unlayered position:relative overrides Tailwind utilities.
+            Keep the full-screen geometry explicit for both map engines, and
+            contain Leaflet's high pane z-index beneath the flight controls. */}
+        <div ref={container} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }} aria-label="Mapa del ensayo de vuelo" />
         {!ready && !mapError && <div className="absolute inset-0 grid place-items-center bg-[#07121e]"><p className="animate-pulse text-sm font-semibold text-cyan-100">Preparando cabina…</p></div>}
 
         <header className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-slate-950/90 to-transparent px-3 pb-12 pt-[max(.75rem,env(safe-area-inset-top))]">

@@ -52,6 +52,16 @@ app.whenReady().then(async () => {
         await wc.loadURL(gateway.publicOrigin + rehearsal);
         await until(() => wc.executeJavaScript(`Boolean(document.querySelector('.maplibregl-marker'))`), '3D map loads with markers');
         await until(() => tiles.length > 0, 'basemap image tiles received');
+        const layout = await wc.executeJavaScript(`(() => {
+          const map = document.querySelector('[aria-label="Mapa del ensayo de vuelo"]');
+          const r = map.getBoundingClientRect();
+          const canvas = map.querySelector('canvas').getBoundingClientRect();
+          return {position:getComputedStyle(map).position,width:r.width,height:r.height,canvasWidth:canvas.width,canvasHeight:canvas.height};
+        })()`);
+        console.log('Map layout:', layout);
+        assert.ok(layout.width > 300 && layout.height > 500, 'map must occupy the phone screen, not a zero-height clipped container');
+        assert.equal(layout.position, 'absolute');
+        assert.ok(Math.abs(layout.canvasHeight - layout.height) < 2 && Math.abs(layout.canvasWidth - layout.width) < 2, 'canvas must match visible map bounds');
         const workerErrors = errors.filter(message => /worker failed|worker.*error|No se pudo iniciar/i.test(message));
         assert.deepEqual(workerErrors, []);
         assert.equal(await wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length`), 2);
