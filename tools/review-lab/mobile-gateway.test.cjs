@@ -6,6 +6,11 @@ const { startMobileGateway } = require('./server.cjs');
 
 async function fixture(label) {
   const server = http.createServer((request, response) => {
+    if (request.url === '/redirect') {
+      response.writeHead(307, { location: `http://localhost:${server.address().port}/review-mobile?token_hash=test#fragment` });
+      response.end();
+      return;
+    }
     response.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' });
     response.end(`${label}:${request.url}`);
   });
@@ -26,6 +31,9 @@ test('temporary LAN gateway separates app and backend and rejects uninvited clie
     const entry = await fetch(gateway.mobileBaseURL + '/staff/dashboard');
     assert.equal(await entry.text(), 'app:/staff/dashboard');
     const cookie = entry.headers.get('set-cookie').split(';')[0];
+    const redirect = await fetch(gateway.mobileBaseURL + '/redirect', { redirect: 'manual' });
+    assert.equal(redirect.status, 307);
+    assert.equal(redirect.headers.get('location'), gateway.publicOrigin + '/review-mobile?token_hash=test#fragment');
     const asset = await fetch(gateway.publicOrigin + '/_next/asset.js', { headers: { cookie } });
     assert.equal(await asset.text(), 'app:/_next/asset.js');
     const api = await fetch(gateway.publicBackendURL + '/rest/v1/schools');

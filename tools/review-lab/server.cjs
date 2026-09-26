@@ -50,6 +50,14 @@ async function startMobileGateway({ backendOrigin, token, advertisedHost, bindHo
       : { hostname: '127.0.0.1', port: appPort, host: publicOrigin ? new URL(publicOrigin).host : `127.0.0.1:${appPort}` };
     const upstream = http.request({ hostname: target.hostname, port: target.port, method: request.method, path: route.path, headers: proxyHeaders(request, target.host) }, upstreamResponse => {
       const headers = { ...upstreamResponse.headers };
+      // Next constructs request.url from its own listener even behind a proxy.
+      // Never send that loopback origin to a phone (including auth redirects).
+      if (route.target === 'app' && typeof headers.location === 'string') {
+        const location = new URL(headers.location, publicOrigin);
+        if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && location.port === String(appPort)) {
+          headers.location = publicOrigin + location.pathname + location.search + location.hash;
+        }
+      }
       if (route.establish) {
         const existing = headers['set-cookie'];
         headers['set-cookie'] = [...(Array.isArray(existing) ? existing : existing ? [existing] : []),

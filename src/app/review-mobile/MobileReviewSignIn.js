@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
@@ -9,6 +9,7 @@ export default function MobileReviewSignIn() {
     const router = useRouter();
     const params = useSearchParams();
     const [error, setError] = useState('');
+    const verification = useRef(null);
     const role = params.get('role');
     const tokenHash = params.get('token_hash');
     const next = params.get('next') || '/staff/dashboard';
@@ -17,7 +18,12 @@ export default function MobileReviewSignIn() {
     useEffect(() => {
         if (invalid) return;
         let cancelled = false;
-        createClient().auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' }).then(({ error: authError }) => {
+        // StrictMode replays effects in the review environment. A one-use link
+        // must be exchanged only once; both effect subscriptions share the result.
+        if (verification.current?.tokenHash !== tokenHash) {
+            verification.current = { tokenHash, result: createClient().auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' }) };
+        }
+        verification.current.result.then(({ error: authError }) => {
             if (cancelled) return;
             if (authError) setError('El enlace expiró o ya fue utilizado. Genera un QR nuevo desde la Mesa.');
             else router.replace(next);

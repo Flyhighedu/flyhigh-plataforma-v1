@@ -1,7 +1,5 @@
 const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell } = require('electron');
-const React = require('react');
-const { renderToStaticMarkup } = require('react-dom/server');
-const { QRCodeSVG } = require('qrcode.react');
+const { qrDataURL } = require('./qr.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -78,10 +76,6 @@ function allowedRequest(url, config) {
     // Public visual/map assets only. External APIs and other Supabase projects stay blocked.
     return parsed.protocol === 'https:' && ['fonts.googleapis.com', 'fonts.gstatic.com', 'images.unsplash.com', 'ibasemaps-api.arcgis.com', 'tile.openstreetmap.org', 'a.tile.openstreetmap.org', 'b.tile.openstreetmap.org', 'c.tile.openstreetmap.org'].includes(parsed.hostname);
   } catch { return false; }
-}
-function qrDataURL(value) {
-  const svg = renderToStaticMarkup(React.createElement(QRCodeSVG, { value, size: 272, level: 'M', marginSize: 2, bgColor: '#ffffff', fgColor: '#071a33' }));
-  return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
 }
 async function mobileLink(roleId) {
   const config = await runtimeConfig();
