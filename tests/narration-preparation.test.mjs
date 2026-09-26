@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel } from '../src/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, distanceMeters, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
 
 const catalog = [
     { id: 'official_a', name: 'Museo', audio_url: 'https://example.test/a.wav', narrative_script: 'Museo original' },
@@ -62,6 +62,11 @@ test('The nearest POI is derived without mutating the flight state', () => {
     assert.ok(distanceMeters(position, pois[1]) < 20);
     assert.equal(closestPoi(position, pois, 100)?.poi.id, 'near');
     assert.equal(closestPoi(position, pois, 5), null);
+});
+test('The compatible map represents gimbal tilt with a bounded zoom range', () => {
+    assert.equal(fallbackZoom(-20), 15.5);
+    assert.equal(fallbackZoom(-90), 17.5);
+    assert.ok(fallbackZoom(-40) > fallbackZoom(-20));
 });
 test('Duration distinguishes unknown from a playable length', () => {
     assert.equal(durationLabel(null), 'Duración por confirmar');

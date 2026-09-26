@@ -15,6 +15,10 @@ export function normalizeHeading(value) {
     return ((Number(value) % 360) + 360) % 360;
 }
 
+export function fallbackZoom(gimbalAngle) {
+    return 15.5 + ((-Number(gimbalAngle) - 20) / 70) * 2;
+}
+
 export function advanceFlight(state, controls, elapsedSeconds, limits = FLIGHT_LIMITS) {
     const elapsed = clamp(elapsedSeconds, 0, 0.1);
     const heading = normalizeHeading(state.heading + clamp(controls?.yaw, -1, 1) * limits.yawDegreesPerSecond * elapsed);

@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Crosshair, Eye, EyeOff, Headphones, MapPin, Pause, Play } from 'lucide-react';
 import { coordinates, distanceKm, usableAudio } from '@/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi } from '@/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, fallbackZoom } from '@/lib/flight-rehearsal.mjs';
 import { LoadingPreparation, Notice, secondary, usePreparationData } from './PreparationUI';
 import useNarrationAudio from './useNarrationAudio';
+import 'leaflet/dist/leaflet.css';
 
 const ARCGIS_KEY = process.env.NEXT_PUBLIC_ARCGIS_API_KEY || '';
 const DEFAULT_GIMBAL = -40;
@@ -98,6 +99,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
     const showPoisRef = useRef(true);
     const [ready, setReady] = useState(false);
     const [mapError, setMapError] = useState('');
+    const [mapMode, setMapMode] = useState('3d');
     const [playing, setPlaying] = useState(true);
     const [showPois, setShowPois] = useState(true);
     const [gimbalAngle, setGimbalAngle] = useState(DEFAULT_GIMBAL);
@@ -124,11 +126,95 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
 
     useEffect(() => {
         let disposed = false;
+        let fallbackStarted = false;
+        let loadTimer;
         let frame = 0;
         let latestHud = 0;
         let lastTime = performance.now();
-        import('maplibre-gl').then(({ default: maplibregl }) => {
+
+        const beginFlightLoop = (moveAircraft, moveCamera) => {
+            const tick = time => {
+                if (disposed) return;
+                const elapsed = Math.min((time - lastTime) / 1000, 0.1);
+                lastTime = time;
+                if (running.current && aircraftMarker.current) {
+                    flight.current = advanceFlight(flight.current, controls.current, elapsed);
+                    const current = flight.current;
+                    moveAircraft(current);
+                    moveCamera(current);
+                    if (time - latestHud > 180) {
+                        latestHud = time;
+                        setHud({ altitude: current.altitude, heading: current.heading, nearest: closestPoi(current, pois, 3000) });
+                    }
+                }
+                frame = requestAnimationFrame(tick);
+            };
+            frame = requestAnimationFrame(tick);
+        };
+
+        const startCompatibleMap = async reason => {
+            if (disposed || fallbackStarted || !container.current) return;
+            fallbackStarted = true;
+            clearTimeout(loadTimer);
+            console.warn('Flight rehearsal: switching to compatible map.', reason);
+            try { map.current?.remove(); } catch { /* A failed WebGL map may be only partially initialized. */ }
+            map.current = null;
+            container.current.replaceChildren();
+            try {
+                const leafletModule = await import('leaflet');
+                const L = leafletModule.default || leafletModule;
+                if (disposed || !container.current) return;
+                const instance = L.map(container.current, { zoomControl: false }).setView([schoolLatitude, schoolLongitude], fallbackZoom(DEFAULT_GIMBAL));
+                L.tileLayer(ARCGIS_KEY
+                    ? `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=${encodeURIComponent(ARCGIS_KEY)}`
+                    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: ARCGIS_KEY ? 'Esri y colaboradores' : '&copy; OpenStreetMap contributors',
+                }).addTo(instance);
+                const adapter = {
+                    jumpTo: ({ center, pitch }) => {
+                        if (center) instance.panTo([center[1], center[0]], { animate: false });
+                        if (Number.isFinite(pitch)) instance.setZoom(fallbackZoom(pitch - 90), { animate: false });
+                    },
+                    remove: () => instance.remove(),
+                };
+                map.current = adapter;
+
+                const aircraft = L.marker([schoolLatitude, schoolLongitude], {
+                    icon: L.divIcon({ className: '', html: '<div style="display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:999px;background:rgba(3,105,161,.9);border:3px solid white;box-shadow:0 8px 26px rgba(0,0,0,.45);color:white"><div data-aircraft-arrow style="font-size:24px;line-height:1;transform-origin:center">▲</div></div>', iconSize: [48, 48], iconAnchor: [24, 24] }),
+                }).addTo(instance);
+                aircraftArrow.current = aircraft.getElement()?.querySelector('[data-aircraft-arrow]') || null;
+                aircraftMarker.current = { setLngLat: ([lng, lat]) => aircraft.setLatLng([lat, lng]) };
+
+                L.marker([schoolLatitude, schoolLongitude], {
+                    icon: L.divIcon({ className: '', html: createMarkerElement('school', visit.nombre_escuela).outerHTML, iconSize: [34, 34], iconAnchor: [17, 34] }),
+                }).addTo(instance);
+                for (const poi of pois) {
+                    const sourceElement = createMarkerElement(usableAudio(poi.audio_url) ? 'audio' : 'poi', poi.name, selectedIds.has(String(poi.id)));
+                    const marker = L.marker([poi.latitude, poi.longitude], {
+                        icon: L.divIcon({ className: '', html: sourceElement.outerHTML, iconSize: [34, 34], iconAnchor: [17, 34] }),
+                    }).addTo(instance);
+                    const renderedElement = marker.getElement()?.querySelector('button') || marker.getElement();
+                    if (renderedElement) renderedElement.style.display = showPoisRef.current ? 'flex' : 'none';
+                    marker.on('click', () => setActivePoi(poi));
+                    poiMarkers.current.push({ marker, element: renderedElement || sourceElement });
+                }
+                setMapMode('compatible');
+                setMapError('');
+                setReady(true);
+                beginFlightLoop(current => {
+                    aircraft.setLatLng([current.latitude, current.longitude]);
+                    if (aircraftArrow.current) aircraftArrow.current.style.transform = `rotate(${current.heading}deg)`;
+                }, current => adapter.jumpTo({ center: [current.longitude, current.latitude], pitch: 90 + gimbal.current }));
+            } catch (fallbackError) {
+                console.error('Flight rehearsal compatible map failed:', fallbackError);
+                if (!disposed) setMapError('No se pudo iniciar el mapa. Comprueba la conexión y vuelve a intentarlo.');
+            }
+        };
+
+        import('maplibre-gl').then(maplibreModule => {
             if (disposed || !container.current) return;
+            const maplibregl = maplibreModule.default || maplibreModule;
             const instance = new maplibregl.Map({
                 container: container.current,
                 style: mapStyle(),
@@ -140,7 +226,10 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
                 maxPitch: 75,
             });
             map.current = instance;
+            loadTimer = setTimeout(() => startCompatibleMap(new Error('El motor 3D no terminó de iniciar.')), 6000);
             instance.on('load', () => {
+                if (disposed || fallbackStarted) return;
+                clearTimeout(loadTimer);
                 setReady(true);
                 const aircraft = document.createElement('div');
                 aircraft.style.cssText = 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:999px;background:rgba(3,105,161,.9);border:3px solid white;box-shadow:0 8px 26px rgba(0,0,0,.45);color:white;';
@@ -160,32 +249,19 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
                     const marker = new maplibregl.Marker({ element }).setLngLat([poi.longitude, poi.latitude]).addTo(instance);
                     poiMarkers.current.push({ marker, element });
                 }
+                beginFlightLoop(current => {
+                    aircraftMarker.current?.setLngLat([current.longitude, current.latitude]);
+                    if (aircraftArrow.current) aircraftArrow.current.style.transform = `rotate(${current.heading}deg)`;
+                }, current => instance.jumpTo({ center: [current.longitude, current.latitude], bearing: current.heading, pitch: 90 + gimbal.current }));
             });
             instance.on('error', event => {
-                if (event?.error?.message) setMapError(ARCGIS_KEY ? 'No se pudo cargar parte de la imagen satelital.' : 'El mapa abierto no respondió.');
+                if (!instance.loaded()) startCompatibleMap(event?.error || new Error('No se pudo crear el contexto WebGL.'));
+                else if (event?.error?.message) setMapError(ARCGIS_KEY ? 'No se pudo cargar parte de la imagen satelital.' : 'El mapa abierto no respondió.');
             });
-
-            const tick = time => {
-                if (disposed) return;
-                const elapsed = Math.min((time - lastTime) / 1000, 0.1);
-                lastTime = time;
-                if (running.current && aircraftMarker.current) {
-                    flight.current = advanceFlight(flight.current, controls.current, elapsed);
-                    const current = flight.current;
-                    aircraftMarker.current.setLngLat([current.longitude, current.latitude]);
-                    if (aircraftArrow.current) aircraftArrow.current.style.transform = `rotate(${current.heading}deg)`;
-                    instance.jumpTo({ center: [current.longitude, current.latitude], bearing: current.heading, pitch: 90 + gimbal.current });
-                    if (time - latestHud > 180) {
-                        latestHud = time;
-                        setHud({ altitude: current.altitude, heading: current.heading, nearest: closestPoi(current, pois, 3000) });
-                    }
-                }
-                frame = requestAnimationFrame(tick);
-            };
-            frame = requestAnimationFrame(tick);
-        }).catch(() => setMapError('No se pudo iniciar el mapa de ensayo.'));
+        }).catch(startCompatibleMap);
         return () => {
             disposed = true;
+            clearTimeout(loadTimer);
             cancelAnimationFrame(frame);
             poiMarkers.current = [];
             aircraftMarker.current = null;
@@ -227,6 +303,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
         </label>
 
         {mapError && <p role="alert" className="absolute left-3 right-16 top-36 z-10 rounded-xl border border-amber-300/30 bg-amber-950/85 px-3 py-2 text-xs text-amber-100">{mapError}</p>}
+        {mapMode === 'compatible' && !mapError && <p className="absolute left-3 top-36 z-10 max-w-[15rem] rounded-xl border border-cyan-300/25 bg-slate-950/80 px-3 py-2 text-[10px] leading-relaxed text-cyan-50">Mapa compatible activo. El movimiento, los POI y el gimbal siguen disponibles; la inclinación se representa con acercamiento.</p>}
         {!ARCGIS_KEY && !mapError && <p className="absolute left-3 top-36 z-10 max-w-[14rem] rounded-xl border border-blue-300/25 bg-slate-950/80 px-3 py-2 text-[10px] leading-relaxed text-slate-200">Vista abierta de respaldo. Agrega la clave gratuita de ArcGIS para activar satélite.</p>}
 
         {showPois && currentPoi && <section className="absolute bottom-40 left-1/2 z-10 w-[min(82vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 p-3 shadow-2xl backdrop-blur-xl sm:bottom-44">
