@@ -230,6 +230,7 @@ async function createWindow() {
         win.webContents.send('review:progress', 'Sincronizando narraciones oficiales…');
         try {
           const narrationSync = await require('./import-narrations.cjs').syncNarrations();
+          await require('./setup-local.cjs').refreshReviewLocations();
           win.webContents.send('review:progress', `${narrationSync.imported} narraciones oficiales actualizadas.`);
         } catch (error) {
           win.webContents.send('review:progress', `No se pudo actualizar el contenido oficial; se conservará la copia local. ${error.message}`);

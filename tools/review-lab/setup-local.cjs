@@ -87,6 +87,17 @@ const ROLES = [
 ];
 function todayMexico() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); }
 function must(result, operation) { if (result.error) throw new Error(operation + ': ' + result.error.message); return result.data; }
+const REVIEW_FALLBACK_LOCATION = { lat: 19.4145, lng: -102.0520 };
+async function reviewLocation(admin) {
+  const { data: points } = await admin.from('master_route_pois').select('lat, lng').not('lat', 'is', null).not('lng', 'is', null).limit(1);
+  const point = points?.[0];
+  return point
+    ? { lat: point.lat + 0.002, lng: point.lng + 0.002, source: { kind: 'review-lab-near-official-poi', poi_lat: point.lat, poi_lng: point.lng } }
+    : { ...REVIEW_FALLBACK_LOCATION, source: { kind: 'review-lab-fictional-fallback', label: 'Punto ficticio de prueba en Uruapan' } };
+}
+function locationFields(location) {
+  return { ubicacion_lat: location.lat, ubicacion_lng: location.lng, ubicacion_fuente: location.source, ubicacion_verificada_at: new Date().toISOString() };
+}
 async function seed(input, onProgress = () => {}) {
   onProgress('Preparando cuatro cuentas y una escuela ficticia…');
   fs.mkdirSync(dataDir, { recursive: true });
@@ -114,37 +125,46 @@ async function seed(input, onProgress = () => {}) {
     must(await admin.from('staff_profiles').upsert({ user_id: user.id, full_name: role.name, role: role.role, is_active: true }, { onConflict: 'user_id' }), 'Crear perfil de ' + role.id);
   }
   const cct = 'TEST-LOCAL-0001';
+  const location = await reviewLocation(admin);
   let school = must(await admin.from('proximas_escuelas').select('id, fecha_programada').eq('cct', cct).maybeSingle(), 'Buscar escuela local');
   if (!school) school = must(await admin.from('proximas_escuelas').insert({
     cct, nombre_escuela: 'ESCUELA FICTICIA · REVISIÓN LOCAL', colonia: 'Laboratorio local',
     fecha_programada: todayMexico(), estatus: 'pendiente', numero_ninos: 24, turno: 'Matutino',
-    registrado_via: 'review-lab',
+    registrado_via: 'review-lab', ...locationFields(location),
   }).select('id').single(), 'Crear escuela ficticia');
-  else if (school.fecha_programada !== todayMexico()) must(await admin.from('proximas_escuelas').update({ fecha_programada: todayMexico(), estatus: 'pendiente' }).eq('id', school.id), 'Reprogramar escuela ficticia');
+  else must(await admin.from('proximas_escuelas').update({ fecha_programada: todayMexico(), estatus: 'pendiente', ...locationFields(location) }).eq('id', school.id), 'Actualizar escuela ficticia');
   let journey = must(await admin.from('staff_journeys').select('id').eq('school_id', school.id).eq('date', todayMexico()).maybeSingle(), 'Buscar jornada local');
   if (!journey) journey = must(await admin.from('staff_journeys').insert({
     date: todayMexico(), school_id: school.id, school_name: 'ESCUELA FICTICIA · REVISIÓN LOCAL',
     status: 'prep', mission_state: 'PILOT_PREP', meta: { review_lab: true }, created_by: pilotId,
   }).select('id').single(), 'Crear jornada ficticia');
-  await seedPreparationVisits(admin);
+  await seedPreparationVisits(admin, location);
   return { schoolId: school.id, journeyId: journey.id, accountFile: file };
 }
 
-async function seedPreparationVisits(admin) {
+async function seedPreparationVisits(admin, suppliedLocation) {
   // Clearly fictional upcoming visits, only in the validated local database.
   const { data: points } = await admin.from('master_route_pois').select('lat, lng').not('lat', 'is', null).not('lng', 'is', null).limit(1);
-  const location = points?.[0];
+  const location = suppliedLocation || (points?.[0] ? { lat: points[0].lat + 0.002, lng: points[0].lng + 0.002 } : null);
   for (const [offset, suffix, name] of [[1, '0002', 'ESCUELA FICTICIA · PREPARAR VISITA'], [3, '0003', 'ESCUELA FICTICIA · SIN UBICACIÓN']]) {
     const date = new Date(todayMexico() + 'T12:00:00Z');
     date.setUTCDate(date.getUTCDate() + offset);
     const cct = 'TEST-LOCAL-' + suffix;
     const row = { cct, nombre_escuela: name, colonia: 'Laboratorio local', fecha_programada: date.toISOString().slice(0, 10), estatus: 'pendiente', registrado_via: 'review-lab', turno: 'Matutino',
-      ubicacion_lat: offset === 1 && location ? location.lat + 0.002 : null,
-      ubicacion_lng: offset === 1 && location ? location.lng + 0.002 : null };
+      ubicacion_lat: offset === 1 && location ? location.lat : null,
+      ubicacion_lng: offset === 1 && location ? location.lng : null };
     const existing = must(await admin.from('proximas_escuelas').select('id').eq('cct', cct).maybeSingle(), 'Buscar visita ficticia');
     if (!existing) must(await admin.from('proximas_escuelas').insert(row), 'Crear visita ficticia de preparación');
     else must(await admin.from('proximas_escuelas').update(row).eq('id', existing.id), 'Actualizar visita ficticia de preparación');
   }
+}
+async function refreshReviewLocations(input = readEnv(path.join(root, '.env.review.local'))) {
+  validateEnvironment(input, readEnv(path.join(root, '.env.local')));
+  const admin = createClient(input.NEXT_PUBLIC_SUPABASE_URL, input.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const location = await reviewLocation(admin);
+  const school = must(await admin.from('proximas_escuelas').select('id').eq('cct', 'TEST-LOCAL-0001').maybeSingle(), 'Buscar escuela ficticia principal');
+  if (school) must(await admin.from('proximas_escuelas').update(locationFields(location)).eq('id', school.id), 'Ubicar escuela ficticia principal');
+  await seedPreparationVisits(admin, location);
 }
 async function setup(onProgress) {
   const input = await ensureStack(onProgress);
@@ -160,4 +180,4 @@ if (require.main === module) {
     console.log('Cuentas de prueba guardadas en ' + result.accountFile);
   }).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { setup, parseStatus, todayMexico, seedPreparationVisits };
+module.exports = { setup, parseStatus, todayMexico, seedPreparationVisits, refreshReviewLocations, REVIEW_FALLBACK_LOCATION };

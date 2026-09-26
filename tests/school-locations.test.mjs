@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeCct, validCoordinates, classifyMatch, mayFillVisit, locationSnapshot } from '../src/lib/school-locations.mjs';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { REVIEW_FALLBACK_LOCATION } = require('../tools/review-lab/setup-local.cjs');
 const catalog = { cct: '16DPR0001A', turno: 'Matutino' };
 const source = { id: 'source', ...catalog, latitud: 19.42, longitud: -102.06 };
 test('CCT normalizes only case and surrounding whitespace', () => {
@@ -40,4 +43,9 @@ test('new visits receive coordinates only from a reviewed catalog with the same 
     assert.deepEqual(locationSnapshot({ ...located, ubicacion_verificada_at: null }, 'Matutino'), {});
     assert.equal(locationSnapshot(located, 'Matutino').ubicacion_lat, 19);
     assert.equal(locationSnapshot(located, 'Matutino').cct, undefined);
+});
+test('the main fictional review visit always has a usable fallback location', () => {
+    assert.equal(validCoordinates(REVIEW_FALLBACK_LOCATION.lat, REVIEW_FALLBACK_LOCATION.lng), true);
+    assert.ok(REVIEW_FALLBACK_LOCATION.lat >= 14 && REVIEW_FALLBACK_LOCATION.lat <= 33);
+    assert.ok(REVIEW_FALLBACK_LOCATION.lng >= -119 && REVIEW_FALLBACK_LOCATION.lng <= -86);
 });
