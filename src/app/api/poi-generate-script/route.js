@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PHASES } from '@/lib/narration-phases.mjs';
 
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { poiName, lat, lng, researchArticle, customInstructions, educationPhase } = body;
+        const { poiName, lat, lng, researchArticle, customInstructions } = body;
 
         if (!poiName) {
             return NextResponse.json({ error: 'poiName es requerido' }, { status: 400 });
-        }
-        const phase = educationPhase ? PHASES.find(item => item.key === educationPhase) : null;
-        if (educationPhase && !phase) return NextResponse.json({ error: 'Fase educativa inválida' }, { status: 400 });
-        if (phase && (!researchArticle?.trim() || researchArticle.trim().length < 60)) {
-            return NextResponse.json({ error: 'Revisa y guarda la investigación antes de generar versiones por fase.' }, { status: 400 });
         }
 
         const apiKey = process.env.GEMINI_API_KEY;
@@ -32,8 +26,6 @@ export async function POST(request) {
         let prompt = hasCoords
             ? `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el lugar: '${poiName}', ubicado en: ${lat}, ${lng}. Escribe un guion de MÁXIMO 60 palabras (15 segs). REGLAS ESTRICTAS:${REGLAS}`
             : `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el tema: '${poiName}'. Escribe un guion de MÁXIMO 60 palabras (15 segs). REGLAS ESTRICTAS:${REGLAS}`;
-
-        if (phase) prompt += `\n\nADAPTACIÓN EDUCATIVA PARA ${phase.label.toUpperCase()} (fase ${phase.key.slice(-1)}): ${phase.guidance} La voz, personalidad y las seis reglas anteriores NO cambian. Adapta solo la selección de ideas y el vocabulario. Basa cada afirmación en la investigación suministrada; si faltan datos, omítelos. Entrega únicamente el guion, sin título ni etiquetas.`;
 
         if (customInstructions && customInstructions.trim().length > 0) {
             prompt += `\n\nATENCIÓN (INSTRUCCIÓN DIRECTA DEL DIRECTOR): \nDEBES seguir obligatoriamente esta indicación para construir el guion:\n"${customInstructions}"`;

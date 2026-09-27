@@ -3,7 +3,6 @@ import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdmin } from '@supabase/supabase-js';
 import { GET as officialLibrary } from '@/app/api/official-pois/route';
 import { buildSequence, fingerprint, sequenceChanged } from '@/lib/narration-preparation.mjs';
-import { phaseForGrade } from '@/lib/narration-phases.mjs';
 
 export const dynamic = 'force-dynamic';
 const json = (data, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -77,8 +76,7 @@ export async function PUT(request) {
         if (!visit) return json({ error: 'Esta visita no está disponible.' }, 404);
         if (body.visitDate !== visit.fecha_programada) return json({ error: 'La visita cambió de fecha. Recarga antes de confirmar la preparación.' }, 409);
         let items;
-        if (body.grade && !phaseForGrade(body.grade)) return json({ error: 'Grado inválido.' }, 400);
-        try { items = buildSequence(body.ids, await catalog(db, user.id), body.status, body.grade || null); }
+        try { items = buildSequence(body.ids, await catalog(db, user.id), body.status); }
         catch (error) { return json({ error: error.message }, 400); }
         if (body.status === 'ready' && JSON.stringify(body.fingerprints) !== JSON.stringify(items.map(fingerprint))) {
             return json({ error: 'Una narración cambió. Actualiza el contenido y revisa la secuencia antes de confirmarla.' }, 409);
@@ -86,7 +84,7 @@ export async function PUT(request) {
         const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
         const row = {
             user_id: user.id, visit_id: body.visitId, visit_date: visit.fecha_programada,
-            items, grade: body.grade || null, status: body.status, revision: body.revision + 1,
+            items, status: body.status, revision: body.revision + 1,
             confirmed_at: body.status === 'ready' ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
         };

@@ -15,7 +15,7 @@ export function PreparationDialog({ title, onClose, children }) {
         dialog.showModal(); document.body.style.overflow = 'hidden';
         return () => { dialog.close(); document.body.style.overflow = overflow; previous?.focus?.(); };
     }, []);
-    return <dialog ref={ref} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby="preparation-dialog-title" className="m-auto max-h-[92dvh] w-[calc(100%_-_1rem)] max-w-2xl rounded-3xl bg-white p-0 text-[#071a33] shadow-2xl backdrop:bg-slate-950/60">
+    return <dialog ref={ref} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby="preparation-dialog-title" className="m-auto max-h-[92dvh] w-[calc(100%_-_1rem)] max-w-2xl rounded-3xl bg-[#f3f7fb] p-0 text-[#071a33] shadow-2xl backdrop:bg-slate-950/60">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
             <h2 id="preparation-dialog-title" className="text-lg font-extrabold">{title}</h2>
             <button autoFocus onClick={onClose} aria-label="Cerrar" className={secondary}><X size={19} /></button>
@@ -44,7 +44,7 @@ export default function NarrationLibrary({ catalog, selectedIds = [], onAdd, add
             const loading = audio.id === p.id && audio.status === 'loading';
             const available = usableAudio(p.audio_url);
             return <article key={p.id} className={`rounded-2xl border bg-white p-4 ${selected ? 'border-blue-300' : 'border-slate-200'}`}>
-                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{p.version_label ? `${p.version_label} · ` : ''}{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
+                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button disabled={!available || loading} onClick={() => audio.toggle(p)} aria-label={`${playing ? 'Pausar' : 'Escuchar'} ${p.name}`} className={secondary}>{loading ? <Loader2 size={16} className="animate-spin" /> : playing ? <Pause size={16} /> : <Play size={16} />}{playing ? 'Pausar' : 'Escuchar'}</button>
                     {onAdd && <button disabled={selected || !available || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-50 px-3 text-sm font-bold text-blue-700 disabled:text-slate-500">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregada' : 'Agregar'}</button>}
@@ -53,6 +53,6 @@ export default function NarrationLibrary({ catalog, selectedIds = [], onAdd, add
                 {expanded === p.id && <p className="mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600">{p.narrative_script}</p>}
             </article>;
         })}</div>
-        <div className="border-t border-slate-200 pt-4"><p className="mb-2 text-xs text-slate-500">¿Falta un lugar o necesitas editar una narración personal?</p><Link href="/staff/narraciones" onClick={audio.stop} className={secondary}><Plus size={16} />Ir a Narraciones</Link></div>
+        <div className="border-t border-slate-200 pt-4"><p className="mb-2 text-xs text-slate-500">¿Falta un lugar o necesitas editar una narración personal?</p><Link href="/staff/mapeo" onClick={audio.stop} className={secondary}><Plus size={16} />Crear o editar en el mapa</Link></div>
     </>;
 }

@@ -33,20 +33,6 @@ test('Deleted or edited source content invalidates a confirmed snapshot', () => 
     assert.equal(sequenceChanged(items, [{ ...catalog[0], narrative_script: 'Nuevo guion' }]), true);
     assert.equal(sequenceChanged(items, [{ ...catalog[0], audio_url: 'https://example.test/new.wav' }]), true);
 });
-test('La preparación guarda la variante del grado sin mezclar audio de otra fase', () => {
-    const poi = { id: 'personal_phase', name: 'Río', narrative_script: 'General', audio_url: 'https://example.test/general.wav', phase_variants: {
-        phase3: { script: 'Para primero y segundo', audio_url: 'https://example.test/fase3.wav' },
-        phase4: { script: 'Para tercero y cuarto' },
-    } };
-    const first = buildSequence([poi.id], [poi], 'ready', 'primaria1')[0];
-    assert.equal(first.grade, 'primaria1');
-    assert.equal(first.version_phase, 'phase3');
-    assert.equal(first.audio_url, 'https://example.test/fase3.wav');
-    assert.equal(sequenceChanged([first], [poi]), false);
-    assert.throws(() => buildSequence([poi.id], [poi], 'ready', 'primaria3'));
-    assert.throws(() => buildSequence([poi.id], [poi], 'ready', 'universidad'));
-    assert.equal(sequenceChanged([first], [{ ...poi, phase_variants: { ...poi.phase_variants, phase3: { script: 'Texto corregido', audio_url: 'https://example.test/fase3.wav' } } }]), true);
-});
 test('Missing coordinates never turn into a real map marker at zero', () => {
     assert.equal(coordinates(null, null), null);
     assert.equal(coordinates('', ''), null);
