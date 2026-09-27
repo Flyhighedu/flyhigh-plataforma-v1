@@ -115,14 +115,15 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                 // Phase 3: Slim select — only fields needed for map pins + modal basics
                 const [personalResult, officialResult] = await Promise.all([
                     supabase.from('pilot_pois')
-                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, narrative_versions, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
+                        .select('id, name, latitude, longitude, category, description, is_favorite, is_general_topic, research_article, narrative_script, narrative_versions, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
                         .eq('user_id', userId).order('created_at', { ascending: false }),
                     fetch('/api/official-pois').then(r => { if (!r.ok) throw new Error('No se pudieron cargar los puntos oficiales.'); return r.json(); })
                 ]);
 
                 if (personalResult.error) throw personalResult.error;
                 setLoadError('');
-                const personalPois = personalResult.data || [];
+                // Official status comes from the catalog source, not a pilot_pois column.
+                const personalPois = (personalResult.data || []).map(poi => ({ ...poi, is_official: false }));
                 const officialPois = officialResult.pois || [];
                 const allPois = [...officialPois, ...personalPois];
 
