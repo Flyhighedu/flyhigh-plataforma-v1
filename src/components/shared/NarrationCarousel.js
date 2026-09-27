@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { swipeDestination } from '@/lib/narration-gestures.mjs';
 import styles from './PhaseNarrativeEditor.module.css';
@@ -8,6 +8,8 @@ import styles from './PhaseNarrativeEditor.module.css';
 export default function NarrationCarousel({ items, selectedId, versions, onSelect, disabled, children, hintSeenRef }) {
     const index = items.findIndex(item => item.id === selectedId);
     const frame = useRef(null);
+    const canvasRef = useRef(null);
+    const [height, setHeight] = useState(null);
     const gesture = useRef(null);
     const hintTimer = useRef(null);
     const suppressClick = useRef(false);
@@ -21,6 +23,15 @@ export default function NarrationCarousel({ items, selectedId, versions, onSelec
         hintTimer.current = setTimeout(() => { hintSeenRef.current = true; controls.start({ x: [0, -26, 4, 0], transition: { duration: .85 } }); }, 650);
         return () => { clearTimeout(hintTimer.current); controls.stop(); };
     }, [controls, disabled, hintSeenRef, items.length, reduced]);
+
+    useLayoutEffect(() => {
+        const canvas = canvasRef.current;
+        const measure = () => setHeight(canvas.offsetHeight);
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(canvas);
+        return () => observer.disconnect();
+    }, []);
 
     async function finish(event, cancelled = false) {
         const start = gesture.current;
@@ -39,7 +50,7 @@ export default function NarrationCarousel({ items, selectedId, versions, onSelec
     }
 
     return <>
-        <div ref={frame} className={styles.carousel} role="group" aria-roledescription="carrusel" aria-label="Guiones por nivel" onClickCapture={event => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}
+        <motion.div ref={frame} initial={false} animate={{ height: height ?? 'auto' }} transition={{ height: { duration: reduced ? 0 : .32, ease: [.22, 1, .36, 1] } }} style={{ overflow: 'hidden', overflowAnchor: 'none' }} className={styles.carousel} role="group" aria-roledescription="carrusel" aria-label="Guiones por nivel" onClickCapture={event => { if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; } }}
             onPointerDown={event => {
                 suppressClick.current = false;
                 if (disabled || settling || !event.isPrimary || event.button !== 0 || event.target.closest('button,input,textarea,select,audio,summary,a')) return;
@@ -62,9 +73,9 @@ export default function NarrationCarousel({ items, selectedId, versions, onSelec
             }} onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)}>
             <motion.div className={styles.carouselTrack} animate={controls} style={{ userSelect: offset ? 'none' : undefined }}>
                 {[index - 1, index + 1].filter(i => items[i]).map(i => <div key={items[i].id} aria-hidden="true" className={styles.carouselNeighbor} style={{ left: i < index ? 'calc(-100% - 16px)' : 'calc(100% + 16px)' }}><h2>{items[i].label}</h2><p>{versions[items[i].id]?.narrative_script}</p></div>)}
-                <div className={styles.scriptCanvas}>{children}</div>
+                <div ref={canvasRef} className={styles.scriptCanvas}>{children}</div>
             </motion.div>
-        </div>
+        </motion.div>
         {items.length > 1 && <nav className={styles.positionDots} aria-label="Seleccionar nivel educativo">{items.map(item => <button type="button" key={item.id} aria-label={item.label} aria-current={item.id === selectedId ? 'true' : undefined} disabled={disabled || settling} onClick={() => { clearTimeout(hintTimer.current); hintSeenRef.current = true; controls.set({ x: 0 }); onSelect(item.id); }}><span /></button>)}</nav>}
     </>;
 }

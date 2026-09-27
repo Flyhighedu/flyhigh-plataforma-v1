@@ -66,6 +66,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const bodyRef = useRef(null);
     const stepHeadingRef = useRef(null);
     const audioRef = useRef(null);
+    const autoplayUrlRef = useRef(null);
     const closeEditor = useNarrationEntrance(panelRef, poi._origin, onClose);
     const phase = educationPhase(phaseId);
     const current = versions[phaseId] || emptyNarration();
@@ -88,7 +89,16 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
 
     useEffect(() => { if (error) bodyRef.current?.scrollTo({ top: 0 }); }, [error]);
 
+    useEffect(() => {
+        if (!showAudio || !current.audio_url || autoplayUrlRef.current !== current.audio_url || !audioRef.current) return;
+        autoplayUrlRef.current = null;
+        audioRef.current.play().catch(failure => {
+            if (failure.name !== 'AbortError') setError('El navegador no permitió iniciar el audio. Puedes reproducirlo con el botón del reproductor.');
+        });
+    }, [current.audio_url, showAudio]);
+
     function selectPhase(id) {
+        autoplayUrlRef.current = null;
         audioRef.current?.pause();
         setShowAudio(false);
         setPhaseId(id);
@@ -246,7 +256,8 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
                 return { ...previous, [targetPhase]: { ...previous[targetPhase], audio_url: data.audio_url,
                     audio_duration_seconds: data.audio_duration_seconds ?? null, audio_generated_at: new Date().toISOString() } };
             });
-            setDirty(true); setShowAudio(true);
+            if (step === 2 && targetPhase === phaseId) { autoplayUrlRef.current = data.audio_url; setShowAudio(true); }
+            setDirty(true);
         });
     }
 
@@ -299,7 +310,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
         setStepDirection(next > step ? 1 : -1);
         audioRef.current?.pause(); setEditingScript(false); setShowAudio(false); setEditingResearch(false); setError(''); setStep(next);
     }
-    const audioPlayer = (url, label, ref) => <audio ref={ref} key={url} aria-label={label} controls preload="none" src={localReviewAudioPath(url) ? `/api/review-lab/audio?url=${encodeURIComponent(url)}` : url} onPlay={event => { panelRef.current?.querySelectorAll('audio').forEach(player => { if (player !== event.currentTarget) player.pause(); }); }} onError={() => setError('No se pudo cargar este audio. Comprueba tu conexión e intenta de nuevo.')} />;
+    const audioPlayer = (url, label, ref) => <audio ref={ref} key={url} aria-label={label} controls preload="metadata" src={localReviewAudioPath(url) ? `/api/review-lab/audio?url=${encodeURIComponent(url)}` : url} onPlay={event => { panelRef.current?.querySelectorAll('audio').forEach(player => { if (player !== event.currentTarget) player.pause(); }); }} onError={() => setError('No se pudo cargar este audio. Comprueba tu conexión e intenta de nuevo.')} />;
     const researchView = <>
         <div className={styles.documentHeading}><div><span className={styles.eyebrow}>LA HISTORIA DETRÁS DEL LUGAR</span><h2 ref={stepHeadingRef} tabIndex={-1}>Tu investigación</h2></div>{!readOnly && <button type="button" disabled={!!busy} onClick={() => setEditingResearch(!editingResearch)}>{editingResearch ? <Check size={17} /> : <Pencil size={17} />}{editingResearch ? 'Terminar edición' : 'Editar investigación'}</button>}</div>
         {editingResearch && !readOnly ? <><label className={styles.srOnly} htmlFor={uid + '-research'}>Texto de la investigación</label><GrowingTextarea id={uid + '-research'} className={styles.documentInput} value={researchDraft} disabled={!!busy} onChange={event => { setResearchDraft(event.target.value); setResearch(replaceResearchDocument(research, event.target.value)); setDirty(true); }} placeholder="Escribe o pega aquí la investigación." /></> : <NarrationDocument text={researchText} label="Investigación del lugar" />}
@@ -315,12 +326,12 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
         </NarrationCarousel>
         {!proposal && <div className={styles.scriptTools}>
             {current.audio_url ? <button type="button" className={styles.listenButton} aria-expanded={showAudio} onClick={() => { if (showAudio) audioRef.current?.pause(); else requestAnimationFrame(() => audioRef.current?.play().catch(() => setError('No se pudo reproducir este audio. Intenta con los controles del reproductor.'))); setShowAudio(!showAudio); }}><Headphones size={17} />{showAudio ? 'Cerrar audio' : 'Escuchar'}</button> : !readOnly ? <button type="button" className={styles.listenButton} disabled={!!busy || !hasScript(current)} onClick={() => generateAudio()}>{busy?.kind === 'audio' ? <Loader2 size={17} className={styles.spin} /> : <Headphones size={17} />}{busy?.kind === 'audio' ? 'Creando voz…' : staleAudio[phaseId] ? 'Actualizar audio' : 'Probar voz'}</button> : <span>Sin audio</span>}
-            {!readOnly && <button type="button" className={styles.proposalButton} disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button>}
+            {!readOnly && <details className={styles.proposalComposer}><summary><Sparkles size={17} />Otra propuesta</summary><div><label htmlFor={uid + '-notes'}>Ideas para otra propuesta</label><GrowingTextarea id={uid + '-notes'} disabled={!!busy} placeholder="¿Qué te gustaría cambiar? (Opcional)" value={current.custom_instructions} maxLength={2000} onChange={event => edit({ custom_instructions: event.target.value })} /><button type="button" className={styles.proposalButton} disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button></div></details>}
         </div>}
         {showAudio && current.audio_url && !proposal && <section className={styles.audio} aria-label="Audio del guion">{audioPlayer(current.audio_url, 'Escuchar ' + phase.label, audioRef)}</section>}
         {!proposal && <details className={styles.details} open={error.includes('propósito') || undefined}><summary>Propósito y enfoque educativo</summary>
             {phase.number && (readOnly ? <p><strong>Para aprender:</strong> {current.learning_goal}</p> : <><label htmlFor={uid + '-goal'}>Propósito de aprendizaje</label><GrowingTextarea id={uid + '-goal'} value={current.learning_goal} disabled={!!busy} maxLength={220} placeholder={phase.goal} onChange={event => edit({ learning_goal: event.target.value })} /></>)}
-            {!readOnly && <fieldset disabled={!!busy}>{phase.number && <><label htmlFor={uid + '-focus'}>Relación curricular</label><select id={uid + '-focus'} value={current.curriculum_focus} onChange={event => edit({ curriculum_focus: event.target.value })}><option value="context">Según el contenido del lugar</option><option value="nature">Naturaleza y cuidado del entorno</option></select></>}<label htmlFor={uid + '-notes'}>Ideas para otra propuesta</label><GrowingTextarea id={uid + '-notes'} value={current.custom_instructions} maxLength={2000} onChange={event => edit({ custom_instructions: event.target.value })} /></fieldset>}
+            {!readOnly && <fieldset disabled={!!busy}>{phase.number && <><label htmlFor={uid + '-focus'}>Relación curricular</label><select id={uid + '-focus'} value={current.curriculum_focus} onChange={event => edit({ curriculum_focus: event.target.value })}><option value="context">Según el contenido del lugar</option><option value="nature">Naturaleza y cuidado del entorno</option></select></>}</fieldset>}
             {reference && <><p>{reference.summary}</p><p>{reference.scope}</p>{current.review_note && <p>{current.review_note}</p>}</>}
             {!readOnly && current.audio_url && <button type="button" disabled={!!busy} onClick={() => generateAudio()}>Regenerar audio</button>}
         </details>}

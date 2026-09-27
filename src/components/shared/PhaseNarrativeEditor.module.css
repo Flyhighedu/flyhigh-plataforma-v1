@@ -255,3 +255,11 @@
     .steps button { min-height:42px; }
     .content[data-generating=true] { justify-content:flex-start; }
 }
+.proposalComposer { flex:1; min-width:180px; border:1px solid #dcd1ed; border-radius:12px; color:#653ba7; }
+.proposalComposer>summary { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px 14px; min-height:44px; list-style:none; }
+.proposalComposer>summary::-webkit-details-marker { display:none; }
+.proposalComposer[open]>summary { border-bottom:1px solid #e8e0f2; }
+.proposalComposer>div { padding:0 14px 14px; }
+.proposalComposer button { width:100%; margin-top:12px; }
+.scriptTools { align-items:flex-start; }
+.generationCurrent { animation:completed-row .35s ease-out; }
