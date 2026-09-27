@@ -103,7 +103,7 @@ function createPanel(role, index) {
     if (more.open) document.querySelectorAll('.more-controls').forEach(other => { if (other !== more) other.open = false; });
     measure();
   });
-  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['mobile', 'Abrir en celular'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar']];
+  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['mobile', 'Abrir en celular'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar'], ['reset-permissions', 'Restablecer permisos']];
   for (const [action, label] of actions) {
     const button = document.createElement('button'); button.textContent = label; button.dataset.action = action;
     button.addEventListener('click', async () => {
@@ -132,7 +132,7 @@ window.review.onState(next => {
     panel.querySelector('.path').textContent = role.pathname || role.route;
     panel.querySelector('.pane-state').textContent = !state.connected ? 'Sin conectar' : role.problem || (!role.online ? 'Sin red simulada' : role.loading ? 'Cargando…' : 'Disponible');
     panel.querySelector('.placeholder').hidden = state.connected;
-    for (const action of ['signin', 'mobile', 'home', 'reload', 'offline', 'inspect']) panel.querySelector('[data-action="' + action + '"]').disabled = !state.connected;
+    for (const action of ['signin', 'mobile', 'home', 'reload', 'offline', 'inspect', 'reset-permissions']) panel.querySelector('[data-action="' + action + '"]').disabled = !state.connected;
     const offline = panel.querySelector('[data-action="offline"]'); offline.textContent = role.online === false ? 'Restaurar red' : 'Sin red'; offline.classList.toggle('offline', role.online === false);
   }
   applyWorkspace();

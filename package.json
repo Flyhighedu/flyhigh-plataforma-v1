@@ -9,7 +9,7 @@
     "review:audit-school-locations": "node tools/review-lab/audit-school-locations.cjs --production",
     "review:verify-school-locations": "node tools/review-lab/verify-school-locations.cjs",
     "review:server": "node tools/review-lab/server.cjs",
-    "review:test": "node --test --test-isolation=none tools/review-lab/core.test.cjs tools/review-lab/mobile-gateway.test.cjs",
+    "review:test": "node --test --test-isolation=none tools/review-lab/core.test.cjs tools/review-lab/mobile-gateway.test.cjs tools/review-lab/permissions.test.cjs",
     "review:check": "node tools/review-lab/server.cjs --check",
     "dev": "next dev --webpack",
     "build": "next build --webpack",

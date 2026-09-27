@@ -4,10 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { ROLES, partitionFor, isNavigationAllowed, safePath, reportMarkdown } = require('./core.cjs');
+const { createLocationPermissions } = require('./permissions.cjs');
 const root = path.resolve(__dirname, '../..');
 const dataDir = path.join(root, '.review-lab');
 const selfTest = process.argv.find(arg => arg.startsWith('--self-test='))?.split('=')[1];
 fs.mkdirSync(dataDir, { recursive: true });
+const locationPermissions = createLocationPermissions(path.join(dataDir, selfTest ? 'verification-permissions.json' : 'permissions.json'));
 app.setPath('userData', path.join(dataDir, selfTest ? 'verification-profiles' : 'profiles'));
 app.setPath('sessionData', app.getPath('userData'));
 // Chromium includes the app name in User-Agent. Keep it ASCII so GoTrue can
@@ -94,14 +96,31 @@ async function mobileLink(roleId) {
 }
 function configureSession(ses, role, config) {
   ses.webRequest.onBeforeRequest((details, callback) => callback({ cancel: panes.get(role.id)?.status.online === false || !allowedRequest(details.url, config) }));
-  ses.setPermissionCheckHandler((_contents, permission, origin) => origin === config.baseURL && (permission === 'fullscreen' || permission === 'screen-wake-lock' || grants.get(role.id)?.has(permission) === true));
+  const approved = permission => ['fullscreen', 'screen-wake-lock'].includes(permission) ||
+    (permission === 'geolocation' && locationPermissions.get(config, role.id) === true) || grants.get(role.id)?.has(permission) === true;
+  ses.setPermissionCheckHandler((_contents, permission, origin) => origin === config.baseURL && approved(permission));
   ses.setPermissionRequestHandler(async (contents, permission, callback, details) => {
-    if (!isNavigationAllowed(contents.getURL(), config.baseURL) || !['media', 'geolocation', 'fullscreen', 'screen-wake-lock'].includes(permission)) { callback(false); return; }
-    if (['fullscreen', 'screen-wake-lock'].includes(permission)) { callback(true); return; }
+    if (!contents || !isNavigationAllowed(contents.getURL(), config.baseURL) ||
+      (details.requestingUrl && !isNavigationAllowed(details.requestingUrl, config.baseURL)) ||
+      !['media', 'geolocation', 'fullscreen', 'screen-wake-lock'].includes(permission)) { callback(false); return; }
+    if (permission === 'geolocation') {
+      const saved = locationPermissions.get(config, role.id);
+      if (saved !== undefined) { callback(saved); return; }
+    }
+    if (approved(permission)) { callback(true); return; }
     const description = permission === 'media' ? 'micrófono o cámara (' + (details.mediaTypes || []).join(', ') + ')' : 'ubicación';
-    const choice = await dialog.showMessageBox(win, { type: 'question', title: role.name, message: role.name + ' solicita ' + description, detail: 'Permiso solo para esta sesión del laboratorio.', buttons: ['No permitir', 'Permitir'], defaultId: 0, cancelId: 0 });
-    if (choice.response === 1) { if (!grants.has(role.id)) grants.set(role.id, new Set()); grants.get(role.id).add(permission); }
-    callback(choice.response === 1);
+    try {
+      const choice = await dialog.showMessageBox(win, { type: 'question', title: role.name, message: role.name + ' solicita ' + description,
+        detail: permission === 'geolocation' ? 'Puedes recordar esta decisión para este perfil de la Mesa de revisión.' : 'Permiso solo para esta sesión del laboratorio.',
+        ...(permission === 'geolocation' ? { checkboxLabel: 'Recordar en esta computadora', checkboxChecked: true } : {}),
+        buttons: ['No permitir', 'Permitir'], defaultId: 0, cancelId: 0 });
+      if (permission === 'geolocation' && choice.checkboxChecked) locationPermissions.set(config, role.id, choice.response === 1);
+      if (choice.response === 1) { if (!grants.has(role.id)) grants.set(role.id, new Set()); grants.get(role.id).add(permission); }
+      callback(choice.response === 1);
+    } catch (error) {
+      console.error('No se pudo guardar el permiso:', error.message);
+      callback(false);
+    }
   });
 }
 async function attach(config) {
@@ -140,6 +159,11 @@ async function act(roleId, action) {
   const contents = pane.view.webContents;
   if (action === 'signin') await signInRole(roleId);
   else if (action === 'reload') contents.reload();
+  else if (action === 'reset-permissions') {
+    locationPermissions.clear(connected, roleId);
+    grants.delete(roleId);
+    contents.reload();
+  }
   else if (action === 'home') await contents.loadURL(connected.baseURL + ROLES.find(role => role.id === roleId).route);
   else if (action === 'offline') {
     const offline = pane.status.online;
