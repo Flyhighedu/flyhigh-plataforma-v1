@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Headphones, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, Headphones, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import NarrationDocument, { GrowingTextarea } from './NarrationDocument';
@@ -54,6 +54,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const bodyRef = useRef(null);
     const stepHeadingRef = useRef(null);
     const audioRef = useRef(null);
+    const swipeStart = useRef(null);
     const phase = educationPhase(phaseId);
     const current = versions[phaseId] || emptyNarration();
     const reference = curriculumReference(phaseId, current.curriculum_focus);
@@ -262,6 +263,16 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const selectable = !readOnly && hasScript(versions.general) ? [...availablePhases, EDUCATION_PHASES[0]] : availablePhases;
     const selectedIndex = selectable.findIndex(item => item.id === phaseId);
     const showPicker = (readOnly || step === 2) && !generating && !!selectable.length;
+    function swipeEnd(event) {
+        const start = swipeStart.current;
+        swipeStart.current = null;
+        if (!start || busy || proposal || editingScript || !showPicker || window.getSelection()?.toString()) return;
+        const touch = event.changedTouches[0];
+        const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+        if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+        const next = selectable[selectedIndex + (dx < 0 ? 1 : -1)];
+        if (next) selectPhase(next.id);
+    }
     const completeLabel = missing.length === 5 ? 'Crear los 5 guiones' : missing.length === 1 ? 'Completar la versión faltante' : `Completar las ${missing.length} versiones faltantes`;
     let primaryLabel, primaryAction;
     const primaryDisabled = !!busy || !!proposal || title.trim().length < 2;
@@ -287,26 +298,39 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
         {!readOnly && <details className={styles.details}><summary>Opciones de investigación</summary><label htmlFor={uid + '-name'}>Nombre del lugar o tema</label><input id={uid + '-name'} value={title} disabled={!!busy} maxLength={240} onChange={event => { setTitle(event.target.value); setDirty(true); }} /><button type="button" disabled={!!busy} onClick={() => run('research', researchPlace)}>Investigar de nuevo</button><div className={styles.engine}><EngineSelector activeEngine={engine} setActiveEngine={setEngine} tavilyUsage={usage} readOnly={!!busy} /></div></details>}
     </>;
     const scriptView = <>
+        {selectable.length > 1 && <nav className={styles.scriptNavigation} aria-label="Explorar guiones">
+            <div><strong>Guion {selectedIndex + 1} de {selectable.length}</strong><div className={styles.positionDots} aria-hidden="true">{selectable.map(item => <i key={item.id} data-active={item.id === phaseId} />)}</div></div>
+        </nav>}
         <div className={styles.documentHeading}><div><span className={styles.eyebrow}>{phase.number ? `FASE ${phase.number} · ${phase.grades}` : 'NARRACIÓN ORIGINAL'}</span><h2 ref={stepHeadingRef} tabIndex={-1}>{phase.label}</h2></div><span className={styles.status}>{narrationStatus(current, phaseId)}</span></div>
+        {!proposal && <section className={styles.listenCard} aria-label={'Audio de ' + phase.label}>
+            <div><Headphones size={21} /><div><strong>Escucha este guion</strong>{!current.audio_url && readOnly && <p>Sin audio</p>}</div></div>
+            {current.audio_url ? <><button type="button" className={styles.listenButton} onClick={async () => { try { await audioRef.current?.play(); } catch { setError('No se pudo reproducir el audio. Intenta de nuevo con los controles del reproductor.'); } }}><Headphones size={17} />Escuchar narración</button>{audioPlayer(current.audio_url, 'Escuchar ' + phase.label, audioRef)}</> : !readOnly && <button type="button" className={styles.listenButton} disabled={!!busy || !hasScript(current)} onClick={() => generateAudio()}>{busy?.kind === 'audio' ? <Loader2 size={17} className={styles.spin} /> : <Headphones size={17} />}{busy?.kind === 'audio' ? 'Creando audio…' : 'Crear audio de este guion'}</button>}
+        </section>}
         {phase.number && (editingScript && !readOnly ? <div className={styles.goalEdit}><label htmlFor={uid + '-goal'}>Propósito de aprendizaje</label><GrowingTextarea id={uid + '-goal'} value={current.learning_goal} disabled={!!busy || !!proposal} maxLength={220} placeholder={phase.goal} onChange={event => edit({ learning_goal: event.target.value })} /></div> : <p className={styles.goal}><strong>Para aprender:</strong> {current.learning_goal || 'Propósito pendiente de definir.'}</p>)}
+        {!readOnly && !proposal && <div className={styles.scriptTools}><button type="button" disabled={!!busy} onClick={() => setEditingScript(!editingScript)}>{editingScript ? <Check size={17} /> : <Pencil size={17} />}{editingScript ? 'Terminar edición' : 'Editar guion'}</button><button type="button" className={styles.proposalButton} disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button><span>{wordCount} palabras</span></div>}
+        <div className={styles.swipePreview}>
         {proposal ? <section className={styles.proposal} aria-label="Propuesta de guion"><span className={styles.eyebrow}>NUEVA PROPUESTA</span><NarrationDocument text={proposal.narrative_script} label="Nuevo guion propuesto" /><p className={styles.goal}>{proposal.learning_goal}</p><div className={styles.actions}><button type="button" className={styles.primary} onClick={() => { const { phaseId: target, ...changes } = proposal; setVersions(previous => editNarration(previous, target, changes)); setDirty(true); setProposal(null); setEditingScript(false); }}>Usar esta propuesta</button><button type="button" onClick={() => setProposal(null)}>Conservar el anterior</button></div><p className={styles.hint}>Al usarla, se reemplaza este guion y se retira su audio anterior.</p></section> : editingScript && !readOnly ? <><label className={styles.srOnly} htmlFor={uid + '-script'}>Guion para narrar</label><GrowingTextarea id={uid + '-script'} className={styles.documentInput} value={current.narrative_script} disabled={!!busy} maxLength={10000} onChange={event => edit({ narrative_script: event.target.value })} placeholder="Escribe el guion." /></> : <NarrationDocument text={current.narrative_script || 'Esta versión todavía no tiene guion.'} label="Guion para narrar" />}
-        {!readOnly && !proposal && <div className={styles.scriptTools}><button type="button" disabled={!!busy} onClick={() => setEditingScript(!editingScript)}>{editingScript ? <Check size={17} /> : <Pencil size={17} />}{editingScript ? 'Terminar edición' : 'Editar guion'}</button><button type="button" disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button><span>{wordCount} palabras</span></div>}
+        </div>
+
         {!readOnly && editingScript && <details className={styles.details}><summary>Ajustar el enfoque</summary><fieldset disabled={!!busy || !!proposal}>{phase.number && <><label htmlFor={uid + '-focus'}>Relación curricular</label><select id={uid + '-focus'} value={current.curriculum_focus} onChange={event => edit({ curriculum_focus: event.target.value })}><option value="context">Según el contenido del lugar</option><option value="nature">Naturaleza y cuidado del entorno</option></select></>}<label htmlFor={uid + '-notes'}>Ideas para otra propuesta</label><GrowingTextarea id={uid + '-notes'} value={current.custom_instructions} maxLength={2000} onChange={event => edit({ custom_instructions: event.target.value })} /></fieldset></details>}
         {reference && <details className={styles.details}><summary>Enfoque educativo</summary><p>{reference.summary}</p><p>{reference.scope}</p>{current.review_note && <p>{current.review_note}</p>}</details>}
-        {(readOnly || phaseId === 'general') && current.audio_url && <section className={styles.audio} aria-label="Audio de esta versión">{audioPlayer(current.audio_url, 'Escuchar ' + phase.label, audioRef)}</section>}
-        {!readOnly && phaseId === 'general' && <button type="button" disabled={!!busy || !!proposal || !hasScript(current)} onClick={() => generateAudio()}><Headphones size={17} />{current.audio_url ? 'Regenerar audio original' : 'Generar audio original'}</button>}
+        {!readOnly && phaseId === 'general' && current.audio_url && <button type="button" disabled={!!busy || !!proposal || !hasScript(current)} onClick={() => generateAudio()}><Headphones size={17} />{current.audio_url ? 'Regenerar audio original' : 'Generar audio original'}</button>}
         {readOnly && researchText && <details className={styles.details}><summary>Leer la investigación</summary><NarrationDocument text={researchText} label="Investigación del lugar" /></details>}
     </>;
     const editor = <section ref={panelRef} className={styles.editor} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Editor de narraciones por nivel educativo" onKeyDown={onKeyDown}>
         <header className={styles.header}>
             <div className={styles.headerTop}><div className={styles.identity}><span className={styles.brandIcon}><BookOpen size={19} /></span><div><span className={styles.eyebrow}>{readOnly ? 'BIBLIOTECA OFICIAL' : 'ESTUDIO DE NARRACIONES'}</span><h1 title={title}>{title || (generalTopic ? 'Nuevo tema' : 'Nuevo punto de interés')}</h1></div></div><button type="button" onClick={requestClose} disabled={committing} aria-label="Cerrar editor"><X size={20} /></button></div>
             {!readOnly && <nav className={styles.steps} aria-label="Pasos para crear narraciones">{['Investigación', 'Guiones', 'Finalizar'].map((label, index) => <button type="button" key={label} aria-current={step === index + 1 ? 'step' : undefined} disabled={!!busy || !!proposal || (index === 1 && !draftCount) || (index === 2 && (!!missing.length || !!unreviewed.length))} onClick={() => index === 1 ? startReview() : changeStep(index + 1)}><span>{index + 1}</span>{label}</button>)}</nav>}
-            {showPicker && <div className={styles.mobilePicker}><button type="button" aria-label="Versión anterior" disabled={!!busy || !!proposal || selectedIndex <= 0} onClick={() => selectPhase(selectable[selectedIndex - 1].id)}><ChevronLeft size={18} /></button><label className={styles.srOnly} htmlFor={uid + '-version'}>Versión educativa</label><select id={uid + '-version'} value={phaseId} disabled={!!busy || !!proposal} onChange={event => selectPhase(event.target.value)}>{selectable.map(item => <option key={item.id} value={item.id}>{item.label}{item.id === 'general' ? ' · Original' : ''}</option>)}</select><button type="button" aria-label="Versión siguiente" disabled={!!busy || !!proposal || selectedIndex >= selectable.length - 1} onClick={() => selectPhase(selectable[selectedIndex + 1].id)}><ChevronRight size={18} /></button></div>}
+            {showPicker && <div className={styles.mobilePicker}><label className={styles.srOnly} htmlFor={uid + '-version'}>Versión educativa</label><select id={uid + '-version'} value={phaseId} disabled={!!busy || !!proposal} onChange={event => selectPhase(event.target.value)}>{selectable.map(item => <option key={item.id} value={item.id}>{item.label}{item.id === 'general' ? ' · Original' : ''}</option>)}</select></div>}
         </header>
         <div className={styles.workspace}>
             {showPicker && <nav className={styles.phasePicker} aria-label="Versiones por nivel educativo"><p>TUS VERSIONES</p>{selectable.map(item => <button type="button" key={item.id} disabled={!!busy || !!proposal} aria-pressed={item.id === phaseId} onClick={() => selectPhase(item.id)}><span>{item.label}</span><small>{item.number ? `Fase ${item.number}` : 'Se conserva por separado'}</small></button>)}</nav>}
             <main ref={bodyRef} className={styles.body} data-narration-scroll>
-                <div className={styles.content}>
+                <div className={styles.content} onTouchStart={event => {
+                    swipeStart.current = null;
+                    if (event.touches.length !== 1 || event.target.closest('button, input, textarea, select, audio, summary, a')) return;
+                    swipeStart.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+                }} onTouchEnd={swipeEnd} onTouchCancel={() => { swipeStart.current = null; }}>
                     {error && <div className={styles.error} role="alert"><span>{error}</span><button type="button" aria-label="Cerrar mensaje" onClick={() => setError('')}><X size={16} /></button></div>}
                     {notice && !busy && <p className={styles.notice} role="status">{notice}</p>}
                     {busy && !generating && <p className={styles.busy} role="status"><Loader2 size={17} className={styles.spin} />{busyLabel}</p>}
