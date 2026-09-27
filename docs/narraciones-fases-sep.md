@@ -1,10 +1,18 @@
-# Narraciones por fase: primera iteración
+# Narraciones por fase: flujo guiado
 
 Un punto conserva su investigación compartida y su narración General. El editor común de Administración y Narraciones permite crear cinco versiones independientes: fase 2 (preescolar), 3 (1.º–2.º de primaria), 4 (3.º–4.º), 5 (5.º–6.º) y 6 (secundaria). La pantalla de operación sigue usando General; la selección por grado queda para otra implementación.
 
 Cada versión guarda propósito, enfoque curricular, notas, guion, marca de revisión y audio en `narrative_versions`. Un cambio de guion descarta su audio y revisión, sin modificar otras versiones. Cambiar propósito o referente exige volver a revisar. La marca de revisión es una declaración de la persona editora, no una certificación docente ni de la SEP. Se permiten borradores sin audio.
 
-La generación ofrece una propuesta que debe aceptarse antes de reemplazar el guion. Una respuesta tardía permanece ligada a la fase solicitada aunque se cambie de pestaña. Los errores de generación o guardado conservan la edición abierta. Los audios tienen rutas independientes y su duración se calcula desde el PCM recibido. La calidad de las voces requiere escucha humana.
+## Recorrido del editor
+
+1. **Investigar.** Se muestra la investigación compartida y sus fuentes. Si no existe, la acción principal invita a investigar el lugar o tema; también se puede pegar una investigación propia. Al continuar se reutiliza ese texto para todas las fases.
+2. **Crear.** Las cinco fases aparecen como una lista de progreso, sin preguntar para quién crear. Una sola acción genera todos los guiones faltantes. Los que ya existen conservan su texto, revisión y audio. Las solicitudes son secuenciales; un fallo no impide completar las demás. Reintentar solicita únicamente las fases pendientes. Detener conserva los resultados completados en el borrador abierto.
+3. **Revisar.** Se muestra un guion completo con su propósito y fundamento educativo. Aprobar avanza al siguiente pendiente. Después se ofrecen los audios como paso opcional, generando únicamente los que faltan de guiones aprobados. También se puede guardar y salir sin audio.
+
+El editor abre en el siguiente paso pendiente: investigación, fases faltantes o revisión. La acción principal permanece visible al pie; se permite guardar un borrador desde cualquier paso. El original se consulta por separado y solo cambia mediante edición explícita. Ambos paneles comparten el componente y la lógica del recorrido. La biblioteca oficial del piloto sigue siendo de consulta.
+
+Los guiones nuevos se incorporan como borradores. Crear otra propuesta para un guion existente exige aceptarla antes de reemplazarlo; mientras se genera o revisa la propuesta se bloquean cambios de fase. Los errores de generación o guardado conservan la edición abierta. Los audios tienen rutas independientes y su duración se calcula desde el PCM recibido. La calidad de las voces requiere escucha humana. Esta reorganización no cambia el esquema de datos ni los endpoints de generación.
 
 ## Base educativa y alcance
 
@@ -28,12 +36,12 @@ Para probar generación real, configurar `GEMINI_API_KEY` en `.env.review.local`
 
 El laboratorio prepara el almacenamiento `poi-narratives` durante `review:setup`. Para actualizar una instalación local existente sin reiniciar sus sesiones: `node tools/review-lab/ensure-narration-storage.cjs`.
 
-Pruebas unitarias: `node --test --test-isolation=none tests/gemini-config.test.mjs tests/narrative-phases.test.mjs tests/review-audio.test.mjs tools/review-lab/core.test.cjs`.
+Pruebas unitarias: `node --test --test-isolation=none tests/narration-workflow.test.mjs tests/gemini-config.test.mjs tests/narrative-phases.test.mjs tests/review-audio.test.mjs`.
 
 Regresión no visual: `tools/review-lab/verify-narration-phases.cjs` con Electron del laboratorio y servidor local activo. Usa registros temporales, comprueba persistencia de ambos paneles y simula respuestas de IA sin costes. No sustituye una prueba con el proveedor real ni la evaluación pedagógica.
 
 Verificación real del 27 de septiembre de 2026: Gemini devolvió un guion de fase 3 de 51 palabras y el TTS produjo un WAV de 24 segundos. Se comprobó la descarga desde el almacenamiento local y la duración a partir de sus bytes; después se retiró el archivo de prueba sin modificar las narraciones guardadas. La calidad auditiva y pedagógica continúa requiriendo revisión humana.
 
-Revisión visual pendiente del usuario: Administración → Narraciones → Barranca del Cupatitzio; cambiar entre fases, revisar propósito, guion y fundamento. Repetir en Narraciones del piloto, donde el punto oficial se consulta en modo lectura, a 390 px y escritorio. En un punto propio, editar dos fases, guardar sin audio y reabrir.
+Revisión visual pendiente del usuario: abrir un punto propio sin investigación en Narraciones a 390 px y escritorio; comprobar la claridad de Investigar → Crear → Revisar y el botón fijo inferior. En Administración, abrir Barranca del Cupatitzio para revisar sus borradores existentes y pasar a audios. En el piloto, comprobar que el mismo punto oficial permite leer y escuchar. La regresión automatizada verifica medidas de desbordamiento, no la calidad visual o pedagógica.
 
 Para volver al editor anterior, restaurar código con un commit de reversión; conservar las columnas nuevas para no perder borradores. No borrar ni trasladar las versiones a General.
