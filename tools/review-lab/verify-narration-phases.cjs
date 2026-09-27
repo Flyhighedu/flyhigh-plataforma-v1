@@ -172,6 +172,7 @@ app.whenReady().then(async () => {
         await click('Confirmar guiones y continuar');
         assert.ok((await body()).includes('Añade el propósito de aprendizaje'));
         await field('goal', 'Reconocer el agua del lugar.');
+        await click('Otra propuesta');
         await click('Crear otra propuesta');
         await until(async () => (await body()).includes('Usar esta propuesta'), 'replacement proposal');
         assert.ok(await evaluate(`!!document.querySelector('${dialog} [aria-label="Propuesta de guion"]')`));

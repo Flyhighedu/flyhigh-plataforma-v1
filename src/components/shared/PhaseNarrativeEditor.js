@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Check, Headphones, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Blocks, Compass, Sprout, Telescope, Check, Headphones, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import NarrationCarousel from './NarrationCarousel';
 import useNarrationEntrance from './useNarrationEntrance';
 import { readResearchStream } from '@/lib/research-stream.mjs';
@@ -18,6 +18,9 @@ import { poiImageUrlForBrowser } from '@/lib/poi-image-url.mjs';
 import { localReviewAudioPath } from '@/lib/review-audio.mjs';
 import { NARRATION_PHASES, hasScript, missingPhases, pendingReviews, pendingAudios, initialNarrationStep, confirmNarrations, runNarrationBatch, finishNarrations, narrationReadiness } from '@/lib/narration-workflow.mjs';
 import styles from './PhaseNarrativeEditor.module.css';
+
+const PHASE_ICONS = { phase_2: Sprout, phase_3: Blocks, phase_4: BookOpen, phase_5: Compass, phase_6: Telescope };
+const SCRIPTS_READY = 'Tus cinco guiones están listos para revisar';
 
 async function post(url, body, signal) {
     const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -51,6 +54,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const [busy, setBusy] = useState(null);
     const [error, setError] = useState('');
     const [proposal, setProposal] = useState(null);
+    const [composerOpen, setComposerOpen] = useState(false);
     const [confirmClose, setConfirmClose] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [dirty, setDirty] = useState(false);
@@ -69,6 +73,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const autoplayUrlRef = useRef(null);
     const closeEditor = useNarrationEntrance(panelRef, poi._origin, onClose);
     const phase = educationPhase(phaseId);
+    const PhaseIcon = PHASE_ICONS[phaseId] || BookOpen;
     const current = versions[phaseId] || emptyNarration();
     const reference = curriculumReference(phaseId, current.curriculum_focus);
     const committing = busy?.kind === 'save' || busy?.kind === 'delete';
@@ -97,7 +102,14 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
         });
     }, [current.audio_url, showAudio]);
 
+    useEffect(() => {
+        if (notice !== SCRIPTS_READY || busy) return;
+        const timeout = setTimeout(() => setNotice(''), 5000);
+        return () => clearTimeout(timeout);
+    }, [notice, busy]);
+
     function selectPhase(id) {
+        setComposerOpen(false);
         autoplayUrlRef.current = null;
         audioRef.current?.pause();
         setShowAudio(false);
@@ -213,7 +225,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
                 onFailure: (item, failure) => setFailures(previous => ({ ...previous, [item.id]: failure.message })),
             });
             startReview(next);
-            if (!signal.aborted && !missingPhases(next).length) setNotice('Tus cinco guiones están listos para revisar');
+            if (!signal.aborted && !missingPhases(next).length) setNotice(SCRIPTS_READY);
             if (signal.aborted) setNotice('Generación detenida. Los guiones terminados siguen en este borrador.');
         });
     }
@@ -319,15 +331,24 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const scriptView = <>
         {readOnly && !!missing.length && <details className={styles.pendingNotice}><summary>Versiones por nivel pendientes · {draftCount}/5</summary><p>Solicita a tu coordinación completar estos niveles.</p></details>}
         <NarrationCarousel items={selectable} selectedId={phaseId} versions={versions} onSelect={selectPhase} disabled={!!busy || !!proposal || editingScript} hintSeenRef={hintSeenRef}>
-            <div className={styles.documentHeading}><div><span className={styles.eyebrow}>{phase.number ? 'FASE ' + phase.number + ' · ' + phase.grades : 'NARRACIÓN ORIGINAL'}</span><h2 ref={stepHeadingRef} tabIndex={-1}>{phase.label}</h2></div><span className={styles.status}>{narrationStatus(current, phaseId)}</span></div>
+            <div className={styles.documentHeading}><div className={styles.phaseHeading}><span className={styles.phaseIcon} data-phase={phaseId} aria-hidden="true"><PhaseIcon size={24} strokeWidth={1.8} /></span><div><span className={styles.eyebrow}>{phase.number ? 'FASE ' + phase.number + ' · ' + phase.grades : 'NARRACIÓN ORIGINAL'}</span><h2 ref={stepHeadingRef} tabIndex={-1}>{phase.label}</h2></div></div><span className={styles.status}>{narrationStatus(current, phaseId)}</span></div>
             {proposal ? <section className={styles.proposal} aria-label="Propuesta de guion"><span className={styles.eyebrow}>NUEVA PROPUESTA</span><NarrationDocument text={proposal.narrative_script} label="Nuevo guion propuesto" /><div className={styles.actions}><button type="button" className={styles.proposalButton} onClick={() => { const { phaseId: target, ...changes } = proposal; if (current.audio_url) setStaleAudio(previous => ({ ...previous, [target]: true })); setVersions(previous => editNarration(previous, target, changes)); setDirty(true); setProposal(null); setEditingScript(false); }}>Usar esta propuesta</button><button type="button" onClick={() => setProposal(null)}>Conservar el anterior</button></div></section>
             : editingScript && !readOnly ? <><label className={styles.srOnly} htmlFor={uid + '-script'}>Guion para narrar</label><GrowingTextarea autoFocus id={uid + '-script'} className={styles.documentInput} value={current.narrative_script} disabled={!!busy} maxLength={10000} onBlur={() => setEditingScript(false)} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setEditingScript(false); } }} onChange={event => edit({ narrative_script: event.target.value })} /></>
             : <div className={!readOnly ? styles.editableCanvas : undefined} role={!readOnly ? 'button' : undefined} tabIndex={!readOnly && !busy ? 0 : undefined} aria-label={!readOnly ? 'Editar el texto de este guion' : undefined} onClick={() => { if (!readOnly && !busy && !window.getSelection()?.toString()) setEditingScript(true); }} onKeyDown={event => { if (!readOnly && !busy && ['Enter', ' '].includes(event.key)) { event.preventDefault(); setEditingScript(true); } }}><NarrationDocument text={current.narrative_script || 'Esta versión todavía no tiene guion.'} label="Guion para narrar" /></div>}
         </NarrationCarousel>
         {!proposal && <div className={styles.scriptTools}>
             {current.audio_url ? <button type="button" className={styles.listenButton} aria-expanded={showAudio} onClick={() => { if (showAudio) audioRef.current?.pause(); else requestAnimationFrame(() => audioRef.current?.play().catch(() => setError('No se pudo reproducir este audio. Intenta con los controles del reproductor.'))); setShowAudio(!showAudio); }}><Headphones size={17} />{showAudio ? 'Cerrar audio' : 'Escuchar'}</button> : !readOnly ? <button type="button" className={styles.listenButton} disabled={!!busy || !hasScript(current)} onClick={() => generateAudio()}>{busy?.kind === 'audio' ? <Loader2 size={17} className={styles.spin} /> : <Headphones size={17} />}{busy?.kind === 'audio' ? 'Creando voz…' : staleAudio[phaseId] ? 'Actualizar audio' : 'Probar voz'}</button> : <span>Sin audio</span>}
-            {!readOnly && <details className={styles.proposalComposer}><summary><Sparkles size={17} />Otra propuesta</summary><div><label htmlFor={uid + '-notes'}>Ideas para otra propuesta</label><GrowingTextarea id={uid + '-notes'} disabled={!!busy} placeholder="¿Qué te gustaría cambiar? (Opcional)" value={current.custom_instructions} maxLength={2000} onChange={event => edit({ custom_instructions: event.target.value })} /><button type="button" className={styles.proposalButton} disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button></div></details>}
+            {!readOnly && <button type="button" className={styles.proposalToggle} aria-expanded={composerOpen} aria-controls={uid + '-proposal-composer'} onClick={() => setComposerOpen(open => !open)}><Sparkles size={17} />Otra propuesta</button>}
         </div>}
+        <AnimatePresence initial={false}>
+            {!readOnly && !proposal && composerOpen && <motion.div key={phaseId} id={uid + '-proposal-composer'} className={styles.proposalReveal} initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }}>
+                <div className={styles.proposalComposer}>
+                    <label htmlFor={uid + '-notes'}>Ideas para otra propuesta</label>
+                    <GrowingTextarea id={uid + '-notes'} disabled={!!busy} placeholder="¿Qué te gustaría cambiar? (Opcional)" value={current.custom_instructions} maxLength={2000} onChange={event => edit({ custom_instructions: event.target.value })} />
+                    <button type="button" className={styles.proposalButton} disabled={!!busy || !researchReady} onClick={generateScript}><Sparkles size={17} />Crear otra propuesta</button>
+                </div>
+            </motion.div>}
+        </AnimatePresence>
         {showAudio && current.audio_url && !proposal && <section className={styles.audio} aria-label="Audio del guion">{audioPlayer(current.audio_url, 'Escuchar ' + phase.label, audioRef)}</section>}
         {!proposal && <details className={styles.details} open={error.includes('propósito') || undefined}><summary>Propósito y enfoque educativo</summary>
             {phase.number && (readOnly ? <p><strong>Para aprender:</strong> {current.learning_goal}</p> : <><label htmlFor={uid + '-goal'}>Propósito de aprendizaje</label><GrowingTextarea id={uid + '-goal'} value={current.learning_goal} disabled={!!busy} maxLength={220} placeholder={phase.goal} onChange={event => edit({ learning_goal: event.target.value })} /></>)}
@@ -347,7 +368,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
             <main ref={bodyRef} className={styles.body} data-narration-scroll>
                 <motion.div key={saved ? 'saved' : generating ? busy.kind : step} initial={reducedMotion ? false : { opacity: 0, x: stepDirection * 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .24 }} className={styles.content} data-generating={generating || saved}>
                     {error && <div className={styles.error} role="alert"><span>{error}</span><button type="button" aria-label="Cerrar mensaje" onClick={() => setError('')}><X size={16} /></button></div>}
-                    {notice && !busy && <p className={styles.notice} role="status">{notice}</p>}
+                    <AnimatePresence initial={false}>{notice && !busy && <motion.div key={notice} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: reducedMotion ? 0 : 0.35 }} className={styles.noticeReveal}><p className={styles.notice} role="status">{notice}</p></motion.div>}</AnimatePresence>
                     {busy && !generating && <p className={styles.busy} role="status"><Loader2 size={17} className={styles.spin} />{busyLabel}</p>}
                     {saved ? <section className={styles.success} role="status"><span><Check size={46} /></span><h2>{narrationReadiness(versions).ready ? 'Narraciones guardadas' : 'Borrador guardado'}</h2><p>{narrationReadiness(versions).ready ? 'Los cinco niveles tienen su audio.' : 'Puedes continuar después.'}</p></section> : generating ? <NarrationGeneration kind={busy.kind} versions={versions} progress={progress} failures={failures} researchStage={researchStage} /> : readOnly ? scriptView : step === 1 ? <>
                         {!!missing.length && hasScript(versions.general) && <section className={styles.legacyNotice}><strong>Completa las versiones por nivel</strong><span>{draftCount}/5 guiones · La narración general se conserva.</span></section>}
