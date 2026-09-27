@@ -3,6 +3,7 @@
 import { aboveSurface, surfaceEnvelope, QUALITY } from '@/lib/flight-cockpit.mjs';
 import { distanceMeters } from '@/lib/flight-rehearsal.mjs';
 let library;
+export const preloadGoogle3d = () => loadCesium();
 function loadCesium() {
     if (window.Cesium) return Promise.resolve(window.Cesium);
     if (library) return library;
@@ -71,6 +72,11 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
     let guardQueued = false;
     let surfaceDirty = false;
     let markerCursor = 0;
+    let markerHeightTime = 0;
+    let markerHeightRevision = 0;
+    const markerPoint = new C.Cartesian3();
+    const markerDirection = new C.Cartesian3();
+    const markerPixel = new C.Cartesian2();
     const remove = () => {
         if (disposed) return;
         disposed = true;
@@ -107,7 +113,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             widget.resize(); scene.requestRender();
         };
         setQuality(quality);
-        tileset.tileLoad.addEventListener(() => { surfaceDirty = true; });
+        tileset.tileLoad.addEventListener(() => { surfaceDirty = true; markerHeightRevision++; });
         tileset.tileVisible.addEventListener(() => { rendered++; container.dataset.tilesRendered = String(rendered); });
         tileset.tileFailed.addEventListener(() => { failed++; container.dataset.tileFailures = String(failed); });
         scene.camera.setView({ destination: C.Cartesian3.fromDegrees(initial.longitude, initial.latitude, 10000), orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 } });
@@ -152,7 +158,9 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         const setCamera = state => {
             if (disposed || selecting) return current;
             const moved = state.latitude !== current.latitude || state.longitude !== current.longitude;
-            const renderedSurface = visibleSurface(state);
+            // Rotation/tilt does not change the ground underneath the aircraft;
+            // the separate streamed-terrain guard handles refinement in place.
+            const renderedSurface = moved ? visibleSurface(state) : surface;
             const detailed = distanceMeters(state, takeoff) < .05 ? baseHeight : probed && distanceMeters(state, probed) < .15 ? probed.height : undefined;
             const nextSurface = surfaceEnvelope(renderedSurface, detailed, moved ? undefined : surface);
             if (!Number.isFinite(nextSurface)) {
@@ -186,30 +194,42 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             }
             const markers = [...entries];
             const labelPositions = [];
-            // Amortize optional label-height sampling, rather than ray-casting
-            // hundreds of markers each frame. No sampled values are persisted.
-            for (let n = 0; n < Math.min(2, markers.length); n++) {
-                const entry = markers[markerCursor++ % markers.length];
-                const height = scene.sampleHeight(C.Cartographic.fromDegrees(entry.longitude, entry.latitude));
-                if (Number.isFinite(height)) entry.height = height;
+            // Height picking is expensive. Budget one relevant label every
+            // 120 ms, cache until streamed geometry changes, never raycast
+            // hidden/distant labels on every rendered frame.
+            const now = performance.now();
+            if (now - markerHeightTime > 120) {
+                markerHeightTime = now;
+                for (let n = 0; n < markers.length; n++) {
+                    const entry = markers[markerCursor++ % markers.length];
+                    if (entry.element.style.display === 'none' || distanceMeters(current, entry) > 3500 || entry.revision === markerHeightRevision || now - entry.sampledAt < 2000) continue;
+                    const height = scene.sampleHeight(entry.cartographic);
+                    if (Number.isFinite(height)) entry.height = height;
+                    entry.revision = markerHeightRevision; entry.sampledAt = now;
+                    break;
+                }
             }
             for (const entry of markers) {
-                const point = C.Cartesian3.fromDegrees(entry.longitude, entry.latitude, (entry.height ?? baseHeight) + 3);
-                const direction = C.Cartesian3.subtract(point, scene.camera.positionWC, new C.Cartesian3());
-                const xy = scene.cartesianToCanvasCoordinates(point);
+                if (entry.element.style.display === 'none') continue;
+                const point = C.Cartesian3.fromDegrees(entry.longitude, entry.latitude, (entry.height ?? baseHeight) + 3, undefined, markerPoint);
+                const direction = C.Cartesian3.subtract(point, scene.camera.positionWC, markerDirection);
+                const xy = scene.cartesianToCanvasCoordinates(point, markerPixel);
                 let visible = xy && C.Cartesian3.dot(direction, scene.camera.directionWC) > 0 && xy.x >= -40 && xy.x <= container.clientWidth + 40 && xy.y >= -40 && xy.y <= container.clientHeight + 40;
                 if (visible && entry.street) {
                     visible = Number.isFinite(entry.height) && distanceMeters(current, entry) < 2200 && !labelPositions.some(p => Math.abs(p.x - xy.x) < 150 && Math.abs(p.y - xy.y) < 30);
-                    if (visible) labelPositions.push(xy);
+                    if (visible) labelPositions.push({ x: xy.x, y: xy.y });
                 }
-                entry.element.style.visibility = visible ? 'visible' : 'hidden';
-                if (visible) entry.element.style.transform = `translate(${xy.x}px,${xy.y}px) translate(-50%,-100%)`;
+                if (entry.visible !== Boolean(visible)) { entry.element.style.visibility = visible ? 'visible' : 'hidden'; entry.visible = Boolean(visible); }
+                if (visible) {
+                    const transform = `translate(${xy.x.toFixed(1)}px,${xy.y.toFixed(1)}px) translate(-50%,-100%)`;
+                    if (entry.transform !== transform) { entry.element.style.transform = transform; entry.transform = transform; }
+                }
             }
         });
         const addMarker = (element, poi) => {
             element.style.position = 'absolute'; element.style.left = '0'; element.style.top = '0'; element.style.pointerEvents = 'auto';
             element.classList.add('flight-google-marker');
-            const entry = { element, latitude: poi.latitude, longitude: poi.longitude, street: poi.source === 'osm-street' };
+            const entry = { element, latitude: poi.latitude, longitude: poi.longitude, street: poi.source === 'osm-street', cartographic: C.Cartographic.fromDegrees(poi.longitude, poi.latitude), sampledAt: -Infinity, revision: -1 };
             if (entry.street) element.style.pointerEvents = 'none';
             entries.add(entry); overlay.append(element); scene.requestRender();
             return { remove: () => { entries.delete(entry); element.remove(); if (!disposed) scene.requestRender(); } };
@@ -271,7 +291,8 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             candidatePin?.remove(); candidatePin = addMarker(pin, candidate);
             onSurfaceStatus?.(''); onCandidate?.(candidate);
         }, C.ScreenSpaceEventType.LEFT_CLICK);
-        const confirmSelection = async () => {
+        const confirmSelection = async position => {
+            if (position) { selecting = true; candidate = { ...position }; }
             if (!candidate) throw new Error('Elige un punto en el mapa.');
             const selected = { ...candidate };
             const height = await measure(selected);

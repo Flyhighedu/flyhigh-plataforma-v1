@@ -7,6 +7,7 @@ import { coordinates, distanceKm, usableAudio } from '@/lib/narration-preparatio
 import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, FLIGHT_LIMITS, FLIGHT_SPEEDS, flightLimitsForSpeed } from '@/lib/flight-rehearsal.mjs';
 import { advanceGimbal, createFlightProfiles, DEFAULT_PROFILES, tuneControls, virtualLimits } from '@/lib/flight-cockpit.mjs';
 import FlightSettings from './FlightSettings';
+import TakeoffMap from './TakeoffMap';
 import { LoadingPreparation, Notice, secondary, usePreparationData } from './PreparationUI';
 import useNarrationAudio from './useNarrationAudio';
 import useFlightFullscreen from './useFlightFullscreen';
@@ -52,11 +53,11 @@ function formatDistance(value) {
     return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`;
 }
 
-function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
+function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, departure }) {
     const confirmedLocation = coordinates(visit.ubicacion_lat, visit.ubicacion_lng);
-    const needsOrigin = google3d && !confirmedLocation;
+    const needsOrigin = google3d && !confirmedLocation && !departure;
     // Reference view only; a missing school location requires explicit takeoff.
-    const [schoolLatitude, schoolLongitude] = confirmedLocation || [19.4169, -102.0555];
+    const [schoolLatitude, schoolLongitude] = departure ? [departure.latitude, departure.longitude] : confirmedLocation || [19.4169, -102.0555];
     const container = useRef(null);
     const screenRef = useRef(null);
     const googleCredits = useRef(null);
@@ -82,7 +83,6 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
     const qualityRef = useRef(quality);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [picking, setPicking] = useState(needsOrigin);
-    const [candidate, setCandidate] = useState(null);
     const [originBusy, setOriginBusy] = useState(false);
     const [surfaceStatus, setSurfaceStatus] = useState('');
     const [temporaryOrigin, setTemporaryOrigin] = useState(false);
@@ -277,7 +277,6 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
                         flight.current = { ...corrected };
                         if (lifted) setHud(previous => ({ ...previous, altitude: corrected.altitude }));
                     },
-                    onCandidate: value => { if (!disposed) setCandidate(value); },
                     onSurfaceStatus: value => { if (!disposed) setSurfaceStatus(value); }, quality: qualityRef.current,
                     onLoadStage: value => { if (!disposed) setLoadStage(value); },
                 });
@@ -285,7 +284,6 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
                 map.current = engine;
                 // Camera is the aircraft in this renderer; no redundant arrow.
                 aircraftMarker.current = { setLngLat: () => {} };
-                if (!needsOrigin) engine.addMarker(createMarkerElement('school', visit.nombre_escuela), { latitude: schoolLatitude, longitude: schoolLongitude });
                 const addPoi = (poi, kind) => {
                     const element = createMarkerElement(kind, poi.name, selectedIds.has(String(poi.id)));
                     element.addEventListener('click', event => { event.stopPropagation(); setActivePoi(poi); });
@@ -387,11 +385,11 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
     const currentDistance = currentPoi ? closestPoi(flight.current, [currentPoi])?.distance : null;
 
     const endPointer = event => { leftControl.current?.end(event); rightControl.current?.end(event); };
-    const chooseOrigin = () => { audio.stop(); setPicking(true); setMapError(''); map.current?.beginSelection(); };
-    const confirmOrigin = async () => {
+    const chooseOrigin = () => { audio.stop(); setPicking(true); setMapError(''); };
+    const confirmOrigin = async position => {
         setOriginBusy(true); setMapError('');
         try {
-            const state = await map.current.confirmSelection();
+            const state = await map.current.confirmSelection(position);
             origin.current = { latitude: state.latitude, longitude: state.longitude };
             flight.current = state;
             setTemporaryOrigin(true); setPicking(false); setPlaying(true);
@@ -465,13 +463,14 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
 
         {!picking && currentPoi && <section className={`${styles.poi} absolute bottom-40 left-1/2 z-10 w-[min(82vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 p-3 shadow-2xl backdrop-blur-xl sm:bottom-44`}>
             <div className="flex items-start gap-2"><MapPin size={17} className="mt-0.5 shrink-0 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{currentPoi.name}</p><p className="mt-0.5 text-[10px] text-slate-300">{currentPoi.source === 'osm-radar' ? 'Radar cultural · Sin narración' : selectedIds.has(String(currentPoi.id)) ? 'En tu secuencia' : usableAudio(currentPoi.audio_url) ? 'Narración disponible' : 'Audio pendiente'}{currentDistance != null && ` · ${formatDistance(currentDistance)}`}</p></div>{activePoi && <button onClick={() => setActivePoi(null)} className="px-1 text-xs text-slate-300">Cerrar</button>}</div>
-            {usableAudio(currentPoi.audio_url) && <button onClick={() => audio.toggle(currentPoi)} className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl bg-cyan-500/20 text-xs font-bold text-cyan-100"><Headphones size={15} />{audio.id === currentPoi.id && audio.status === 'playing' ? 'Pausar narración' : 'Escuchar narración'}</button>}
+            {usableAudio(currentPoi.audio_url) && <button onClick={() => audio.toggle(currentPoi)} aria-label={audio.id === currentPoi.id && audio.status === 'playing' ? 'Pausar narración' : 'Escuchar narración'} className={styles.narrationButton}>{audio.id === currentPoi.id && audio.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : audio.id === currentPoi.id && audio.status === 'playing' ? <Pause size={18} /> : <Headphones size={18} />}</button>}
+            {audio.id === currentPoi.id && audio.error && <p role="alert" className={styles.audioError}>{audio.error}</p>}
         </section>}
 
         {ready && !picking && <><button onClick={() => setPlaying(value => !value)} className={`${styles.pause} absolute bottom-5 left-1/2 z-20 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-full border border-white/30 bg-cyan-500 text-slate-950 shadow-xl`} aria-label={playing ? 'Pausar simulación' : 'Continuar simulación'}>{playing ? <Pause size={21} fill="currentColor" /> : <Play size={21} fill="currentColor" />}</button>
         <FloatingJoystick controlRef={leftControl} side="left" label="Movimiento" onChange={left} />
         <FloatingJoystick controlRef={rightControl} side="right" label="Altura · giro" onChange={right} /></>}
-        {google3d && picking && <section className={styles.originPicker} aria-label="Elegir despegue temporal"><h2>Elegir despegue</h2><p>{needsOrigin && !temporaryOrigin ? 'La escuela no tiene ubicación confirmada. ' : ''}Mueve el mapa y toca el punto de partida. Solo se usará en este ensayo.</p><p>{candidate ? `${candidate.latitude.toFixed(5)}, ${candidate.longitude.toFixed(5)}` : 'Selecciona una superficie del mapa'}</p><div>{(!needsOrigin || temporaryOrigin) && <button disabled={originBusy} onClick={() => { map.current.cancelSelection(); setPicking(false); setMapError(''); }}>Cancelar</button>}<button disabled={!candidate || originBusy} onClick={confirmOrigin}>{originBusy ? 'Verificando superficie…' : 'Despegar aquí'}</button></div></section>}
+        {google3d && picking && <TakeoffMap initial={flight.current} busy={originBusy} error={mapError} onConfirm={confirmOrigin} onCancel={() => { setPicking(false); setMapError(''); }} />}
         {settingsOpen && <FlightSettings profiles={profiles} setProfiles={setProfiles} activeMode={speedId} ceiling={ceiling} setCeiling={setCeiling} quality={quality} setQuality={setQuality} onClose={() => setSettingsOpen(false)} />}
         {google3d ? <div className={styles.googleCredits}><span className={styles.googleBrand}>Google Maps</span><div ref={googleCredits} />{(radar.visible || streets.visible) && <span>Calles / lugares © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>
             : <div className={styles.credits}><span dangerouslySetInnerHTML={{ __html: BASEMAP_CREDITS }} />{ARCGIS_KEY && radar.visible && <span> · Lugares © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>}
@@ -479,6 +478,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
 }
 
 export default function FlightRehearsalScreen({ visitId, google3d = false }) {
+    const [departure, setDeparture] = useState(null);
     const { data, loading, error, retry } = usePreparationData(visitId);
     const audio = useNarrationAudio();
     const visit = data?.visits?.[0];
@@ -500,5 +500,6 @@ export default function FlightRehearsalScreen({ visitId, google3d = false }) {
     if (loading) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><LoadingPreparation /></div>;
     if (error) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice></div>;
     if (!location && !google3d) return <div className="min-h-[100svh] bg-[#f3f7fb] p-5 text-[#071a33]"><Link href={`/staff/visitas/${visitId}`} className={secondary}><ArrowLeft size={18} />Volver</Link><div className="mt-5"><Notice>Esta visita necesita una ubicación confirmada antes de ensayar el vuelo.</Notice></div></div>;
-    return <RehearsalMap key={`${visit.id}:${latitude}:${longitude}:${google3d}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} google3d={google3d} />;
+    if (google3d && !departure) return <main className={styles.screen}><TakeoffMap initial={location ? { latitude, longitude } : null} onConfirm={setDeparture} onCancel={() => { window.location.href = `/staff/visitas/${visitId}`; }} /></main>;
+    return <RehearsalMap key={`${visit.id}:${latitude}:${longitude}:${google3d}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} google3d={google3d} departure={departure} />;
 }

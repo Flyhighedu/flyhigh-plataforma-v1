@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { localReviewAudioPath } from '@/lib/review-audio.mjs';
 
 export default function useNarrationAudio() {
     const ref = useRef(null);
@@ -42,7 +43,7 @@ export default function useNarrationAudio() {
         if (active.current === item.id && !audio.paused) { audio.pause(); return; }
         const ticket = ++generation.current;
         if (active.current !== item.id || audio.error) {
-            audio.pause(); audio.src = item.audio_url; audio.load(); active.current = item.id;
+            audio.pause(); audio.src = localReviewAudioPath(item.audio_url) ? `/api/review-lab/audio?url=${encodeURIComponent(item.audio_url)}` : item.audio_url; audio.load(); active.current = item.id;
             setState({ id: item.id, status: 'loading', time: 0, duration: 0, error: '' });
         } else {
             if (audio.ended) audio.currentTime = 0;

@@ -52,7 +52,7 @@ El motor y sus workers se sirven desde el paquete Cesium instalado, por el mismo
 
 El ensayo 3D conserva Modo 3, gimbal de -90° a 0°, marcadores y radar. La cámara usa una altura relativa al **despegue**, no un desplazamiento automático siguiendo cada pendiente. La protección mantiene un margen de 8 m sobre la geometría medida: una malla más alta eleva la cámara incluso en pausa; una medición gruesa no reemplaza una altura mayor ya confirmada en el mismo punto. Ante una zona sin superficie medida, se detiene el desplazamiento horizontal mientras se consulta. Son aproximaciones visuales, no detección de obstáculos ni certificación de que cada triángulo futuro de Google esté disponible. La protección tiene prioridad sobre el techo virtual y su corrección aparece en la telemetría.
 
-El icono de mapa permite mover la vista cenital, tocar un nuevo punto y pulsar **Despegar aquí**. La confirmación calcula la superficie antes de mover la cámara, reutiliza la sesión de Google y no recrea WebGL. **Regresar al despegue** lleva al último punto confirmado, no altera la escuela. Un error conserva el selector y no confirma coordenadas inventadas.
+El icono de mapa abre el selector 2D convencional para centrar un nuevo punto y pulsar **Despegar aquí**. La confirmación calcula la superficie antes de mover la cámara, reutiliza la sesión de Google y no recrea WebGL. **Regresar al despegue** lleva al último punto confirmado, no altera la escuela. Un error conserva el selector y no confirma coordenadas inventadas.
 
 ### Cabina y ajustes de referencia Air 3S / RC 2
 
@@ -66,6 +66,14 @@ El icono de mapa permite mover la vista cenital, tocar un nuevo punto y pulsar *
 La carga exige WebGL compatible y conexión; el detalle y los edificios dependen de la cobertura de Google. Mejorar los ajustes no crea texturas ausentes. Si no se puede confirmar la superficie, se indica el error; no se degrada silenciosamente a calles.
 
 La pantalla **Preparando tu despegue** informa las etapas reales (motor, conexión, superficie y vista). Muestrear una altura no basta: antes de habilitar los controles se espera que la vista inicial tenga tiles dibujados y que el motor reporte completa la carga del detalle requerido durante 400 ms. Si no se completa en 35 segundos desde que se coloca la cámara, se presenta un error con Reintentar/Volver, no una cabina operativa vacía. La carga inicial de superficie tiene su propio timeout de 45 segundos. No hay porcentaje ficticio. Las zonas nuevas siguen necesitando red durante el vuelo.
+
+### Selección de despegue y audio móvil
+
+Toda entrada 3D comienza en un mapa 2D Leaflet: un dedo arrastra, dos hacen zoom y el marcador central indica el punto a confirmar. El código del motor 3D se precarga durante la selección, pero las peticiones de relieve comienzan tras confirmar, evitando cargar una ubicación que no se va a usar. Si el navegador permite geolocalización, se solicita con permiso y tiempo límite de 8 s; la ubicación sigue siendo aproximada y requiere confirmación. HTTP sobre IP LAN normalmente bloquea GPS: se informa al usar Mi ubicación y se conserva la selección manual. No se simula una ubicación GPS ni se guarda en escuelas. El selector también se utiliza para cambiar el despegue durante un ensayo.
+
+Los audios importados desde Supabase local se reproducen mediante `/api/review-lab/audio`, autenticado y exclusivo del laboratorio. Solo acepta rutas de objetos públicos del puerto local 54321; reenvía Range para reproducción/búsqueda desde el teléfono sin enviarle localhost como servidor de audio. El botón de narración es circular, pequeño y centrado; muestra carga, pausa y errores.
+
+Las etiquetas reutilizan coordenadas y objetos de proyección; sus alturas se consultan como máximo una cada 120 ms, solo para lugares cercanos/visibles y cuando cambia la geometría, con separación de 2 s por etiqueta. Se evitan escrituras de estilo idénticas. Girar sin desplazarse no vuelve a medir el suelo en cada cuadro: lo revisa el guardián de terreno. No se cambian resolución ni calidad geométrica para optimizar capas.
 
 ### Calles híbridas y radar resiliente
 

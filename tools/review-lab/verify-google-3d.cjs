@@ -64,6 +64,7 @@ app.whenReady().then(async () => {
     await until(() => wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).some(a=>a.getAttribute('href')?.endsWith('/simulacion-3d'))`), 'separate 3D entry');
     console.log('PASS authenticated LAN access and separate 3D entry');
     await navigate(gateway.publicOrigin + href + '/simulacion-3d');
+    await require('./verify-takeoff.cjs')(wc, until);
     let loadingObserved = false;
     await until(async () => {
       const loading = await wc.executeJavaScript(`({loading:!!document.querySelector('[aria-label="Preparación del ensayo"]'),controls:document.querySelectorAll('[role="application"]').length})`);
@@ -73,18 +74,6 @@ app.whenReady().then(async () => {
       return status.ready;
     }, 'Google 3D surface and camera', 110);
     assert.ok(loadingObserved, 'preparation screen shown before activating flight');
-    if (process.argv.includes('--missing-origin')) {
-      assert.equal(await wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length`), 0, 'no flight before an explicit departure');
-      assert.ok(await wc.executeJavaScript(`document.body.innerText.includes('La escuela no tiene ubicación confirmada')`));
-      await delay(2000);
-      const point = await wc.executeJavaScript(`({x:Math.round(innerWidth*.5),y:Math.round(innerHeight*.35)})`);
-      wc.sendInputEvent({ type: 'mouseDown', ...point, button: 'left', clickCount: 1 });
-      wc.sendInputEvent({ type: 'mouseUp', ...point, button: 'left', clickCount: 1 });
-      await until(() => wc.executeJavaScript(`[...document.querySelectorAll('button')].some(b=>b.textContent==='Despegar aquí'&&!b.disabled)`), 'reference map selection');
-      await wc.executeJavaScript(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Despegar aquí').click()`);
-      await until(() => wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length===2`), 'confirmed departure without school coordinates');
-      console.log('PASS missing school location: explicit selection required; virtual flight unlocked without a database write');
-    }
     // Uncompressed Google meshes do not necessarily need a decoding worker.
     await until(() => resources > 0, 'tile resources');
     await until(() => wc.executeJavaScript(`Number(document.querySelector('[aria-label="Mapa del ensayo de vuelo"]').dataset.tilesRendered)>0`), 'rendered 3D meshes');

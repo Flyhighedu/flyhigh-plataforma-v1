@@ -23,6 +23,12 @@ module.exports = async function verifyGoogleCockpit(wc, until) {
   await read(`window.__contextFetch=window.fetch;window.fetch=async(url,options)=>{if(!String(url).includes('kind=streets'))return window.__contextFetch(url,options);window.__streetQueries=(window.__streetQueries||0)+1;return Response.json({items:[{id:'street_1',name:'Calle de prueba',latitude:19.417,longitude:-102.055,source:'osm-street',geometry:[{lat:19.417,lon:-102.055},{lat:19.418,lon:-102.055}]}]});};true;`);
   await click('Mostrar calles y nombres');
   await until(() => read(`${map}.dataset.streetCount==='1'`), 'hybrid road layer');
+  await read(`window.__sampleCount=0;window.__sampleBaseline=Cesium.Scene.prototype.sampleHeight;Cesium.Scene.prototype.sampleHeight=function(...args){window.__sampleCount++;return window.__sampleBaseline.apply(this,args);};true;`);
+  await delay(1000);
+  const samples = await read('window.__sampleCount');
+  await read('Cesium.Scene.prototype.sampleHeight=window.__sampleBaseline;true;');
+  assert.ok(samples < 35, 'overlay height picking is bounded, not twice per frame');
+  console.log('PASS overlay height workload:', samples, 'queries in one second; quality unchanged');
   assert.equal(await read(`document.querySelectorAll('[data-street-label]').length`), 1);
   await click('Ocultar calles y nombres');
   await until(() => read(`${map}.dataset.streetCount==='0'`), 'hybrid hidden');
@@ -37,6 +43,12 @@ module.exports = async function verifyGoogleCockpit(wc, until) {
   assert.equal(context.status, 200);
   assert.ok(context.count > 0, 'authenticated LAN route returns real nearby OSM places');
   console.log('PASS live radar through authenticated same-origin server:', context.count, 'places');
+  const audio = await read(`(async()=>{const d=await(await fetch('/api/staff/preparation?visit='+location.pathname.split('/')[3])).json();const p=d.catalog.find(p=>p.audio_url?.includes(':54321/'));if(!p)return null;window.__audioTest=new Audio('/api/review-lab/audio?url='+encodeURIComponent(p.audio_url));await window.__audioTest.play();return {paused:window.__audioTest.paused};})()`, true);
+  assert.ok(audio && !audio.paused, 'local narration can play through LAN proxy');
+  await delay(500);
+  assert.ok(await read('window.__audioTest.currentTime') > 0, 'audio decoder advances');
+  await read('window.__audioTest.pause();true;');
+  console.log('PASS actual narration playback through same-origin LAN audio endpoint');
   await click('Ajustes del ensayo');
   await until(() => read('Boolean(document.querySelector("dialog[open]"))'), 'settings drawer');
   const button = text => read(`[...document.querySelectorAll('dialog button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);
@@ -87,16 +99,8 @@ module.exports = async function verifyGoogleCockpit(wc, until) {
   console.log('PASS hover protection: higher streamed mesh lifts camera; lower LOD cannot sink it');
 
   await click('Elegir despegue en el mapa');
-  await until(() => read(`${map}.dataset.selectingOrigin==='true'`), 'takeoff map');
-  assert.equal(await read(`document.querySelectorAll('[role="application"]').length`), 0, 'map selection cannot steer a joystick');
-  await delay(2000);
-  const point = await read(`({x:Math.round(innerWidth*.52),y:Math.round(innerHeight*.39)})`);
-  wc.sendInputEvent({ type: 'mouseMove', ...point });
-  wc.sendInputEvent({ type: 'mouseDown', ...point, button: 'left', clickCount: 1 });
-  wc.sendInputEvent({ type: 'mouseUp', ...point, button: 'left', clickCount: 1 });
-  await until(() => read(`[...document.querySelectorAll('button')].some(b=>b.textContent==='Despegar aquí'&&!b.disabled)`), 'picked terrain position');
-  await read(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Despegar aquí').click()`);
-  await until(() => read(`${map}.dataset.selectingOrigin==='false' && !document.querySelector('[aria-label="Elegir despegue temporal"]')`), 'confirmed temporary takeoff');
+  await require('./verify-takeoff.cjs')(wc, until);
+  await until(() => read(`!document.querySelector('[aria-label="Mapa de despegue"]')`), 'confirmed temporary takeoff');
   assert.ok(await clearance() >= 7.99);
   assert.equal(await read(`window.__googleCanvas===document.querySelector('.cesium-widget canvas')`), true);
   await click('Regresar al despegue');

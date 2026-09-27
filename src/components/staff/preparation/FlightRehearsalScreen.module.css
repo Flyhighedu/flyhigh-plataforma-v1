@@ -1,5 +1,21 @@
 .screen { position: relative; height: 100dvh; min-height: 320px; overflow: hidden; background: #07121e; color: white; touch-action: none; }
 .screen:fullscreen { width: 100%; height: 100%; }
+.takeoffMap { position: absolute; inset: 0; z-index: 50; background: #e2e8f0; color: #0f172a; }
+.takeoffCanvas { position: absolute; inset: 0; z-index: 0; }
+.takeoffCrosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%); z-index: 500; pointer-events: none; color: #0e7490; filter: drop-shadow(0 2px 2px #fff); }
+.takeoffHeading { position: absolute; z-index: 500; top: 12px; left: 64px; right: 64px; text-align: center; pointer-events: none; text-shadow: 0 1px 3px white, 0 -1px 3px white; }
+.takeoffHeading strong, .takeoffHeading small { display: block; }
+.takeoffHeading small { font-size: 11px; }
+.locateButton { position: absolute; z-index: 500; top: 12px; right: 12px; width: 44px; height: 44px; display: grid; place-items: center; background: white; border-radius: 12px; box-shadow: 0 2px 8px #0003; }
+.takeoffConfirm { position: absolute; z-index: 500; bottom: 32px; left: 50%; transform: translateX(-50%); width: min(360px, 90%); text-align: center; }
+.takeoffConfirm p { background: #fffffff0; padding: 6px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; }
+.takeoffConfirm > div { display: flex; justify-content: center; gap: 8px; }
+.takeoffConfirm button { min-height: 44px; padding: 10px 18px; background: white; border-radius: 12px; box-shadow: 0 2px 8px #0003; }
+.takeoffConfirm button:last-child { background: #0891b2; color: white; font-weight: 700; }
+.takeoffConfirm button:disabled { opacity: .65; }
+.narrationButton { width: 44px; height: 44px; display: grid; place-items: center; margin: 4px auto 0; border-radius: 50%; background: #0891b2; color: white; }
+.audioError { font-size: 11px; color: #fecaca; margin-top: 4px; }
+.googleLayout .poi { width: min(260px, 65vw); padding: 8px; bottom: 105px; }
 .loadingView { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 30%, #102b40, #07121e 70%); padding: 24px; }
 .loadingCard { width: min(390px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
 .loadingEyebrow { color: #67e8f9; font-size: 10px; letter-spacing: .18em; }
@@ -103,7 +119,7 @@
     .googleLayout .telemetry p { font-size: 9px; }
     .googleLayout .telemetry strong { font-size: 12px; }
     .googleLayout .pause { bottom: 38px; right: 16px; left: auto; transform: none; width: 34px; height: 34px; }
-    .googleLayout .poi { bottom: 148px; width: min(44vw, 340px); padding: 8px; }
+    .googleLayout .poi { bottom: 90px; width: min(34vw, 260px); padding: 6px 8px; }
     .googleLayout .joystick { margin-bottom: 0; }
     .originPicker { bottom: 40px; padding: 8px 12px; }
 }
