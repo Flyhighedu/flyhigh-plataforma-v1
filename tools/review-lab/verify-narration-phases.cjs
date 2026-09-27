@@ -157,10 +157,10 @@ app.whenReady().then(async () => {
         throw error;
     } finally {
         clearTimeout(timer);
-        win.destroy();
         await client.query('DELETE FROM pilot_pois WHERE id=$1', [ownId]);
         await client.query('DELETE FROM master_route_pois WHERE id=$1', [officialId]);
         await client.query('DELETE FROM pilot_pois WHERE name=$1', [topicName]);
         await client.end();
+        win.destroy();
     }
 }).then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });
