@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect } from 'react';
+import { isChunkLoadError, recoverChunkLoad } from '@/lib/chunk-recovery.mjs';
 
 /**
  * Staff-scoped Error Boundary — catches any crash inside /staff/* routes
  * and shows a branded recovery UI instead of a white screen.
  */
 export default function StaffError({ error, reset }) {
+    const chunkFailed = isChunkLoadError(error);
+
     useEffect(() => {
         console.error('[StaffErrorBoundary]', error?.message || error);
+        recoverChunkLoad(error, window);
     }, [error]);
 
     return (
@@ -37,10 +41,12 @@ export default function StaffError({ error, reset }) {
 
             {/* Title */}
             <h1 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-                Hubo un problema inesperado
+                {chunkFailed ? 'No se pudo cargar la pantalla' : 'Hubo un problema inesperado'}
             </h1>
             <p style={{ fontSize: 14, color: '#94a3b8', maxWidth: 300, lineHeight: 1.6, margin: '0 0 8px' }}>
-                El sistema encontró un error. Tu progreso está guardado.
+                {chunkFailed
+                    ? 'Comprueba tu conexión y recarga para volver a descargar la pantalla.'
+                    : 'El sistema encontró un error. Intenta abrir la pantalla de nuevo.'}
             </p>
 
             {/* Error detail (collapsed) */}
@@ -59,7 +65,7 @@ export default function StaffError({ error, reset }) {
 
             {/* Reset button */}
             <button
-                onClick={reset}
+                onClick={chunkFailed ? () => window.location.reload() : reset}
                 style={{
                     padding: '14px 32px', borderRadius: 14,
                     background: '#2563EB', color: 'white', border: 'none',
@@ -68,11 +74,11 @@ export default function StaffError({ error, reset }) {
                     marginBottom: 12
                 }}
             >
-                Restablecer Tarea
+                {chunkFailed ? 'Recargar pantalla' : 'Restablecer Tarea'}
             </button>
 
             {/* Hard reload link */}
-            <button
+            {!chunkFailed && <button
                 onClick={() => window.location.reload()}
                 style={{
                     padding: '10px 24px', borderRadius: 12,
@@ -81,7 +87,7 @@ export default function StaffError({ error, reset }) {
                 }}
             >
                 Recargar Aplicación
-            </button>
+            </button>}
         </div>
     );
 }
