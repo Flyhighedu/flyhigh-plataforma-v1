@@ -455,8 +455,7 @@ export default function AcademiaLobbyPage() {
                             onDragEnd={handleDragEnd}
                             style={{ x, rotate }}
                             animate={controls}
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            initial={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.2 } }}
                             className="absolute w-full h-full max-h-[70vh] flex items-center justify-center touch-pan-y overscroll-x-none"
                         >
