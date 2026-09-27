@@ -67,6 +67,8 @@ function cleanEnvironment(root, input, inherited = process.env) {
   }
   for (const key of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) env[key] = input[key];
   if (input.NEXT_PUBLIC_ARCGIS_API_KEY) env.NEXT_PUBLIC_ARCGIS_API_KEY = input.NEXT_PUBLIC_ARCGIS_API_KEY;
+  // Optional, explicit laboratory credential only; never inherit production's.
+  if (input.GEMINI_API_KEY) env.GEMINI_API_KEY = input.GEMINI_API_KEY;
   return { ...env, NODE_ENV: 'development', NEXT_TELEMETRY_DISABLED: '1', FLYHIGH_REVIEW_LAB: '1', NEXT_PUBLIC_FLYHIGH_REVIEW_LAB: '1', FLYHIGH_REVIEW_ENVIRONMENT: 'isolated-test' };
 }
 function partitionFor(role, identity) {

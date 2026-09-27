@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { educationPhase } from '@/lib/education-phases.mjs';
 
 // Convertir raw PCM (16-bit, 24kHz, mono) a WAV agregando header de 44 bytes
 function buildWavBuffer(pcmBuffer) {
@@ -32,13 +33,19 @@ export async function POST(request) {
     try {
         const body = await request.json();
         const { poiId, narrativeScript } = body;
+        const phaseId = body.phaseId ?? 'general';
+        const phase = educationPhase(phaseId);
+        if (!phase || typeof narrativeScript !== 'string' || narrativeScript.length > 10000 ||
+            typeof poiId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(poiId)) {
+            return NextResponse.json({ error: 'La versión o el guion no son válidos.' }, { status: 400 });
+        }
 
-        if (!poiId || !narrativeScript) {
+        if (!poiId || !narrativeScript.trim()) {
             return NextResponse.json({ error: 'poiId y narrativeScript son requeridos' }, { status: 400 });
         }
 
         const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
+        if (!apiKey) return NextResponse.json({ error: 'La generación de audio no está configurada en este entorno. Tu borrador se puede guardar sin audio.' }, { status: 503 });
 
         // endpoint estricto: gemini-3.1-flash-tts-preview
         const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${apiKey}`;
@@ -49,7 +56,7 @@ export async function POST(request) {
             body: JSON.stringify({
                 contents: [{
                     role: 'user',
-                    parts: [{ text: `INSTRUCCIÓN DE ACTUACIÓN: Eres una locutora amable y cálida. Lee el siguiente guion como si le narraras a niños y adolescentes: de forma ágil, dinámica, con calidez y a un ritmo ligeramente rápido y con pausas justas, pero totalmente fluido y entendible, manteniendo un tono amigable e ideal para un documental educativo.\n\nGUION:\n${narrativeScript}` }]
+                    parts: [{ text: `INSTRUCCIÓN DE ACTUACIÓN: Eres una locutora amable y cálida de una audioguía educativa. Público: ${phase.audience}. Lee exactamente el guion, sin agregar palabras. ${phaseId === 'phase_2' ? 'Ritmo pausado, frases claras y pausas naturales; sin infantilizar la voz.' : 'Ritmo natural, claro y documental; permite comprender los conceptos y no aceleres para alcanzar una duración fija.'}\n\nGUION:\n${narrativeScript}` }]
                 }],
                 generationConfig: {
                     responseModalities: ["AUDIO"],
@@ -90,7 +97,7 @@ export async function POST(request) {
         });
 
         const timestamp = Date.now();
-        const filePath = `narratives/${poiId}/audio_${timestamp}.wav`;
+        const filePath = `narratives/${poiId}/${phaseId}/audio_${timestamp}_${crypto.randomUUID()}.wav`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from('poi-narratives')

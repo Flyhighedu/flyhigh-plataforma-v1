@@ -177,6 +177,9 @@ async function researchWithGemini(name, type, context, lat, lon) {
     text = text.replace(/^["']+|["']+$/g, '').trim();
 
     validateResponse(text);
+    const sources = [...new Set((result.response.candidates?.[0]?.groundingMetadata?.groundingChunks || [])
+        .map(chunk => chunk.web?.uri).filter(uri => typeof uri === 'string' && /^https?:\/\//.test(uri)))];
+    if (sources.length) text += '\n\nFuentes de la búsqueda (verificar los datos en sus páginas):\n' + sources.map(uri => `- ${uri}`).join('\n');
     return { text, images: [] };
 }
 
@@ -358,6 +361,8 @@ export async function POST(request) {
         // Usar SOLO el motor seleccionado — sin fallback automático
         const engineId = (preferredEngine && ENGINE_FNS[preferredEngine]) ? preferredEngine : 'gemini';
         const fn = ENGINE_FNS[engineId];
+        const configured = { gemini: !!GEMINI_API_KEY, rag: !!TAVILY_API_KEY && !!GROQ_API_KEY, cohere: !!COHERE_API_KEY };
+        if (!configured[engineId]) return NextResponse.json({ error: 'Este motor de investigación no está configurado en este entorno. Puedes agregar información y fuentes manualmente.', allFailed: true }, { status: 503 });
 
         // Leer odómetro Tavily para incluirlo en la respuesta
         let tavilyUsage = null;

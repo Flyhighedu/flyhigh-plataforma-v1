@@ -76,6 +76,7 @@ async function ensureStack(onProgress = () => {}) {
   const file = path.join(root, '.env.review.local');
   const previous = readEnv(file);
   if (previous.NEXT_PUBLIC_ARCGIS_API_KEY) input.NEXT_PUBLIC_ARCGIS_API_KEY = previous.NEXT_PUBLIC_ARCGIS_API_KEY;
+  if (previous.GEMINI_API_KEY) input.GEMINI_API_KEY = previous.GEMINI_API_KEY;
   fs.writeFileSync(file, Object.entries(input).map(([key, value]) => `${key}=${value}`).join('\n') + '\n', { mode: 0o600 });
   return input;
 }
@@ -170,6 +171,7 @@ async function setup(onProgress) {
   const input = await ensureStack(onProgress);
   await require('./migrate-preparations.cjs').migratePreparations(input);
   await require('./migrate-school-locations.cjs').migrateSchoolLocations(input);
+  await require('./migrate-narration-phases.cjs').migrateNarrationPhases(input);
   const seeded = await seed(input, onProgress);
   await require('./seed-school-locations.cjs').seedSchoolLocations(input);
   return { backendOrigin: input.NEXT_PUBLIC_SUPABASE_URL, ...seeded };

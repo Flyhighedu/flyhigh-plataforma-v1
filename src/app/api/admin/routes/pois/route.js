@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { validateNarrativeVersions } from '@/lib/narrative-versions.mjs';
 
 function getAdminClient() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,6 +43,9 @@ export async function POST(request) {
     try {
         const supabase = getAdminClient();
         const body = await request.json();
+        if (body.narrative_versions !== undefined && !validateNarrativeVersions(body.narrative_versions)) {
+            return NextResponse.json({ error: 'Las versiones educativas no son válidas.' }, { status: 400 });
+        }
         
         const { route_id, name, description, image_url, sort_order,
             dato_clave_1, dato_clave_2, dato_clave_3,
@@ -87,6 +91,8 @@ export async function POST(request) {
         if (pregunta_estudio_3 !== undefined) insertPayload.pregunta_estudio_3 = pregunta_estudio_3;
         if (pregunta_interaccion !== undefined) insertPayload.pregunta_interaccion = pregunta_interaccion;
         if (ai_context !== undefined) insertPayload.ai_context = ai_context;
+        if (body.research_article !== undefined) insertPayload.research_article = body.research_article;
+        if (body.narrative_versions !== undefined) insertPayload.narrative_versions = body.narrative_versions;
         
         if (narrative_script !== undefined) insertPayload.narrative_script = narrative_script;
         if (audio_url !== undefined) insertPayload.audio_url = audio_url;
@@ -115,6 +121,9 @@ export async function PATCH(request) {
         const supabase = getAdminClient();
         const body = await request.json();
         const { id, ...updates } = body;
+        if (updates.narrative_versions !== undefined && !validateNarrativeVersions(updates.narrative_versions)) {
+            return NextResponse.json({ error: 'Las versiones educativas no son válidas.' }, { status: 400 });
+        }
 
         if (!id) {
             return NextResponse.json({ error: 'id es requerido' }, { status: 400 });
@@ -130,7 +139,7 @@ export async function PATCH(request) {
             'pregunta_estudio_1', 'pregunta_estudio_2', 'pregunta_estudio_3',
             'pregunta_interaccion', 'ai_context', 'sort_order',
             'narrative_script', 'audio_url', 'audio_duration_seconds', 'audio_generated_at',
-            'is_general_topic', 'trigger_keywords'
+            'is_general_topic', 'trigger_keywords', 'research_article', 'narrative_versions'
         ];
         const safeUpdates = {};
         for (const key of allowed) {

@@ -48,6 +48,7 @@ function autoCategory(desc) {
 function getStudyStatus(poi) {
     if (poi.audio_url) return { label: 'Con narración', icon: '🎙️', accent: 'bg-emerald-500/90 text-white border-emerald-400' };
     if (poi.narrative_script) return { label: 'Sin audio', icon: '📝', accent: 'bg-amber-500/90 text-white border-amber-400' };
+    if (Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim())) return { label: 'Por fases', icon: '📚', accent: 'bg-blue-500/90 text-white border-blue-400' };
     if (poi.dato_clave_1) return { label: 'Ficha clásica', icon: '📋', accent: 'bg-blue-500/90 text-white border-blue-400' };
     return { label: 'Sin contenido', icon: '⚪', accent: 'bg-slate-400/80 text-white border-slate-300' };
 }
@@ -936,6 +937,7 @@ export default function AcademiaLobbyPage() {
                                             <h3 className="font-black text-slate-800 text-[14px] leading-tight mb-2 line-clamp-2">
                                                 {poi.name}
                                             </h3>
+                                            {Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim()) && <p className="text-[11px] text-blue-700 mb-2">{Object.values(poi.narrative_versions).filter(version => version.narrative_script?.trim()).length}/5 fases con guion</p>}
                                             {voiceSimActive && poi.audio_url && (
                                                 <span className="text-[10px] font-bold text-indigo-500/70 bg-indigo-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-1">
                                                     🗣️ {normalizeCommand(poi.name).split(' ').join(', ')}
@@ -950,7 +952,7 @@ export default function AcademiaLobbyPage() {
                                                     </p>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                                                        ⚠️ Requiere Narrativa IA
+                                                        {Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim()) ? 'Consulta las versiones por fase' : 'Guion pendiente'}
                                                     </span>
                                                 )}
                                             </div>
@@ -1054,6 +1056,7 @@ export default function AcademiaLobbyPage() {
                             audio_duration_seconds: poiData.audio_duration_seconds || null,
                             audio_generated_at: poiData.audio_generated_at || null,
                             research_article: poiData.research_article || null,
+                            narrative_versions: poiData.narrative_versions || {},
                         };
 
                         if (!poiData.id) {
@@ -1077,11 +1080,10 @@ export default function AcademiaLobbyPage() {
                         setIsPoiModalOpen(false);
                     } catch (error) {
                         console.error('Error saving POI:', error);
-                        alert('Error guardando los datos. Intenta de nuevo.');
+                        throw new Error('No se guardaron los cambios. ' + (error.message || 'Intenta de nuevo.'));
                     }
                 }}
                 onDelete={selectedPoi?.is_official ? undefined : async (poiId) => {
-                    if (!confirm('¿Eliminar este punto de interés permanentemente?')) return;
                     try {
                         const supabase = createClient();
                         const { error } = await supabase.from('pilot_pois').delete().eq('id', poiId);
@@ -1090,7 +1092,7 @@ export default function AcademiaLobbyPage() {
                         setIsPoiModalOpen(false);
                     } catch (error) {
                         console.error('Error deleting POI:', error);
-                        alert('Error eliminando el punto. Intenta de nuevo.');
+                        throw new Error('No se pudo eliminar el punto. Intenta de nuevo.');
                     }
                 }}
             />

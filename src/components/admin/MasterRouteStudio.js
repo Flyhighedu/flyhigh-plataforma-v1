@@ -145,23 +145,23 @@ export default function MasterRouteStudio() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, ...updates })
             });
-            if (res.ok) {
-                const { poi } = await res.json();
-                setPois(prev => prev.map(p => p.id === id ? poi : p));
-                setEditingPoi(poi);
-            }
-        } catch (err) { console.error(err); }
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'No se guardaron los cambios.');
+            setPois(prev => prev.map(p => p.id === id ? data.poi : p));
+            setEditingPoi(data.poi);
+        }
         finally { setSaving(false); }
     };
 
     // ═══ DELETE POI ═══
-    const deletePoi = async (id) => {
-        if (!confirm('¿Eliminar este punto?')) return;
+    const deletePoi = async (id, confirmed = false) => {
+        if (!confirmed && !confirm('¿Eliminar este punto?')) return;
         try {
-            await fetch(`/api/admin/routes/pois?id=${id}`, { method: 'DELETE' });
+            const response = await fetch(`/api/admin/routes/pois?id=${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('No se pudo eliminar el punto. Intenta de nuevo.');
             setPois(prev => prev.filter(p => p.id !== id));
             if (editingPoi?.id === id) setEditingPoi(null);
-        } catch (err) { console.error(err); }
+        } catch (err) { if (confirmed) throw err; else alert(err.message); }
     };
 
     // ═══ AI FILL ═══
@@ -464,23 +464,19 @@ export default function MasterRouteStudio() {
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ route_id: activeRoute.id, ...poiData })
                                             });
-                                            if (res.ok) {
-                                                const { poi } = await res.json();
-                                                setPois(prev => [...prev, poi]);
-                                                setEditingPoi(null);
-                                                setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
-                                            }
-                                        } catch (err) { console.error(err); }
+                                            const data = await res.json();
+                                            if (!res.ok) throw new Error(data.error || 'No se pudo guardar el punto.');
+                                            setPois(prev => [...prev, data.poi]);
+                                            setEditingPoi(null);
+                                            setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
+                                        }
                                         finally { setSaving(false); }
                                     }
                                     setEditingPoi(null);
                                     setSaveSuccess(true);
                                     setTimeout(() => setSaveSuccess(false), 3000);
                                 }}
-                                onDelete={(id) => {
-                                    deletePoi(id);
-                                    setEditingPoi(null);
-                                }}
+                                onDelete={id => deletePoi(id, true)}
                                 isNewPin={!editingPoi.dato_clave_1}
                                 geoContext={activeRoute.name}
                                 isGeneralTopic={editingPoi?.is_general_topic || false}
@@ -626,9 +622,10 @@ export default function MasterRouteStudio() {
                                         
                                         {/* Content */}
                                         <div className="p-5 bg-white flex-1 flex flex-col">
+                                            {Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim()) && <p className="text-xs text-blue-700 mb-3">{Object.values(poi.narrative_versions).filter(version => version.narrative_script?.trim()).length}/5 fases con guion</p>}
                                             <div className="flex items-center justify-between mb-3">
                                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${hasNarrative ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {hasNarrative ? 'Narrativa Lista' : 'Sin Guion'}
+                                                    {hasNarrative ? 'General con audio' : poi.narrative_script ? 'General sin audio' : 'General pendiente'}
                                                 </span>
                                                 <span className="text-[10px] font-medium text-slate-400 font-mono">
                                                     {isGeneral ? 'Sin ubicación' : `${poi.latitude?.toFixed(4) ?? poi.lat?.toFixed(4) ?? '—'}, ${poi.longitude?.toFixed(4) ?? poi.lng?.toFixed(4) ?? '—'}`}

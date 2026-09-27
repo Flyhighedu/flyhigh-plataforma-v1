@@ -48,6 +48,11 @@ test('review environment only forwards the optional public map credential', () =
   assert.equal(env.NEXT_PUBLIC_ARCGIS_API_KEY, 'review-map-key');
   assert.equal(env.SECRET_TOKEN, undefined);
 });
+
+test('Gemini is forwarded only when explicitly configured for the laboratory', () => {
+  assert.equal(cleanEnvironment(__dirname, config, { GEMINI_API_KEY: 'production' }).GEMINI_API_KEY, undefined);
+  assert.equal(cleanEnvironment(__dirname, { ...config, GEMINI_API_KEY: 'lab-only' }, { GEMINI_API_KEY: 'production' }).GEMINI_API_KEY, 'lab-only');
+});
 test('mobile review chooses a real private LAN adapter before virtual networks', () => {
   const addresses = lanAddresses({
     'vEthernet (WSL)': [{ address: '172.28.0.1', family: 'IPv4', internal: false }],

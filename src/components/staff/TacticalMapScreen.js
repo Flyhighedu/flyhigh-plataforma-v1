@@ -92,7 +92,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             if (cached) {
                 const { data: cachedPois, ts } = JSON.parse(cached);
                 if (cachedPois?.length > 0 && Date.now() - ts < 300000) { // 5 min TTL
-                    setPois(cachedPois);
+                    setPois(cachedPois.map(point => ({ ...point, _cachedSummary: true })));
                     setLoading(false); // Render map immediately with cached data
                 }
             }
@@ -105,7 +105,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 // Phase 3: Slim select — only fields needed for map pins + modal basics
                 const [personalResult, officialResult] = await Promise.all([
                     supabase.from('pilot_pois')
-                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
+                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, narrative_versions, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
                         .eq('user_id', userId).order('created_at', { ascending: false }),
                     fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] }))
                 ]);
@@ -144,9 +144,24 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     }, []);
 
     // ═══ TRIGGER: Tap on saved POI marker ═══
-    const handleMarkerClick = useCallback((poi) => {
-        setModalPoi(poi);
-        setIsNewPin(false);
+    const handleMarkerClick = useCallback(async (poi) => {
+        try {
+            let fullPoi = poi;
+            if (poi._cachedSummary) {
+                if (poi.is_official) {
+                    const response = await fetch('/api/official-pois');
+                    if (!response.ok) throw new Error('No se pudo cargar el punto completo.');
+                    fullPoi = (await response.json()).pois.find(item => item.id === poi.id);
+                } else {
+                    const { data, error } = await createClient().from('pilot_pois').select('*').eq('id', poi.id).single();
+                    if (error) throw error;
+                    fullPoi = data;
+                }
+                if (!fullPoi) throw new Error('Este punto ya no está disponible.');
+            }
+            setModalPoi(fullPoi);
+            setIsNewPin(false);
+        } catch (error) { alert('No se abrió el editor. ' + error.message); }
     }, []);
 
     // ═══ TRIGGER: Tap on suggested POI marker ═══
@@ -479,6 +494,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 is_general_topic: poiData.is_general_topic || false,
                 trigger_keywords: poiData.trigger_keywords || null,
                 research_article: poiData.research_article || null,
+                narrative_versions: poiData.narrative_versions || {},
                 narrative_script: poiData.narrative_script || null,
                 audio_url: poiData.audio_url || null,
                 audio_duration_seconds: poiData.audio_duration_seconds || null,
@@ -523,12 +539,11 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             setModalPoi(null);
         } catch (err) {
             console.error('POI save error:', err);
-            alert('Error al guardar: ' + (err.message || 'Intenta de nuevo'));
+            throw new Error('No se guardaron los cambios. ' + (err.message || 'Intenta de nuevo.'));
         } finally { setIsSaving(false); }
     }, [userId, isSaving]);
 
     const handleDelete = useCallback(async (poiId) => {
-        if (!confirm('¿Eliminar este punto de interés?')) return;
         setIsSaving(true);
         try {
             const supabase = createClient();
@@ -538,7 +553,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             setModalPoi(null);
         } catch (err) {
             console.error('POI delete error:', err);
-            alert('Error al eliminar.');
+            throw new Error('No se pudo eliminar el punto. Intenta de nuevo.');
         } finally { setIsSaving(false); }
     }, [userId]);
 
