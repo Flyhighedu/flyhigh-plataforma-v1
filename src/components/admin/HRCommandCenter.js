@@ -370,7 +370,7 @@ export default function HRCommandCenter({ externalView }) {
                             : 'text-slate-400 dark:text-slate-500 hover:text-slate-600'
                         }`}
                     >
-                        <GraduationCap size={16} strokeWidth={2.5} /> Academia
+                        <GraduationCap size={16} strokeWidth={2.5} /> Capacitación
                     </button>
                 </div>
             </div>

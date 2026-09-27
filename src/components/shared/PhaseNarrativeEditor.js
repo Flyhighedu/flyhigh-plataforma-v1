@@ -32,13 +32,13 @@ async function post(url, body, signal) {
 
 // Both entry points use this editor. The general narration remains in legacy
 // fields; switching an educational phase never changes playback in operations.
-export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, readOnly = false, embedded = false, isGeneralTopic = false, geoContext = '' }) {
+export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, readOnly = false, embedded = false, isGeneralTopic = false, geoContext = '', closeLabel = 'Volver al mapa' }) {
     const uid = useId();
     const [title, setTitle] = useState(poi.name || '');
     const [research, setResearch] = useState(poi.research_article || '');
     const [researchDraft, setResearchDraft] = useState(() => researchDocument(poi.research_article || '').text);
     const [versions, setVersions] = useState(() => readNarrations(poi));
-    const [phaseId, setPhaseId] = useState(() => readOnly && poi.narrative_script ? 'general' : (pendingReviews(readNarrations(poi))[0]?.id || NARRATION_PHASES.find(item => hasScript(readNarrations(poi)[item.id]))?.id || 'phase_2'));
+    const [phaseId, setPhaseId] = useState(() => readOnly && poi._initialPhase ? poi._initialPhase : readOnly && poi.narrative_script ? 'general' : (pendingReviews(readNarrations(poi))[0]?.id || NARRATION_PHASES.find(item => hasScript(readNarrations(poi)[item.id]))?.id || 'phase_2'));
     const [step, setStep] = useState(() => initialNarrationStep(poi, readNarrations(poi)));
     const [stepDirection, setStepDirection] = useState(1);
     const [editingResearch, setEditingResearch] = useState(false);
@@ -391,7 +391,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
         <footer className={styles.footer}>
             {confirmClose ? <div className={styles.confirm} role="alert"><p>{busy ? 'Al salir se cancelará la tarea y perderás los cambios sin guardar.' : 'Tienes cambios o una propuesta sin guardar.'}</p><div className={styles.actions}><button type="button" onClick={() => setConfirmClose(false)}>Seguir editando</button><button type="button" className={styles.danger} disabled={committing} onClick={() => { for (const controller of requests.current) controller.abort(); closeEditor(); }}>Salir sin guardar</button></div></div>
                 : confirmDelete ? <div className={styles.confirm} role="alert"><p>Se eliminará el punto con todas sus versiones.</p><div className={styles.actions}><button type="button" disabled={!!busy} onClick={() => setConfirmDelete(false)}>Conservar</button><button type="button" disabled={!!busy} className={styles.danger} onClick={() => run('delete', async () => { await onDelete(poi.id); })}>Eliminar punto</button></div></div>
-                : saved ? <button type="button" className={styles.primary} onClick={closeEditor}>Volver al mapa</button> : readOnly ? <button type="button" className={styles.primary} onClick={closeEditor}>Cerrar</button> : generating ? <div className={styles.generatingFooter}><span>Tu trabajo terminado se conserva en este borrador.</span><button type="button" onClick={stopGeneration}>Detener</button></div> : <>
+                : saved ? <button type="button" className={styles.primary} onClick={closeEditor}>{closeLabel}</button> : readOnly ? <button type="button" className={styles.primary} onClick={closeEditor}>Cerrar</button> : generating ? <div className={styles.generatingFooter}><span>Tu trabajo terminado se conserva en este borrador.</span><button type="button" onClick={stopGeneration}>Detener</button></div> : <>
                     <div className={styles.footerMain}><button type="button" className={styles.textButton} disabled={!!busy || !!proposal || title.trim().length < 2} onClick={save}>Guardar borrador</button><button type="button" className={styles.primary} disabled={primaryDisabled} onClick={primaryAction}>{busy ? <Loader2 size={18} className={styles.spin} /> : <ArrowRight size={18} />}{busy ? busyLabel : primaryLabel}</button></div>
                     {step === 2 && !missing.length && !!unreviewed.length && !proposal && <small>Al confirmar, marcas las cinco versiones como revisadas.</small>}{proposal && <small>Usa la propuesta o conserva el guion anterior para continuar.</small>}
                 </>}

@@ -92,7 +92,7 @@ const userIcon = L.divIcon({
 });
 
 export default function TacticalMapLeaflet({
-    pois = [], suggestedPois = [], userLocation,
+    pois = [], suggestedPois = [], userLocation, mapCenter,
     onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap
 }) {
     const containerRef = useRef(null);
@@ -112,11 +112,15 @@ export default function TacticalMapLeaflet({
     // Keep ref in sync so the map.on('click') closure always has the latest callback
     useEffect(() => { onMapTapRef.current = onMapTap; }, [onMapTap]);
 
+    useEffect(() => {
+        if (mapRef.current && mapCenter) mapRef.current.flyTo([mapCenter.lat, mapCenter.lng], mapCenter.zoom || 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .4 });
+    }, [mapCenter]);
+
     // Initialize map once
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        const center = userLocation ? [userLocation.lat, userLocation.lng] : [19.4326, -99.1332];
+        const center = mapCenter ? [mapCenter.lat, mapCenter.lng] : userLocation ? [userLocation.lat, userLocation.lng] : [19.4326, -99.1332];
         const map = L.map(containerRef.current, {
             center, zoom: 14, zoomControl: false,
             attributionControl: false
@@ -244,10 +248,10 @@ export default function TacticalMapLeaflet({
 
         if (userMarkerRef.current) {
             userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
-            map.flyTo([userLocation.lat, userLocation.lng], map.getZoom(), { animate: true, duration: 0.5 });
+            map.flyTo([userLocation.lat, userLocation.lng], map.getZoom(), { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: 0.5 });
         } else {
             userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, interactive: false }).addTo(map);
-            map.flyTo([userLocation.lat, userLocation.lng], 14, { animate: true, duration: 0.5 });
+            map.flyTo([userLocation.lat, userLocation.lng], 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: 0.5 });
         }
     }, [userLocation]);
 

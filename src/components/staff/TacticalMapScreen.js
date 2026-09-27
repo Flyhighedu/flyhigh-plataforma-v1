@@ -9,6 +9,9 @@ import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
 import { narrationReadiness } from '@/lib/narration-workflow.mjs';
 import { readNarrations } from '@/lib/narrative-versions.mjs';
 import POIDetailModal from './POIDetailModal';
+import MapPlacePreview from '@/components/shared/MapPlacePreview';
+import { findExistingPlace } from '@/lib/narration-catalog.mjs';
+import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import useNativePOITap from '@/hooks/useNativePOITap';
 
 // Leaflet must be loaded client-side only (no SSR)
@@ -42,10 +45,13 @@ const PremiumRadarIcon = () => (
     </div>
 );
 
-export default function TacticalMapScreen({ userId, profile, onClose = null }) {
+export default function TacticalMapScreen({ userId, profile, onClose = null, embedded = false, onContentChange }) {
     const router = useRouter();
     const handleBack = onClose || (() => router.back());
     const [pois, setPois] = useState([]);
+    const [loadError, setLoadError] = useState('');
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const [mapCenter, setMapCenter] = useState(null);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('map'); // 'map' | 'list'
     const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
@@ -62,7 +68,8 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
 
 
     // ═══ UNIFIED MODAL STATE ═══
-    const [modalPoi, setModalPoi] = useState(null);    // null = closed
+    const [modalPoi, setModalPoi] = useState(null);
+    const [candidate, setCandidate] = useState(null);    // null = closed
     const [isNewPin, setIsNewPin] = useState(false);
 
     // ═══ RADAR V2 STATE ═══
@@ -83,7 +90,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             }, 2500);
         }
         return () => clearInterval(interval);
-    }, [isSearchingCulturalPois]);
+    }, [isSearchingCulturalPois, radarTexts.length]);
 
     // Load POIs — Cache-first + parallel fetch for instant pin rendering
     useEffect(() => {
@@ -110,9 +117,11 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                     supabase.from('pilot_pois')
                         .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, narrative_versions, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
                         .eq('user_id', userId).order('created_at', { ascending: false }),
-                    fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] }))
+                    fetch('/api/official-pois').then(r => { if (!r.ok) throw new Error('No se pudieron cargar los puntos oficiales.'); return r.json(); })
                 ]);
 
+                if (personalResult.error) throw personalResult.error;
+                setLoadError('');
                 const personalPois = personalResult.data || [];
                 const officialPois = officialResult.pois || [];
                 const allPois = [...officialPois, ...personalPois];
@@ -130,21 +139,24 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                     }));
                     localStorage.setItem('flyhigh_pois_cache', JSON.stringify({ data: slimForCache, ts: Date.now() }));
                 } catch (_) { /* quota exceeded, ignore */ }
-            } catch (err) { console.warn('POI load error:', err); }
+            } catch (err) { setLoadError(err.message || 'No se pudieron cargar los puntos.'); }
             finally { setLoading(false); }
         };
         load();
-    }, [userId]);
+    }, [userId, loadAttempt]);
 
-    // GPS
     useEffect(() => {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(
-            (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => setUserLocation({ lat: 19.4326, lng: -99.1332 }), // Mexico City fallback
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+        try { const saved = JSON.parse(localStorage.getItem('flyhigh_narration_map_zone')); if (Number.isFinite(saved?.lat) && Number.isFinite(saved?.lng)) setMapCenter(saved); } catch { /* first visit */ }
     }, []);
+    const locate = () => {
+        if (!navigator.geolocation) { setLoadError('Este navegador no ofrece ubicación. Busca una ciudad.'); return; }
+        navigator.geolocation.getCurrentPosition(pos => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLoadError(''); }, () => setLoadError('No pudimos obtener tu ubicación. Puedes buscar una ciudad.'), { timeout: 10000 });
+    };
+    const rememberBounds = bounds => {
+        setMapBounds(bounds);
+        if (!bounds.isValid()) return;
+        try { localStorage.setItem('flyhigh_narration_map_zone', JSON.stringify({ lat: bounds.getCenter().lat, lng: bounds.getCenter().lng })); } catch { /* storage unavailable */ }
+    };
 
     // ═══ TRIGGER: Tap on saved POI marker ═══
     const handleMarkerClick = useCallback(async (poi) => {
@@ -169,7 +181,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
 
     // ═══ TRIGGER: Tap on suggested POI marker ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
-        setModalPoi({
+        setCandidate({
             _origin: poi._origin,
             name: poi.name,
             description: poi.description,
@@ -254,7 +266,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     // ═══ TRIGGER: Tap on base map (Tap-to-Discover native OSM POIs) ═══
     const { handleMapTap, isDiscovering } = useNativePOITap({
         onPOIFound: useCallback((poi) => {
-            setModalPoi({
+            setCandidate({
                 _origin: poi._origin,
                 latitude: poi.latitude,
                 longitude: poi.longitude,
@@ -546,8 +558,8 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
         } catch (err) {
             console.error('POI save error:', err);
             throw new Error('No se guardaron los cambios. ' + (err.message || 'Intenta de nuevo.'));
-        } finally { setIsSaving(false); }
-    }, [userId, isSaving]);
+        } finally { setIsSaving(false); onContentChange?.(); }
+    }, [userId, isSaving, onContentChange]);
 
     const handleDelete = useCallback(async (poiId) => {
         setIsSaving(true);
@@ -556,19 +568,20 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             const { error } = await supabase.from('pilot_pois').delete().eq('id', poiId).eq('user_id', userId);
             if (error) throw error;
             setPois(prev => prev.filter(p => p.id !== poiId));
+            onContentChange?.();
             setModalPoi(null);
         } catch (err) {
             console.error('POI delete error:', err);
             throw new Error('No se pudo eliminar el punto. Intenta de nuevo.');
         } finally { setIsSaving(false); }
-    }, [userId]);
+    }, [userId, onContentChange]);
 
     if (loading) {
         return (
             <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
                 <div style={{ textAlign: 'center' }}>
                     <Loader2 size={32} style={{ color: '#06B6D4', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
-                    <p style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Cargando mapa táctico...</p>
+                    <p style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>Cargando lugares…</p>
                 </div>
             </div>
         );
@@ -576,13 +589,13 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
 
     return (
         <div style={{
-            ...(onClose
+            ...(embedded ? { height: '100%', display: 'flex', flexDirection: 'column', background: '#F3F6FB' } : onClose
                 ? { position: 'fixed', inset: 0, zIndex: 9997, display: 'flex', flexDirection: 'column', background: '#F8FAFC' }
                 : { minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#F8FAFC' }
             )
         }}>
             {/* Header */}
-            <div style={{
+            {!embedded && <div style={{
                 background: '#FFFFFF',
                 padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 borderBottom: '1px solid #E2E8F0', zIndex: 50, position: 'relative',
@@ -598,7 +611,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                     </button>
                     <div>
                         <p style={{ fontSize: 10, fontWeight: 800, color: '#06B6D4', textTransform: 'uppercase', letterSpacing: '0.14em', margin: 0 }}>
-                            Mapeo Táctico
+                            Explorar lugares
                         </p>
                         <p style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', margin: 0 }}>
                             {pois.length} punto{pois.length !== 1 ? 's' : ''} guardado{pois.length !== 1 ? 's' : ''}
@@ -629,8 +642,11 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                         <List size={14} /> Lista
                     </button>
                 </div>
-            </div>
+            </div>}
 
+            <NarrationMapSearch onSelect={setMapCenter} onLocate={locate}/>
+            {loadError && <div role="alert" className="mx-4 mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{loadError}<button onClick={() => setLoadAttempt(value => value + 1)} className="ml-3 min-h-11 font-bold">Reintentar</button></div>}
+            {view === 'map' && <div className="flex flex-wrap gap-4 px-4 pb-2 text-xs text-slate-500" aria-label="Tipos de puntos"><span>✓ Oficiales</span><span>📍 Personales</span><span>★ Por descubrir</span></div>}
             {/* Filter Chips (visible in list view) */}
             {view === 'list' && (
                 <div style={{ display: 'flex', gap: 8, padding: '12px 16px 0', background: '#F8FAFC' }}>
@@ -658,8 +674,9 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                         pois={pois}
                         suggestedPois={suggestedPois}
                         userLocation={userLocation}
+                        mapCenter={mapCenter}
                         onMarkerClick={handleMarkerClick}
-                        onBoundsChange={setMapBounds}
+                        onBoundsChange={rememberBounds}
                         onSuggestedPoiClick={handleSuggestedPoiClick}
                         onLongPress={handleLongPress}
                         onMapTap={handleMapTap}
@@ -693,7 +710,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                             style={{
                                 position: 'relative',
                                 height: 56, 
-                                width: isSearchingCulturalPois ? 260 : 56, 
+                                width: isSearchingCulturalPois ? 260 : 196,
                                 borderRadius: 28,
                                 background: isSearchingCulturalPois ? '#2563EB' : (suggestedPois.length > 0 ? '#F59E0B' : '#FFFFFF'),
                                 border: 'none', 
@@ -715,7 +732,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                                     </span>
                                 </>
                             ) : (
-                                <Landmark size={24} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                <><Landmark size={20} strokeWidth={2.5} style={{ flexShrink: 0 }} /><span style={{ fontSize: 13, fontWeight: 700 }}>Buscar en esta zona</span></>
                             )}
                         </button>
                     </div>
@@ -885,6 +902,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
             )}
 
             {/* ═══ UNIFIED POI MODAL ═══ */}
+            {candidate && <MapPlacePreview poi={candidate} existing={findExistingPlace(pois, candidate)} onClose={() => setCandidate(null)} onContinue={existing => { const next = existing || candidate; setCandidate(null); if (existing) handleMarkerClick(next); else { setModalPoi(next); setIsNewPin(true); } }}/>}
             <POIDetailModal
                 isOpen={!!modalPoi}
                 onClose={() => setModalPoi(null)}

@@ -235,6 +235,7 @@ export default function PilotHomeLobby({
                 <p className="px-3 pt-1 text-center text-[11px] font-medium leading-relaxed text-slate-400">
                     Narraciones permanece disponible aunque otras tareas de la jornada sigan pendientes.
                 </p>
+                <Link href="/staff/capacitacion" className="flex min-h-14 items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-600">Capacitación FlyHigh<ChevronRight size={17}/></Link>
             </div>
         </main>
     );

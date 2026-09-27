@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import useNativePOITap from '@/hooks/useNativePOITap';
 import {
@@ -15,36 +15,16 @@ const MapWithNoSSR = dynamic(() => import('../staff/TacticalMapLeaflet'), { ssr:
     </div>
 )});
 
-import { narrationReadiness } from '@/lib/narration-workflow.mjs';
-import { readNarrations } from '@/lib/narrative-versions.mjs';
-import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
+import NarrationCatalog from '@/components/shared/NarrationCatalog';
+import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
+import MapPlacePreview from '@/components/shared/MapPlacePreview';
+import { findExistingPlace } from '@/lib/narration-catalog.mjs';
+import CreateNarrationDialog from '@/components/shared/CreateNarrationDialog';
+import { motion, useReducedMotion } from 'framer-motion';
+import libraryStyles from '@/components/shared/NarrationLibrary.module.css';
 import AdminPOIModal from './AdminPOIModal';
-import VoiceSimulatorWidget from '../staff/VoiceSimulatorWidget';
 
 
-// ═══ Auto-emoji by name ═══
-function autoEmoji(name) {
-    if (!name) return '📍';
-    const n = name.toLowerCase();
-    if (/museo/i.test(n)) return '🏛️';
-    if (/templo|iglesia|capilla/i.test(n)) return '⛪';
-    if (/río|lago|cascada|agua/i.test(n)) return '💧';
-    if (/parque|bosque|reserva/i.test(n)) return '🌿';
-    if (/cerro|volcán|montaña/i.test(n)) return '⛰️';
-    if (/universidad|biblioteca|escuela/i.test(n)) return '📚';
-    if (/aeropuerto/i.test(n)) return '✈️';
-    if (/estadio|deportiv/i.test(n)) return '⚽';
-    if (/monument|históric/i.test(n)) return '🏺';
-    if (/mirador/i.test(n)) return '👁️';
-    if (/zoológico|acuario/i.test(n)) return '🐾';
-    return '📍';
-}
-
-const STATUS_CFG = {
-    draft: { label: 'Borrador', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', icon: Edit3 },
-    published: { label: 'Publicada', color: '#10b981', bg: 'rgba(16,185,129,0.1)', icon: Globe },
-    archived: { label: 'Archivada', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: Archive },
-};
 
 export default function MasterRouteStudio() {
     const [routes, setRoutes] = useState([]);
@@ -59,12 +39,11 @@ export default function MasterRouteStudio() {
     const [creating, setCreating] = useState(false);
     const [expandedContext, setExpandedContext] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
-    const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
-
-    // ═══ VOICE SIMULATOR STATE ═══
-    const [isCopilotActive, setIsCopilotActive] = useState(false);
-    const [playingPoiId, setPlayingPoiId] = useState(null);
-    const audioRef = useRef(null);
+    const [studioTab, setStudioTab] = useState('library');
+    const [createOpen, setCreateOpen] = useState(false);
+    const [mapCenter, setMapCenter] = useState(null);
+    const reducedMotion = useReducedMotion();
+    const openOfficial = poi => { setEditingPoi(poi); setStudioTab('explore'); };
 
     // ═══ MAP STATE ═══
     const [searchError, setSearchError] = useState('');
@@ -74,20 +53,7 @@ export default function MasterRouteStudio() {
     const [isAwaitingSelection, setIsAwaitingSelection] = useState(false);
     const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
-    const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(false);
-
-    // Auto-locate on mount
-    useEffect(() => {
-        if (typeof window !== 'undefined' && !localStorage.getItem('studio_onboarded_v1')) {
-            setShowWelcomeOverlay(true);
-        }
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.warn('GPS location failed on mount:', err)
-            );
-        }
-    }, []);
+    const [candidate, setCandidate] = useState(null);
 
     // ═══ INIT GLOBAL ROUTE ═══
     const initGlobalRoute = useCallback(async () => {
@@ -232,8 +198,8 @@ export default function MasterRouteStudio() {
     // ═══ MAP: TAP-TO-DISCOVER (Native OSM POIs) ═══
     const { handleMapTap, isDiscovering } = useNativePOITap({
         onPOIFound: useCallback((poi) => {
-            addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description, poi._origin);
-        }, [addPoiFromMap]),
+            setCandidate(poi);
+        }, []),
         enabled: !!activeRoute
     });
 
@@ -341,8 +307,8 @@ export default function MasterRouteStudio() {
     // ═══ MAP: CLICK SUGGESTED POI → ADD TO ROUTE ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
         if (!activeRoute) return;
-        addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description || '', poi._origin);
-    }, [activeRoute, addPoiFromMap]);
+        setCandidate(poi);
+    }, [activeRoute]);
 
     // ═══ MAP: CLICK SAVED POI MARKER ═══
     const handleMarkerClick = useCallback((poi) => {
@@ -360,19 +326,23 @@ export default function MasterRouteStudio() {
 
     return (
         <div className="w-full">
+            <header className={libraryStyles.header} style={{ padding: '20px 20px 0', borderRadius: '22px 22px 0 0', marginBottom: 20 }}><div className={libraryStyles.headerRow}><h1>Narraciones oficiales</h1><button disabled={!activeRoute || !!editingPoi || saving} onClick={() => setCreateOpen(true)}><Plus size={18}/>Crear narración</button></div><div className={libraryStyles.tabs} aria-label="Vistas de narraciones">{[['library','Biblioteca'],['explore','Explorar']].map(([value,label]) => <button key={value} disabled={!!editingPoi || saving} aria-pressed={studioTab === value} onClick={() => setStudioTab(value)}>{studioTab === value && <motion.i className={libraryStyles.activeTab} layoutId="official-library-tab" transition={{ duration: reducedMotion ? 0 : .24 }}/>}<span style={{ color: studioTab === value ? '#173b77' : 'white' }}>{label}</span></button>)}</div></header>
+            {createOpen && <CreateNarrationDialog onClose={() => setCreateOpen(false)} onPlace={() => { setCreateOpen(false); setStudioTab('explore'); addPoi(); }} onTopic={() => { setCreateOpen(false); openOfficial({ id: 'temp-' + Date.now(), name: '', is_general_topic: true }); }}/>}
             {searchError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950"><span className="flex-1">{searchError}</span><button type="button" disabled={isSearchingPois} onClick={handleSearchCulturalPois} className="min-h-11 px-3 font-semibold">Reintentar</button><button type="button" onClick={() => { setSearchError(''); setIsAwaitingSelection(true); }} className="min-h-11 px-3 font-semibold">Elegir punto en el mapa</button></div>}
             {/* ── MAIN SPLIT LAYOUT ── */}
             {activeRoute && (
                 <>
-                <div className="flex flex-col lg:flex-row gap-6 overflow-hidden">
+                <div style={{ display: studioTab === 'explore' ? undefined : 'none' }} className="flex flex-col lg:flex-row gap-6 overflow-hidden">
                     {/* ═══ LEFT: Map Info ═══ */}
                     <div className={`relative flex flex-col transition-all duration-500 ease-in-out ${editingPoi?.is_general_topic ? 'w-0 opacity-0 overflow-hidden' : 'flex-1 opacity-100'}`}>
                         {/* ═══ INTERACTIVE MAP ═══ */}
+                        <NarrationMapSearch onSelect={setMapCenter} onLocate={() => { if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }), () => setSearchError('No se pudo obtener tu ubicación. Busca una ciudad.')); }}/>
                         <div className="neu-card overflow-hidden mb-4" style={{ height: 'calc(100vh - 140px)', minHeight: 500, position: 'relative' }}>
                             <MapWithNoSSR
                                 pois={pois.filter(p => (p.latitude || p.lat) && (p.longitude || p.lng)).map(p => ({ ...p, latitude: p.latitude || p.lat, longitude: p.longitude || p.lng, is_official: true }))}
                                 suggestedPois={suggestedPois}
-                                userLocation={userLocation || { lat: 19.4326, lng: -99.1332 }}
+                                userLocation={userLocation}
+                                mapCenter={mapCenter}
                                 onMarkerClick={handleMarkerClick}
                                 onBoundsChange={setMapBounds}
                                 onSuggestedPoiClick={handleSuggestedPoiClick}
@@ -416,7 +386,7 @@ export default function MasterRouteStudio() {
                         </div>
                     </div>
 
-                    {/* ═══ RIGHT: GAMIFIED SIDEBAR FORM ═══ */}
+                    {/* Selected place and narration editor */}
                     <div className={`transition-all duration-500 ease-in-out flex flex-col bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden ${editingPoi?.is_general_topic ? 'w-full max-w-5xl mx-auto' : 'w-full lg:w-[450px] shrink-0'}`} style={{ height: 'calc(100vh - 140px)' }}>
                         {editingPoi ? (
                             <AdminPOIModal
@@ -529,183 +499,18 @@ export default function MasterRouteStudio() {
                 </div>
 
                 {/* ═══ BOTTOM: GRID DE PUNTOS OFICIALES GUARDADOS ═══ */}
-                <div className="mt-8 w-full">
+                <div hidden={studioTab !== 'library'} className="mt-8 w-full">
                     <div className="flex items-center gap-2 mb-4 px-2 flex-wrap">
                         <Crown size={24} className="text-blue-600" />
-                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Directorio de Narrativas</h3>
+                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Narraciones oficiales</h3>
                         <span className="bg-slate-200 text-slate-600 text-sm font-bold px-3 py-1 rounded-full">{pois.length}</span>
                     </div>
-                    {/* Filter Chips */}
-                    <div className="flex gap-2 mb-6 px-2">
-                        {[{ key: 'all', label: '🏷️ Todos', count: pois.length },
-                          { key: 'map', label: '📍 En Mapa', count: pois.filter(p => p.lat != null || p.latitude != null).length },
-                          { key: 'general', label: '💡 Temas', count: pois.filter(p => p.is_general_topic || (p.lat == null && p.latitude == null)).length }
-                        ].map(f => (
-                            <button key={f.key} onClick={() => setPoiFilter(f.key)}
-                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
-                                    poiFilter === f.key
-                                        ? 'bg-slate-800 text-white border-slate-800 shadow-md'
-                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-                                }`}
-                            >
-                                {f.label} ({f.count})
-                            </button>
-                        ))}
-                    </div>
-
-                    {pois.length === 0 ? (
-                        <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
-                            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
-                                <Archive size={28} />
-                            </div>
-                            <p className="text-slate-500 font-medium">Aún no hay puntos oficiales registrados.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-2">
-                            {pois.filter(poi => {
-                                if (poiFilter === 'map') return (poi.lat != null || poi.latitude != null) && !poi.is_general_topic;
-                                if (poiFilter === 'general') return poi.is_general_topic || (poi.lat == null && poi.latitude == null);
-                                return true;
-                            }).map((poi) => {
-                                const hasNarrative = poi.narrative_script && poi.audio_url;
-                                const readiness = narrationReadiness(readNarrations(poi));
-                                const isGeneral = poi.is_general_topic || (poi.lat == null && poi.latitude == null);
-                                return (
-                                    <div key={poi.id} onClick={event => setEditingPoi({ ...poi, _origin: narrationOrigin(event.currentTarget) })} className="neu-card cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl group flex flex-col" style={{ overflow: 'hidden', padding: 0 }}>
-                                        {/* Header / Cover */}
-                                        <div style={{ height: 140, background: poi.image_url ? `url(${poi.image_url}) center/cover` : (isGeneral ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #2563EB, #1D4ED8)'), position: 'relative' }}>
-                                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.1) 100%)' }} />
-                                            <div style={{ position: 'absolute', bottom: 12, left: 16, right: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <span className="text-4xl drop-shadow-lg group-hover:scale-110 transition-transform">{isGeneral ? '💡' : autoEmoji(poi.name)}</span>
-                                                <div className="min-w-0 flex-1">
-                                                    <h4 className="text-white font-black text-lg truncate drop-shadow-md leading-tight">{poi.name}</h4>
-                                                    <div className={`inline-block mt-1 rounded-md px-2 py-0.5 text-[9px] font-black text-white tracking-widest uppercase shadow-md border ${isGeneral ? 'bg-amber-600 border-amber-500/50' : 'bg-blue-600 border-blue-500/50'}`}>
-                                                        {isGeneral ? 'Tema General' : 'Oficial'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <button onClick={e => { e.stopPropagation(); deletePoi(poi.id); }} className="absolute top-3 right-3 p-2.5 rounded-full bg-white/10 backdrop-blur-md text-white hover:bg-red-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-
-                                        {/* Content */}
-                                        <div className="p-5 bg-white flex-1 flex flex-col">
-                                            <p className={`mb-3 text-xs font-semibold ${readiness.ready ? 'text-emerald-800' : 'text-amber-800'}`}>{readiness.label}</p>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${hasNarrative ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {hasNarrative ? 'General con audio' : poi.narrative_script ? 'General sin audio' : 'Versiones por nivel'}
-                                                </span>
-                                                <span className="text-[10px] font-medium text-slate-400 font-mono">
-                                                    {isGeneral ? 'Sin ubicación' : `${poi.latitude?.toFixed(4) ?? poi.lat?.toFixed(4) ?? '—'}, ${poi.longitude?.toFixed(4) ?? poi.lng?.toFixed(4) ?? '—'}`}
-                                                </span>
-                                            </div>
-
-                                            {hasNarrative ? (
-                                                <div className="flex-1 flex flex-col gap-3 mt-1">
-                                                    <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed italic border-l-2 border-purple-200 pl-2">
-                                                        &quot;{poi.narrative_script}&quot;
-                                                    </p>
-                                                    <div className="mt-auto bg-slate-50 rounded-lg p-2 flex items-center gap-2 border border-slate-100" onClick={e => e.stopPropagation()}>
-                                                        <Volume2 size={14} className="text-slate-400" />
-                                                        <audio controls src={poi.audio_url} style={{ height: 24, width: '100%' }} className="opacity-80 hover:opacity-100 transition-opacity" />
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex-1 flex items-center justify-center">
-                                                    <div className="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
-                                                        <Mic size={14} /> {readiness.scripts ? 'Abrir guiones por nivel' : 'Crear narraciones'}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                    <NarrationCatalog pois={pois.map(poi => ({ ...poi, is_official: true }))} admin onOpen={openOfficial} onDelete={deletePoi} active={!editingPoi && studioTab === 'library'}/>
                 </div>
                 </>
             )}
 
-            {/* ═══ WELCOME OVERLAY ═══ */}
-            {showWelcomeOverlay && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)' }}>
-                    <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-md w-full relative overflow-hidden flex flex-col gap-6" style={{ border: '1px solid rgba(255,255,255,0.5)', animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-                        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 to-violet-600" />
-
-                        <div className="flex flex-col items-center text-center gap-3 mt-4">
-                            <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center text-3xl mb-2">🌍</div>
-                            <h2 className="text-2xl font-black text-slate-800">Estudio de Misiones</h2>
-                            <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                                Aquí es donde la magia ocurre. Descubre, cura y prepara los Puntos de Interés que nuestros operativos visitarán en campo.
-                            </p>
-                        </div>
-
-                        <div className="flex flex-col gap-4 mt-2 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                            <div className="flex gap-4 items-start">
-                                <div className="text-xl">📡</div>
-                                <div>
-                                    <h4 className="font-bold text-slate-700 text-sm">Paso 1: Usa el Radar</h4>
-                                    <p className="text-xs text-slate-500 font-medium">Presiona Añadir para encontrar cultura automáticamente cerca de ti.</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4 items-start">
-                                <div className="text-xl">📍</div>
-                                <div>
-                                    <h4 className="font-bold text-slate-700 text-sm">Paso 2: Toca el mapa</h4>
-                                    <p className="text-xs text-slate-500 font-medium">O mantén presionado en el mapa para crear un punto exacto manualmente.</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-4 items-start">
-                                <div className="text-xl">✨</div>
-                                <div>
-                                    <h4 className="font-bold text-slate-700 text-sm">Paso 3: Magia con IA</h4>
-                                    <p className="text-xs text-slate-500 font-medium">Tridente AI redactará toda la historia y datos clave en segundos.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button 
-                            onClick={() => {
-                                if (typeof window !== 'undefined') localStorage.setItem('studio_onboarded_v1', 'true');
-                                setShowWelcomeOverlay(false);
-                            }} 
-                            className="w-full py-4 mt-2 rounded-2xl font-black text-white text-lg shadow-xl hover:-translate-y-1 hover:shadow-2xl active:scale-95 transition-all"
-                            style={{ background: 'linear-gradient(135deg, #F43F5E, #8B5CF6)' }}
-                        >
-                            ¡Comenzar a Explorar!
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* ═══ VOICE SIMULATOR WIDGET ═══ */}
-            <div className={`fixed bottom-6 right-6 z-[10000] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                editingPoi
-                    ? 'opacity-0 translate-y-8 scale-90 pointer-events-none'
-                    : 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
-            }`}>
-                <div className="relative animate-[orbiEntrance_0.8s_cubic-bezier(0.34,1.56,0.64,1)_both]">
-                    {/* Attention pulse rings */}
-                    <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_0.8s_1_both] pointer-events-none" />
-                    <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_10.8s_1_both] pointer-events-none" />
-
-                    <VoiceSimulatorWidget
-                        pois={pois}
-                        audioRef={audioRef}
-                        playingPoiId={playingPoiId}
-                        setPlayingPoiId={setPlayingPoiId}
-                        isActive={isCopilotActive}
-                        setIsActive={setIsCopilotActive}
-                    />
-                </div>
-            </div>
-
-            {/* Reproductor de Audio Oculto para Testing */}
-            <audio ref={audioRef} className="hidden" onEnded={() => setPlayingPoiId(null)} />
-
-            {/* Radar pulse & slide animation */}
+            {candidate && <MapPlacePreview poi={candidate} existing={findExistingPlace(pois, candidate)} onClose={() => setCandidate(null)} onContinue={existing => { const point = candidate; setCandidate(null); if (existing) openOfficial(existing); else addPoiFromMap(point.name, point.latitude, point.longitude, point.description, point._origin); }}/>}
             <style>{`
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px) scale(0.95); }

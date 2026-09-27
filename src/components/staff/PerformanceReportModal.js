@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 //   • Typewriter animation for AI narrative
 //   • Haptic feedback on dismiss
 //   • Score ring with glow
-//   • Conditional "Ir a Academia" CTA
+//   • Conditional "Ir a Narraciones" CTA
 //
 // SAFETY: 100% non-blocking. Never blocks checkout.
 // ═══════════════════════════════════════════════════════════════
@@ -199,19 +199,19 @@ export default function PerformanceReportModal({ isOpen, onClose, report, role, 
                         </div>
                     </div>
 
-                    {/* ── Academia CTA (only for pilots who need it) ── */}
+                    {/* ── Narraciones CTA (only for pilots who need it) ── */}
                     {report.needsAcademia && typingDone && (
                         <div className="mb-4" style={{ animation: 'prm_fadeSlideUp 0.4s ease-out' }}>
                             <button
                                 onClick={() => {
                                     if (navigator.vibrate) navigator.vibrate(10);
                                     onClose();
-                                    router.push('/staff/academia');
+                                    router.push('/staff/narraciones');
                                 }}
                                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-extrabold text-[13px] shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-[0.98] transition-all"
                             >
                                 <span className="text-base">📚</span>
-                                Ir a la Academia
+                                Ir a Narraciones
                             </button>
                             <p className="text-center text-[10px] text-slate-400 font-medium mt-1.5">
                                 Estudia los puntos de interés antes de tu próxima misión

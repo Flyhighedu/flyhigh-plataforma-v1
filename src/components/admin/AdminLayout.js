@@ -97,7 +97,7 @@ export default function AdminLayout({ activeTab, setActiveTab, isAuthenticated, 
             subTabs: [
                 { id: 'hr-directorio', label: 'Directorio', icon: <Users size={18} /> },
                 { id: 'hr-asistencia', label: 'Asistencia', icon: <Calendar size={18} /> },
-                { id: 'hr-academia', label: 'Academia', icon: <GraduationCap size={18} /> },
+                { id: 'hr-academia', label: 'Capacitación', icon: <GraduationCap size={18} /> },
             ]
         },
         { 

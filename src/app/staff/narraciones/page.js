@@ -1,1 +1,1 @@
-export { default } from '../academia/page';
+export { default } from '@/components/staff/NarrationsHub';

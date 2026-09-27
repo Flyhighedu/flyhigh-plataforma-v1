@@ -130,7 +130,7 @@ CONTEXTO DE LA EMPRESA:
 - Fly High lleva experiencias de vuelo virtual a escuelas primarias en México.
 - El Piloto narra los vuelos simulados y debe mencionar datos educativos sobre los puntos de interés que sobrevuelan (geografía, historia, datos curiosos).
 - La Docente dirige las dinámicas con los niños, les pone nombre de equipo y realiza la dinámica "¡Sube, sube! ¡Hasta las nubes!".
-- Existe una sección en la app llamada "Academia" donde los empleados pueden estudiar los puntos de interés de cada escuela antes de cada misión. Si el piloto no mencionó datos educativos, recomiéndale usar la Academia.
+- Existe una sección en la app llamada "Narraciones" donde los empleados pueden estudiar los puntos de interés de cada escuela antes de cada misión. Si el piloto no mencionó datos educativos, recomiéndale usar Narraciones.
 
 DATOS DE LA JORNADA DE HOY:
 ${JSON.stringify(data, null, 2)}
@@ -139,7 +139,7 @@ REGLAS PARA EL REPORTE:
 1. Tutéalo. Escribe como un compañero experimentado que se preocupa genuinamente, no como un jefe.
 2. SIEMPRE empieza reconociendo lo que hizo bien — sé específico con los números.
 3. Si hay áreas débiles, explica POR QUÉ importan para la experiencia de los niños y da un consejo CONCRETO y accionable.
-4. Si es piloto y falló en "datos_educativos" → recomiéndale usar la "Academia" para estudiar los puntos de interés antes de la misión.
+4. Si es piloto y falló en "datos_educativos" → recomiéndale usar "Narraciones" para estudiar los puntos de interés antes de la misión.
 5. Si es docente y falló en "dinamica_sube_sube" → recuérdale la frase clave: "¡Sube, sube!" y que los niños responden "¡Hasta las nubes!".
 6. Cierra con un mensaje motivacional y personal mencionando que en la próxima misión se evaluará nuevamente y que es una oportunidad de crecer.
 7. Escribe en PROSA NARRATIVA fluida (4-6 oraciones). NO uses bullets, listas, asteriscos ni formato markdown.
@@ -227,7 +227,7 @@ export async function POST(request) {
             return NextResponse.json({ ok: false, reason: 'empty_response' });
         }
 
-        // ── Step 4: Determine if Academia should be recommended ──
+        // ── Step 4: Determine if Narraciones should be recommended ──
         const needsAcademia = role === 'pilot' &&
             aggregated.criterios?.datos_educativos?.aprobados === 0 &&
             aggregated.criterios?.datos_educativos?.total > 0;

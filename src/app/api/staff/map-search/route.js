@@ -28,6 +28,18 @@ export async function POST(request) {
     try { body = await request.json(); }
     catch { return reply({ error: 'Solicitud de mapa no válida.' }, 400); }
 
+    if (body?.kind === 'place-search') {
+        const search = typeof body.query === 'string' ? body.query.trim() : '';
+        if (search.length < 3 || search.length > 160) return reply({ error: 'Escribe entre 3 y 160 caracteres.' }, 400);
+        try {
+            const params = new URLSearchParams({ q: search, format: 'jsonv2', limit: '5', 'accept-language': 'es' });
+            const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { headers: { 'User-Agent': 'FlyHigh-Narraciones/1.0' }, signal: AbortSignal.timeout(10000), next: { revalidate: 86400 } });
+            if (!response.ok) throw new Error('Place provider unavailable');
+            const locations = (await response.json()).filter(item => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))).map(item => ({ id: String(item.place_id), name: item.display_name, lat: Number(item.lat), lng: Number(item.lon) }));
+            return reply({ locations });
+        } catch { return reply({ error: 'No se pudo buscar el lugar. Intenta de nuevo.' }, 503); }
+    }
+
     let query;
     try {
         if (body?.kind === 'cultural') {

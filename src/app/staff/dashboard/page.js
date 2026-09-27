@@ -2364,12 +2364,13 @@ export default function StaffDashboard() {
 
 
 
-                    {/* Tarjeta 2: Academia / Bitácora POI — Todos los roles */}
+                    <button onClick={() => router.push('/staff/capacitacion')} className="flex min-h-14 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left text-sm font-bold text-slate-700">Capacitación FlyHigh</button>
+                    {/* Tarjeta 2: Narraciones / Bitácora POI — Todos los roles */}
                     {['pilot', 'teacher', 'assistant'].includes(profile?.role) && (
                         <div className="mt-8">
                             <h2 className="text-lg font-extrabold text-slate-800 mb-3 px-1">Herramientas</h2>
                             <div 
-                                onClick={() => router.push('/staff/academia')}
+                                onClick={() => router.push('/staff/narraciones')}
                                 className="bg-white rounded-[32px] p-6 border border-indigo-100/60 shadow-[0_8px_30px_rgba(79,70,229,0.06)] relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-all hover:shadow-[0_8px_30px_rgba(79,70,229,0.12)] hover:border-indigo-200"
                             >
                                 {/* Decorative vibrant blur */}
@@ -2383,8 +2384,8 @@ export default function StaffDashboard() {
                                         <GraduationCap className="w-7 h-7 text-white" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-lg font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-0.5">Academia</h3>
-                                        <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Estudia puntos de interés y repasa tus fichas.</p>
+                                        <h3 className="text-lg font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-0.5">Narraciones</h3>
+                                        <p className="text-[13px] text-slate-500 leading-tight group-hover:text-slate-600 transition-colors">Encuentra lugares, escucha y crea narraciones.</p>
                                     </div>
                                     <div className="w-8 h-8 rounded-full bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition-colors shrink-0">
                                         <ChevronLeft className="w-4 h-4 rotate-180 text-indigo-500" strokeWidth={3} />

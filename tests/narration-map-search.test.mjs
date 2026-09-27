@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { signAdminToken } from '../src/lib/adminAuth.js';
 
 test('shared map search accepts signed admins and staff sessions, rejects unsigned callers and bounds abuse', async () => {
+    const originalFetch = globalThis.fetch;
     const oldSecret = process.env.ADMIN_AUTH_SECRET;
     process.env.ADMIN_AUTH_SECRET = 'local-unit-test-only';
     globalThis.__mapSearchTest = { cookie: null, user: null, calls: 0, fail: false };
@@ -27,9 +28,17 @@ test('shared map search accepts signed admins and staff sessions, rejects unsign
         globalThis.__mapSearchTest.cookie = null;
         globalThis.__mapSearchTest.user = { id: 'pilot-test' };
         assert.equal((await POST(request())).status, 200);
+        assert.equal((await POST(request({ kind:'place-search', query:'a' }))).status,400);
+        globalThis.fetch = async url => { assert.ok(String(url).includes('q=Uruapan')); return Response.json([{place_id:1, display_name:'Uruapan, Michoacán', lat:'19.4', lon:'-102.0'}]); };
+        const places = await POST(request({kind:'place-search',query:'Uruapan'}));
+        assert.equal(places.status,200);
+        assert.deepEqual((await places.json()).locations,[{id:'1',name:'Uruapan, Michoacán',lat:19.4,lng:-102}]);
+        globalThis.fetch = async () => { throw new Error('timeout'); };
+        assert.equal((await POST(request({kind:'place-search',query:'Uruapan'}))).status,503);
         globalThis.__mapSearchTest.fail = true;
         assert.equal((await POST(request())).status, 503);
     } finally {
+        globalThis.fetch = originalFetch;
         delete globalThis.__mapSearchTest;
         if (oldSecret === undefined) delete process.env.ADMIN_AUTH_SECRET; else process.env.ADMIN_AUTH_SECRET = oldSecret;
     }

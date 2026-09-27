@@ -43,10 +43,10 @@ app.whenReady().then(async () => {
     const labels = { phase_2: 'Preescolar', phase_3: '1.º y 2.º de primaria', phase_4: '3.º y 4.º de primaria', phase_5: '5.º y 6.º de primaria', phase_6: 'Secundaria', general: 'General' };
     const selectVersion = id => evaluate(`document.querySelector('[aria-label="Seleccionar nivel educativo"] button[aria-label="${labels[id]}"]').click(); true;`);
     const editScript = () => evaluate(`document.querySelector('[aria-label="Editar el texto de este guion"]').click(); true;`);
-    const closeSaved = async () => { await click('Volver al mapa'); await until(() => evaluate(`!document.querySelector('${dialog}')`), 'saved editor closed'); };
+    const closeSaved = async () => { await evaluate(`Array.from(document.querySelectorAll('${dialog} button')).find(e => e.textContent.startsWith('Volver a')).click(); true;`); await until(() => evaluate(`!document.querySelector('${dialog}')`), 'saved editor closed'); };
     const openCard = async name => {
         await until(async () => (await body()).includes(name), 'point card');
-        await evaluate(`(() => { const e = [...document.querySelectorAll('h3,h4')].find(e => e.textContent.trim() === ${JSON.stringify(name)}); if (!e) throw new Error('Missing card'); e.closest('.cursor-pointer').click(); return true; })()`);
+        await evaluate(`(() => { const e = [...document.querySelectorAll('h2,h3,h4')].find(e => e.textContent.trim() === ${JSON.stringify(name)}); if (!e) throw new Error('Missing card'); (e.closest('button') || e.closest('.cursor-pointer')).click(); return true; })()`);
         await until(() => evaluate(`!!document.querySelector('${dialog}')`), 'editor');
         await until(() => evaluate(`document.querySelector('${dialog}').getAnimations().every(a => a.playState === 'finished')`), 'entrance finished');
     };
@@ -89,6 +89,18 @@ app.whenReady().then(async () => {
             }; return true;
         })()`);
         await signIn('pilot', '/staff/narraciones');
+        await until(() => evaluate("!!document.querySelector('[aria-label=\"Buscar narraciones\"]')"), 'new library loaded');
+        assert.ok(!(await body()).includes('Próximo Rango'));
+        assert.ok(!(await body()).includes('Prueba de comandos'));
+        for (const width of [320,390,1280]) {
+            win.setContentSize(width,844); await delay(120);
+            assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'library fits ' + width);
+        }
+        win.setContentSize(390,844);
+        await click('Explorar');
+        await until(() => evaluate("!!document.querySelector('[aria-label=\"Buscar ciudad o lugar\"]')"), 'embedded exploration');
+        await click('Biblioteca');
+        report('PASS: new library fits 320/390/1280; exploration stays inside Narraciones; gamification and voice commands absent');
         await openCard(ownName);
         assert.ok((await body()).includes('Cada lugar tiene algo que contar'));
         assert.equal(await evaluate("document.querySelectorAll('[aria-label=\"Versiones por nivel educativo\"] button').length"), 0);
@@ -209,7 +221,8 @@ app.whenReady().then(async () => {
         assert.ok((await body()).includes('Guion de prueba para phase_2.'));
         await evaluate(`document.querySelector('${dialog} [aria-label="Cerrar editor"]').click(); true;`);
         await until(() => evaluate(`!document.querySelector('${dialog}')`), 'existing editor closed');
-        await evaluate(`Array.from(document.querySelectorAll('button')).find(e => e.textContent.includes('AGREGAR TEMA GENERAL')).click(); true;`);
+        await click('Crear narración');
+        await evaluate(`Array.from(document.querySelectorAll('button')).find(e => e.textContent.includes('De un tema')).click(); true;`);
         await field('name', topicName);
         await click('Ya tengo una investigación');
         await field('research', base.research_article);
@@ -222,6 +235,7 @@ app.whenReady().then(async () => {
         assert.equal(topic.research_article, base.research_article);
         report('PASS: drafts survive save errors, research provenance survives editing, existing General/audio preserved, new topic saves without coordinates');
         await signIn('admin', '/admin/hr-rutas');
+        await until(async () => (await body()).includes(officialName), 'admin library loaded');
         const search = await evaluate(`fetch('/api/staff/map-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'cultural', bounds: { south: 19.412, west: -102.065, north: 19.425, east: -102.050 } }) }).then(async response => ({ status: response.status, data: await response.json() }))`);
         assert.equal(search.status, 200, search.data.error);
         assert.ok(Array.isArray(search.data.elements));
@@ -262,6 +276,7 @@ app.whenReady().then(async () => {
         report('PASS: final action generates only missing audio, persists all five and confirms success');
     } catch (error) {
         console.error('Regression error:', error);
+        console.error('Overflow elements:', await evaluate(`Array.from(document.querySelectorAll('body *')).filter(e => e.getBoundingClientRect().right > innerWidth + 1 && e.getBoundingClientRect().width > 0).slice(0,8).map(e => ({ tag:e.tagName, className:String(e.className), width:e.getBoundingClientRect().width, right:e.getBoundingClientRect().right, viewport:innerWidth }))`));
         if (wc.getURL()) console.error('Regression state:', (await body()).slice(-3500));
         throw error;
     } finally {
