@@ -15,8 +15,17 @@ export function normalizeHeading(value) {
     return ((Number(value) % 360) + 360) % 360;
 }
 
-export function fallbackZoom(gimbalAngle) {
-    return 15.5 + ((-Number(gimbalAngle) - 20) / 70) * 2;
+export function fallbackZoom(gimbalAngle, altitude = 24) {
+    return clamp(15.5 + ((-Number(gimbalAngle) - 20) / 70) * 2 - Math.log2(Math.max(1, altitude) / 24), 12, 22);
+}
+
+// Flat ground is zero in this rehearsal (no terrain/elevation dataset).
+// Avoid the singularity at ground level while preserving the displayed height.
+export function flightCamera(map, state, gimbalAngle) {
+    return map.calculateCameraOptionsFromCameraLngLatAltRotation(
+        [state.longitude, state.latitude], Math.max(1, state.altitude),
+        state.heading, clamp(90 + gimbalAngle, 0, 70),
+    );
 }
 
 export function advanceFlight(state, controls, elapsedSeconds, limits = FLIGHT_LIMITS) {

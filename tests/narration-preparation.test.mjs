@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel } from '../src/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
 
 const catalog = [
     { id: 'official_a', name: 'Museo', audio_url: 'https://example.test/a.wav', narrative_script: 'Museo original' },
@@ -67,6 +67,16 @@ test('The compatible map represents gimbal tilt with a bounded zoom range', () =
     assert.equal(fallbackZoom(-20), 15.5);
     assert.equal(fallbackZoom(-90), 17.5);
     assert.ok(fallbackZoom(-40) > fallbackZoom(-20));
+});
+
+test('Altitude and gimbal independently drive the camera and remain finite at ground level', () => {
+    const state = { latitude: 19.4326, longitude: -99.1332, altitude: 24, heading: 15 };
+    const map = { calculateCameraOptionsFromCameraLngLatAltRotation: (...args) => args };
+    assert.deepEqual(flightCamera(map, state, -40), [[-99.1332, 19.4326], 24, 15, 50]);
+    assert.equal(flightCamera(map, { ...state, altitude: 0 }, -90)[1], 1);
+    assert.equal(flightCamera(map, state, -90)[3], 0);
+    assert.equal(fallbackZoom(-40, 24) - fallbackZoom(-40, 48), 1);
+    assert.ok(Number.isFinite(fallbackZoom(-40, 0)));
 });
 test('Duration distinguishes unknown from a playable length', () => {
     assert.equal(durationLabel(null), 'Duración por confirmar');
