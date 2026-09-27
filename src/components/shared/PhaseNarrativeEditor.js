@@ -291,7 +291,7 @@ export default function PhaseNarrativeEditor({ poi, onClose, onSave, onDelete, r
     const availablePhases = (readOnly ? EDUCATION_PHASES : NARRATION_PHASES).filter(item => hasScript(versions[item.id]));
     const selectable = !readOnly && hasScript(versions.general) ? [...availablePhases, EDUCATION_PHASES[0]] : availablePhases;
     const showPicker = !saved && (readOnly || step === 2) && !generating && !!selectable.length;
-    const completeLabel = missing.length === 5 ? 'Crear los 5 guiones' : missing.length === 1 ? 'Completar la versión faltante' : `Completar las ${missing.length} versiones faltantes`;
+    const completeLabel = missing.length === 5 ? 'Crear guiones' : missing.length === 1 ? 'Completar la versión faltante' : `Completar las ${missing.length} versiones faltantes`;
     let primaryLabel, primaryAction;
     const primaryDisabled = !!busy || !!proposal || title.trim().length < 2;
     if (step === 1) {

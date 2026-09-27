@@ -229,7 +229,7 @@ app.whenReady().then(async () => {
         assert.ok((await body()).includes('Tu investigación'));
         await installMocks();
         await evaluate('window.__failPhase = false; true;');
-        await click('Crear los 5 guiones');
+        await click('Crear guiones');
         await until(async () => (await body()).includes('Confirmar guiones y continuar'), 'admin generation');
         await click('Guardar borrador');
         await until(async () => (await body()).includes('Borrador guardado'), 'admin saved');
