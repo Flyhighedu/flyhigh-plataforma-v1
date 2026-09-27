@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, Loader2, Sparkles, Save, Trash2, RefreshCw, BookOpen, Search, Zap, Check, Mic, Play, Pause, Volume2, FileText } from 'lucide-react';
 import { EngineSelector, ResearchAccordion, NarrativeFactoryPanel, ImageSelector } from '@/components/shared/SharedNarrativeFactory';
+import { poiImageUrlForBrowser } from '@/lib/poi-image-url.mjs';
 
 // ═══════════════════════════════════════════════════════════════
 // POIDetailModal — Modal Staff (usa SharedNarrativeFactory)
@@ -231,7 +232,7 @@ export default function POIDetailModal({
             <div ref={scrollRef} style={{ width: '100%', maxWidth: 600, height: '95dvh', background: '#FFFFFF', borderRadius: '2rem 2rem 0 0', display: 'flex', flexDirection: 'column', border: 'none', overflow: 'hidden', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)', animation: 'poiSlideUp 0.35s cubic-bezier(0.16,1,0.3,1)', transform: `translateY(${modalTranslateY}px)`, transition: touchStartY === null ? 'transform 0.2s ease-out' : 'none' }}>
 
                 {/* ═══ HEADER ═══ */}
-                <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ background: selectedImageUrl ? `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${selectedImageUrl}) center/cover no-repeat` : headerColor, padding: '20px 20px', position: 'relative', flexShrink: 0, transition: 'background 0.3s ease' }}>
+                <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ background: selectedImageUrl ? `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)), url(${poiImageUrlForBrowser(selectedImageUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)}) center/cover no-repeat` : headerColor, padding: '20px 20px', position: 'relative', flexShrink: 0, transition: 'background 0.3s ease' }}>
                     <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.3)', borderRadius: 10, margin: '0 auto 16px' }} />
                     <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 16, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                         <X size={18} />

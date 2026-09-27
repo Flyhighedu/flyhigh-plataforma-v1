@@ -16,6 +16,7 @@ import VoiceSimulatorWidget from '@/components/staff/VoiceSimulatorWidget';
 import { normalizeCommand } from '@/hooks/useVoiceCopilot';
 import PilotDashboardHeader from '@/components/staff/PilotDashboardHeader';
 import SimulationContainer from '@/components/staff/SimulationContainer';
+import { poiImageUrlForBrowser } from '@/lib/poi-image-url.mjs';
 
 // ═══════════════════════════════════════════════════════════════
 // autoCategory — reutilizada de POIDetailModal.js
@@ -44,6 +45,19 @@ function getStudyStatus(poi) {
     if (poi.narrative_script) return { label: 'Sin audio', icon: '📝', accent: 'bg-amber-500/90 text-white border-amber-400' };
     if (poi.dato_clave_1) return { label: 'Ficha clásica', icon: '📋', accent: 'bg-blue-500/90 text-white border-blue-400' };
     return { label: 'Sin contenido', icon: '⚪', accent: 'bg-slate-400/80 text-white border-slate-300' };
+}
+
+function PoiCoverImage({ imageUrl, name, emoji }) {
+    const [failed, setFailed] = useState(false);
+    if (!imageUrl || failed) {
+        return <div className="flex h-full w-full items-center justify-center"><span className="text-5xl drop-shadow-md">{emoji}</span></div>;
+    }
+    return <img
+        src={poiImageUrlForBrowser(imageUrl, process.env.NEXT_PUBLIC_SUPABASE_URL)}
+        alt={name}
+        className="h-full w-full object-cover"
+        onError={() => setFailed(true)}
+    />;
 }
 
 // Fisher-Yates shuffle
@@ -482,8 +496,8 @@ export default function AcademiaLobbyPage() {
                                                 <h2 className="text-xl font-black text-slate-800 px-4 text-center">{card.name}</h2>
                                             </div>
                                         ) : card.image_url ? (
-                                            <div className="relative h-1/2 w-full shrink-0">
-                                                <img src={card.image_url} alt={card.name} className="w-full h-full object-cover" />
+                                            <div className="relative h-1/2 w-full shrink-0" style={{ background: cat.color + '30' }}>
+                                                <PoiCoverImage key={card.image_url} imageUrl={card.image_url} name={card.name} emoji={cat.emoji} />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                                 <div className="absolute bottom-4 left-6 right-6">
                                                     <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider rounded-full mb-2">
@@ -866,12 +880,12 @@ export default function AcademiaLobbyPage() {
                                         {/* Top Image / Pattern Area — NO play button here (prevents zoom inheritance) */}
                                         <div 
                                             className="h-[130px] shrink-0 w-full relative flex flex-col items-center justify-center overflow-hidden"
-                                            style={!poi.image_url ? { background: `linear-gradient(135deg, ${cat.color}20, ${cat.color}40)` } : {}}
+                                            style={{ background: `linear-gradient(135deg, ${cat.color}20, ${cat.color}40)` }}
                                         >
                                             <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
                                                 {poi.image_url ? (
                                                     <>
-                                                        <img src={poi.image_url} alt={poi.name} className="w-full h-full object-cover" />
+                                                        <PoiCoverImage key={poi.image_url} imageUrl={poi.image_url} name={poi.name} emoji={cat.emoji} />
                                                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-slate-900/30" />
                                                     </>
                                                 ) : (

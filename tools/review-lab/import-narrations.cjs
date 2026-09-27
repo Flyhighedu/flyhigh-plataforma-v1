@@ -82,6 +82,50 @@ async function localizeAudioFiles(sourcePois, targetClient) {
   return localized;
 }
 
+const imageExtensions = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/gif': '.gif'
+};
+
+async function localizeImageFiles(sourcePois, targetClient) {
+  const bucket = 'poi-images';
+  const candidates = sourcePois.filter((poi) => poi.image_url && !poi.image_url.includes('/storage/v1/object/public/poi-images/'));
+  if (!candidates.length) return sourcePois;
+  await ensurePublicBucket(targetClient, bucket);
+
+  const localized = [];
+  for (const poi of sourcePois) {
+    if (!candidates.includes(poi)) { localized.push(poi); continue; }
+    try {
+      const sourceUrl = new URL(poi.image_url);
+      if (sourceUrl.protocol !== 'https:') throw new Error('el enlace no usa HTTPS');
+      const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(12000), redirect: 'error' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+      const extension = imageExtensions[contentType];
+      if (!extension) { await response.body?.cancel(); throw new Error('formato de imagen no admitido'); }
+      const maxBytes = 8 * 1024 * 1024;
+      if (Number(response.headers.get('content-length')) > maxBytes) { await response.body?.cancel(); throw new Error('imagen mayor a 8 MB'); }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > maxBytes) throw new Error('imagen mayor a 8 MB');
+
+      const objectPath = `official/${poi.id}${extension}`;
+      const { error: uploadError } = await targetClient.storage.from(bucket)
+        .upload(objectPath, bytes, { contentType, upsert: true });
+      if (uploadError) throw uploadError;
+      const { data } = targetClient.storage.from(bucket).getPublicUrl(objectPath);
+      localized.push({ ...poi, image_url: data.publicUrl });
+    } catch (error) {
+      console.warn(`Imagen de ${poi.name} no copiada: ${error.message}`);
+      localized.push(poi);
+    }
+  }
+  return localized;
+}
+
 async function syncNarrations() {
   const sourceEnvironment = readEnvironment('.env.local');
   const targetEnvironment = readEnvironment('.env.review.local');
@@ -115,7 +159,7 @@ async function syncNarrations() {
     throw new Error(`Importación detenida: ${incomplete.length} registros oficiales están incompletos.`);
   }
 
-  const localizedPois = await localizeAudioFiles(pois, target.client);
+  const localizedPois = await localizeImageFiles(await localizeAudioFiles(pois, target.client), target.client);
 
   const routeFields = [
     'id', 'title', 'description', 'emoji', 'status', 'sort_order',
@@ -156,7 +200,8 @@ async function syncNarrations() {
     route: route.title,
     source: source.url.hostname,
     destination: target.url.hostname,
-    audioMode: 'archivos copiados al almacenamiento local'
+    audioMode: 'archivos copiados al almacenamiento local',
+    imagesLocalized: localizedPois.filter((poi) => poi.image_url?.includes('/storage/v1/object/public/poi-images/')).length
   };
 }
 
@@ -169,4 +214,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { syncNarrations };
+module.exports = { syncNarrations, readEnvironment, createAdminClient, assertSafeDestination, localizeImageFiles };
