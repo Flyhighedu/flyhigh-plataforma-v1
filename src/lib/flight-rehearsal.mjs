@@ -45,7 +45,7 @@ export function advanceFlight(state, controls, elapsedSeconds, limits = FLIGHT_L
     const elapsed = clamp(elapsedSeconds, 0, 0.1);
     const heading = normalizeHeading(state.heading + clamp(controls?.yaw, -1, 1) * limits.yawDegreesPerSecond * elapsed);
     const altitude = clamp(
-        state.altitude + clamp(controls?.climb, -1, 1) * limits.climbMetersPerSecond * elapsed,
+        state.altitude + clamp(controls?.climb, -1, 1) * (controls?.climb < 0 ? limits.descentMetersPerSecond ?? limits.climbMetersPerSecond : limits.climbMetersPerSecond) * elapsed,
         0,
         limits.maximumAltitudeMeters,
     );

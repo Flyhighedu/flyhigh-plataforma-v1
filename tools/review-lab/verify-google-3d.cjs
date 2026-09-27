@@ -54,9 +54,14 @@ app.whenReady().then(async () => {
     assert.equal(linkResponse.status, 200);
     await navigate(gateway.mobileBaseURL + (await linkResponse.json()).path);
     await until(() => wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).some(a=>a.textContent.includes('Preparar visita'))`), 'pilot sign in');
-    const href = await wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).find(a=>a.textContent.includes('Preparar visita')).getAttribute('href')`);
+    let href = await wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).find(a=>a.textContent.includes('Preparar visita')).getAttribute('href')`);
+    if (process.argv.includes('--missing-origin')) {
+      const id = await wc.executeJavaScript(`(async()=>{const d=await(await fetch('/api/staff/preparation')).json();return d.visits.find(v=>v.ubicacion_lat==null||v.ubicacion_lng==null)?.id;})()`);
+      assert.ok(id, 'existing local fixture without coordinates');
+      href = '/staff/visitas/' + id;
+    }
     await navigate(gateway.publicOrigin + href);
-    await until(() => wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).some(a=>a.textContent.includes('Probar relieve 3D'))`), 'separate 3D entry');
+    await until(() => wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).some(a=>a.getAttribute('href')?.endsWith('/simulacion-3d'))`), 'separate 3D entry');
     console.log('PASS authenticated LAN access and separate 3D entry');
     await navigate(gateway.publicOrigin + href + '/simulacion-3d');
     await until(async () => {
@@ -64,6 +69,18 @@ app.whenReady().then(async () => {
       if (/No se pudo|El relieve de esta|Este dispositivo|Falta GOOGLE|Google rechazó|Se alcanzó/.test(status.body)) throw new Error(status.body.slice(0, 900));
       return status.ready;
     }, 'Google 3D surface and camera', 110);
+    if (process.argv.includes('--missing-origin')) {
+      assert.equal(await wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length`), 0, 'no flight before an explicit departure');
+      assert.ok(await wc.executeJavaScript(`document.body.innerText.includes('La escuela no tiene ubicación confirmada')`));
+      await delay(2000);
+      const point = await wc.executeJavaScript(`({x:Math.round(innerWidth*.5),y:Math.round(innerHeight*.35)})`);
+      wc.sendInputEvent({ type: 'mouseDown', ...point, button: 'left', clickCount: 1 });
+      wc.sendInputEvent({ type: 'mouseUp', ...point, button: 'left', clickCount: 1 });
+      await until(() => wc.executeJavaScript(`[...document.querySelectorAll('button')].some(b=>b.textContent==='Despegar aquí'&&!b.disabled)`), 'reference map selection');
+      await wc.executeJavaScript(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Despegar aquí').click()`);
+      await until(() => wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length===2`), 'confirmed departure without school coordinates');
+      console.log('PASS missing school location: explicit selection required; virtual flight unlocked without a database write');
+    }
     // Uncompressed Google meshes do not necessarily need a decoding worker.
     await until(() => resources > 0, 'tile resources');
     await until(() => wc.executeJavaScript(`Number(document.querySelector('[aria-label="Mapa del ensayo de vuelo"]').dataset.tilesRendered)>0`), 'rendered 3D meshes');
@@ -86,7 +103,7 @@ app.whenReady().then(async () => {
     wc.sendInputEvent({ type: 'mouseUp', ...pad, button: 'left', clickCount: 1 });
     await delay(250);
     assert.ok(await altitude() > before, 'right control raises real 3D camera');
-    await wc.executeJavaScript(`document.querySelector('[aria-label="Regresar a la escuela"]').click()`);
+    await wc.executeJavaScript(`document.querySelector('[aria-label="Regresar al despegue"]').click()`);
     await until(async () => await altitude() === before, 'camera reset');
     await wc.executeJavaScript(`document.querySelector('[role="slider"]').focus()`);
     wc.sendInputEvent({ type: 'keyDown', keyCode: 'End' });
@@ -110,6 +127,9 @@ app.whenReady().then(async () => {
     assert.deepEqual(failed, []);
     assert.deepEqual(consoleErrors.filter(message => /error|failed|exception/i.test(message)), []);
     console.log('PASS altitude, gimbal 0/-90, reset, fullscreen, landscape, polling stability and credential privacy:', { roots, resources, workerRequests });
+    await require('./verify-google-cockpit.cjs')(wc, until);
+    assert.equal(roots, 1, 'origin and quality changes must reuse the existing Google session');
+    assert.equal(leaked, false);
     const unauthorized = await fetch(runtime.baseURL + '/api/review-lab/google-3d?visit=1', { redirect: 'manual' });
     assert.equal(unauthorized.status, 401);
     const negative = await wc.executeJavaScript(`Promise.all(['/api/review-lab/google-3d?resource=invalid','/api/review-lab/google-3d?visit=not-an-id','/api/review-lab/cesium/package.json'].map(async p=>(await fetch(p)).status))`);

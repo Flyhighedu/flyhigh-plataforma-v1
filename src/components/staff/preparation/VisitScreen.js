@@ -59,7 +59,7 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
             {schoolLocation
                 ? <Link href={`/staff/visitas/${visit.id}/simulacion`} onClick={audio.stop} className={`${primary} mt-4 w-full !bg-cyan-700 hover:!bg-cyan-800`}><Gamepad2 size={18} />Abrir simulador</Link>
                 : <button disabled className={`${secondary} mt-4 w-full`}><MapPin size={18} />Requiere ubicación confirmada</button>}
-            {schoolLocation && <><Link href={`/staff/visitas/${visit.id}/simulacion-3d`} onClick={audio.stop} className={`${secondary} mt-3 w-full`}><MapPin size={18} />Probar relieve 3D</Link><p className="mt-2 text-xs text-cyan-900/75">Google Maps · Prueba local con consumo de API. El detalle depende de la cobertura; no sirve para navegar un dron real.</p></>}
+            <Link href={`/staff/visitas/${visit.id}/simulacion-3d`} onClick={audio.stop} className={`${secondary} mt-3 w-full`}><MapPin size={18} />{schoolLocation ? 'Probar relieve 3D' : 'Elegir despegue y probar 3D'}</Link><p className="mt-2 text-xs text-cyan-900/75">Google Maps · Prueba local con consumo de API. Puedes elegir un despegue temporal sin cambiar la ubicación escolar. No sirve para navegar un dron real.</p>
         </section>}
 
         <section className={card} aria-labelledby="sequence-heading">

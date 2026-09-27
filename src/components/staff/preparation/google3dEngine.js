@@ -1,5 +1,7 @@
 // A separate, lazy engine for the isolated 3D preview. The existing MapLibre
 // renderer is not changed, and Google's credential never enters this module.
+import { aboveSurface, surfaceEnvelope, QUALITY } from '@/lib/flight-cockpit.mjs';
+import { distanceMeters } from '@/lib/flight-rehearsal.mjs';
 let library;
 function loadCesium() {
     if (window.Cesium) return Promise.resolve(window.Cesium);
@@ -20,7 +22,7 @@ function loadCesium() {
     return library;
 }
 
-export async function createGoogle3dEngine({ container, credits, visitId, initial, gimbal, signal, onError }) {
+export async function createGoogle3dEngine({ container, credits, visitId, initial, gimbal, signal, onError, onCorrection, onCandidate, onSurfaceStatus, quality = 'high' }) {
     const C = await loadCesium();
     signal.throwIfAborted();
     // Check authorization/configuration before creating a WebGL context. This
@@ -30,6 +32,9 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
     const root = await response.json();
     if (!response.ok) throw new Error(root.error || 'Google 3D no está disponible.');
     signal.throwIfAborted();
+    // CesiumJS is the open-source renderer; we do not use Cesium ion services.
+    // Keep a compact, truthful engine credit, plus ALL Google/provider credits.
+    C.CreditDisplay.cesiumCredit = new C.Credit('<a href="https://cesium.com/" target="_blank" rel="noopener noreferrer">CesiumJS</a>', true);
     const widget = new C.CesiumWidget(container, {
         globe: false, baseLayer: false, skyBox: false, skyAtmosphere: false,
         creditContainer: credits, creditViewport: container,
@@ -40,7 +45,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
     const scene = widget.scene;
     scene.backgroundColor = C.Color.fromCssColorString('#b9d7e8');
     scene.screenSpaceCameraController.enableInputs = false;
-    scene.postProcessStages.fxaa.enabled = false;
+    scene.postProcessStages.fxaa.enabled = true;
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden';
     container.append(overlay);
@@ -51,15 +56,26 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
     let baseHeight;
     let rendered = 0;
     let failed = 0;
-    let lastCamera;
-    let lastSurface = 0;
-    let sampledHeight;
+    let current = { ...initial };
+    let surface;
+    let takeoff = { ...initial };
+    let probing = false;
+    let probed;
+    let selecting = false;
+    let candidate;
+    let candidatePin;
+    let picker;
+    let guardTimer;
+    let guardQueued = false;
+    let surfaceDirty = false;
     let markerCursor = 0;
     const remove = () => {
         if (disposed) return;
         disposed = true;
         signal.removeEventListener('abort', remove);
         entries.clear(); overlay.remove();
+        clearInterval(guardTimer);
+        picker?.destroy();
         URL.revokeObjectURL(rootBlob);
         if (!widget.isDestroyed()) widget.destroy();
     };
@@ -69,12 +85,22 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         // All children are absolute same-origin URLs. A transient object URL
         // avoids requesting a second billable root; it is never persisted.
         tileset = await C.Cesium3DTileset.fromUrl(rootBlob, {
-            showCreditsOnScreen: true, maximumScreenSpaceError: 12,
-            cacheBytes: 96 * 1024 * 1024, maximumCacheOverflowBytes: 32 * 1024 * 1024,
+            showCreditsOnScreen: true, maximumScreenSpaceError: QUALITY[quality].error,
+            cacheBytes: QUALITY[quality].memory * 1024 * 1024, maximumCacheOverflowBytes: 64 * 1024 * 1024,
             preloadWhenHidden: false, preloadFlightDestinations: false,
         });
         if (signal.aborted) { tileset.destroy(); signal.throwIfAborted(); }
         scene.primitives.add(tileset);
+        const setQuality = id => {
+            const preset = QUALITY[id] || QUALITY.high;
+            tileset.maximumScreenSpaceError = preset.error;
+            tileset.cacheBytes = preset.memory * 1024 * 1024;
+            widget.resolutionScale = Math.min(window.devicePixelRatio || 1, preset.pixels);
+            container.dataset.quality = id;
+            widget.resize(); scene.requestRender();
+        };
+        setQuality(quality);
+        tileset.tileLoad.addEventListener(() => { surfaceDirty = true; });
         tileset.tileVisible.addEventListener(() => { rendered++; container.dataset.tilesRendered = String(rendered); });
         tileset.tileFailed.addEventListener(() => { failed++; container.dataset.tileFailures = String(failed); });
         scene.camera.setView({ destination: C.Cartesian3.fromDegrees(initial.longitude, initial.latitude, 10000), orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 } });
@@ -91,26 +117,65 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             baseHeight = heights[0]?.height;
             if (!Number.isFinite(baseHeight)) throw new Error('No se pudo confirmar el relieve de esta ubicación. Usa el ensayo actual.');
         } finally { clearTimeout(timeout); }
-        sampledHeight = baseHeight;
+        surface = baseHeight;
         container.dataset.groundReady = 'true';
-        const setCamera = state => {
-            if (disposed) return;
-            const now = performance.now();
-            if (now - lastSurface > 250 && (!lastCamera || lastCamera.latitude !== state.latitude || lastCamera.longitude !== state.longitude)) {
-                lastSurface = now;
-                const height = scene.sampleHeight(C.Cartographic.fromDegrees(state.longitude, state.latitude));
-                if (Number.isFinite(height)) sampledHeight = height;
-            }
-            lastCamera = { ...state };
-            const altitude = sampledHeight + Math.max(2, state.altitude);
-            scene.camera.setView({ destination: C.Cartesian3.fromDegrees(state.longitude, state.latitude, altitude), orientation: { heading: C.Math.toRadians(state.heading), pitch: C.Math.toRadians(gimbal()), roll: 0 } });
-            // Diagnostics contain no coordinates or credentials.
-            container.dataset.cameraHeight = (scene.camera.positionCartographic.height - sampledHeight).toFixed(2);
-            container.dataset.cameraPitch = C.Math.toDegrees(scene.camera.pitch).toFixed(0);
-            scene.requestRender();
+        const measure = async position => {
+            const points = [C.Cartographic.fromDegrees(position.longitude, position.latitude)];
+            let timer;
+            try {
+                const result = await Promise.race([scene.sampleHeightMostDetailed(points, [], 2), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('No se pudo confirmar la superficie. Elige otro punto o vuelve a intentarlo.')), 30000); })]);
+                signal.throwIfAborted();
+                if (!Number.isFinite(result[0]?.height)) throw new Error('No se pudo confirmar la superficie. Elige otro punto.');
+                return result[0].height;
+            } finally { clearTimeout(timer); }
         };
+        const visibleSurface = position => scene.sampleHeight(C.Cartographic.fromDegrees(position.longitude, position.latitude), [], 2);
+        const apply = state => {
+            const safe = aboveSurface(state.altitude, baseHeight, surface);
+            current = { ...state, altitude: safe.altitude };
+            scene.camera.setView({ destination: C.Cartesian3.fromDegrees(current.longitude, current.latitude, safe.height), orientation: { heading: C.Math.toRadians(current.heading), pitch: C.Math.toRadians(gimbal()), roll: 0 } });
+            container.dataset.cameraHeight = (scene.camera.positionCartographic.height - baseHeight).toFixed(2);
+            container.dataset.surfaceClearance = (scene.camera.positionCartographic.height - surface).toFixed(2);
+            container.dataset.cameraPitch = C.Math.toDegrees(scene.camera.pitch).toFixed(0);
+            onCorrection?.(current);
+            scene.requestRender();
+            return current;
+        };
+        const setCamera = state => {
+            if (disposed || selecting) return current;
+            const moved = state.latitude !== current.latitude || state.longitude !== current.longitude;
+            const renderedSurface = visibleSurface(state);
+            const detailed = distanceMeters(state, takeoff) < .05 ? baseHeight : probed && distanceMeters(state, probed) < .15 ? probed.height : undefined;
+            const nextSurface = surfaceEnvelope(renderedSurface, detailed, moved ? undefined : surface);
+            if (!Number.isFinite(nextSurface)) {
+                // Never move horizontally into unmeasured space. At most one
+                // asynchronous sample; it is for this visible flight only.
+                if (!probing) {
+                    probing = true;
+                    onSurfaceStatus?.('Esperando superficie…');
+                    measure(state).then(height => { probed = { ...state, height }; }).catch(() => { if (!disposed) onSurfaceStatus?.('No se confirmó la superficie. Movimiento detenido.'); }).finally(() => { probing = false; });
+                }
+                return apply({ ...state, latitude: current.latitude, longitude: current.longitude });
+            }
+            surface = nextSurface;
+            onSurfaceStatus?.('');
+            return apply(state);
+        };
+        // Re-check even while hovering or paused: streamed detail can raise the
+        // visible surface without any input. Never lower the known same-point
+        // floor or replace a detailed measurement with a coarse rendered LOD.
+        const guardSurface = () => {
+            if (disposed || selecting) return;
+            const next = surfaceEnvelope(surface, visibleSurface(current));
+            if (next > surface) { surface = next; apply(current); }
+        };
+        guardTimer = setInterval(guardSurface, 250);
         scene.postRender.addEventListener(() => {
             if (disposed) return;
+            if (surfaceDirty && !guardQueued && !selecting) {
+                surfaceDirty = false; guardQueued = true;
+                queueMicrotask(() => { guardQueued = false; guardSurface(); });
+            }
             const markers = [...entries];
             // Amortize optional label-height sampling, rather than ray-casting
             // hundreds of markers each frame. No sampled values are persisted.
@@ -135,9 +200,52 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             entries.add(entry); overlay.append(element); scene.requestRender();
             return { remove: () => { entries.delete(entry); element.remove(); if (!disposed) scene.requestRender(); } };
         };
+        const homeElement = document.createElement('span');
+        homeElement.textContent = 'H';
+        homeElement.style.cssText = 'display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#facc15;color:#111827;border:2px solid white;font-weight:900';
+        homeElement.title = 'Despegue del ensayo';
+        let homePin = addMarker(homeElement, takeoff);
+        const beginSelection = () => {
+            if (disposed) return;
+            selecting = true; candidate = null; onCandidate?.(null);
+            const controller = scene.screenSpaceCameraController;
+            controller.enableInputs = true; controller.enableTilt = false; controller.enableLook = false;
+            scene.camera.setView({ destination: C.Cartesian3.fromDegrees(current.longitude, current.latitude, surface + 1800), orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 } });
+            container.dataset.selectingOrigin = 'true';
+            scene.requestRender();
+        };
+        const cancelSelection = () => {
+            selecting = false; candidate = null; candidatePin?.remove(); candidatePin = null;
+            scene.screenSpaceCameraController.enableInputs = false;
+            container.dataset.selectingOrigin = 'false';
+            apply(current);
+        };
+        picker = new C.ScreenSpaceEventHandler(widget.canvas);
+        picker.setInputAction(click => {
+            if (!selecting) return;
+            const point = scene.pickPositionSupported && scene.pickPosition(click.position);
+            if (!point) { onSurfaceStatus?.('Espera a que cargue el mapa y toca una superficie visible.'); return; }
+            const geographic = C.Cartographic.fromCartesian(point);
+            candidate = { latitude: C.Math.toDegrees(geographic.latitude), longitude: C.Math.toDegrees(geographic.longitude) };
+            const pin = homeElement.cloneNode(true); pin.textContent = '+';
+            candidatePin?.remove(); candidatePin = addMarker(pin, candidate);
+            onSurfaceStatus?.(''); onCandidate?.(candidate);
+        }, C.ScreenSpaceEventType.LEFT_CLICK);
+        const confirmSelection = async () => {
+            if (!candidate) throw new Error('Elige un punto en el mapa.');
+            const selected = { ...candidate };
+            const height = await measure(selected);
+            if (disposed || !selecting || candidate?.latitude !== selected.latitude || candidate?.longitude !== selected.longitude) throw new Error('El punto cambió. Confirma otra vez.');
+            baseHeight = surfaceEnvelope(height, visibleSurface(selected)); surface = baseHeight;
+            takeoff = { ...selected }; probed = null;
+            homePin.remove(); homePin = addMarker(homeElement, takeoff);
+            current = { ...takeoff, altitude: 24, heading: 0 };
+            cancelSelection();
+            return { ...current };
+        };
         setCamera(initial);
         container.dataset.engine = 'google-3d';
-        return { remove, resize: () => { if (!disposed) { widget.resize(); scene.requestRender(); } }, setCamera, addMarker };
+        return { remove, resize: () => { if (!disposed) { widget.resize(); scene.requestRender(); } }, setCamera, addMarker, setQuality, beginSelection, cancelSelection, confirmSelection };
     } catch (error) {
         remove();
         if (error.name === 'AbortError') throw error;

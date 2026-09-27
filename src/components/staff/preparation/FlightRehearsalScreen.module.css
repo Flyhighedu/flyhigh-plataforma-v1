@@ -2,10 +2,54 @@
 .screen:fullscreen { width: 100%; height: 100%; }
 .credits { position: absolute; right: max(4px, env(safe-area-inset-right)); bottom: 0; z-index: 25; max-width: 95%; font: 10px/1.25 sans-serif; background: #07121ee6; padding: 2px 4px; color: #e2e8f0; }
 .credits a { text-decoration: underline; }
-.googleCredits { position: absolute; bottom: 0; left: 0; right: 0; z-index: 25; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 4px max(10px, env(safe-area-inset-right)) 4px max(10px, env(safe-area-inset-left)); background: #07121ee6; color: white; font: 10px/1.3 sans-serif; max-height: 24%; overflow: auto; }
+.googleCredits { position: absolute; bottom: 0; left: 0; right: 0; z-index: 25; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; padding: 2px max(6px, env(safe-area-inset-right)) 2px max(6px, env(safe-area-inset-left)); background: #07121ee6; color: white; font: 10px/1.2 sans-serif; }
 .googleBrand { font: 500 16px/1.3 Arial, sans-serif; white-space: nowrap; }
 .googleCredits :global(.cesium-widget-credits) { position: static; display: block; color: white; font-size: 10px; }
 .googleCredits a { color: white; }
+.googleCredits :global(.cesium-credit-logoContainer), .googleCredits :global(.cesium-credit-textContainer) { display: inline; }
+.googleCredits :global(.cesium-credit-logoContainer) { margin-right: 6px; }
+.googleLayout .header { left: 0; right: 0; }
+.googleLayout .tools { top: 72px; left: 12px; right: auto; flex-direction: row; gap: 6px; }
+.googleLayout .speed { top: 126px; width: 146px; }
+.googleLayout .gimbal { top: 126px; }
+.googleLayout .status { top: 212px; left: 12px; right: 72px; }
+.googleLayout .radarStatus { top: 212px; }
+.googleLayout .poi { bottom: 238px; }
+.googleLayout .pause { bottom: 68px; width: 40px; height: 40px; }
+.googleLayout .joystick { margin-bottom: 22px; }
+.telemetry { position: absolute; z-index: 10; left: 12px; right: 12px; bottom: 174px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 8px 10px; border-radius: 12px; color: white; background: #020617bf; font-variant-numeric: tabular-nums; pointer-events: none; }
+.telemetry p { font-size: 8px; color: #cbd5e1; }
+.telemetry strong { display: block; font-size: 12px; white-space: nowrap; }
+.telemetry small { display: block; font-size: 8px; color: #cbd5e1; }
+.settings { margin: auto 0 auto auto; width: min(620px, 96vw); max-width: 96vw; max-height: 100%; height: 100%; padding: 0; border: 1px solid #334155; background: #0f172a; color: white; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.settings::backdrop { background: #02061780; }
+.settingsBody { padding: 16px; }
+.settings header { display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #0f172a; z-index: 1; }
+.settings h2 { font-weight: 800; font-size: 17px; }
+.settings fieldset { margin-top: 24px; border-top: 1px solid #334155; padding-top: 8px; }
+.settings legend { padding-right: 8px; color: #67e8f9; font-weight: 700; font-size: 14px; }
+.settings label { display: block; margin: 12px 0; font-size: 13px; }
+.settings output { float: right; font-variant-numeric: tabular-nums; }
+.settings input[type=range] { display: block; width: 100%; min-height: 38px; accent-color: #22d3ee; touch-action: none; }
+.settings select { display: block; width: 100%; min-height: 42px; margin: 6px 0; border: 1px solid #475569; border-radius: 8px; padding: 6px; background: #1e293b; color: white; }
+.settings button, .originPicker button { min-height: 42px; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; font-size: 12px; }
+.settings small { display: block; font-size: 11px; color: #cbd5e1; line-height: 1.45; }
+.settingsTabs { display: flex; gap: 4px; margin: 14px 0; padding: 4px; background: #1e293b; border-radius: 10px; }
+.settingsTabs button { flex: 1; border-color: transparent; color: #cbd5e1; }
+.settingsTabs button[aria-pressed=true] { background: #334155; color: white; box-shadow: inset 0 -2px #22d3ee; }
+.modelCaption { font-size: 11px; color: #94a3b8; margin: 10px 0; }
+.settingsEntry { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; margin: 20px 0; }
+.settings .tuningRow { display: grid; grid-template-columns: minmax(0, 1fr) 70px; gap: 4px 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid #334155; }
+.tuningRow input { grid-column: 1 / -1; }
+.tuningRow output { text-align: right; }
+.resetProfile { width: 100%; color: #67e8f9; margin: 16px 0; }
+@media (orientation: landscape) { .settings .tuningRow { grid-template-columns: minmax(170px, 1fr) 64px minmax(120px, 1fr); } .tuningRow input { grid-column: auto; } }
+.originPicker { position: absolute; z-index: 20; bottom: 64px; left: 50%; transform: translateX(-50%); width: min(440px, 92%); border: 1px solid #475569; border-radius: 16px; background: #0f172aee; padding: 12px 16px; touch-action: auto; }
+.originPicker h2 { font-weight: 800; font-size: 15px; }
+.originPicker p { margin-top: 6px; font-size: 12px; color: #cbd5e1; }
+.originPicker > div { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.originPicker button:last-child { background: #0891b2; color: white; font-weight: 700; }
+.originPicker button:disabled { opacity: .5; }
 .speed { position: absolute; left: 12px; top: 144px; z-index: 10; display: flex; flex-direction: column; gap: 2px; width: 148px; padding: 6px 8px; border: 1px solid #ffffff33; border-radius: 12px; background: #020617cc; font-size: 10px; }
 .speed > span { color: #cbd5e1; }
 .speed select { min-height: 30px; width: 100%; color: white; background: #0f172a; border-radius: 4px; font-size: 12px; }
@@ -33,4 +77,18 @@
     .speed { top: 64px; }
     .radarStatus { top: 135px; max-width: 148px; font-size: 10px; }
     .status { top: 114px; left: 180px; max-width: calc(100vw - 280px); font-size: 9px; padding: 4px 8px; }
+    .googleLayout .header { left: 0; right: 0; }
+    .googleLayout .tools { top: 60px; left: 12px; flex-direction: column; }
+    .googleLayout .tools button { width: 36px; height: 36px; border-radius: 10px; }
+    .googleLayout .speed { top: 60px; left: 60px; width: 134px; }
+    .googleLayout .gimbal { top: 62px; height: 148px; right: 12px; }
+    .googleLayout .status { top: 64px; left: 204px; right: 76px; }
+    .googleLayout .radarStatus { top: 130px; left: 60px; max-width: 132px; }
+    .googleLayout .telemetry { bottom: 30px; left: 140px; right: 140px; padding: 6px 10px; }
+    .googleLayout .telemetry p { font-size: 9px; }
+    .googleLayout .telemetry strong { font-size: 14px; }
+    .googleLayout .pause { bottom: 96px; }
+    .googleLayout .poi { bottom: 148px; width: min(44vw, 340px); padding: 8px; }
+    .googleLayout .joystick { margin-bottom: 0; }
+    .originPicker { bottom: 40px; padding: 8px 12px; }
 }
