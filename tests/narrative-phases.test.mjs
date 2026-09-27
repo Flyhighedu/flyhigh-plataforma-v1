@@ -66,7 +66,8 @@ test('drafts without audio are valid; malformed phases, metadata and payloads ar
 async function loadRoute(name, replacements) {
     let source = readFileSync(new URL(`../src/app/api/${name}/route.js`, import.meta.url), 'utf8');
     source = source.replace("import { NextResponse } from 'next/server';", 'const NextResponse = Response;')
-        .replace("from '@/lib/education-phases.mjs'", `from '${new URL('../src/lib/education-phases.mjs', import.meta.url).href}'`);
+        .replace("from '@/lib/education-phases.mjs'", `from '${new URL('../src/lib/education-phases.mjs', import.meta.url).href}'`)
+        .replace("from '@/lib/gemini-config.mjs'", `from '${new URL('../src/lib/gemini-config.mjs', import.meta.url).href}'`);
     for (const [from, to] of replacements) source = source.replace(from, to);
     return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
@@ -93,6 +94,10 @@ test('script API validates phase, research and model output before returning a p
         assert.equal(result.status, 200);
         assert.equal((await result.json()).phaseId, 'phase_2');
         assert.match(prompt, /Preescolar/);
+        modelOutput = JSON.stringify({ script: 'Cupatitzio tiene manantiales que forman un río.', learning_goal: 'Observar el agua.', review_note: 'Revisar el contexto del grupo. '.repeat(25) });
+        const extendedNote = await POST(request(valid));
+        assert.equal(extendedNote.status, 200, 'a useful review note above the editorial target must not discard a valid script');
+        assert.equal(validateNarrativeVersions({ phase_2: { ...emptyNarration(), ...(await extendedNote.json()), narrative_script: 'Guion revisable.' } }), true);
     } finally { delete globalThis.__phaseTestModel; if (old === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = old; }
 });
 

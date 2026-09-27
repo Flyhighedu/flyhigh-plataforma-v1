@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { buildPhasePrompt, educationPhase, hasUsableResearch } from '@/lib/education-phases.mjs';
+import { geminiApiKey } from '@/lib/gemini-config.mjs';
 
 export async function POST(request) {
     try {
@@ -21,12 +22,20 @@ export async function POST(request) {
             return NextResponse.json({ error: 'El contenido excede el tamaño permitido.' }, { status: 400 });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = geminiApiKey();
         if (!apiKey) return NextResponse.json({ error: 'La generación con IA no está configurada en este entorno. Puedes escribir y guardar los guiones manualmente.' }, { status: 503 });
 
         // Utilizamos gemini-2.5-flash-lite ya que 1.5 y 2.0 arrojan 404
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite', ...(phaseId !== 'general' ? { generationConfig: { responseMimeType: 'application/json', temperature: 0.4 } } : {}) });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite', ...(phaseId !== 'general' ? { generationConfig: {
+            responseMimeType: 'application/json', temperature: 0.4,
+            responseSchema: { type: 'OBJECT', properties: {
+                script: { type: 'STRING', description: 'Guion oral breve. Vacío si falta información factual.' },
+                learning_goal: { type: 'STRING', description: 'Propósito concreto, máximo 220 caracteres.' },
+                review_note: { type: 'STRING', description: 'Una observación breve para revisión humana. No redefinir fases ni grados de la SEP.' },
+                error: { type: 'STRING', description: 'Solo si no es posible redactar un guion con la información aportada.' },
+            }, required: ['script', 'learning_goal', 'review_note'] },
+        } } : {}) });
 
         if (phaseId !== 'general') {
             const prompt = buildPhasePrompt({ poiName, researchArticle, phaseId, focus: body.curriculumFocus, learningGoal: body.learningGoal, customInstructions });
@@ -36,7 +45,7 @@ export async function POST(request) {
             if (data?.error) return NextResponse.json({ error: String(data.error).slice(0, 500) }, { status: 422 });
             if (!data || typeof data.script !== 'string' || data.script.trim().length < 10 || data.script.length > 10000 ||
                 typeof data.learning_goal !== 'string' || !data.learning_goal.trim() || data.learning_goal.length > 220 ||
-                typeof data.review_note !== 'string' || data.review_note.length > 400) {
+                typeof data.review_note !== 'string' || data.review_note.length > 2000) {
                 return NextResponse.json({ error: 'La propuesta no incluye un guion y un propósito válidos. Intenta de nuevo.' }, { status: 502 });
             }
             return NextResponse.json({ script: data.script.trim(), learning_goal: data.learning_goal.trim(), review_note: data.review_note, phaseId });

@@ -24,11 +24,15 @@ Aplicar `supabase/migrations/20260927120000_narrative_phase_versions.sql` antes 
 
 En el laboratorio, `node tools/review-lab/migrate-narration-phases.cjs` valida que la conexión sea local. `node tools/review-lab/seed-phase-example.cjs` añade cinco borradores documentados de Cupatitzio si no existen, conservando General y sus audios. La investigación enlaza fuentes de CONANP y SEMARNAT. Los borradores no se marcan revisados.
 
-Para probar generación real, configurar `GEMINI_API_KEY` en `.env.review.local` y reiniciar la Mesa. El laboratorio nunca hereda automáticamente la clave de producción. Sin ella, el editor permite escribir y guardar, y los endpoints explican la falta de configuración.
+Para probar generación real, configurar `GEMINI_API_KEY` en `.env.review.local`. Puede usarse la clave ya autorizada de la aplicación: la base sigue siendo local. Los endpoints de investigación, guion y audio leen esa configuración en cada solicitud, sin reiniciar sesiones ni cambiar el QR. El laboratorio nunca hereda automáticamente las credenciales de `.env.local`. Sin clave explícita, el editor permite escribir y guardar, y los endpoints explican la falta de configuración. La aplicación habitual continúa leyendo su variable de entorno.
 
-Pruebas unitarias: `node --test --test-isolation=none tests/narrative-phases.test.mjs tests/review-audio.test.mjs tools/review-lab/core.test.cjs`.
+El laboratorio prepara el almacenamiento `poi-narratives` durante `review:setup`. Para actualizar una instalación local existente sin reiniciar sus sesiones: `node tools/review-lab/ensure-narration-storage.cjs`.
+
+Pruebas unitarias: `node --test --test-isolation=none tests/gemini-config.test.mjs tests/narrative-phases.test.mjs tests/review-audio.test.mjs tools/review-lab/core.test.cjs`.
 
 Regresión no visual: `tools/review-lab/verify-narration-phases.cjs` con Electron del laboratorio y servidor local activo. Usa registros temporales, comprueba persistencia de ambos paneles y simula respuestas de IA sin costes. No sustituye una prueba con el proveedor real ni la evaluación pedagógica.
+
+Verificación real del 27 de septiembre de 2026: Gemini devolvió un guion de fase 3 de 51 palabras y el TTS produjo un WAV de 24 segundos. Se comprobó la descarga desde el almacenamiento local y la duración a partir de sus bytes; después se retiró el archivo de prueba sin modificar las narraciones guardadas. La calidad auditiva y pedagógica continúa requiriendo revisión humana.
 
 Revisión visual pendiente del usuario: Administración → Narraciones → Barranca del Cupatitzio; cambiar entre fases, revisar propósito, guion y fundamento. Repetir en Narraciones del piloto, donde el punto oficial se consulta en modo lectura, a 390 px y escritorio. En un punto propio, editar dos fases, guardar sin audio y reabrir.
 

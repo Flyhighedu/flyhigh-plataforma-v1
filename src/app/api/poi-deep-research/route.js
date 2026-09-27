@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
+import { geminiApiKey } from '@/lib/gemini-config.mjs';
 
 // ═══════════════════════════════════════════════════════════════
 // POI Deep Research — EL TRIDENTE 🔱
@@ -10,7 +11,6 @@ import { createClient } from '@supabase/supabase-js';
 // Fallover automático e invisible entre motores.
 // ═══════════════════════════════════════════════════════════════
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const COHERE_API_KEY = process.env.COHERE_API_KEY;
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -159,6 +159,7 @@ function validateResponse(text) {
 // MOTOR 1: Gemini 2.5 Flash (con Google Search Grounding)
 // ═══════════════════════════════════════════════════════════════
 async function researchWithGemini(name, type, context, lat, lon) {
+    const GEMINI_API_KEY = geminiApiKey();
     if (!GEMINI_API_KEY) throw new Error('NO_KEY');
 
     const { systemPrompt, userMsg } = buildPrompt(name, type, context, lat, lon);
@@ -361,7 +362,7 @@ export async function POST(request) {
         // Usar SOLO el motor seleccionado — sin fallback automático
         const engineId = (preferredEngine && ENGINE_FNS[preferredEngine]) ? preferredEngine : 'gemini';
         const fn = ENGINE_FNS[engineId];
-        const configured = { gemini: !!GEMINI_API_KEY, rag: !!TAVILY_API_KEY && !!GROQ_API_KEY, cohere: !!COHERE_API_KEY };
+        const configured = { gemini: !!geminiApiKey(), rag: !!TAVILY_API_KEY && !!GROQ_API_KEY, cohere: !!COHERE_API_KEY };
         if (!configured[engineId]) return NextResponse.json({ error: 'Este motor de investigación no está configurado en este entorno. Puedes agregar información y fuentes manualmente.', allFailed: true }, { status: 503 });
 
         // Leer odómetro Tavily para incluirlo en la respuesta

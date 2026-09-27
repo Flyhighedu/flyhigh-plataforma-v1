@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { educationPhase } from '@/lib/education-phases.mjs';
+import { geminiApiKey } from '@/lib/gemini-config.mjs';
 
 // Convertir raw PCM (16-bit, 24kHz, mono) a WAV agregando header de 44 bytes
 function buildWavBuffer(pcmBuffer) {
@@ -44,7 +45,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'poiId y narrativeScript son requeridos' }, { status: 400 });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = geminiApiKey();
         if (!apiKey) return NextResponse.json({ error: 'La generación de audio no está configurada en este entorno. Tu borrador se puede guardar sin audio.' }, { status: 503 });
 
         // endpoint estricto: gemini-3.1-flash-tts-preview

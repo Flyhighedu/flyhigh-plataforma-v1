@@ -44,7 +44,7 @@ export function validateNarrativeVersions(value) {
     return Object.entries(value).every(([key, item]) => educationPhase(key)?.number && item && typeof item === 'object' && !Array.isArray(item) &&
         typeof item.narrative_script === 'string' && item.narrative_script.length <= 10000 &&
         (item.curriculum_focus === 'context' || item.curriculum_focus === 'nature') &&
-        Object.entries({ learning_goal: 220, custom_instructions: 5000, review_note: 400 }).every(([field, limit]) => typeof item[field] === 'string' && item[field].length <= limit) &&
+        Object.entries({ learning_goal: 220, custom_instructions: 5000, review_note: 2000 }).every(([field, limit]) => typeof item[field] === 'string' && item[field].length <= limit) &&
         ['reviewed_at', 'audio_generated_at'].every(field => item[field] == null || (typeof item[field] === 'string' && Number.isFinite(Date.parse(item[field])))) &&
         (item.audio_duration_seconds == null || (Number.isFinite(item.audio_duration_seconds) && item.audio_duration_seconds >= 0)) &&
         (!item.audio_url || (typeof item.audio_url === 'string' && /^https?:\/\//.test(item.audio_url))));

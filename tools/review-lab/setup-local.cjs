@@ -172,6 +172,7 @@ async function setup(onProgress) {
   await require('./migrate-preparations.cjs').migratePreparations(input);
   await require('./migrate-school-locations.cjs').migrateSchoolLocations(input);
   await require('./migrate-narration-phases.cjs').migrateNarrationPhases(input);
+  await require('./ensure-narration-storage.cjs').ensureNarrationStorage(input);
   const seeded = await seed(input, onProgress);
   await require('./seed-school-locations.cjs').seedSchoolLocations(input);
   return { backendOrigin: input.NEXT_PUBLIC_SUPABASE_URL, ...seeded };
