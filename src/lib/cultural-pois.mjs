@@ -27,6 +27,13 @@ export function buildCulturalPoiQuery({ south, west, north, east }) {
     return `[out:json][timeout:12][maxsize:8388608];(${FILTERS.flatMap(filter => ['node', 'way'].map(type => `${type}${filter}["name"](${bbox});`)).join('\n')});out center 500;`;
 }
 
+export function buildNearbyNamedPoiQuery({ latitude, longitude, radius = 150 }) {
+    if (!coordinates(latitude, longitude) || !Number.isFinite(radius) || radius < 25 || radius > 500) {
+        throw new Error('La ubicación de búsqueda no es válida.');
+    }
+    return `[out:json][timeout:10][maxsize:4194304];(node["name"](around:${Math.round(radius)},${latitude},${longitude});way["name"](around:${Math.round(radius)},${latitude},${longitude});relation["name"](around:${Math.round(radius)},${latitude},${longitude}););out center 100;`;
+}
+
 export function radarBounds(center, radius = 3000) {
     if (!coordinates(center?.latitude, center?.longitude)) throw new Error('Ubicación no válida.');
     const latDelta = radius / 111320;

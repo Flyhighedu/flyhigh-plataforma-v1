@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIDetailModal from './POIDetailModal';
 import useNativePOITap from '@/hooks/useNativePOITap';
-import { buildCulturalPoiQuery } from '@/lib/cultural-pois.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -167,18 +166,10 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
         setIsReverseGeocoding(true);
         let placeName = '';
         try {
-            const query = `
-                [out:json][timeout:10];
-                (
-                  node["name"](around:150, ${lat}, ${lng});
-                  way["name"](around:150, ${lat}, ${lng});
-                  relation["name"](around:150, ${lat}, ${lng});
-                );
-                out center;
-            `;
-            const res = await fetch('https://overpass-api.de/api/interpreter', {
+            const res = await fetch('/api/staff/map-search', {
                 method: 'POST',
-                body: query
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'nearby-name', latitude: lat, longitude: lng, radius: 150 })
             });
             
             if (res.ok) {
@@ -271,17 +262,22 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
         try {
             const sw = mapBounds._southWest;
             const ne = mapBounds._northEast;
-            const query = buildCulturalPoiQuery({ south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng });
-
-            const res = await fetch('https://overpass-api.de/api/interpreter', {
+            const res = await fetch('/api/staff/map-search', {
                 method: 'POST',
-                body: query
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    kind: 'cultural',
+                    bounds: { south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng }
+                })
             });
 
-            if (!res.ok) throw new Error('Failed to fetch from Overpass');
+            if (!res.ok) {
+                const failure = await res.json().catch(() => ({}));
+                throw new Error(failure.error || 'No se pudo consultar el mapa.');
+            }
             const data = await res.json();
 
-            let newPois = data.elements.map(el => {
+            let newPois = (Array.isArray(data.elements) ? data.elements : []).map(el => {
                 const lat = el.type === 'node' ? el.lat : el.center?.lat;
                 const lon = el.type === 'node' ? el.lon : el.center?.lon;
                 const name = el.tags?.name;
@@ -444,8 +440,8 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 }
             })();
         } catch (err) {
-            console.error('Overpass error:', err);
-            alert('Error al buscar sitios culturales. Por favor, intenta de nuevo.');
+            console.warn('Cultural POI search failed:', err);
+            alert(err.message || 'Error al buscar sitios culturales. Por favor, intenta de nuevo.');
         } finally {
             setIsSearchingCulturalPois(false);
         }

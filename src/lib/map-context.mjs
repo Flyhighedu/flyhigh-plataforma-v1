@@ -3,6 +3,32 @@ import { buildCulturalPoiQuery, parseCulturalPois, radarBounds } from './cultura
 import { distanceMeters } from './flight-rehearsal.mjs';
 
 export const OVERPASS_ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+
+export async function fetchOverpassElements(query, fetcher = fetch) {
+    if (typeof query !== 'string' || query.length < 20 || query.length > 50000) throw new Error('Consulta de mapa no válida.');
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+        try {
+            const response = await fetcher(endpoint, {
+                method: 'POST',
+                headers: {
+                    'User-Agent': 'FlyHigh/1.0 (educational narration map)',
+                    Accept: 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: new URLSearchParams({ data: query }),
+                signal: AbortSignal.timeout(16000),
+                cache: 'no-store',
+                redirect: 'error'
+            });
+            if (!response.ok) { await response.body?.cancel(); continue; }
+            const data = await response.json();
+            if (data.remark || !Array.isArray(data.elements)) continue;
+            return data.elements;
+        } catch { /* Try the one bounded fallback provider. */ }
+    }
+    throw new Error('Los servidores del mapa están ocupados. Intenta de nuevo en unos momentos.');
+}
+
 export function mapContextRequest(params) {
     const kind = params.get('kind');
     const lat = params.get('lat'), lng = params.get('lng');
@@ -37,17 +63,13 @@ export function createMapContextLoader(fetcher = fetch, now = Date.now) {
         const entry = { expires: now() + 10 * 60 * 1000 };
         entry.promise = (async () => {
             const query = request.kind === 'streets' ? streetQuery(request.center) : buildCulturalPoiQuery(radarBounds(request.center));
-            for (const endpoint of OVERPASS_ENDPOINTS) {
-                try {
-                    const response = await fetcher(endpoint, { method: 'POST', headers: { 'User-Agent': 'FlyHigh-LocalReview/1.0 (interactive school-visit map preview)', Accept: 'application/json' }, body: new URLSearchParams({ data: query }), signal: AbortSignal.timeout(16000), cache: 'no-store', redirect: 'error' });
-                    if (!response.ok) { await response.body?.cancel(); continue; }
-                    const data = await response.json();
-                    if (data.remark || !Array.isArray(data.elements)) continue;
-                    return { items: request.kind === 'streets' ? parseStreets(data.elements, request.center) : parseCulturalPois(data.elements, request.center), center: request.center };
-                } catch { /* One bounded fallback, not an endless retry loop. */ }
+            try {
+                const elements = await fetchOverpassElements(query, fetcher);
+                return { items: request.kind === 'streets' ? parseStreets(elements, request.center) : parseCulturalPois(elements, request.center), center: request.center };
+            } catch (error) {
+                entry.expires = now() + 30000;
+                throw error;
             }
-            entry.expires = now() + 30000;
-            throw new Error('Los servidores del mapa están ocupados. Intenta de nuevo en unos momentos.');
         })();
         cache.set(request.key, entry);
         return entry.promise;

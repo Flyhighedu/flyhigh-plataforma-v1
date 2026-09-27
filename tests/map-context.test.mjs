@@ -13,7 +13,8 @@ test('provider failure falls back once, identifies app, and cached concurrent ca
     let calls = 0;
     const load = createMapContextLoader(async (_url, options) => {
         calls++;
-        assert.ok(options.headers['User-Agent'].startsWith('FlyHigh-LocalReview'));
+        assert.ok(options.headers['User-Agent'].startsWith('FlyHigh/'));
+        assert.equal(options.headers['Content-Type'], 'application/x-www-form-urlencoded;charset=UTF-8');
         return calls === 1 ? new Response('', { status: 503 }) : Response.json({ elements: [] });
     });
     const result = await Promise.all([load(area), load(area)]);
