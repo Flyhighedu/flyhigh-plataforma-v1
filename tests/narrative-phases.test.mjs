@@ -44,6 +44,17 @@ test('editing one phase clears only its obsolete review and audio', () => {
     assert.deepEqual(readNarrations(serialized), changed);
 });
 
+test('preschool guidance targets listening and concrete language without invented sensory facts', () => {
+    const prompt = buildPhasePrompt({ phaseId: 'phase_2', poiName: 'Cupatitzio', researchArticle: article });
+    assert.match(prompt, /3 a 5 años/);
+    assert.match(prompt, /escucharlas una sola vez/);
+    assert.match(prompt, /No inventes sonidos, colores, animales/);
+    assert.match(prompt, /evita el estilo de un informe/);
+    assert.match(prompt, /sin abrir con una dirección completa/);
+    assert.doesNotMatch(prompt, /tono cálido y documental/);
+    assert.match(prompt, /ÚNICA base factual/);
+});
+
 test('changing educational intent requires review; selecting or reusing identical text preserves audio', () => {
     const versions = { phase_2: saved };
     const same = editNarration(versions, 'phase_2', { narrative_script: saved.narrative_script });

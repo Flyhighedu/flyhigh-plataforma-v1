@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NARRATION_PHASES, initialNarrationStep, missingPhases, pendingReviews, pendingAudios, runNarrationBatch } from '../src/lib/narration-workflow.mjs';
+import { NARRATION_PHASES, initialNarrationStep, confirmNarrations, missingPhases, pendingReviews, pendingAudios, runNarrationBatch } from '../src/lib/narration-workflow.mjs';
 import { editNarration, readNarrations } from '../src/lib/narrative-versions.mjs';
 
 const research = 'Información del lugar verificada en sus fuentes oficiales. '.repeat(4);
@@ -9,10 +9,10 @@ const draft = { narrative_script: 'Conozcamos este lugar.', learning_goal: 'Reco
 test('entry resumes research, missing versions or review without choosing an audience', () => {
     const original = readNarrations({ narrative_script: 'Original', audio_url: 'https://example.org/original.wav' });
     assert.equal(initialNarrationStep({}, original), 1);
-    assert.equal(initialNarrationStep({ research_article: research }, original), 2);
+    assert.equal(initialNarrationStep({ research_article: research }, original), 1);
     let complete = original;
     for (const phase of NARRATION_PHASES) complete = editNarration(complete, phase.id, draft);
-    assert.equal(initialNarrationStep({}, complete), 3);
+    assert.equal(initialNarrationStep({}, complete), 2);
     assert.equal(pendingReviews(complete).length, 5);
 });
 
@@ -62,4 +62,22 @@ test('only reviewed scripts with a learning purpose and no audio enter audio gen
     };
     assert.deepEqual(pendingAudios(versions).map(phase => phase.id), ['phase_3']);
     assert.deepEqual(pendingReviews(versions).map(phase => phase.id), ['phase_2', 'phase_5']);
+});
+
+
+test('one explicit confirmation reviews the complete set and preserves existing timestamps and audio', () => {
+    let versions = readNarrations({ narrative_script: 'Original', audio_url: 'https://example.org/original.wav' });
+    assert.throws(() => confirmNarrations(versions), /Completa/);
+    for (const phase of NARRATION_PHASES) versions = editNarration(versions, phase.id, draft);
+    versions.phase_3 = { ...versions.phase_3, reviewed_at: '2026-09-01T00:00:00Z', audio_url: 'https://example.org/3.wav' };
+    const original = versions.general, existing = versions.phase_3;
+    const confirmed = confirmNarrations(versions, '2026-09-27T00:00:00Z');
+    assert.equal(pendingReviews(confirmed).length, 0);
+    assert.equal(pendingReviews(versions).length, 4);
+    assert.equal(confirmed.general, original);
+    assert.equal(confirmed.phase_3, existing);
+    assert.equal(confirmed.phase_2.reviewed_at, '2026-09-27T00:00:00Z');
+    const edited = editNarration(confirmed, 'phase_2', { narrative_script: 'Texto corregido.' });
+    assert.deepEqual(pendingReviews(edited).map(p => p.id), ['phase_2']);
+    assert.throws(() => confirmNarrations(editNarration(edited, 'phase_2', { learning_goal: '' })), /propósito/);
 });
