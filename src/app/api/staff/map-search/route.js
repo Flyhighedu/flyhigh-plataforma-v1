@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery } from '@/lib/cultural-pois.mjs';
 import { fetchOverpassElements } from '@/lib/map-context.mjs';
+import { cookies } from 'next/headers';
+import { verifyAdminToken } from '@/lib/adminAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,9 +15,14 @@ const reply = (body, status = 200) => Response.json(body, {
 export async function POST(request) {
     if (request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'Origen no permitido' }, 403);
 
-    const db = await createClient();
-    const { data: { user } } = await db.auth.getUser();
-    if (!user) return reply({ error: 'Inicia sesión para consultar el mapa.' }, 401);
+    // Admin uses a signed session cookie, while pilots use Supabase sessions.
+    // Both entry points share the same bounded, read-only map query.
+    const admin = await verifyAdminToken((await cookies()).get('flyhigh_admin_auth')?.value);
+    if (!admin) {
+        const db = await createClient();
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return reply({ error: 'Inicia sesión para consultar el mapa.' }, 401);
+    }
 
     let body;
     try { body = await request.json(); }

@@ -103,13 +103,13 @@ export default function useNativePOITap({ onPOIFound, enabled = true }) {
     const isBusyRef = useRef(false);
     const [isDiscovering, setIsDiscovering] = useState(false);
 
-    const handleMapTap = useCallback(async (lat, lng) => {
+    const handleMapTap = useCallback(async (lat, lng, origin) => {
         if (!enabled || isBusyRef.current) return;
 
         // ── Cache hit: instant modal ──
         const cached = getFromCache(lat, lng);
         if (cached) {
-            onPOIFound?.({
+            onPOIFound?.({ _origin: origin,
                 name: cached.name,
                 latitude: cached.lat,
                 longitude: cached.lon,
@@ -158,7 +158,7 @@ export default function useNativePOITap({ onPOIFound, enabled = true }) {
                     // Save to cache for instant revisit
                     saveToCache(lat, lng, poi);
 
-                    onPOIFound?.({
+                    onPOIFound?.({ _origin: origin,
                         name: poi.name,
                         latitude: poi.lat,
                         longitude: poi.lon,

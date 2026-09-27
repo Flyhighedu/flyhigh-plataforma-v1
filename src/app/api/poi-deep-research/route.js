@@ -354,7 +354,7 @@ const ENGINE_FNS = {
 
 const MAX_RETRIES = 5;
 
-export async function POST(request) {
+async function research(request, report = () => {}) {
     try {
         const { name, type, context, lat, lon, preferredEngine } = await request.json();
         if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
@@ -365,6 +365,7 @@ export async function POST(request) {
         const configured = { gemini: !!geminiApiKey(), rag: !!TAVILY_API_KEY && !!GROQ_API_KEY, cohere: !!COHERE_API_KEY };
         if (!configured[engineId]) return NextResponse.json({ error: 'Este motor de investigación no está configurado en este entorno. Puedes agregar información y fuentes manualmente.', allFailed: true }, { status: 503 });
 
+        report('Preparando la búsqueda del lugar');
         // Leer odómetro Tavily para incluirlo en la respuesta
         let tavilyUsage = null;
         try { tavilyUsage = await getTavilyUsage(); } catch (e) { /* ignore */ }
@@ -376,7 +377,11 @@ export async function POST(request) {
             console.log(`🔬 [${ENGINE_LABELS[engineId]}] Intento ${attempt}/${MAX_RETRIES} — Investigando: "${name}"`);
 
             try {
+                if (request.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                report(attempt === 1 ? 'Buscando información del lugar' : 'Reintentando la búsqueda · intento ' + attempt);
                 const result = await fn(name, type, context, lat, lon);
+                if (request.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                report('Organizando tu investigación');
                 const rawArticle = typeof result === 'string' ? result : result.text;
                 const images = result.images || [];
 
@@ -403,6 +408,7 @@ export async function POST(request) {
                     failedAttempts: engineLog.length > 0 ? engineLog : undefined
                 });
             } catch (err) {
+                if (request.signal.aborted) return NextResponse.json({ error: 'Investigación cancelada.' }, { status: 499 });
                 const msg = err.message;
                 const reason = msg === 'EMPTY_RESPONSE' ? 'sin información'
                              : msg === 'NO_KEY' ? 'sin API key'
@@ -438,4 +444,23 @@ export async function POST(request) {
             engine: 'none'
         }, { status: 500 });
     }
+}
+
+export async function POST(request) {
+    if (!request.headers.get('accept')?.includes('application/x-ndjson')) return research(request);
+    const encoder = new TextEncoder();
+    let cancelled = false;
+    const stream = new ReadableStream({
+        async start(controller) {
+            const send = event => { if (!cancelled && !request.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
+            try {
+                const response = await research(request, message => send({ type: 'progress', message }));
+                const data = await response.json();
+                send(response.ok && !data.allFailed ? { type: 'result', data } : { type: 'error', message: data.error || data.article || 'No se pudo completar la investigación.' });
+            } catch { send({ type: 'error', message: 'La investigación se interrumpió. Intenta de nuevo.' }); }
+            finally { if (!cancelled) controller.close(); }
+        },
+        cancel() { cancelled = true; },
+    });
+    return new Response(stream, { headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' } });
 }

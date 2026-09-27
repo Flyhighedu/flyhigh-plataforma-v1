@@ -12,14 +12,14 @@ export function StoryIllustration({ active = false }) {
     </svg>;
 }
 
-export default function NarrationGeneration({ kind, versions, progress, failures }) {
+export default function NarrationGeneration({ kind, versions, progress, failures, researchStage }) {
     const research = kind === 'research';
     const audio = kind === 'audios';
     const complete = item => audio ? !!versions[item.id]?.audio_url : hasScript(versions[item.id]);
     const count = NARRATION_PHASES.filter(complete).length;
     return <section className={styles.generation} aria-label="Generación en curso">
         <StoryIllustration active />
-        <div role="status" aria-live="polite" aria-atomic="true"><span className={styles.eyebrow}>{research ? 'CONOCIENDO EL LUGAR' : audio ? 'DANDO VOZ A TUS HISTORIAS' : 'UNA HISTORIA PARA CADA NIVEL'}</span><h2 tabIndex={-1}>{research ? 'Preparando tu investigación' : audio ? 'Tus guiones están tomando voz' : 'Tus cinco versiones están tomando forma'}</h2><p>{research ? 'Estamos reuniendo la información del lugar.' : `${count} de 5 ${audio ? 'audios listos' : 'guiones terminados'}`}</p><p className={styles.generationCurrent}>{progress ? `${audio ? 'Grabando' : 'Preparando'} · ${educationPhase(progress.phase).label}` : 'Un momento…'}</p></div>
+        <div role="status" aria-live="polite" aria-atomic="true"><span className={styles.eyebrow}>{research ? 'CONOCIENDO EL LUGAR' : audio ? 'DANDO VOZ A TUS HISTORIAS' : 'UNA HISTORIA PARA CADA NIVEL'}</span><h2 tabIndex={-1}>{research ? 'Preparando tu investigación' : audio ? 'Tus guiones están tomando voz' : 'Tus cinco versiones están tomando forma'}</h2>{!research && <p>{`${count} de 5 ${audio ? 'audios listos' : 'guiones terminados'}`}</p>}<p className={styles.generationCurrent}>{research ? researchStage : progress ? `${audio ? 'Grabando' : 'Preparando'} · ${educationPhase(progress.phase).label}` : 'Un momento…'}</p></div>
         {!research && <><progress value={count} max={5} aria-label={audio ? 'Audios listos' : 'Guiones terminados'} /><div className={styles.generationList}>{NARRATION_PHASES.map(item => <div key={item.id} data-state={complete(item) ? 'done' : failures[item.id] ? 'failed' : progress?.phase === item.id ? 'active' : 'pending'}><span>{complete(item) ? <Check size={17} /> : progress?.phase === item.id ? <Loader2 className={styles.spin} size={17} /> : <span className={styles.dot} />}</span><strong>{item.shortLabel}</strong><small>{complete(item) ? 'Listo' : failures[item.id] ? 'Pendiente de reintento' : progress?.phase === item.id ? 'Creando…' : 'En espera'}</small></div>)}</div></>}
     </section>;
 }

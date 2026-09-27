@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, Headphones, Loader2, Pause, Play, Plus, Search, X } from 'lucide-react';
+import { narrationReadiness } from '@/lib/narration-workflow.mjs';
+import { readNarrations } from '@/lib/narrative-versions.mjs';
 import { coordinates, distanceKm, durationLabel, usableAudio } from '@/lib/narration-preparation.mjs';
 import { Notice, secondary } from './PreparationUI';
 
@@ -45,6 +47,7 @@ export default function NarrationLibrary({ catalog, selectedIds = [], onAdd, add
             const available = usableAudio(p.audio_url);
             return <article key={p.id} className={`rounded-2xl border bg-white p-4 ${selected ? 'border-blue-300' : 'border-slate-200'}`}>
                 <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
+                {p.is_official && !narrationReadiness(readNarrations(p)).ready && <details className="mt-2 text-xs text-amber-800"><summary className="min-h-11 cursor-pointer py-3">Versiones por nivel pendientes</summary><p>Solicita a tu coordinación completar estos niveles.</p></details>}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button disabled={!available || loading} onClick={() => audio.toggle(p)} aria-label={`${playing ? 'Pausar' : 'Escuchar'} ${p.name}`} className={secondary}>{loading ? <Loader2 size={16} className="animate-spin" /> : playing ? <Pause size={16} /> : <Play size={16} />}{playing ? 'Pausar' : 'Escuchar'}</button>
                     {onAdd && <button disabled={selected || !available || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-50 px-3 text-sm font-bold text-blue-700 disabled:text-slate-500">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregada' : 'Agregar'}</button>}

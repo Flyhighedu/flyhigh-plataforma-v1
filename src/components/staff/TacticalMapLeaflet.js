@@ -6,6 +6,7 @@
 // No popups. Clean interaction model.
 // =====================================================
 
+import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -99,6 +100,8 @@ export default function TacticalMapLeaflet({
     const markersLayerRef = useRef(null);        // LayerGroup for saved POIs
     const suggestedLayerRef = useRef(null);       // LayerGroup for suggested POIs
     const markersRef = useRef([]);
+    const latestPoisRef = useRef(pois);
+    useEffect(() => { latestPoisRef.current = pois; }, [pois]);
     const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
     const markerClickedRef = useRef(false);
@@ -143,7 +146,9 @@ export default function TacticalMapLeaflet({
             startPos = e.containerPoint ? { x: e.containerPoint.x, y: e.containerPoint.y } : null;
             pressTimer = setTimeout(() => {
                 longPressedRef.current = true; // Flag: suppress the click that fires on release
-                onLongPress?.(latlng.lat, latlng.lng);
+                const rect = containerRef.current.getBoundingClientRect();
+                const point = map.latLngToContainerPoint(latlng);
+                onLongPress?.(latlng.lat, latlng.lng, { x: rect.x + point.x, y: rect.y + point.y });
                 pressTimer = null;
             }, 600);
         };
@@ -173,7 +178,8 @@ export default function TacticalMapLeaflet({
         map.on('mouseup', endPress);
         map.on('touchend', endPress);
         map.on('contextmenu', (e) => {
-            onLongPress?.(e.latlng.lat, e.latlng.lng);
+            const rect = containerRef.current.getBoundingClientRect();
+            onLongPress?.(e.latlng.lat, e.latlng.lng, { x: rect.x + e.containerPoint.x, y: rect.y + e.containerPoint.y });
         });
 
         // ═══ TAP-TO-DISCOVER: Detect taps on base map (not on markers) ═══
@@ -186,7 +192,8 @@ export default function TacticalMapLeaflet({
                 longPressedRef.current = false;
                 return; // Was a long-press — suppress (already handled)
             }
-            onMapTapRef.current?.(e.latlng.lat, e.latlng.lng);
+            const rect = containerRef.current.getBoundingClientRect();
+            onMapTapRef.current?.(e.latlng.lat, e.latlng.lng, { x: rect.x + e.containerPoint.x, y: rect.y + e.containerPoint.y });
         });
 
         map.on('moveend', () => {
@@ -272,7 +279,9 @@ export default function TacticalMapLeaflet({
 
                 marker.on('click', () => {
                     markerClickedRef.current = true;
-                    onMarkerClick?.(poi);
+                    const element = marker.getElement();
+                    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) element?.animate([{ opacity: .5 }, { opacity: 1 }], { duration: 220 });
+                    onMarkerClick?.({ ...(latestPoisRef.current.find(item => item.id === poi.id) || poi), _origin: narrationOrigin(element) });
                 });
 
                 layer.addLayer(marker);
@@ -306,7 +315,7 @@ export default function TacticalMapLeaflet({
 
             marker.on('click', () => {
                 markerClickedRef.current = true;
-                onSuggestedPoiClick?.(poi);
+                onSuggestedPoiClick?.({ ...poi, _origin: narrationOrigin(marker.getElement()) });
             });
 
             layer.addLayer(marker);

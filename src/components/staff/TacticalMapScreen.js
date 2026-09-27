@@ -5,6 +5,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Lightbulb, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
+import { narrationReadiness } from '@/lib/narration-workflow.mjs';
+import { readNarrations } from '@/lib/narrative-versions.mjs';
 import POIDetailModal from './POIDetailModal';
 import useNativePOITap from '@/hooks/useNativePOITap';
 
@@ -159,7 +162,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 }
                 if (!fullPoi) throw new Error('Este punto ya no está disponible.');
             }
-            setModalPoi(fullPoi);
+            setModalPoi({ ...fullPoi, _origin: poi._origin });
             setIsNewPin(false);
         } catch (error) { alert('No se abrió el editor. ' + error.message); }
     }, []);
@@ -167,6 +170,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     // ═══ TRIGGER: Tap on suggested POI marker ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
         setModalPoi({
+            _origin: poi._origin,
             name: poi.name,
             description: poi.description,
             latitude: poi.latitude,
@@ -177,7 +181,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     }, []);
 
     // ═══ TRIGGER: Long-press on empty map ═══
-    const handleLongPress = useCallback(async (lat, lng) => {
+    const handleLongPress = useCallback(async (lat, lng, origin) => {
         setIsReverseGeocoding(true);
         let placeName = '';
         try {
@@ -237,6 +241,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
         } finally {
             setIsReverseGeocoding(false);
             setModalPoi({
+                _origin: origin,
                 latitude: lat,
                 longitude: lng,
                 name: placeName,
@@ -250,6 +255,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     const { handleMapTap, isDiscovering } = useNativePOITap({
         onPOIFound: useCallback((poi) => {
             setModalPoi({
+                _origin: poi._origin,
                 latitude: poi.latitude,
                 longitude: poi.longitude,
                 name: poi.name,
@@ -536,7 +542,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 if (result.error) throw result.error;
                 setPois(prev => [result.data, ...prev]);
             }
-            setModalPoi(null);
+
         } catch (err) {
             console.error('POI save error:', err);
             throw new Error('No se guardaron los cambios. ' + (err.message || 'Intenta de nuevo.'));
@@ -824,7 +830,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                                 return (
                                 <button
                                     key={poi.id}
-                                    onClick={() => handleMarkerClick(poi)}
+                                    onClick={event => handleMarkerClick({ ...poi, _origin: narrationOrigin(event.currentTarget) })}
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: 14,
                                         padding: '16px', borderRadius: 16,
@@ -864,6 +870,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                                         )}
                                     </div>
                                     {/* Show edit icon only for personal (non-official) POIs */}
+                                    {poi.is_official && !narrationReadiness(readNarrations(poi)).ready && <span className="text-xs text-amber-800">Versiones por nivel pendientes</span>}
                                     {!poi.is_official && (
                                         <div style={{ width: 32, height: 32, borderRadius: 10, background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                             <Edit3 size={16} strokeWidth={2.5} style={{ color: '#06B6D4' }} />

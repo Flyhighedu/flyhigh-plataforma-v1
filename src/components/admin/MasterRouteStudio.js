@@ -15,6 +15,9 @@ const MapWithNoSSR = dynamic(() => import('../staff/TacticalMapLeaflet'), { ssr:
     </div>
 )});
 
+import { narrationReadiness } from '@/lib/narration-workflow.mjs';
+import { readNarrations } from '@/lib/narrative-versions.mjs';
+import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
 import AdminPOIModal from './AdminPOIModal';
 import VoiceSimulatorWidget from '../staff/VoiceSimulatorWidget';
 
@@ -64,6 +67,7 @@ export default function MasterRouteStudio() {
     const audioRef = useRef(null);
 
     // ═══ MAP STATE ═══
+    const [searchError, setSearchError] = useState('');
     const [mapBounds, setMapBounds] = useState(null);
     const [suggestedPois, setSuggestedPois] = useState([]);
     const [isSearchingPois, setIsSearchingPois] = useState(false);
@@ -92,7 +96,7 @@ export default function MasterRouteStudio() {
             if (res.ok) {
                 const data = await res.json();
                 let globalRoute = (data.routes || []).find(r => r.title === 'Directorio Global');
-                
+
                 if (!globalRoute) {
                     const createRes = await fetch('/api/admin/routes', {
                         method: 'POST',
@@ -104,7 +108,7 @@ export default function MasterRouteStudio() {
                         globalRoute = createData.route;
                     }
                 }
-                
+
                 if (globalRoute) {
                     setActiveRoute(globalRoute);
                     fetchPois(globalRoute.id);
@@ -148,7 +152,7 @@ export default function MasterRouteStudio() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'No se guardaron los cambios.');
             setPois(prev => prev.map(p => p.id === id ? data.poi : p));
-            setEditingPoi(data.poi);
+
         }
         finally { setSaving(false); }
     };
@@ -189,14 +193,27 @@ export default function MasterRouteStudio() {
         finally { setAiLoading(false); }
     };
 
+    // ═══ ADD POI FROM MAP (MEMORY ONLY) ═══
+    const addPoiFromMap = useCallback((name, lat, lng, description, origin) => {
+        if (!activeRoute) return;
+        setIsAwaitingSelection(false);
+        setEditingPoi({
+            _origin: origin,
+            id: `temp-${Date.now()}`,
+            name,
+            description,
+            latitude: lat,
+            longitude: lng
+        });
+    }, [activeRoute]);
+
     // ═══ MAP: LONG-PRESS → NEW POI ═══
-    const handleLongPress = useCallback(async (lat, lng) => {
+    const handleLongPress = useCallback(async (lat, lng, origin) => {
         if (!activeRoute) return;
         setIsReverseGeocoding(true);
         let placeName = '';
         try {
-            const query = `[out:json][timeout:10];(node["name"](around:150,${lat},${lng});way["name"](around:150,${lat},${lng}););out center;`;
-            const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+            const res = await fetch('/api/staff/map-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'nearby-name', latitude: lat, longitude: lng, radius: 150 }) });
             if (res.ok) {
                 const data = await res.json();
                 if (data?.elements?.length > 0) {
@@ -208,63 +225,29 @@ export default function MasterRouteStudio() {
         finally {
             setIsReverseGeocoding(false);
             // Auto-create POI and open editor
-            addPoiFromMap(placeName || 'Nuevo Punto', lat, lng, '');
+            addPoiFromMap(placeName || 'Nuevo Punto', lat, lng, '', origin);
         }
-    }, [activeRoute]);
+    }, [activeRoute, addPoiFromMap]);
 
     // ═══ MAP: TAP-TO-DISCOVER (Native OSM POIs) ═══
     const { handleMapTap, isDiscovering } = useNativePOITap({
         onPOIFound: useCallback((poi) => {
-            addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description);
-        }, []),
+            addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description, poi._origin);
+        }, [addPoiFromMap]),
         enabled: !!activeRoute
     });
 
     // ═══ MAP: RADAR SEARCH (Overpass Cultural POIs) ═══
     const handleSearchCulturalPois = async () => {
         if (suggestedPois.length > 0) { setSuggestedPois([]); return; }
-        if (!mapBounds) { alert('Mueve el mapa para detectar la zona.'); return; }
+        if (!mapBounds) { setSearchError('Mueve el mapa para detectar la zona.'); return; }
+        setSearchError('');
         setIsSearchingPois(true);
         try {
             const sw = mapBounds._southWest, ne = mapBounds._northEast;
-            const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
-            const query = `
-                [out:json][timeout:20];
-                (
-                  node["historic"](${bbox});
-                  way["historic"](${bbox});
-                  node["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  way["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  node["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
-                  way["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
-                  node["aeroway"="aerodrome"](${bbox});
-                  way["aeroway"="aerodrome"](${bbox});
-                  node["waterway"~"dam|river|waterfall"](${bbox});
-                  way["waterway"~"dam|river|waterfall"](${bbox});
-                  node["natural"~"peak|volcano|water|wood|forest"](${bbox});
-                  way["natural"~"peak|volcano|water|wood|forest"](${bbox});
-                  node["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
-                  way["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
-                  node["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill|works"](${bbox});
-                  way["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill|works"](${bbox});
-                  node["power"="plant"](${bbox});
-                  way["power"="plant"](${bbox});
-                  node["railway"="station"](${bbox});
-                  way["railway"="station"](${bbox});
-                  node["landuse"~"industrial|commercial|cemetery"]["name"](${bbox});
-                  way["landuse"~"industrial|commercial|cemetery"]["name"](${bbox});
-                  node["amenity"~"fuel|hospital|police|fire_station|grave_yard"]["name"](${bbox});
-                  way["amenity"~"fuel|hospital|police|fire_station|grave_yard"]["name"](${bbox});
-                  node["shop"="mall"]["name"](${bbox});
-                  way["shop"="mall"]["name"](${bbox});
-                  node["place"~"city|town|village|suburb|municipality"]["name"](${bbox});
-                  way["place"~"city|town|village|suburb|municipality"]["name"](${bbox});
-                );
-                out center;
-            `;
-            const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-            if (!res.ok) throw new Error('Overpass failed');
+            const res = await fetch('/api/staff/map-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'cultural', bounds: { south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng } }) });
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'No se pudo consultar el mapa.');
             const newPois = data.elements.map(el => {
                 const lat = el.type === 'node' ? el.lat : el.center?.lat;
                 const lon = el.type === 'node' ? el.lon : el.center?.lon;
@@ -349,35 +332,22 @@ export default function MasterRouteStudio() {
 
                 return { id: el.id, name, description: desc, category: cat, latitude: lat, longitude: lon };
             }).filter(Boolean);
-            if (newPois.length === 0) { alert('No se encontraron sitios en esta zona.'); return; }
+            if (newPois.length === 0) { setSearchError('No encontramos sitios aquí. Puedes mantener presionado el mapa para crear uno.'); return; }
             setSuggestedPois(newPois);
-        } catch (err) { console.error(err); alert('Error al buscar sitios.'); }
+        } catch (err) { console.error(err); setSearchError(err.message || 'No se pudo consultar el mapa.'); }
         finally { setIsSearchingPois(false); }
     };
 
     // ═══ MAP: CLICK SUGGESTED POI → ADD TO ROUTE ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
         if (!activeRoute) return;
-        addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description || '');
-    }, [activeRoute]);
+        addPoiFromMap(poi.name, poi.latitude, poi.longitude, poi.description || '', poi._origin);
+    }, [activeRoute, addPoiFromMap]);
 
     // ═══ MAP: CLICK SAVED POI MARKER ═══
     const handleMarkerClick = useCallback((poi) => {
         setEditingPoi(poi);
     }, []);
-
-    // ═══ ADD POI FROM MAP (MEMORY ONLY) ═══
-    const addPoiFromMap = (name, lat, lng, description) => {
-        if (!activeRoute) return;
-        setIsAwaitingSelection(false);
-        setEditingPoi({
-            id: `temp-${Date.now()}`,
-            name,
-            description,
-            latitude: lat,
-            longitude: lng
-        });
-    };
 
     // ═══ RENDER ═══
     if (loading) {
@@ -390,6 +360,7 @@ export default function MasterRouteStudio() {
 
     return (
         <div className="w-full">
+            {searchError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950"><span className="flex-1">{searchError}</span><button type="button" disabled={isSearchingPois} onClick={handleSearchCulturalPois} className="min-h-11 px-3 font-semibold">Reintentar</button><button type="button" onClick={() => { setSearchError(''); setIsAwaitingSelection(true); }} className="min-h-11 px-3 font-semibold">Elegir punto en el mapa</button></div>}
             {/* ── MAIN SPLIT LAYOUT ── */}
             {activeRoute && (
                 <>
@@ -454,7 +425,6 @@ export default function MasterRouteStudio() {
                                 onSave={async (poiData) => {
                                     if (editingPoi.id && !editingPoi.id.startsWith('temp-')) {
                                         await updatePoi(editingPoi.id, poiData);
-                                        setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
                                     } else {
                                         // Save new POI to server
                                         setSaving(true);
@@ -467,12 +437,10 @@ export default function MasterRouteStudio() {
                                             const data = await res.json();
                                             if (!res.ok) throw new Error(data.error || 'No se pudo guardar el punto.');
                                             setPois(prev => [...prev, data.poi]);
-                                            setEditingPoi(null);
-                                            setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
                                         }
                                         finally { setSaving(false); }
                                     }
-                                    setEditingPoi(null);
+
                                     setSaveSuccess(true);
                                     setTimeout(() => setSaveSuccess(false), 3000);
                                 }}
@@ -600,9 +568,10 @@ export default function MasterRouteStudio() {
                                 return true;
                             }).map((poi) => {
                                 const hasNarrative = poi.narrative_script && poi.audio_url;
+                                const readiness = narrationReadiness(readNarrations(poi));
                                 const isGeneral = poi.is_general_topic || (poi.lat == null && poi.latitude == null);
                                 return (
-                                    <div key={poi.id} onClick={() => { setEditingPoi(poi); window.scrollTo({top: 0, behavior: 'smooth'}); }} className="neu-card cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl group flex flex-col" style={{ overflow: 'hidden', padding: 0 }}>
+                                    <div key={poi.id} onClick={event => setEditingPoi({ ...poi, _origin: narrationOrigin(event.currentTarget) })} className="neu-card cursor-pointer transition-all hover:-translate-y-2 hover:shadow-2xl group flex flex-col" style={{ overflow: 'hidden', padding: 0 }}>
                                         {/* Header / Cover */}
                                         <div style={{ height: 140, background: poi.image_url ? `url(${poi.image_url}) center/cover` : (isGeneral ? 'linear-gradient(135deg, #F59E0B, #D97706)' : 'linear-gradient(135deg, #2563EB, #1D4ED8)'), position: 'relative' }}>
                                             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.1) 100%)' }} />
@@ -619,19 +588,19 @@ export default function MasterRouteStudio() {
                                                 <Trash2 size={14} />
                                             </button>
                                         </div>
-                                        
+
                                         {/* Content */}
                                         <div className="p-5 bg-white flex-1 flex flex-col">
-                                            {Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim()) && <p className="text-xs text-blue-700 mb-3">{Object.values(poi.narrative_versions).filter(version => version.narrative_script?.trim()).length}/5 fases con guion</p>}
+                                            <p className={`mb-3 text-xs font-semibold ${readiness.ready ? 'text-emerald-800' : 'text-amber-800'}`}>{readiness.label}</p>
                                             <div className="flex items-center justify-between mb-3">
                                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${hasNarrative ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {hasNarrative ? 'General con audio' : poi.narrative_script ? 'General sin audio' : 'General pendiente'}
+                                                    {hasNarrative ? 'General con audio' : poi.narrative_script ? 'General sin audio' : 'Versiones por nivel'}
                                                 </span>
                                                 <span className="text-[10px] font-medium text-slate-400 font-mono">
                                                     {isGeneral ? 'Sin ubicación' : `${poi.latitude?.toFixed(4) ?? poi.lat?.toFixed(4) ?? '—'}, ${poi.longitude?.toFixed(4) ?? poi.lng?.toFixed(4) ?? '—'}`}
                                                 </span>
                                             </div>
-                                            
+
                                             {hasNarrative ? (
                                                 <div className="flex-1 flex flex-col gap-3 mt-1">
                                                     <p className="text-xs text-slate-600 font-medium line-clamp-3 leading-relaxed italic border-l-2 border-purple-200 pl-2">
@@ -645,7 +614,7 @@ export default function MasterRouteStudio() {
                                             ) : (
                                                 <div className="flex-1 flex items-center justify-center">
                                                     <div className="flex items-center gap-2 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
-                                                        <Mic size={14} /> Requiere Narrativa
+                                                        <Mic size={14} /> {readiness.scripts ? 'Abrir guiones por nivel' : 'Crear narraciones'}
                                                     </div>
                                                 </div>
                                             )}
@@ -664,7 +633,7 @@ export default function MasterRouteStudio() {
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)' }}>
                     <div className="bg-white rounded-[2rem] shadow-2xl p-8 max-w-md w-full relative overflow-hidden flex flex-col gap-6" style={{ border: '1px solid rgba(255,255,255,0.5)', animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-rose-500 to-violet-600" />
-                        
+
                         <div className="flex flex-col items-center text-center gap-3 mt-4">
                             <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center text-3xl mb-2">🌍</div>
                             <h2 className="text-2xl font-black text-slate-800">Estudio de Misiones</h2>
@@ -721,7 +690,7 @@ export default function MasterRouteStudio() {
                     {/* Attention pulse rings */}
                     <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_0.8s_1_both] pointer-events-none" />
                     <div className="absolute inset-0 rounded-[28px] animate-[orbiPulseRing_1.8s_cubic-bezier(0,0,0.2,1)_10.8s_1_both] pointer-events-none" />
-                    
+
                     <VoiceSimulatorWidget
                         pois={pois}
                         audioRef={audioRef}

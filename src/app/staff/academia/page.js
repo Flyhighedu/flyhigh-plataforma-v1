@@ -12,6 +12,9 @@ import {
     Play, Pause, Volume2, Pencil
 } from 'lucide-react';
 import { motion, useAnimation, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
+import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
+import { narrationReadiness } from '@/lib/narration-workflow.mjs';
+import { readNarrations } from '@/lib/narrative-versions.mjs';
 import POIDetailModal from '@/components/staff/POIDetailModal';
 import VoiceSimulatorWidget from '@/components/staff/VoiceSimulatorWidget';
 import { normalizeCommand } from '@/lib/normalize-command.mjs';
@@ -857,7 +860,7 @@ export default function AcademiaLobbyPage() {
                                 return (
                                     <div 
                                         key={poi.id}
-                                        onClick={() => { setSelectedPoi(poi); setIsPoiModalOpen(true); }}
+                                        onClick={event => { setSelectedPoi({ ...poi, _origin: narrationOrigin(event.currentTarget) }); setIsPoiModalOpen(true); }}
                                         className="bg-white rounded-[28px] overflow-hidden border border-slate-100 shadow-[0_8px_20px_rgba(0,0,0,0.03)] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] transition-all cursor-pointer group flex flex-col relative"
                                     >
                                         {/* Status Badge */}
@@ -937,7 +940,7 @@ export default function AcademiaLobbyPage() {
                                             <h3 className="font-black text-slate-800 text-[14px] leading-tight mb-2 line-clamp-2">
                                                 {poi.name}
                                             </h3>
-                                            {Object.values(poi.narrative_versions || {}).some(version => version.narrative_script?.trim()) && <p className="text-[11px] text-blue-700 mb-2">{Object.values(poi.narrative_versions).filter(version => version.narrative_script?.trim()).length}/5 fases con guion</p>}
+                                            <p className={`text-[11px] mb-2 ${narrationReadiness(readNarrations(poi)).ready ? 'text-emerald-800' : 'text-amber-800'}`}>{narrationReadiness(readNarrations(poi)).label}</p>
                                             {voiceSimActive && poi.audio_url && (
                                                 <span className="text-[10px] font-bold text-indigo-500/70 bg-indigo-50 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-1">
                                                     🗣️ {normalizeCommand(poi.name).split(' ').join(', ')}
@@ -1077,7 +1080,7 @@ export default function AcademiaLobbyPage() {
                             if (error) throw error;
                             setPois(prev => prev.map(p => p.id === poiData.id ? { ...p, ...updatePayload } : p));
                         }
-                        setIsPoiModalOpen(false);
+
                     } catch (error) {
                         console.error('Error saving POI:', error);
                         throw new Error('No se guardaron los cambios. ' + (error.message || 'Intenta de nuevo.'));

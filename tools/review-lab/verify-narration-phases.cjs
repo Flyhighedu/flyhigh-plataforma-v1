@@ -40,16 +40,22 @@ app.whenReady().then(async () => {
     const click = text => evaluate(`(() => { const e = [...document.querySelectorAll('button')].find(e => e.textContent.trim() === ${JSON.stringify(text)}); if (!e || e.disabled) throw new Error('Button unavailable: ' + ${JSON.stringify(text)}); e.click(); return true; })()`);
     const field = (suffix, value) => evaluate(`(() => { const e = document.querySelector('[id$="-${suffix}"]'); Object.getOwnPropertyDescriptor(e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     const value = suffix => evaluate(`document.querySelector('[id$="-${suffix}"]').value`);
-    const selectVersion = id => evaluate(`(() => { const e = document.querySelector('[id$="-version"]'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, ${JSON.stringify(id)}); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    const labels = { phase_2: 'Preescolar', phase_3: '1.º y 2.º de primaria', phase_4: '3.º y 4.º de primaria', phase_5: '5.º y 6.º de primaria', phase_6: 'Secundaria', general: 'General' };
+    const selectVersion = id => evaluate(`document.querySelector('[aria-label="Seleccionar nivel educativo"] button[aria-label="${labels[id]}"]').click(); true;`);
+    const editScript = () => evaluate(`document.querySelector('[aria-label="Editar el texto de este guion"]').click(); true;`);
+    const closeSaved = async () => { await click('Volver al mapa'); await until(() => evaluate(`!document.querySelector('${dialog}')`), 'saved editor closed'); };
     const openCard = async name => {
         await until(async () => (await body()).includes(name), 'point card');
         await evaluate(`(() => { const e = [...document.querySelectorAll('h3,h4')].find(e => e.textContent.trim() === ${JSON.stringify(name)}); if (!e) throw new Error('Missing card'); e.closest('.cursor-pointer').click(); return true; })()`);
         await until(() => evaluate(`!!document.querySelector('${dialog}')`), 'editor');
+        await until(() => evaluate(`document.querySelector('${dialog}').getAnimations().every(a => a.playState === 'finished')`), 'entrance finished');
     };
     const signIn = async (role, pathname) => {
         const response = await fetch(runtime.baseURL + '/api/review-lab/mobile-link', { method: 'POST', headers: { 'content-type': 'application/json', 'x-flyhigh-review-token': runtime.token }, body: JSON.stringify({ role, pathname }) });
         assert.equal(response.status, 200);
-        await wc.loadURL(runtime.mobileBaseURL + (await response.json()).path);
+        try { await wc.loadURL(runtime.mobileBaseURL + (await response.json()).path); }
+        catch (error) { if (error.errno !== -3 || new URL(wc.getURL()).pathname !== pathname) throw error; }
+        await until(() => evaluate("document.readyState !== 'loading'"), 'signed-in document');
     };
     const timer = setTimeout(() => { console.error('Regression exceeded 240 seconds'); app.exit(1); }, 240000);
     try {
@@ -127,7 +133,7 @@ app.whenReady().then(async () => {
         await until(async () => (await body()).includes('Confirmar guiones y continuar'), 'automatic review');
         assert.deepEqual(await evaluate("window.__calls.filter(c => c.endpoint.includes('generate-script')).map(c => c.phase)"), ['phase_2', 'phase_4', 'phase_5', 'phase_6', 'phase_4']);
         assert.equal(await evaluate("window.__calls.filter(c => c.endpoint.includes('deep-research')).length"), 1);
-        assert.equal(await evaluate(`document.querySelector('${dialog} textarea') === null`), true);
+        assert.equal(await evaluate(`!!document.querySelector('[id$="-script"]')`), false);
         for (const id of ['phase_4', 'phase_5', 'phase_6', 'phase_2']) {
             await selectVersion(id);
             assert.ok((await body()).includes('Confirmar guiones y continuar'));
@@ -139,18 +145,28 @@ app.whenReady().then(async () => {
         assert.ok(!(await body()).includes('Aprobar y continuar'));
         assert.ok(!(await body()).includes('Escribir una versión manualmente'));
         report('PASS: full document, one scroll area at 320/390/1280, expanding editing, hidden bibliography, direct creation, real progress, missing-only retry, free navigation without auto approval');
+        await delay(1500);
+        const bounds = await evaluate(`(() => { const r = document.querySelector('[aria-roledescription="carrusel"]').getBoundingClientRect(); return { x: r.left + r.width * .75, y: r.top + 32 }; })()`);
+        wc.debugger.attach('1.3');
+        await wc.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: bounds.x, y: bounds.y }] });
+        for (const dx of [35, 80, 140]) {
+            await wc.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: bounds.x - dx, y: bounds.y }] });
+            await delay(25);
+        }
+        await wc.debugger.sendCommand('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        wc.debugger.detach();
+        await until(() => evaluate(`document.querySelector('[aria-label="Seleccionar nivel educativo"] [aria-current="true"]').getAttribute('aria-label') === '1.º y 2.º de primaria'`), 'finger swipe changes the script');
+        assert.equal(await evaluate(`!!document.querySelector('[id$="-script"]')`), false);
+        report('PASS: real touch drag changes the script without opening its editor');
         await click('Confirmar guiones y continuar');
-        await until(async () => (await body()).includes('Tus narraciones, listas para guardar'), 'single confirmation');
+        await until(async () => (await body()).includes('Voz para cada nivel'), 'single confirmation');
         assert.ok((await body()).includes('Personalizar portada'));
-        await click('Generar los 4 audios pendientes');
-        await until(async () => (await body()).includes('Generar el audio pendiente'), 'partial audio completion');
+        await click('Crear audios y guardar');
+        await until(async () => (await body()).includes('Reintentar pendientes y guardar'), 'partial audio completion');
         assert.ok((await body()).includes('Audio de prueba pendiente'));
-        await click('Generar el audio pendiente');
-        await until(async () => (await body()).includes('5/5 audios'), 'audio retry complete');
-        assert.deepEqual(await evaluate("window.__calls.filter(c => c.endpoint.includes('generate-audio')).map(c => c.phase)"), ['phase_2', 'phase_4', 'phase_5', 'phase_6', 'phase_5']);
-        await click('2Guiones');
+        await evaluate(`[...document.querySelectorAll('[aria-label="Pasos para crear narraciones"] button')].find(e => e.textContent.includes('Guiones')).click(); true;`);
         await selectVersion('phase_2');
-        await click('Editar guion');
+        await editScript();
         await field('script', 'Guion corregido para preescolar.');
         await field('goal', '');
         await click('Confirmar guiones y continuar');
@@ -160,20 +176,21 @@ app.whenReady().then(async () => {
         await until(async () => (await body()).includes('Usar esta propuesta'), 'replacement proposal');
         assert.ok(await evaluate(`!!document.querySelector('${dialog} [aria-label="Propuesta de guion"]')`));
         await click('Conservar el anterior');
-        assert.equal(await value('script'), 'Guion corregido para preescolar.');
+        assert.ok((await body()).includes('Guion corregido para preescolar.'));
         await click('Crear otra propuesta');
         await until(async () => (await body()).includes('Usar esta propuesta'), 'replacement second proposal');
         await click('Usar esta propuesta');
         assert.ok((await body()).includes('Guion de prueba para phase_2.'));
         assert.ok((await body()).includes('Confirmar guiones y continuar'));
-        report('PASS: one set confirmation, optional audio and cover only at finish, audio retry preserves existing audio, editing requires re-confirmation, replacement is explicit');
+        report('PASS: partial audio recovery, direct text editing invalidates audio, editing requires re-confirmation, replacement is explicit');
         await evaluate(`window.fetch = (url, options) => String(url).includes('/rest/v1/pilot_pois') && options?.method === 'PATCH' ? Promise.resolve(Response.json({ message: 'Fallo simulado de guardado' }, { status: 500 })) : window.__originalFetch(url, options); true;`);
-        await click('Guardar borrador y salir');
+        await click('Guardar borrador');
         await until(async () => (await body()).includes('No se guardaron los cambios'), 'save failure feedback');
         assert.ok((await body()).includes('Guion de prueba para phase_2.'));
         await evaluate('window.fetch = window.__originalFetch; true;');
-        await click('Guardar borrador y salir');
-        await until(() => evaluate(`!document.querySelector('${dialog}')`), 'save and close');
+        await click('Guardar borrador');
+        await until(async () => (await body()).includes('Borrador guardado'), 'draft saved');
+        await closeSaved();
         const stored = (await client.query('SELECT * FROM pilot_pois WHERE id=$1', [ownId])).rows[0];
         assert.equal(stored.narrative_script, base.narrative_script);
         assert.equal(stored.audio_url, base.audio_url);
@@ -190,26 +207,33 @@ app.whenReady().then(async () => {
         assert.ok((await body()).includes('Confirmar guiones y continuar'));
         assert.ok((await body()).includes('Guion de prueba para phase_2.'));
         await evaluate(`document.querySelector('${dialog} [aria-label="Cerrar editor"]').click(); true;`);
+        await until(() => evaluate(`!document.querySelector('${dialog}')`), 'existing editor closed');
         await evaluate(`Array.from(document.querySelectorAll('button')).find(e => e.textContent.includes('AGREGAR TEMA GENERAL')).click(); true;`);
         await field('name', topicName);
         await click('Ya tengo una investigación');
         await field('research', base.research_article);
-        await click('Guardar borrador y salir');
-        await until(() => evaluate(`!document.querySelector('${dialog}')`), 'research-only new topic save');
+        await click('Guardar borrador');
+        await until(async () => (await body()).includes('Borrador guardado'), 'new topic saved');
+        await closeSaved();
         const topic = (await client.query('SELECT * FROM pilot_pois WHERE name=$1 AND user_id=$2', [topicName, user.id])).rows[0];
         assert.ok(topic);
         assert.equal(topic.latitude, null);
         assert.equal(topic.research_article, base.research_article);
         report('PASS: drafts survive save errors, research provenance survives editing, existing General/audio preserved, new topic saves without coordinates');
         await signIn('admin', '/admin/hr-rutas');
+        const search = await evaluate(`fetch('/api/staff/map-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'cultural', bounds: { south: 19.412, west: -102.065, north: 19.425, east: -102.050 } }) }).then(async response => ({ status: response.status, data: await response.json() }))`);
+        assert.equal(search.status, 200, search.data.error);
+        assert.ok(Array.isArray(search.data.elements));
+        report('PASS: signed admin queries the real map service (' + search.data.elements.length + ' results)');
         await openCard(officialName);
         assert.ok((await body()).includes('Tu investigación'));
         await installMocks();
         await evaluate('window.__failPhase = false; true;');
         await click('Crear los 5 guiones');
         await until(async () => (await body()).includes('Confirmar guiones y continuar'), 'admin generation');
-        await click('Guardar borrador y salir');
-        await until(() => evaluate(`!document.querySelector('${dialog}')`), 'admin save');
+        await click('Guardar borrador');
+        await until(async () => (await body()).includes('Borrador guardado'), 'admin saved');
+        await closeSaved();
         const official = (await client.query('SELECT * FROM master_route_pois WHERE id=$1', [officialId])).rows[0];
         assert.equal(official.narrative_script, base.narrative_script);
         assert.equal(official.audio_url, base.audio_url);
@@ -220,8 +244,21 @@ app.whenReady().then(async () => {
         await selectVersion('phase_5');
         assert.ok((await body()).includes('Guion de prueba para phase_5.'));
         assert.equal(await evaluate(`!!document.querySelector('${dialog} textarea')`), false);
-        assert.ok(!(await body()).includes('Guardar borrador y salir'));
+        assert.ok(!(await body()).includes('Guardar borrador'));
         report('PASS: admin uses the same spacious workflow; official library stays read-only');
+        await click('Cerrar');
+        await until(() => evaluate(`!document.querySelector('${dialog}')`), 'official read-only closed');
+        await openCard(ownName);
+        await installMocks();
+        await evaluate('window.__failAudio = false; true;');
+        await click('Confirmar guiones y continuar');
+        await click('Crear audios y guardar');
+        await until(async () => (await body()).includes('Narraciones guardadas'), 'automatic final save');
+        assert.deepEqual(await evaluate("window.__calls.filter(c => c.endpoint.includes('generate-audio')).map(c => c.phase)"), ['phase_2', 'phase_5']);
+        const finished = (await client.query('SELECT narrative_versions FROM pilot_pois WHERE id=$1', [ownId])).rows[0];
+        assert.equal(Object.values(finished.narrative_versions).filter(v => v.audio_url).length, 5);
+        await closeSaved();
+        report('PASS: final action generates only missing audio, persists all five and confirms success');
     } catch (error) {
         console.error('Regression error:', error);
         if (wc.getURL()) console.error('Regression state:', (await body()).slice(-3500));
