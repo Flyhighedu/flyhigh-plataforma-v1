@@ -38,7 +38,7 @@ export async function POST(request) {
         } } : {}) });
 
         if (phaseId !== 'general') {
-            const prompt = buildPhasePrompt({ poiName, researchArticle, phaseId, focus: body.curriculumFocus, learningGoal: body.learningGoal, customInstructions });
+            const prompt = buildPhasePrompt({ isGeneralTopic: body.isGeneralTopic === true || (lat == null && lng == null), poiName, researchArticle, phaseId, focus: body.curriculumFocus, learningGoal: body.learningGoal, customInstructions });
             const result = await model.generateContent(prompt);
             let data;
             try { data = JSON.parse(result.response.text()); } catch { return NextResponse.json({ error: 'La propuesta llegó incompleta. Vuelve a intentarlo; tu guion se conserva.' }, { status: 502 }); }
@@ -51,15 +51,14 @@ export async function POST(request) {
             return NextResponse.json({ script: data.script.trim(), learning_goal: data.learning_goal.trim(), review_note: data.review_note, phaseId });
         }
 
-        // Bifurcación mínima: solo la línea introductoria cambia según coordenadas.
-        // Las 6 reglas de personalidad son IDÉNTICAS al prompt original pre-Temas-Generales.
-        const hasCoords = lat != null && lng != null;
+        // Keep general narration compatible while sharing the tour-guide voice.
+        const hasCoords = body.isGeneralTopic !== true && lat != null && lng != null;
 
         const REGLAS = `\n1. OBLIGATORIO: La primera oración DEBE mencionar explícitamente el nombre del lugar. (Ej. "El ${poiName} es..." o "La historia de ${poiName} comenzó..."). PROHIBIDO iniciar con frases genéricas de relleno como "¡Imagina un lugar donde...!" o "¿Sabías que este rincón...?". Ve directo al grano.\n2. Tono narrativo directo, calmado y amigable. Sin euforia ni exageraciones (PROHIBIDO usar signos de exclamación innecesarios).\n3. Di los hechos TAL CUAL SON, pero fáciles de digerir. PROHIBIDO usar jerga burocrática, histórica compleja o palabras rebuscadas. Explica las cosas de forma literal y sencilla (Ej. en lugar de decir "decretado zona protegida", di "se convirtió en parque"). NUNCA inventes datos.\n4. PROHIBIDO sonar como telegrama enciclopédico. Hila los datos en una narración corta y natural.\n5. Mantén respeto y calidez documental, sin infantilizar el contenido en exceso.\n6. PROHIBIDO fingir procesos de computadora ('escaneando'). NUNCA saludes ni te presentes.`;
 
         let prompt = hasCoords
-            ? `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el lugar: '${poiName}', ubicado en: ${lat}, ${lng}. Escribe un guion de MÁXIMO 60 palabras (15 segs). REGLAS ESTRICTAS:${REGLAS}`
-            : `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el tema: '${poiName}'. Escribe un guion de MÁXIMO 60 palabras (15 segs). REGLAS ESTRICTAS:${REGLAS}`;
+            ? `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el lugar: '${poiName}', ubicado en: ${lat}, ${lng}. Escribe un guion de MÁXIMO 60 palabras. REGLAS ESTRICTAS:${REGLAS}`
+            : `Eres la locutora principal de una AUDIOGUÍA DOCUMENTAL para niños y adolescentes. Investiga el tema: '${poiName}'. Escribe un guion de MÁXIMO 60 palabras. REGLAS ESTRICTAS:${REGLAS}`;
 
         if (customInstructions && customInstructions.trim().length > 0) {
             prompt += `\n\nATENCIÓN (INSTRUCCIÓN DIRECTA DEL DIRECTOR): \nDEBES seguir obligatoriamente esta indicación para construir el guion:\n"${customInstructions}"`;
@@ -69,6 +68,7 @@ export async function POST(request) {
             prompt += `\n\nCONTEXTO GENERAL (Úsalo solo como base para hilar la historia):\n${researchArticle}`;
         }
 
+        prompt += hasCoords ? '\nActúa como guía de un recorrido durante un vuelo educativo: presenta directamente el lugar por su nombre (por ejemplo «Este es…»), con entradas variadas. Evita «En [ciudad] existe…». No inventes dirección, cercanía, visibilidad o movimiento: no digas «a tu derecha» ni «estamos encima». Usa exclusivamente la investigación adjunta como base factual; si no es suficiente, no inventes datos.' : '\nPresenta el tema directamente, sin fingir que es un lugar visible.';
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
 

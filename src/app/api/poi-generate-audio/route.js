@@ -57,7 +57,7 @@ export async function POST(request) {
             body: JSON.stringify({
                 contents: [{
                     role: 'user',
-                    parts: [{ text: `INSTRUCCIÓN DE ACTUACIÓN: Eres una locutora amable y cálida de una audioguía educativa. Público: ${phase.audience}. Lee exactamente el guion, sin agregar palabras. ${phaseId === 'phase_2' ? 'Ritmo pausado, frases claras y pausas naturales; sin infantilizar la voz.' : 'Ritmo natural, claro y documental; permite comprender los conceptos y no aceleres para alcanzar una duración fija.'}\n\nGUION:\n${narrativeScript}` }]
+                    parts: [{ text: `INSTRUCCIÓN DE ACTUACIÓN: Eres una locutora amable y cálida de una audioguía educativa. Público: ${phase.audience}. Lee exactamente el guion, sin agregar palabras. Habla de forma ágil, dinámica y cálida, a un ritmo ligeramente rápido, fluido y entendible, con pausas breves y justas. No alargues las palabras ni agregues silencios prolongados. ${phaseId === 'phase_2' ? 'Para preescolar, articula claramente sin volver lenta la lectura ni infantilizar la voz.' : 'Conserva claridad en nombres y conceptos.'}\n\nGUION:\n${narrativeScript}` }]
                 }],
                 generationConfig: {
                     responseModalities: ["AUDIO"],

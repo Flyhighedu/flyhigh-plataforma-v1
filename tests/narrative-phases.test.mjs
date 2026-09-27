@@ -125,7 +125,7 @@ test('audio API keeps phase files separate and measures duration from actual PCM
         assert.equal((await POST(request({ ...input, poiId: '../../other' }))).status, 400);
         assert.equal((await POST(request({ ...input, narrativeScript: '  ' }))).status, 400);
         process.env.GEMINI_API_KEY = 'mock-only';
-        globalThis.fetch = async () => Response.json({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.alloc(48000 * 7).toString('base64') } }] } }] });
+        globalThis.fetch = async (_url, options) => { const instruction = JSON.parse(options.body).contents[0].parts[0].text; assert.match(instruction, /ritmo ligeramente rápido/); assert.doesNotMatch(instruction, /Ritmo pausado/); return Response.json({ candidates: [{ content: { parts: [{ inlineData: { data: Buffer.alloc(48000 * 7).toString('base64') } }] } }] }); };
         for (const phaseId of ['phase_2', 'phase_3', 'phase_2']) {
             const result = await POST(request({ ...input, phaseId }));
             assert.equal(result.status, 200);

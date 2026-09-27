@@ -53,12 +53,13 @@ export function hasUsableResearch(article) {
         !/^(error|no (?:se pudo|fue posible|se encontró)|ocurrió un error)/i.test(article.trim());
 }
 
-export function buildPhasePrompt({ poiName, researchArticle, phaseId, focus, learningGoal, customInstructions }) {
+export function buildPhasePrompt({ poiName, researchArticle, phaseId, focus, learningGoal, customInstructions, isGeneralTopic = false }) {
     const phase = educationPhase(phaseId);
     if (!phase || phase.id === 'general') throw new Error('Selecciona una fase educativa válida.');
     if (!hasUsableResearch(researchArticle)) throw new Error('Primero agrega una investigación del lugar con información suficiente y fuentes.');
     const reference = curriculumReference(phaseId, focus);
     return `Redacta una audioguía educativa en español de México para ${phase.audience}.
+${isGeneralTopic ? 'Presenta el tema de forma cercana y directa, sin fingir que corresponde a un lugar visible.' : 'Eres la guía de un recorrido durante un vuelo educativo. Presenta directamente el punto de interés por su nombre, por ejemplo «Este es…», con entradas variadas y naturales. Evita aperturas enciclopédicas como «En [ciudad] existe…». No inventes orientación, cercanía, visibilidad ni movimientos: no digas «a tu derecha», «debajo» o «estamos pasando» sin datos que lo sustenten.'}
 La investigación adjunta es la ÚNICA base factual del lugar. No investigues de memoria, no inventes datos ni fuentes y no presentes leyendas como hechos. Si no alcanza para un guion veraz, devuelve {"error":"Explicación breve de la información que falta"}.
 No conviertas una contribución en una garantía ni agregues afirmaciones universales como "para todos" o "siempre" cuando las fuentes no lo sostengan.
 Guía editorial FlyHigh (no requisitos de la SEP): ${phase.guidance}
