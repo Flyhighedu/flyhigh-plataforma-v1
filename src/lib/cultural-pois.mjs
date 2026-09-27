@@ -24,7 +24,7 @@ export function buildCulturalPoiQuery({ south, west, north, east }) {
         throw new Error('La zona de búsqueda no es válida.');
     }
     const bbox = `${south},${west},${north},${east}`;
-    return `[out:json][timeout:20];(${FILTERS.flatMap(filter => ['node', 'way'].map(type => `${type}${filter}(${bbox});`)).join('\n')});out center;`;
+    return `[out:json][timeout:12][maxsize:8388608];(${FILTERS.flatMap(filter => ['node', 'way'].map(type => `${type}${filter}["name"](${bbox});`)).join('\n')});out center 500;`;
 }
 
 export function radarBounds(center, radius = 3000) {

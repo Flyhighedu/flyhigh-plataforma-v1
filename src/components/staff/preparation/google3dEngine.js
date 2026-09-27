@@ -22,12 +22,14 @@ function loadCesium() {
     return library;
 }
 
-export async function createGoogle3dEngine({ container, credits, visitId, initial, gimbal, signal, onError, onCorrection, onCandidate, onSurfaceStatus, quality = 'high' }) {
+export async function createGoogle3dEngine({ container, credits, visitId, initial, gimbal, signal, onError, onCorrection, onCandidate, onSurfaceStatus, onLoadStage, quality = 'high' }) {
+    onLoadStage?.('Preparando la vista 3D');
     const C = await loadCesium();
     signal.throwIfAborted();
     // Check authorization/configuration before creating a WebGL context. This
     // fetch is the only root request; Cesium consumes its already-fetched JSON.
     const rootUrl = `/api/review-lab/google-3d?visit=${encodeURIComponent(visitId)}`;
+    onLoadStage?.('Conectando con Google Maps');
     const response = await fetch(rootUrl, { signal, cache: 'no-store' });
     const root = await response.json();
     if (!response.ok) throw new Error(root.error || 'Google 3D no está disponible.');
@@ -39,7 +41,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         globe: false, baseLayer: false, skyBox: false, skyAtmosphere: false,
         creditContainer: credits, creditViewport: container,
         requestRenderMode: true, maximumRenderTimeChange: Infinity,
-        useBrowserRecommendedResolution: true, targetFrameRate: 30,
+        useBrowserRecommendedResolution: true, targetFrameRate: 60,
         showRenderLoopErrors: false, contextOptions: { webgl: { antialias: false } },
     });
     const scene = widget.scene;
@@ -88,15 +90,20 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             showCreditsOnScreen: true, maximumScreenSpaceError: QUALITY[quality].error,
             cacheBytes: QUALITY[quality].memory * 1024 * 1024, maximumCacheOverflowBytes: 64 * 1024 * 1024,
             preloadWhenHidden: false, preloadFlightDestinations: false,
+            cullRequestsWhileMoving: false, foveatedScreenSpaceError: false, foveatedTimeDelay: 0,
+            dynamicScreenSpaceErrorFactor: 4,
         });
         if (signal.aborted) { tileset.destroy(); signal.throwIfAborted(); }
         scene.primitives.add(tileset);
         const setQuality = id => {
             const preset = QUALITY[id] || QUALITY.high;
             tileset.maximumScreenSpaceError = preset.error;
-            tileset.cacheBytes = preset.memory * 1024 * 1024;
+            const memory = navigator.deviceMemory && navigator.deviceMemory <= 4 ? Math.min(preset.memory, 256) : preset.memory;
+            tileset.cacheBytes = memory * 1024 * 1024;
             widget.resolutionScale = Math.min(window.devicePixelRatio || 1, preset.pixels);
             container.dataset.quality = id;
+            container.dataset.tileCacheMb = String(memory);
+            container.dataset.movingDetail = 'continuous';
             widget.resize(); scene.requestRender();
         };
         setQuality(quality);
@@ -106,6 +113,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         scene.camera.setView({ destination: C.Cartesian3.fromDegrees(initial.longitude, initial.latitude, 10000), orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 } });
         scene.requestRender();
         if (!scene.sampleHeightSupported) throw new Error('Este dispositivo no permite calcular la posición sobre el relieve. Usa el ensayo actual.');
+        onLoadStage?.('Comprobando la superficie de despegue');
         const points = [C.Cartographic.fromDegrees(initial.longitude, initial.latitude)];
         let timeout;
         try {
@@ -177,6 +185,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
                 queueMicrotask(() => { guardQueued = false; guardSurface(); });
             }
             const markers = [...entries];
+            const labelPositions = [];
             // Amortize optional label-height sampling, rather than ray-casting
             // hundreds of markers each frame. No sampled values are persisted.
             for (let n = 0; n < Math.min(2, markers.length); n++) {
@@ -188,7 +197,11 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
                 const point = C.Cartesian3.fromDegrees(entry.longitude, entry.latitude, (entry.height ?? baseHeight) + 3);
                 const direction = C.Cartesian3.subtract(point, scene.camera.positionWC, new C.Cartesian3());
                 const xy = scene.cartesianToCanvasCoordinates(point);
-                const visible = xy && C.Cartesian3.dot(direction, scene.camera.directionWC) > 0 && xy.x >= -40 && xy.x <= container.clientWidth + 40 && xy.y >= -40 && xy.y <= container.clientHeight + 40;
+                let visible = xy && C.Cartesian3.dot(direction, scene.camera.directionWC) > 0 && xy.x >= -40 && xy.x <= container.clientWidth + 40 && xy.y >= -40 && xy.y <= container.clientHeight + 40;
+                if (visible && entry.street) {
+                    visible = Number.isFinite(entry.height) && distanceMeters(current, entry) < 2200 && !labelPositions.some(p => Math.abs(p.x - xy.x) < 150 && Math.abs(p.y - xy.y) < 30);
+                    if (visible) labelPositions.push(xy);
+                }
                 entry.element.style.visibility = visible ? 'visible' : 'hidden';
                 if (visible) entry.element.style.transform = `translate(${xy.x}px,${xy.y}px) translate(-50%,-100%)`;
             }
@@ -196,9 +209,36 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         const addMarker = (element, poi) => {
             element.style.position = 'absolute'; element.style.left = '0'; element.style.top = '0'; element.style.pointerEvents = 'auto';
             element.classList.add('flight-google-marker');
-            const entry = { element, latitude: poi.latitude, longitude: poi.longitude };
+            const entry = { element, latitude: poi.latitude, longitude: poi.longitude, street: poi.source === 'osm-street' };
+            if (entry.street) element.style.pointerEvents = 'none';
             entries.add(entry); overlay.append(element); scene.requestRender();
             return { remove: () => { entries.delete(entry); element.remove(); if (!disposed) scene.requestRender(); } };
+        };
+        let streetPrimitive;
+        let streetMarkers = [];
+        const setStreets = roads => {
+            if (disposed) return;
+            streetMarkers.forEach(marker => marker.remove()); streetMarkers = [];
+            if (streetPrimitive) scene.groundPrimitives.remove(streetPrimitive);
+            streetPrimitive = null;
+            if (roads.length) {
+                streetPrimitive = scene.groundPrimitives.add(new C.GroundPolylinePrimitive({
+                    geometryInstances: roads.map(road => new C.GeometryInstance({ geometry: new C.GroundPolylineGeometry({ positions: C.Cartesian3.fromDegreesArray(road.geometry.flatMap(point => [point.lon, point.lat])), width: 2 }) })),
+                    appearance: new C.PolylineMaterialAppearance({ material: C.Material.fromType('Color', { color: C.Color.fromCssColorString('#fce5a0').withAlpha(.65) }) }),
+                    classificationType: C.ClassificationType.CESIUM_3D_TILE,
+                }));
+                const names = new Set();
+                for (const road of roads) {
+                    if (names.has(road.name) || names.size >= 40) continue;
+                    names.add(road.name);
+                    const label = document.createElement('span'); label.textContent = road.name;
+                    label.dataset.streetLabel = 'true';
+                    label.style.cssText = 'font:600 11px/1.3 sans-serif;color:white;text-shadow:0 1px 2px #000,1px 0 2px #000,-1px 0 2px #000;white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis';
+                    streetMarkers.push(addMarker(label, road));
+                }
+            }
+            container.dataset.streetCount = String(roads.length);
+            scene.requestRender();
         };
         const homeElement = document.createElement('span');
         homeElement.textContent = 'H';
@@ -244,8 +284,31 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             return { ...current };
         };
         setCamera(initial);
+        onLoadStage?.('Afinando el entorno inicial');
+        // Ground sampling alone is not readiness: wait for the actual view to
+        // draw and settle before exposing controls. No fixed artificial delay.
+        const firstRendered = rendered;
+        await new Promise((resolve, reject) => {
+            const started = performance.now();
+            let stableSince;
+            const aborted = () => { clearInterval(timer); reject(new DOMException('Aborted', 'AbortError')); };
+            const timer = setInterval(() => {
+                if (disposed || signal.aborted) { aborted(); return; }
+                const now = performance.now();
+                if (tileset.tilesLoaded && rendered > firstRendered) stableSince ??= now;
+                else stableSince = undefined;
+                if (stableSince && now - stableSince >= 400) {
+                    clearInterval(timer); signal.removeEventListener('abort', aborted); resolve();
+                } else if (now - started > 35000) {
+                    clearInterval(timer); signal.removeEventListener('abort', aborted);
+                    reject(new Error('El entorno inicial no terminó de cargar. Reintenta con una conexión estable.'));
+                }
+            }, 100);
+            signal.addEventListener('abort', aborted, { once: true });
+        });
+        container.dataset.initialViewReady = 'true';
         container.dataset.engine = 'google-3d';
-        return { remove, resize: () => { if (!disposed) { widget.resize(); scene.requestRender(); } }, setCamera, addMarker, setQuality, beginSelection, cancelSelection, confirmSelection };
+        return { remove, resize: () => { if (!disposed) { widget.resize(); scene.requestRender(); } }, setCamera, addMarker, setQuality, setStreets, beginSelection, cancelSelection, confirmSelection };
     } catch (error) {
         remove();
         if (error.name === 'AbortError') throw error;

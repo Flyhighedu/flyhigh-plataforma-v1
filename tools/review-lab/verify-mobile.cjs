@@ -86,8 +86,8 @@ app.whenReady().then(async () => {
         wc.sendInputEvent({ type: 'mouseDown', ...pad, button: 'left', clickCount: 1 });
         await delay(300);
         assert.equal(await altitude(), before, 'touching a joystick only establishes its neutral center');
-        wc.sendInputEvent({ type: 'mouseMove', x: pad.x, y: pad.y - 35 });
-        await delay(800);
+        wc.sendInputEvent({ type: 'mouseMove', x: pad.x, y: pad.y - 72 });
+        await delay(1500);
         wc.sendInputEvent({ type: 'mouseUp', ...pad, button: 'left', clickCount: 1 });
         await delay(250);
         assert.notEqual(await altitude(), before, 'joystick changes flight altitude');
@@ -96,8 +96,8 @@ app.whenReady().then(async () => {
         const lowerPad = await wc.executeJavaScript(`(() => { const r=document.querySelector('[aria-label="Altura · giro"]').getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; })()`);
         wc.sendInputEvent({ type: 'mouseMove', ...lowerPad });
         wc.sendInputEvent({ type: 'mouseDown', ...lowerPad, button: 'left', clickCount: 1 });
-        wc.sendInputEvent({ type: 'mouseMove', x: lowerPad.x, y: lowerPad.y + 35 });
-        await delay(1200);
+        wc.sendInputEvent({ type: 'mouseMove', x: lowerPad.x, y: lowerPad.y + 72 });
+        await delay(1800);
         wc.sendInputEvent({ type: 'mouseUp', ...lowerPad, button: 'left', clickCount: 1 });
         await delay(250);
         console.log('Altitude:', { before, high, descended: await altitude() });
@@ -125,6 +125,11 @@ app.whenReady().then(async () => {
       }
     }
     console.log('PASS all mobile regression checks');
+  } catch (error) {
+    for (const win of windows) {
+      if (!win.isDestroyed()) console.error('Failure state:', await win.webContents.executeJavaScript(`({path:location.pathname,text:document.body.innerText.slice(0,1400)})`).catch(() => null));
+    }
+    throw error;
   } finally {
     for (const win of windows) win.destroy();
     gateway.close();

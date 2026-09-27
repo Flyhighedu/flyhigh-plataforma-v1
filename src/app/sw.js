@@ -11,6 +11,7 @@ const serwist = new Serwist({
         // account switch. Pending edits are stored separately, scoped by user.
         { matcher: ({ url }) => url.pathname === '/api/staff/preparation', handler: new NetworkOnly() },
         { matcher: ({ url }) => url.pathname.startsWith('/api/review-lab/google-3d'), handler: new NetworkOnly() },
+        { matcher: ({ url }) => url.pathname.startsWith('/api/review-lab/map-context'), handler: new NetworkOnly() },
         ...defaultCache,
     ],
     fallbacks: {

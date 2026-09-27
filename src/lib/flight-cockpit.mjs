@@ -20,11 +20,11 @@ export const TUNING_FIELDS = Object.freeze([
     { key: 'gimbalSpeed', label: 'Velocidad máxima de inclinación', min: 1, max: 100, step: 1, unit: '°/s', group: 'Gimbal' },
     { key: 'gimbalSmoothness', label: 'Suavidad de inclinación', min: 0, max: 30, step: 1, unit: '', group: 'Gimbal' },
 ]);
-const common = { yawSmoothness: 10, braking: 100, expoVertical: .5, expoYaw: .5, expoHorizontal: .5, gimbalSpeed: 50, gimbalSmoothness: 10 };
+const common = { yawSmoothness: 35, braking: 100, expoVertical: .4, expoYaw: .3, expoHorizontal: .4, gimbalSpeed: 50, gimbalSmoothness: 10 };
 export const DEFAULT_PROFILES = Object.freeze({
     slow: Object.freeze({ ...common, horizontal: 6, ascent: 3, descent: 3, yawRate: 45, yawSmoothness: 30, gimbalSpeed: 25, gimbalSmoothness: 20 }),
     normal: Object.freeze({ ...common, horizontal: 12, ascent: 6, descent: 6, yawRate: 90 }),
-    fast: Object.freeze({ ...common, horizontal: 21, ascent: 10, descent: 10, yawRate: 150, yawSmoothness: 0, gimbalSpeed: 80, gimbalSmoothness: 0 }),
+    fast: Object.freeze({ ...common, horizontal: 21, ascent: 10, descent: 10, yawRate: 120, yawSmoothness: 25, gimbalSpeed: 80, gimbalSmoothness: 10 }),
 });
 export function createFlightProfiles() {
     return Object.fromEntries(Object.entries(DEFAULT_PROFILES).map(([id, value]) => [id, { ...value }]));
@@ -34,9 +34,17 @@ export function sanitizeProfile(value = {}) {
 }
 export const SURFACE_CLEARANCE = 8;
 export const QUALITY = Object.freeze({
-    balanced: { error: 12, pixels: 1, memory: 128 },
-    high: { error: 6, pixels: 1.5, memory: 192 },
+    balanced: { error: 10, pixels: 1, memory: 192 },
+    high: { error: 4, pixels: 1.5, memory: 384 },
 });
+
+// Continuous dead band, then full physical travel. No jump when leaving neutral.
+export function joystickInput(x, y, maximum = 72, deadZone = 9) {
+    const length = Math.hypot(x, y);
+    if (length <= deadZone) return { x: 0, y: 0 };
+    const amount = Math.min(1, (length - deadZone) / (maximum - deadZone));
+    return { x: x / length * amount, y: -y / length * amount };
+}
 
 export function virtualLimits(mode, maximumAltitude = 120, profiles = DEFAULT_PROFILES) {
     const profile = sanitizeProfile(profiles[mode] || profiles.normal);

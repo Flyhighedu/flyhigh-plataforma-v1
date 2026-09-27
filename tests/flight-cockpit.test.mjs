@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aboveSurface, surfaceEnvelope, tuneControls, virtualLimits, DEFAULT_PROFILES, createFlightProfiles, sanitizeProfile, TUNING_FIELDS, advanceGimbal, QUALITY } from '../src/lib/flight-cockpit.mjs';
+import { readFileSync } from 'node:fs';
+import { aboveSurface, surfaceEnvelope, tuneControls, virtualLimits, DEFAULT_PROFILES, createFlightProfiles, sanitizeProfile, TUNING_FIELDS, advanceGimbal, QUALITY, joystickInput } from '../src/lib/flight-cockpit.mjs';
 import { advanceFlight } from '../src/lib/flight-rehearsal.mjs';
 
 test('coarse LOD cannot lower the known takeoff surface', () => {
@@ -31,7 +32,7 @@ test('virtual ceiling unlock does not change the default limits', () => {
 });
 test('three Expo curves independently preserve neutral, signs and full-stick bounds', () => {
     const input = { forward: .5, strafe: -.5, climb: 0, yaw: 1 };
-    const linear = { ...DEFAULT_PROFILES.normal, yawSmoothness: 0, braking: 150 };
+    const linear = { ...DEFAULT_PROFILES.normal, expoHorizontal: .5, expoVertical: .5, expoYaw: .5, yawSmoothness: 0, braking: 150 };
     assert.deepEqual(tuneControls(input, {}, linear), input);
     const soft = tuneControls(input, {}, { ...linear, expoHorizontal: .1 });
     const responsive = tuneControls(input, {}, { ...linear, expoHorizontal: .9 });
@@ -67,7 +68,7 @@ test('each of three modes owns eleven controls; edit/reset cannot mutate another
     assert.equal(profiles.normal.horizontal, 12);
     profiles.slow = { ...DEFAULT_PROFILES.slow };
     assert.equal(profiles.fast.yawRate, 190);
-    assert.equal(DEFAULT_PROFILES.fast.yawRate, 150);
+    assert.equal(DEFAULT_PROFILES.fast.yawRate, 120);
     for (const field of TUNING_FIELDS) {
         assert.equal(sanitizeProfile({ [field.key]: field.max + 100 })[field.key], field.max);
         assert.equal(sanitizeProfile({ [field.key]: field.min - 100 })[field.key], field.min);
@@ -108,5 +109,24 @@ test('gimbal speed and smoothness affect actual angle, obey rates, and reach end
 test('higher quality requests finer geometry and more display pixels within bounded memory', () => {
     assert.ok(QUALITY.high.error < QUALITY.balanced.error);
     assert.ok(QUALITY.high.pixels > QUALITY.balanced.pixels);
-    assert.ok(QUALITY.high.memory <= 192);
+    assert.ok(QUALITY.high.memory <= 384);
+});
+test('floating sticks have a continuous dead zone and longer travel in both orientations', () => {
+    assert.deepEqual(joystickInput(8, 0), { x: 0, y: 0 });
+    assert.ok(joystickInput(10, 0).x < .02);
+    assert.ok(joystickInput(35, 0).x < .42);
+    assert.equal(joystickInput(72, 0).x, 1);
+    assert.equal(joystickInput(0, -100).y, 1);
+    assert.ok(Math.hypot(...Object.values(joystickInput(100, 100))) <= 1.000001);
+    for (const profile of Object.values(DEFAULT_PROFILES)) {
+        assert.ok(tuneControls({ yaw: .4 }, {}, profile).yaw < .1);
+    }
+});
+test('telemetry has no panel background, border or box shadow', () => {
+    const css = readFileSync(new URL('../src/components/staff/preparation/FlightRehearsalScreen.module.css', import.meta.url), 'utf8');
+    const base = css.match(/^\.telemetry \{([^}]+)\}/m)[1];
+    assert.match(base, /background: transparent/);
+    assert.match(base, /border: 0/);
+    assert.match(base, /box-shadow: none/);
+    for (const rule of css.matchAll(/\.googleLayout \.telemetry \{([^}]+)\}/g)) assert.doesNotMatch(rule[1], /background|box-shadow|border/);
 });

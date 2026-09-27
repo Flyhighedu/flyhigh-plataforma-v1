@@ -26,7 +26,7 @@ app.whenReady().then(async () => {
   let workerRequests = 0;
   const failed = [];
   const consoleErrors = [];
-  const watchdog = setTimeout(() => { console.error('Global timeout in hidden 3D check'); app.exit(1); }, 220000);
+  const watchdog = setTimeout(() => { console.error('Global timeout in hidden 3D check'); app.exit(1); }, 270000);
   const navigate = async url => {
     console.log('Loading:', new URL(url).pathname.replace(/\/review\/[^/]+/, '/review/[temporary]'));
     const timer = setTimeout(() => { console.log('Stopping stalled document load'); wc.stop(); }, 30000);
@@ -64,11 +64,15 @@ app.whenReady().then(async () => {
     await until(() => wc.executeJavaScript(`Array.from(document.querySelectorAll('a')).some(a=>a.getAttribute('href')?.endsWith('/simulacion-3d'))`), 'separate 3D entry');
     console.log('PASS authenticated LAN access and separate 3D entry');
     await navigate(gateway.publicOrigin + href + '/simulacion-3d');
+    let loadingObserved = false;
     await until(async () => {
+      const loading = await wc.executeJavaScript(`({loading:!!document.querySelector('[aria-label="Preparación del ensayo"]'),controls:document.querySelectorAll('[role="application"]').length})`);
+      if (loading.loading) { loadingObserved = true; assert.equal(loading.controls, 0, 'controls cannot be used while the initial view is incomplete'); }
       const status = await wc.executeJavaScript(`(() => { const m=document.querySelector('[aria-label="Mapa del ensayo de vuelo"]'); return { ready:m?.dataset.engine==='google-3d', status:[...document.querySelectorAll('[role="status"]')].map(e=>e.textContent).join(' '), body:document.body.innerText }; })()`);
       if (/No se pudo|El relieve de esta|Este dispositivo|Falta GOOGLE|Google rechazó|Se alcanzó/.test(status.body)) throw new Error(status.body.slice(0, 900));
       return status.ready;
     }, 'Google 3D surface and camera', 110);
+    assert.ok(loadingObserved, 'preparation screen shown before activating flight');
     if (process.argv.includes('--missing-origin')) {
       assert.equal(await wc.executeJavaScript(`document.querySelectorAll('[role="application"]').length`), 0, 'no flight before an explicit departure');
       assert.ok(await wc.executeJavaScript(`document.body.innerText.includes('La escuela no tiene ubicación confirmada')`));

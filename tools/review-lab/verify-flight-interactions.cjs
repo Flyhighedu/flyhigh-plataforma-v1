@@ -83,11 +83,11 @@ module.exports = async function verifyFlightInteractions(wc, until) {
     const original = window.fetch;
     window.__radarRequests=0; window.__radarMode='success';
     window.fetch=async (url, options) => {
-      if (!String(url).includes('overpass-api.de')) return original(url,options);
+      if (!String(url).includes('/api/review-lab/map-context')) return original(url,options);
       window.__radarRequests++;
       if (window.__radarMode==='pending') return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError'))));
       if (window.__radarMode==='error') return new Response('{}',{status:503});
-      return new Response(JSON.stringify({elements:window.__radarMode==='empty'?[]:[{type:'node',id:777,lat:Number(school.ubicacion_lat)+.001,lon:Number(school.ubicacion_lng),tags:{name:'Radar de prueba'}}]}),{headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({items:window.__radarMode==='empty'?[]:[{id:'osm_node_777',latitude:Number(school.ubicacion_lat)+.001,longitude:Number(school.ubicacion_lng),name:'Radar de prueba',source:'osm-radar'}]}),{headers:{'content-type':'application/json'}});
     };
     return true;
   })()`);

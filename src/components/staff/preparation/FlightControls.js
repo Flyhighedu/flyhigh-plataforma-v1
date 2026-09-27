@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { clamp } from '@/lib/flight-rehearsal.mjs';
+import { joystickInput } from '@/lib/flight-cockpit.mjs';
 import styles from './FlightRehearsalScreen.module.css';
 
 export function FloatingJoystick({ controlRef, label, side, onChange }) {
@@ -19,7 +20,7 @@ export function FloatingJoystick({ controlRef, label, side, onChange }) {
         start(event, bounds) {
             if (drag.current) return false;
             const radius = pad.current.getBoundingClientRect().width / 2;
-            drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, maximum: radius * 0.62 };
+            drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, maximum: 72 };
             setCenter({ x: clamp(event.clientX - bounds.left, radius + 8, bounds.width - radius - 8), y: clamp(event.clientY - bounds.top, radius + 8, bounds.height - radius - 24), radius });
             setKnob({ x: 0, y: 0 });
             onChange({ x: 0, y: 0 });
@@ -30,11 +31,10 @@ export function FloatingJoystick({ controlRef, label, side, onChange }) {
             if (start?.id !== event.pointerId) return;
             let x = event.clientX - start.x;
             let y = event.clientY - start.y;
-            const length = Math.hypot(x, y);
-            if (length > start.maximum) { x *= start.maximum / length; y *= start.maximum / length; }
-            setKnob({ x, y });
-            // Small touch jitter should not start a flight movement.
-            onChange(length < 3 ? { x: 0, y: 0 } : { x: x / start.maximum, y: -y / start.maximum });
+            const value = joystickInput(x, y, start.maximum);
+            const visualRadius = pad.current.getBoundingClientRect().width * .3;
+            setKnob({ x: value.x * visualRadius, y: -value.y * visualRadius });
+            onChange(value);
         },
         end(event) { if (drag.current?.id === event.pointerId) stop(); },
         stop,
@@ -46,7 +46,7 @@ export function FloatingJoystick({ controlRef, label, side, onChange }) {
         document.addEventListener('visibilitychange', hidden);
         return () => { window.removeEventListener('blur', stop); window.removeEventListener('resize', stop); document.removeEventListener('visibilitychange', hidden); };
     }, [stop]);
-    return <div className={`${styles.joystick} pointer-events-none absolute z-10 select-none text-center text-white`} style={center ? { left: center.x, top: center.y, transform: `translate(-50%, -${center.radius}px)` } : { bottom: 32, [side]: 20 }}>
+    return <div data-active={Boolean(center)} className={`${styles.joystick} pointer-events-none absolute z-10 select-none text-center text-white`} style={center ? { left: center.x, top: center.y, transform: `translate(-50%, -${center.radius}px)` } : { bottom: 32, [side]: 20 }}>
         <div ref={pad} role="application" aria-label={label} className="pointer-events-auto relative h-28 w-28 touch-none rounded-full border border-white/35 bg-slate-950/55 shadow-lg sm:h-32 sm:w-32">
             <span className="absolute inset-x-3 top-1/2 h-px bg-white/20" />
             <span className="absolute inset-y-3 left-1/2 w-px bg-white/20" />
