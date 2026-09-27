@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import POIDetailModal from './POIDetailModal';
 import useNativePOITap from '@/hooks/useNativePOITap';
+import { buildCulturalPoiQuery } from '@/lib/cultural-pois.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -270,42 +271,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
         try {
             const sw = mapBounds._southWest;
             const ne = mapBounds._northEast;
-            const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
-
-            const query = `
-                [out:json][timeout:20];
-                (
-                  node["historic"](${bbox});
-                  way["historic"](${bbox});
-                  node["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  way["tourism"~"museum|artwork|attraction|theme_park|zoo|aquarium|viewpoint"](${bbox});
-                  node["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
-                  way["amenity"~"place_of_worship|university|college|school|library|theatre|townhall|public_building"](${bbox});
-                  node["aeroway"="aerodrome"](${bbox});
-                  way["aeroway"="aerodrome"](${bbox});
-                  node["waterway"~"dam|river|waterfall"](${bbox});
-                  way["waterway"~"dam|river|waterfall"](${bbox});
-                  node["natural"~"peak|volcano|water|wood|forest"](${bbox});
-                  way["natural"~"peak|volcano|water|wood|forest"](${bbox});
-                  node["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
-                  way["leisure"~"park|nature_reserve|sports_centre|stadium"](${bbox});
-                  node["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill|works"](${bbox});
-                  way["man_made"~"wastewater_plant|water_works|observatory|lighthouse|windmill|watermill|works"](${bbox});
-                  node["power"="plant"](${bbox});
-                  way["power"="plant"](${bbox});
-                  node["railway"="station"](${bbox});
-                  way["railway"="station"](${bbox});
-                  node["landuse"~"industrial|commercial|cemetery"]["name"](${bbox});
-                  way["landuse"~"industrial|commercial|cemetery"]["name"](${bbox});
-                  node["amenity"~"fuel|hospital|police|fire_station|grave_yard"]["name"](${bbox});
-                  way["amenity"~"fuel|hospital|police|fire_station|grave_yard"]["name"](${bbox});
-                  node["shop"="mall"]["name"](${bbox});
-                  way["shop"="mall"]["name"](${bbox});
-                  node["place"~"city|town|village|suburb|municipality"]["name"](${bbox});
-                  way["place"~"city|town|village|suburb|municipality"]["name"](${bbox});
-                );
-                out center;
-            `;
+            const query = buildCulturalPoiQuery({ south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng });
 
             const res = await fetch('https://overpass-api.de/api/interpreter', {
                 method: 'POST',

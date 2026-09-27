@@ -7,6 +7,16 @@ export const FLIGHT_LIMITS = Object.freeze({
     maximumAltitudeMeters: 120,
 });
 
+export const FLIGHT_SPEEDS = Object.freeze([
+    Object.freeze({ id: 'slow', label: 'Lenta', horizontalMetersPerSecond: 3, climbMetersPerSecond: 2, yawDegreesPerSecond: 35 }),
+    Object.freeze({ id: 'normal', label: 'Normal', horizontalMetersPerSecond: 8, climbMetersPerSecond: 4, yawDegreesPerSecond: 50 }),
+    Object.freeze({ id: 'fast', label: 'Rápida', horizontalMetersPerSecond: 18, climbMetersPerSecond: 6, yawDegreesPerSecond: 70 }),
+]);
+
+export function flightLimitsForSpeed(id) {
+    return { ...FLIGHT_LIMITS, ...(FLIGHT_SPEEDS.find(speed => speed.id === id) || FLIGHT_SPEEDS[1]) };
+}
+
 export function clamp(value, minimum, maximum) {
     return Math.min(maximum, Math.max(minimum, Number(value) || 0));
 }
@@ -22,9 +32,12 @@ export function fallbackZoom(gimbalAngle, altitude = 24) {
 // Flat ground is zero in this rehearsal (no terrain/elevation dataset).
 // Avoid the singularity at ground level while preserving the displayed height.
 export function flightCamera(map, state, gimbalAngle) {
+    // Looking exactly at the horizon raises the focus plane in MapLibre.
+    // Restore the known flat ground before solving the next camera position.
+    if (map.getCenterElevation?.() !== 0) map.setCenterElevation?.(0);
     return map.calculateCameraOptionsFromCameraLngLatAltRotation(
         [state.longitude, state.latitude], Math.max(1, state.altitude),
-        state.heading, clamp(90 + gimbalAngle, 0, 70),
+        state.heading, clamp(90 + gimbalAngle, 0, 90),
     );
 }
 
@@ -37,8 +50,11 @@ export function advanceFlight(state, controls, elapsedSeconds, limits = FLIGHT_L
         limits.maximumAltitudeMeters,
     );
     const radians = heading * Math.PI / 180;
-    const forward = clamp(controls?.forward, -1, 1) * limits.horizontalMetersPerSecond * elapsed;
-    const strafe = clamp(controls?.strafe, -1, 1) * limits.horizontalMetersPerSecond * elapsed;
+    const forwardInput = clamp(controls?.forward, -1, 1);
+    const strafeInput = clamp(controls?.strafe, -1, 1);
+    const magnitude = Math.max(1, Math.hypot(forwardInput, strafeInput));
+    const forward = forwardInput / magnitude * limits.horizontalMetersPerSecond * elapsed;
+    const strafe = strafeInput / magnitude * limits.horizontalMetersPerSecond * elapsed;
     const northMeters = forward * Math.cos(radians) - strafe * Math.sin(radians);
     const eastMeters = forward * Math.sin(radians) + strafe * Math.cos(radians);
     const latitudeRadians = Number(state.latitude) * Math.PI / 180;

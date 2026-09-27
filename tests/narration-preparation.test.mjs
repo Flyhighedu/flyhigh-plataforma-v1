@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel } from '../src/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, normalizeHeading } from '../src/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, normalizeHeading, FLIGHT_SPEEDS, flightLimitsForSpeed } from '../src/lib/flight-rehearsal.mjs';
 
 const catalog = [
     { id: 'official_a', name: 'Museo', audio_url: 'https://example.test/a.wav', narrative_script: 'Museo original' },
@@ -75,8 +75,29 @@ test('Altitude and gimbal independently drive the camera and remain finite at gr
     assert.deepEqual(flightCamera(map, state, -40), [[-99.1332, 19.4326], 24, 15, 50]);
     assert.equal(flightCamera(map, { ...state, altitude: 0 }, -90)[1], 1);
     assert.equal(flightCamera(map, state, -90)[3], 0);
+    assert.equal(flightCamera(map, state, 0)[3], 90);
     assert.equal(fallbackZoom(-40, 24) - fallbackZoom(-40, 48), 1);
     assert.ok(Number.isFinite(fallbackZoom(-40, 0)));
+});
+test('Every speed respects the altitude ceiling and diagonal movement speed', () => {
+    const start = { latitude: 19.4326, longitude: -99.1332, altitude: 119.9, heading: 0 };
+    for (const speed of FLIGHT_SPEEDS) {
+        const limits = flightLimitsForSpeed(speed.id);
+        const moved = advanceFlight(start, { forward: 1, strafe: 1, climb: 1 }, 0.1, limits);
+        assert.equal(moved.altitude, 120);
+        assert.ok(Math.abs(distanceMeters(start, moved) - speed.horizontalMetersPerSecond * 0.1) < 0.001);
+        assert.equal(advanceFlight({ ...start, altitude: 0 }, { climb: -1 }, 0.1, limits).altitude, 0);
+    }
+    assert.equal(flightLimitsForSpeed('invalid').id, 'normal');
+});
+test('Returning from the horizon restores flat ground before calculating the camera', () => {
+    let elevation = 24;
+    const map = {
+        getCenterElevation: () => elevation,
+        setCenterElevation: value => { elevation = value; },
+        calculateCameraOptionsFromCameraLngLatAltRotation: () => { assert.equal(elevation, 0); return {}; },
+    };
+    flightCamera(map, { latitude: 19, longitude: -102, altitude: 24, heading: 0 }, -40);
 });
 test('Duration distinguishes unknown from a playable length', () => {
     assert.equal(durationLabel(null), 'Duración por confirmar');

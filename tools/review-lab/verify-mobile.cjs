@@ -1,10 +1,12 @@
 // Real Chromium regression checks against the running isolated lab; no visible UI.
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
+const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { startMobileGateway } = require('./server.cjs');
 const { qrDataURL } = require('./qr.cjs');
+const verifyFlightInteractions = require('./verify-flight-interactions.cjs');
 app.setName('FlyHigh Regression');
 app.setPath('userData', path.resolve(__dirname, '../../.review-lab/mobile-verification'));
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -13,6 +15,11 @@ async function until(check, description) {
   throw new Error('Timeout: ' + description);
 }
 app.whenReady().then(async () => {
+  // Exercise pan/zoom without automated harvesting of public map tiles.
+  const tile = nativeImage.createFromBitmap(Buffer.alloc(256 * 256 * 4, 220), { width: 256, height: 256 }).toPNG();
+  const fixtureServer = http.createServer((_req, res) => { res.writeHead(200, { 'content-type': 'image/png', 'access-control-allow-origin': '*', 'cache-control': 'max-age=3600' }); res.end(tile); });
+  await new Promise(resolve => fixtureServer.listen(0, '127.0.0.1', resolve));
+  const tileOrigin = `http://127.0.0.1:${fixtureServer.address().port}`;
   const runtime = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../.review-lab/runtime.json')));
   const gateway = await startMobileGateway({ backendOrigin: runtime.backendOrigin, token: runtime.token, advertisedHost: runtime.lan.address });
   const windows = [];
@@ -23,9 +30,14 @@ app.whenReady().then(async () => {
       const wc = win.webContents;
       const errors = [];
       const tiles = [];
-      wc.on('console-message', event => { if (event.level === 'error') errors.push(event.message); });
+      wc.session.webRequest.onBeforeRequest((details, callback) => {
+        callback(/tile\.openstreetmap\.org|ibasemaps-api\.arcgis\.com/.test(details.url) ? { redirectURL: `${tileOrigin}/tile.png` } : {});
+      });
+      wc.on('console-message', event => {
+        if (event.level === 'error') { errors.push(event.message); console.error('Renderer:', event.message.replace(/https?:\/\/\S+/g, '[URL]').slice(0, 900)); }
+      });
       wc.session.webRequest.onCompleted(details => {
-        if (/tile\.openstreetmap\.org|ibasemaps-api\.arcgis\.com/.test(details.url) && details.statusCode === 200) tiles.push(details.url);
+        if (details.url.startsWith(tileOrigin) && details.statusCode === 200) tiles.push(details.url);
       });
       const response = await fetch(runtime.baseURL + '/api/review-lab/mobile-link', {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-flyhigh-review-token': runtime.token }, body: JSON.stringify({ role }),
@@ -70,17 +82,21 @@ app.whenReady().then(async () => {
         const markerTransforms = () => wc.executeJavaScript(`Array.from(document.querySelectorAll('.maplibregl-marker')).map(e=>e.style.transform).join('|')`);
         const before = await altitude();
         const transformsBefore = await markerTransforms();
-        const pad = await wc.executeJavaScript(`(() => { const r=document.querySelector('[aria-label="Altura · giro"]').getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height*.2)}; })()`);
+        const pad = await wc.executeJavaScript(`(() => { const r=document.querySelector('[aria-label="Altura · giro"]').getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; })()`);
         wc.sendInputEvent({ type: 'mouseDown', ...pad, button: 'left', clickCount: 1 });
+        await delay(300);
+        assert.equal(await altitude(), before, 'touching a joystick only establishes its neutral center');
+        wc.sendInputEvent({ type: 'mouseMove', x: pad.x, y: pad.y - 35 });
         await delay(800);
         wc.sendInputEvent({ type: 'mouseUp', ...pad, button: 'left', clickCount: 1 });
         await delay(250);
         assert.notEqual(await altitude(), before, 'joystick changes flight altitude');
         assert.notEqual(await markerTransforms(), transformsBefore, 'altitude changes actual projected POIs, not only the HUD number');
         const high = parseFloat(await altitude());
-        const lowerPad = await wc.executeJavaScript(`(() => { const r=document.querySelector('[aria-label="Altura · giro"]').getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height*.8)}; })()`);
+        const lowerPad = await wc.executeJavaScript(`(() => { const r=document.querySelector('[aria-label="Altura · giro"]').getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; })()`);
         wc.sendInputEvent({ type: 'mouseMove', ...lowerPad });
         wc.sendInputEvent({ type: 'mouseDown', ...lowerPad, button: 'left', clickCount: 1 });
+        wc.sendInputEvent({ type: 'mouseMove', x: lowerPad.x, y: lowerPad.y + 35 });
         await delay(1200);
         wc.sendInputEvent({ type: 'mouseUp', ...lowerPad, button: 'left', clickCount: 1 });
         await delay(250);
@@ -103,13 +119,15 @@ app.whenReady().then(async () => {
         assert.ok(horizontal.controls.every(r=>r.bottom <= horizontal.h && r.right <= horizontal.w), 'both joysticks fit in landscape');
         assert.equal(await wc.executeJavaScript('window.__flightCanvas === document.querySelector(".maplibregl-canvas")'), true, 'fullscreen and rotation must keep the same map');
         console.log('PASS fullscreen: enter, exit, landscape layout and preserved map');
+        await verifyFlightInteractions(wc, until);
         assert.deepEqual(errors.filter(message => /worker failed|worker.*error|No se pudo iniciar/i.test(message)), []);
-        console.log('PASS rehearsal: native worker, real map tiles, markers, joystick movement and reset');
+        console.log('PASS rehearsal: native worker, fixture tiles, markers, joystick movement and reset');
       }
     }
     console.log('PASS all mobile regression checks');
   } finally {
     for (const win of windows) win.destroy();
     gateway.close();
+    fixtureServer.close();
   }
 }).then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });

@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Crosshair, Eye, EyeOff, Headphones, MapPin, Maximize2, Minimize2, Pause, Play } from 'lucide-react';
+import { ArrowLeft, Crosshair, Eye, EyeOff, Headphones, MapPin, Maximize2, Minimize2, Pause, Play, Radar, Loader2 } from 'lucide-react';
 import { coordinates, distanceKm, usableAudio } from '@/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, fallbackZoom, flightCamera } from '@/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, fallbackZoom, flightCamera, FLIGHT_LIMITS, FLIGHT_SPEEDS, flightLimitsForSpeed } from '@/lib/flight-rehearsal.mjs';
 import { LoadingPreparation, Notice, secondary, usePreparationData } from './PreparationUI';
 import useNarrationAudio from './useNarrationAudio';
 import useFlightFullscreen from './useFlightFullscreen';
+import useRehearsalRadar from './useRehearsalRadar';
+import { FloatingJoystick, RelativeGimbal } from './FlightControls';
 import styles from './FlightRehearsalScreen.module.css';
 import 'leaflet/dist/leaflet.css';
 
@@ -21,6 +23,7 @@ const BASEMAP_CREDITS = ARCGIS_KEY ? 'Esri, Vantor, Earthstar Geographics y cola
 function mapStyle() {
     return {
         version: 8,
+        sky: { 'sky-color': '#b9d7e8', 'horizon-color': '#e2edf3', 'sky-horizon-blend': 0.3 },
         sources: {
             basemap: {
                 type: 'raster', tiles: [BASEMAP_URL], tileSize: 256, maxzoom: 19,
@@ -31,64 +34,15 @@ function mapStyle() {
     };
 }
 
-function VirtualJoystick({ label, hint, onChange }) {
-    const pad = useRef(null);
-    const pointer = useRef(null);
-    const [knob, setKnob] = useState({ x: 0, y: 0 });
-    const update = useCallback(event => {
-        const rectangle = pad.current?.getBoundingClientRect();
-        if (!rectangle) return;
-        const radius = rectangle.width / 2;
-        const maximum = radius * 0.62;
-        let x = event.clientX - rectangle.left - radius;
-        let y = event.clientY - rectangle.top - radius;
-        const magnitude = Math.hypot(x, y);
-        if (magnitude > maximum) { x *= maximum / magnitude; y *= maximum / magnitude; }
-        setKnob({ x, y });
-        onChange({ x: x / maximum, y: -y / maximum });
-    }, [onChange]);
-    const release = useCallback(event => {
-        if (pointer.current !== event.pointerId) return;
-        pointer.current = null;
-        setKnob({ x: 0, y: 0 });
-        onChange({ x: 0, y: 0 });
-    }, [onChange]);
-    useEffect(() => {
-        const stop = () => { pointer.current = null; setKnob({ x: 0, y: 0 }); onChange({ x: 0, y: 0 }); };
-        const hidden = () => { if (document.hidden) stop(); };
-        window.addEventListener('blur', stop);
-        document.addEventListener('visibilitychange', hidden);
-        return () => { window.removeEventListener('blur', stop); document.removeEventListener('visibilitychange', hidden); };
-    }, [onChange]);
-    return <div className="select-none text-center text-white">
-        <div
-            ref={pad}
-            role="application"
-            aria-label={label}
-            className="relative h-28 w-28 touch-none rounded-full border border-white/35 bg-slate-950/55 shadow-[inset_0_0_32px_rgba(255,255,255,0.08),0_12px_30px_rgba(0,0,0,0.25)] backdrop-blur-md sm:h-32 sm:w-32"
-            onPointerDown={event => { if (pointer.current !== null) return; pointer.current = event.pointerId; event.currentTarget.setPointerCapture(event.pointerId); update(event); }}
-            onPointerMove={event => { if (pointer.current === event.pointerId) update(event); }}
-            onPointerUp={release}
-            onPointerCancel={release}
-            onLostPointerCapture={release}
-        >
-            <span className="absolute inset-x-3 top-1/2 h-px bg-white/15" />
-            <span className="absolute inset-y-3 left-1/2 w-px bg-white/15" />
-            <span className="absolute left-1/2 top-1/2 h-11 w-11 rounded-full border border-cyan-200/60 bg-cyan-400/30 shadow-[0_4px_18px_rgba(34,211,238,0.35)]" style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }} />
-        </div>
-        <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.14em]">{label}</p>
-        <p className="text-[9px] text-slate-300">{hint}</p>
-    </div>;
-}
-
 function createMarkerElement(kind, name, selected = false) {
     const element = document.createElement('button');
     element.type = 'button';
     element.title = name;
     element.setAttribute('aria-label', name);
     element.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;border:3px solid white;box-shadow:0 5px 16px rgba(0,0,0,.35);color:white;font-weight:900;cursor:pointer;';
-    element.style.background = kind === 'school' ? '#2563eb' : selected ? '#f59e0b' : kind === 'audio' ? '#0891b2' : '#64748b';
-    element.textContent = kind === 'school' ? 'E' : selected ? '★' : '•';
+    element.dataset.poiKind = kind;
+    element.style.background = kind === 'school' ? '#2563eb' : selected ? '#f59e0b' : kind === 'radar' ? '#7c3aed' : kind === 'audio' ? '#0891b2' : '#64748b';
+    element.textContent = kind === 'school' ? 'E' : selected ? '★' : kind === 'radar' ? '◇' : '•';
     return element;
 }
 
@@ -106,8 +60,13 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
     const aircraftMarker = useRef(null);
     const aircraftArrow = useRef(null);
     const poiMarkers = useRef([]);
+    const addRadarMarker = useRef(null);
+    const leftControl = useRef(null);
+    const rightControl = useRef(null);
     const controls = useRef({ forward: 0, strafe: 0, climb: 0, yaw: 0 });
     const flight = useRef({ latitude: schoolLatitude, longitude: schoolLongitude, altitude: 24, heading: 0 });
+    const radar = useRehearsalRadar(flight, pois);
+    const speedLimits = useRef(flightLimitsForSpeed('normal'));
     const running = useRef(true);
     const gimbal = useRef(DEFAULT_GIMBAL);
     const showPoisRef = useRef(true);
@@ -119,17 +78,26 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
     const [gimbalAngle, setGimbalAngle] = useState(DEFAULT_GIMBAL);
     const [hud, setHud] = useState({ altitude: 24, heading: 0, nearest: null });
     const [activePoi, setActivePoi] = useState(null);
+    const [speedId, setSpeedId] = useState('normal');
 
     const reset = useCallback(() => {
         flight.current = { latitude: schoolLatitude, longitude: schoolLongitude, altitude: 24, heading: 0 };
         aircraftMarker.current?.setLngLat([schoolLongitude, schoolLatitude]);
         if (aircraftArrow.current) aircraftArrow.current.style.transform = 'rotate(0deg)';
         controls.current = { forward: 0, strafe: 0, climb: 0, yaw: 0 };
+        leftControl.current?.stop();
+        rightControl.current?.stop();
         updateCamera.current?.(flight.current);
         setHud({ altitude: 24, heading: 0, nearest: null });
     }, [schoolLatitude, schoolLongitude]);
 
     useEffect(() => { running.current = playing; }, [playing]);
+    useEffect(() => { speedLimits.current = flightLimitsForSpeed(speedId); }, [speedId]);
+    useEffect(() => {
+        if (!ready || !radar.visible || !addRadarMarker.current) return;
+        const markers = radar.items.map(poi => addRadarMarker.current(poi));
+        return () => markers.forEach(marker => marker.remove());
+    }, [ready, radar.visible, radar.items]);
     useEffect(() => {
         gimbal.current = gimbalAngle;
         updateCamera.current?.(flight.current);
@@ -160,7 +128,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
                 lastTime = time;
                 if (running.current && aircraftMarker.current) {
                     const previous = flight.current;
-                    flight.current = advanceFlight(previous, controls.current, elapsed);
+                    flight.current = advanceFlight(previous, controls.current, elapsed, speedLimits.current);
                     const current = flight.current;
                     if (current.latitude !== previous.latitude || current.longitude !== previous.longitude || current.altitude !== previous.altitude || current.heading !== previous.heading) {
                         moveAircraft(current);
@@ -203,6 +171,13 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
                     resize: () => instance.invalidateSize({ animate: false }),
                 };
                 map.current = adapter;
+                addRadarMarker.current = poi => {
+                    const marker = L.marker([poi.latitude, poi.longitude], {
+                        icon: L.divIcon({ className: '', html: createMarkerElement('radar', poi.name).outerHTML, iconSize: [34, 34], iconAnchor: [17, 34] }),
+                    }).addTo(instance);
+                    marker.on('click', () => setActivePoi(poi));
+                    return marker;
+                };
 
                 const aircraft = L.marker([schoolLatitude, schoolLongitude], {
                     icon: L.divIcon({ className: '', html: '<div style="display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:999px;background:rgba(3,105,161,.9);border:3px solid white;box-shadow:0 8px 26px rgba(0,0,0,.45);color:white"><div data-aircraft-arrow style="font-size:24px;line-height:1;transform-origin:center">▲</div></div>', iconSize: [48, 48], iconAnchor: [24, 24] }),
@@ -250,7 +225,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
                 pitch: 90 + DEFAULT_GIMBAL,
                 bearing: 0,
                 attributionControl: false,
-                maxPitch: 75,
+                maxPitch: 90,
                 maxZoom: 24,
                 interactive: false,
                 pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
@@ -264,6 +239,11 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             instance.on('load', () => {
                 if (disposed || fallbackStarted) return;
                 clearTimeout(loadTimer);
+                addRadarMarker.current = poi => {
+                    const element = createMarkerElement('radar', poi.name);
+                    element.addEventListener('click', event => { event.stopPropagation(); setActivePoi(poi); });
+                    return new maplibregl.Marker({ element }).setLngLat([poi.longitude, poi.latitude]).addTo(instance);
+                };
                 setReady(true);
                 const aircraft = document.createElement('div');
                 aircraft.style.cssText = 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:999px;background:rgba(3,105,161,.9);border:3px solid white;box-shadow:0 8px 26px rgba(0,0,0,.45);color:white;';
@@ -290,7 +270,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             });
             instance.on('error', event => {
                 if (/webgl|worker|context/i.test(event?.error?.message || '')) startCompatibleMap(event.error);
-                else if (event?.error?.message) setMapError('No se pudo cargar parte de la imagen satelital. Comprueba tu conexión.');
+                else if (event?.error?.message) setMapError('No se pudo cargar parte del mapa. Comprueba tu conexión.');
             });
             instance.on('sourcedata', () => { if (instance.isSourceLoaded('basemap')) setMapError(''); });
         }).catch(startCompatibleMap);
@@ -304,6 +284,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             poiMarkers.current = [];
             aircraftMarker.current = null;
             updateCamera.current = null;
+            addRadarMarker.current = null;
             map.current?.remove();
             map.current = null;
         };
@@ -311,50 +292,61 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
 
     const left = useCallback(value => { controls.current.forward = value.y; controls.current.strafe = value.x; }, []);
     const right = useCallback(value => { controls.current.climb = value.y; controls.current.yaw = value.x; }, []);
-    const currentPoi = activePoi || hud.nearest?.poi;
+    const currentPoi = activePoi?.source === 'osm-radar' ? (radar.visible && radar.items.some(poi => poi.id === activePoi.id) ? activePoi : (showPois ? hud.nearest?.poi : null)) : (showPois ? activePoi || hud.nearest?.poi : null);
     const currentDistance = currentPoi ? closestPoi(flight.current, [currentPoi])?.distance : null;
 
-    return <main ref={screenRef} className={styles.screen}>
+    const endPointer = event => { leftControl.current?.end(event); rightControl.current?.end(event); };
+    return <main ref={screenRef} className={styles.screen}
+        onPointerDown={event => {
+            if (event.button !== 0 || event.target.closest('button, a, input, select, label, header, section, [role="slider"]')) return;
+            const bounds = event.currentTarget.getBoundingClientRect();
+            if (event.clientY - bounds.top < bounds.height * 0.42) return;
+            const control = event.clientX - bounds.left < bounds.width / 2 ? leftControl : rightControl;
+            if (control.current?.start(event, bounds)) { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); }
+        }}
+        onPointerMove={event => { leftControl.current?.move(event); rightControl.current?.move(event); }}
+        onPointerUp={endPointer} onPointerCancel={endPointer} onLostPointerCapture={endPointer}>
         {/* MapLibre's unlayered position:relative overrides Tailwind utilities.
             Keep the full-screen geometry explicit for both map engines, and
             contain Leaflet's high pane z-index beneath the flight controls. */}
         <div ref={container} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }} aria-label="Mapa del ensayo de vuelo" />
+        <div className={styles.touchZones} aria-hidden="true"><div /><div /></div>
         {!ready && !mapError && <div className="absolute inset-0 grid place-items-center bg-[#07121e]"><p className="animate-pulse text-sm font-semibold text-cyan-100">Preparando cabina…</p></div>}
 
-        <header className={`${styles.header} pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-slate-950/90 to-transparent px-3 pb-12 pt-[max(.75rem,env(safe-area-inset-top))]`}>
+        <header className={`${styles.header} pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-[max(.75rem,env(safe-area-inset-top))]`}>
             <div className="pointer-events-auto flex items-center gap-2">
                 <Link href={`/staff/visitas/${visit.id}`} onClick={audio.stop} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 backdrop-blur-md" aria-label="Volver a preparar visita"><ArrowLeft size={20} /></Link>
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-black">Ensayo de vuelo</p><p className="truncate text-[10px] text-slate-300">{visit.nombre_escuela}</p></div>
+                <div className="min-w-0 flex-1 [text-shadow:0_1px_4px_#000]"><p className="truncate text-sm font-black">Ensayo de vuelo</p><p className="truncate text-[10px] text-white">{visit.nombre_escuela}</p></div>
                 <button onClick={immersive.toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/25 bg-slate-950/70" aria-label={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'} title={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'}>{immersive.fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}</button>
             </div>
             <div className={`${styles.hud} pointer-events-auto mt-2 grid grid-cols-3 gap-1.5 text-center`}>
-                <div className="rounded-xl border border-white/15 bg-slate-950/60 px-2 py-1.5 backdrop-blur"><p className="text-[9px] text-slate-300">ALTURA</p><p className="text-xs font-black tabular-nums">{hud.altitude.toFixed(1)} m</p></div>
-                <div className="rounded-xl border border-white/15 bg-slate-950/60 px-2 py-1.5 backdrop-blur"><p className="text-[9px] text-slate-300">RUMBO</p><p className="text-xs font-black tabular-nums">{String(Math.round(hud.heading)).padStart(3, '0')}°</p></div>
-                <div className="rounded-xl border border-white/15 bg-slate-950/60 px-2 py-1.5 backdrop-blur"><p className="text-[9px] text-slate-300">GIMBAL</p><p className="text-xs font-black tabular-nums">{gimbalAngle}°</p></div>
+                <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5" title="Límite del ensayo: 120 m sobre suelo plano"><p className="text-[9px] text-slate-300">ALTURA</p><p className="text-xs font-black tabular-nums">{hud.altitude.toFixed(1)} m</p><p className="text-[8px] text-slate-300">Máx. {FLIGHT_LIMITS.maximumAltitudeMeters} m</p></div>
+                <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5"><p className="text-[9px] text-slate-300">RUMBO</p><p className="text-xs font-black tabular-nums">{String(Math.round(hud.heading)).padStart(3, '0')}°</p></div>
+                <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5"><p className="text-[9px] text-slate-300">GIMBAL</p><p className="text-xs font-black tabular-nums">{gimbalAngle}°</p></div>
             </div>
         </header>
 
         <div className={`${styles.tools} absolute right-3 top-36 z-10 flex flex-col gap-2`}>
-            <button onClick={() => setShowPois(value => !value)} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg backdrop-blur-md" aria-label={showPois ? 'Ocultar puntos de interés' : 'Mostrar puntos de interés'}>{showPois ? <Eye size={19} /> : <EyeOff size={19} />}</button>
+            <button onClick={() => setShowPois(value => !value)} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-pressed={showPois} title="Lugares guardados y narraciones" aria-label={showPois ? 'Ocultar puntos de interés' : 'Mostrar puntos de interés'}>{showPois ? <Eye size={19} /> : <EyeOff size={19} />}</button>
+            <button onClick={radar.toggle} className={`grid h-11 w-11 place-items-center rounded-2xl border border-white/20 shadow-lg ${radar.visible ? 'bg-violet-700' : 'bg-slate-950/75'}`} aria-pressed={radar.visible} aria-label={radar.visible ? 'Ocultar radar de lugares' : 'Explorar lugares cercanos'} title="Radar cultural · 3 km">{radar.status === 'loading' ? <Loader2 size={19} className="animate-spin" /> : <Radar size={19} />}</button>
             <button onClick={reset} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg backdrop-blur-md" aria-label="Regresar a la escuela"><Crosshair size={19} /></button>
         </div>
 
-        <label className={`${styles.gimbal} absolute right-3 top-[15rem] z-10 flex h-44 w-11 flex-col items-center rounded-2xl border border-white/20 bg-slate-950/65 py-2 shadow-lg backdrop-blur-md`}>
-            <span className="text-[8px] font-black uppercase tracking-wider text-slate-300">Gimbal</span>
-            <input aria-label="Inclinación del gimbal" type="range" min="-90" max="-20" step="1" value={gimbalAngle} onChange={event => setGimbalAngle(Number(event.target.value))} className="mt-2 h-28 w-5 [writing-mode:vertical-lr] [direction:rtl]" />
-        </label>
+        <RelativeGimbal value={gimbalAngle} onChange={setGimbalAngle} />
+        <label className={styles.speed}><span>Velocidad</span><select aria-label="Velocidad del ensayo" value={speedId} onChange={event => setSpeedId(event.target.value)}>{FLIGHT_SPEEDS.map(speed => <option key={speed.id} value={speed.id}>{speed.label} · {speed.horizontalMetersPerSecond} m/s</option>)}</select></label>
+        {radar.visible && <section className={styles.radarStatus} aria-label="Estado del radar"><p role="status">{radar.status === 'loading' ? 'Buscando lugares a 3 km…' : radar.status === 'error' ? 'El radar no respondió. Intenta de nuevo.' : radar.status === 'empty' ? 'Sin lugares adicionales a 3 km.' : `${radar.items.length} lugares · radio 3 km`}</p><button disabled={radar.status === 'loading'} onClick={radar.search}>Buscar aquí</button></section>}
 
         {(mapError || immersive.notice || mapMode === 'compatible') && <p role="status" className={`${styles.status} absolute left-3 right-16 top-36 z-10 rounded-xl border border-cyan-300/25 bg-slate-950/85 px-3 py-2 text-xs text-cyan-50`}>{mapError || immersive.notice || 'Vista compatible: altura y gimbal se representan con acercamiento.'}</p>}
 
-        {showPois && currentPoi && <section className={`${styles.poi} absolute bottom-40 left-1/2 z-10 w-[min(82vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 p-3 shadow-2xl backdrop-blur-xl sm:bottom-44`}>
-            <div className="flex items-start gap-2"><MapPin size={17} className="mt-0.5 shrink-0 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{currentPoi.name}</p><p className="mt-0.5 text-[10px] text-slate-300">{selectedIds.has(String(currentPoi.id)) ? 'En tu secuencia' : usableAudio(currentPoi.audio_url) ? 'Narración disponible' : 'Audio pendiente'}{currentDistance != null && ` · ${formatDistance(currentDistance)}`}</p></div>{activePoi && <button onClick={() => setActivePoi(null)} className="px-1 text-xs text-slate-300">Cerrar</button>}</div>
+        {currentPoi && <section className={`${styles.poi} absolute bottom-40 left-1/2 z-10 w-[min(82vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 p-3 shadow-2xl backdrop-blur-xl sm:bottom-44`}>
+            <div className="flex items-start gap-2"><MapPin size={17} className="mt-0.5 shrink-0 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{currentPoi.name}</p><p className="mt-0.5 text-[10px] text-slate-300">{currentPoi.source === 'osm-radar' ? 'Radar cultural · Sin narración' : selectedIds.has(String(currentPoi.id)) ? 'En tu secuencia' : usableAudio(currentPoi.audio_url) ? 'Narración disponible' : 'Audio pendiente'}{currentDistance != null && ` · ${formatDistance(currentDistance)}`}</p></div>{activePoi && <button onClick={() => setActivePoi(null)} className="px-1 text-xs text-slate-300">Cerrar</button>}</div>
             {usableAudio(currentPoi.audio_url) && <button onClick={() => audio.toggle(currentPoi)} className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl bg-cyan-500/20 text-xs font-bold text-cyan-100"><Headphones size={15} />{audio.id === currentPoi.id && audio.status === 'playing' ? 'Pausar narración' : 'Escuchar narración'}</button>}
         </section>}
 
         <button onClick={() => setPlaying(value => !value)} className="absolute bottom-5 left-1/2 z-20 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-full border border-white/30 bg-cyan-500 text-slate-950 shadow-xl" aria-label={playing ? 'Pausar simulación' : 'Continuar simulación'}>{playing ? <Pause size={21} fill="currentColor" /> : <Play size={21} fill="currentColor" />}</button>
-        <div className={`${styles.joystick} absolute bottom-4 left-4 z-10`}><VirtualJoystick label="Movimiento" hint="Avance · traslación" onChange={left} /></div>
-        <div className={`${styles.joystick} absolute bottom-4 right-4 z-10`}><VirtualJoystick label="Altura · giro" hint="Sube · baja · rota" onChange={right} /></div>
-        <div className={styles.credits}>{!ARCGIS_KEY && <span>Mapa de calles · Satélite pendiente · </span>}<span dangerouslySetInnerHTML={{ __html: BASEMAP_CREDITS }} /></div>
+        <FloatingJoystick controlRef={leftControl} side="left" label="Movimiento" onChange={left} />
+        <FloatingJoystick controlRef={rightControl} side="right" label="Altura · giro" onChange={right} />
+        <div className={styles.credits}><span dangerouslySetInnerHTML={{ __html: BASEMAP_CREDITS }} />{ARCGIS_KEY && radar.visible && <span> · Lugares © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>
     </main>;
 }
 

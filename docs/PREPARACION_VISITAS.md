@@ -29,7 +29,22 @@ Migración de producción preparada, **no aplicada a producción**: `supabase/mi
 
 La mesa de revisión aplica exactamente esa migración mediante `tools/review-lab/migrate-preparations.cjs`, con destino fijo local y validación previa. También se aplica al conectar mediante `setup-local.cjs`. El contenido oficial mantiene la sincronización unidireccional existente. No hay cambios de datos en producción.
 
-La simulación usa MapLibre. Si `.env.review.local` contiene `NEXT_PUBLIC_ARCGIS_API_KEY`, carga ArcGIS World Imagery; la clave debe limitarse a mapas y a los orígenes autorizados. Sin clave muestra OpenStreetMap como respaldo de revisión y señala que la vista satelital no está activa. `review:setup` conserva esa variable opcional al regenerar las claves locales.
+La simulación usa MapLibre. Si `.env.review.local` contiene `NEXT_PUBLIC_ARCGIS_API_KEY`, carga ArcGIS World Imagery; la clave debe limitarse a mapas y a los orígenes autorizados. Sin clave muestra el mapa de calles de OpenStreetMap como respaldo de revisión, con atribución visible. `review:setup` conserva esa variable opcional al regenerar las claves locales. Google Map Tiles aún no está integrado ni activo.
+
+### Controles del ensayo
+
+- Dos zonas táctiles delimitadas sin instrucciones escritas. Tocar establece el centro del joystick flotante y no mueve el dron; arrastrar controla movimiento o altura/giro. Soltar, perder el foco o rotar la pantalla deja los controles a cero. Admite dos dedos simultáneos y no intercepta botones, marcadores ni el gimbal.
+- Gimbal relativo entre -90° y 0°: tocar no cambia el ángulo. Deslizar lo ajusta desde el valor actual. También admite flechas, Inicio y Fin por teclado. MapLibre permite mirar al horizonte; la vista compatible de Leaflet solo representa el ajuste con zoom.
+- Velocidades lenta/normal/rápida: 3/8/18 m/s de desplazamiento, 2/4/6 m/s de ascenso y 35/50/70°/s de giro. Predeterminada: normal. Todas conservan el límite fijo del ensayo de 120 m sobre suelo plano; no representa autorización ni altitud segura de un vuelo real.
+- Pantalla completa solicita orientación horizontal cuando el navegador la admite. En caso contrario se conserva la vista normal y se puede girar físicamente el dispositivo. Los cambios de tamaño no recrean el mapa.
+- Sin degradado ni desenfoque en el encabezado; se conservan tarjetas independientes para los indicadores y créditos cartográficos obligatorios.
+- El ojo muestra/oculta lugares guardados y narraciones. El radar consulta, solo al pulsarlo, las mismas categorías culturales de Overpass que el editor de narraciones. Busca a 3 km de la posición simulada, muestra hasta 200 lugares adicionales y evita duplicados cercanos con el mismo nombre. Los marcadores violetas permiten consultar nombre/distancia; no generan audio ni escriben en el catálogo. Ocultar/mostrar reutiliza el resultado; «Buscar aquí» actualiza la zona. Se manejan resultado vacío, error y cancelación sin reiniciar el mapa.
+
+### Credencial de Google pendiente
+
+En el proyecto de Google Cloud con facturación, habilitar [Map Tiles API](https://console.cloud.google.com/apis/library/tile.googleapis.com) y crear una clave exclusiva en [Credenciales](https://console.cloud.google.com/apis/credentials). Restringirla a Map Tiles API y al origen de consumo que se defina en su integración. Es preferible una clave separada, en la misma cuenta/proyecto, a cambiar los permisos de las claves de narraciones.
+
+No pegar la clave en conversaciones ni incorporarla a Git. Puede guardarse en `.env.local` como `GOOGLE_MAP_TILES_API_KEY` (sin prefijo `NEXT_PUBLIC_`) para la futura integración del servidor. Guardarla por sí solo no activa el satélite; la Mesa bloquea por diseño la herencia de credenciales externas y requerirá configuración explícita de esta integración.
 
 La API lleva `private, no-store` y el service worker usa solo red para este endpoint. No se comparten cachés de preparaciones entre cuentas.
 
@@ -38,6 +53,7 @@ La API lleva `private, no-store` y el service worker usa solo red para este endp
 - Lógica: `node --test --test-isolation=none tests/narration-preparation.test.mjs tools/review-lab/core.test.cjs`.
 - Integración local, con mesa conectada: `node tools/review-lab/verify-preparations.cjs`. Comprueba autenticación, permisos, cronograma futuro, orden, confirmación, vuelta a borrador, concurrencia, rechazo de contenido inválido y ausencia de cambios operativos. Crea una visita temporal y elimina exclusivamente esa visita al finalizar.
 - El usuario realiza las comprobaciones visuales. La mesa dispone de dos visitas ficticias futuras: una cercana a un punto importado y otra sin coordenadas.
+- Regresión de controles: `tests/narration-preparation.test.mjs` y `tests/cultural-pois.test.mjs`. El ejecutable Electron de la mesa puede correr `tools/review-lab/verify-mobile.cjs --flight-only`: comprueba ingreso LAN, renderizado nativo, cámara, estabilidad, pantalla completa, controles multitáctiles, gimbal, velocidades y radar. Utiliza imágenes y respuestas del radar de prueba para no automatizar descargas masivas de servicios públicos; no acredita disponibilidad del proveedor.
 
 Recorrido de revisión: Inicio → Ver cronograma → escuela futura → agregar tres narraciones → cambiar orden → volver y entrar → ensayar → dejar lista → modificar orden y verificar regreso a borrador. Comprobar también lista/mapa, escuela sin ubicación y error de reproducción.
 
