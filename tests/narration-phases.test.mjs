@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GRADES, PHASES, narrationForGrade, phaseForGrade, phaseProgress } from '../src/lib/narration-phases.mjs';
+import { GRADES, PHASES, defaultGradeForNarration, narrationForGrade, phaseForGrade, phaseProgress } from '../src/lib/narration-phases.mjs';
 
 test('los nueve grados se agrupan en las cuatro fases de educación básica', () => {
     assert.equal(GRADES.length, 9);
@@ -18,4 +18,18 @@ test('una variante incompleta no toma el audio general o de otra fase', () => {
     assert.equal(resolved.version_general, false);
     assert.equal(narrationForGrade(poi, 'primaria3').version_label, 'Versión general');
     assert.equal(phaseProgress(poi).filter(item => item.script).length, 1);
+});
+
+test('el audio general heredado se puede escuchar aunque falte su transcripción', () => {
+    const resolved = narrationForGrade({ id: 'legacy', audio_url: 'https://audio.test/legacy.wav' }, null);
+    assert.equal(resolved.version_label, 'Versión general');
+    assert.equal(resolved.audio_url, 'https://audio.test/legacy.wav');
+});
+
+test('la ficha abre el contenido existente sin pedir grado', () => {
+    assert.equal(defaultGradeForNarration({ narrative_script: 'Ya existe' }), null);
+    assert.equal(defaultGradeForNarration({ audio_url: 'https://audio.test/general.wav' }), null);
+    const phaseOnly = { phase_variants: { phase4: { script: 'Guion de tercero y cuarto' } } };
+    assert.equal(defaultGradeForNarration(phaseOnly), 'primaria3');
+    assert.equal(narrationForGrade(phaseOnly, defaultGradeForNarration(phaseOnly)).narrative_script, 'Guion de tercero y cuarto');
 });

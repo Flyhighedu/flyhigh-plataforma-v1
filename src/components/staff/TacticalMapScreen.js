@@ -39,6 +39,13 @@ const PremiumRadarIcon = () => (
     </div>
 );
 
+const RADAR_TEXTS = [
+    'Escaneando zona...',
+    'Consultando mapas históricos...',
+    'Descubriendo sitios...',
+    'Analizando puntos de interés...'
+];
+
 export default function TacticalMapScreen({ userId, profile, onClose = null }) {
     const router = useRouter();
     const handleBack = onClose || (() => router.back());
@@ -64,19 +71,13 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
 
     // ═══ RADAR V2 STATE ═══
     const [radarTextIndex, setRadarTextIndex] = useState(0);
-    const radarTexts = [
-        "Escaneando zona...",
-        "Consultando mapas históricos...",
-        "Descubriendo sitios...",
-        "Analizando puntos de interés..."
-    ];
 
     useEffect(() => {
         let interval;
         if (isSearchingCulturalPois) {
             setRadarTextIndex(0); // Reset
             interval = setInterval(() => {
-                setRadarTextIndex(prev => (prev + 1) % radarTexts.length);
+                setRadarTextIndex(prev => (prev + 1) % RADAR_TEXTS.length);
             }, 2500);
         }
         return () => clearInterval(interval);
@@ -105,7 +106,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 // Phase 3: Slim select — only fields needed for map pins + modal basics
                 const [personalResult, officialResult] = await Promise.all([
                     supabase.from('pilot_pois')
-                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, research_article, narrative_script, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
+                        .select('id, name, latitude, longitude, category, description, is_favorite, is_official, is_general_topic, research_article, narrative_script, audio_url, audio_duration_seconds, audio_generated_at, dato_clave_1, dato_clave_2, dato_clave_3, pregunta_estudio_1, pregunta_estudio_2, pregunta_estudio_3, pregunta_interaccion, image_url, created_at, updated_at')
                         .eq('user_id', userId).order('created_at', { ascending: false }),
                     fetch('/api/official-pois').then(r => r.ok ? r.json() : { pois: [] }).catch(() => ({ pois: [] }))
                 ]);
@@ -115,13 +116,16 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                 const allPois = [...officialPois, ...personalPois];
 
                 setPois(allPois);
+                const requestedPoiId = new URLSearchParams(window.location.search).get('poi');
+                const requestedPoi = requestedPoiId && allPois.find(p => String(p.id) === requestedPoiId);
+                if (requestedPoi) { setModalPoi(requestedPoi); setIsNewPin(false); }
 
                 // Phase 4: Cache slim version for next visit (only map-essential fields)
                 try {
                     const slimForCache = allPois.map(p => ({
                         id: p.id, name: p.name, latitude: p.latitude, longitude: p.longitude,
                         category: p.category, description: p.description, is_favorite: p.is_favorite,
-                        is_official: p.is_official, dato_clave_1: p.dato_clave_1 || null,
+                        is_official: p.is_official, is_general_topic: p.is_general_topic, image_url: p.image_url || null, dato_clave_1: p.dato_clave_1 || null,
                         narrative_script: p.narrative_script ? '1' : null, // Just a flag, not the full text
                         audio_url: p.audio_url ? '1' : null
                     }));
@@ -643,6 +647,9 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                         onLongPress={handleLongPress}
                         onMapTap={handleMapTap}
                     />
+                    <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2000, maxWidth: 240, borderRadius: 12, background: '#1264B8', color: '#FFFFFF', padding: '9px 12px', fontSize: 12, fontWeight: 700, lineHeight: 1.4, pointerEvents: 'none' }}>
+                        Activa el radar y toca un punto encontrado para abrir su ficha.
+                    </div>
                     
                     {/* Reverse Geocoding Loading Toast */}
                     {(isReverseGeocoding || isDiscovering) && (
@@ -672,7 +679,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                             style={{
                                 position: 'relative',
                                 height: 56, 
-                                width: isSearchingCulturalPois ? 260 : 56, 
+                                width: isSearchingCulturalPois ? 260 : 156,
                                 borderRadius: 28,
                                 background: isSearchingCulturalPois ? '#2563EB' : (suggestedPois.length > 0 ? '#F59E0B' : '#FFFFFF'),
                                 border: 'none', 
@@ -682,19 +689,20 @@ export default function TacticalMapScreen({ userId, profile, onClose = null }) {
                                 cursor: isSearchingCulturalPois ? 'wait' : 'pointer',
                                 transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
                                 overflow: 'hidden',
-                                padding: isSearchingCulturalPois ? '0 20px' : 0
+                                padding: '0 16px'
                             }}
-                            title="Buscar sitios culturales e históricos"
+                            title={suggestedPois.length ? 'Ocultar puntos encontrados' : 'Activar radar de puntos de interés'}
+                            aria-label={suggestedPois.length ? 'Ocultar puntos encontrados' : 'Activar radar de puntos de interés'}
                         >
                             {isSearchingCulturalPois ? (
                                 <>
                                     <PremiumRadarIcon />
                                     <span key={radarTextIndex} style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', animation: 'poiSlideText 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
-                                        {radarTexts[radarTextIndex]}
+                                        {RADAR_TEXTS[radarTextIndex]}
                                     </span>
                                 </>
                             ) : (
-                                <Landmark size={24} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                                <><Landmark size={22} strokeWidth={2.5} style={{ flexShrink: 0 }} /><span style={{ fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap' }}>{suggestedPois.length ? 'Ocultar puntos' : 'Activar radar'}</span></>
                             )}
                         </button>
                     </div>

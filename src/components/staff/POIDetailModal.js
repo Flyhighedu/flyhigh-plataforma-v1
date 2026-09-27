@@ -3,28 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, Loader2, Sparkles, Save, Trash2, RefreshCw, BookOpen, Search, Zap, Check, Mic, Play, Pause, Volume2, FileText } from 'lucide-react';
 import { EngineSelector, ResearchAccordion, NarrativeFactoryPanel, ImageSelector } from '@/components/shared/SharedNarrativeFactory';
+import { poiCategory } from '@/lib/poi-presentation.mjs';
 
 // ═══════════════════════════════════════════════════════════════
 // POIDetailModal — Modal Staff (usa SharedNarrativeFactory)
 // Soporta readOnly para POIs oficiales y edición completa para personales.
 // ═══════════════════════════════════════════════════════════════
-
-function autoCategory(desc) {
-    if (!desc) return { emoji: '📍', label: 'Punto de interés' };
-    if (/museo/i.test(desc)) return { emoji: '🏛️', label: 'Museo' };
-    if (/templo|iglesia|culto|capilla|parroquia/i.test(desc)) return { emoji: '⛪', label: 'Templo' };
-    if (/río|lago|presa|cascada|agua|laguna/i.test(desc)) return { emoji: '💧', label: 'Agua' };
-    if (/parque|reserva|bosque|natural|área/i.test(desc)) return { emoji: '🌿', label: 'Natural' };
-    if (/cerro|volcán|montaña|elevación|peak/i.test(desc)) return { emoji: '⛰️', label: 'Cerro' };
-    if (/universidad|biblioteca|educativa|teatro|college/i.test(desc)) return { emoji: '📚', label: 'Educativo' };
-    if (/planta|fábrica|infraestructura|estación|tratadora/i.test(desc)) return { emoji: '🏭', label: 'Industrial' };
-    if (/aeropuerto|aeródromo/i.test(desc)) return { emoji: '✈️', label: 'Aeropuerto' };
-    if (/deportiv|estadio/i.test(desc)) return { emoji: '⚽', label: 'Deportivo' };
-    if (/monument|históric|arqueológ/i.test(desc)) return { emoji: '🏺', label: 'Histórico' };
-    if (/mirador|viewpoint/i.test(desc)) return { emoji: '👁️', label: 'Mirador' };
-    if (/zoológico|acuario/i.test(desc)) return { emoji: '🐾', label: 'Fauna' };
-    return { emoji: '📍', label: 'Punto de interés' };
-}
 
 const HEADER_GRADIENTS = {
     '🏛️': 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
@@ -210,6 +194,7 @@ export default function POIDetailModal({
                 audio_duration_seconds: audioDuration || null,
                 audio_generated_at: audioGeneratedAt || null,
                 image_url: selectedImageUrl || null,
+                is_general_topic: isGeneral,
                 ...(poi?.id ? { id: poi.id } : {})
             });
         } finally { setIsSaving(false); }
@@ -217,7 +202,7 @@ export default function POIDetailModal({
 
     if (!isOpen || !poi) return null;
 
-    const cat = autoCategory(poi?.description);
+    const cat = poiCategory(poi);
     const isGeneral = poi?.is_general_topic || (poi?.latitude == null && poi?.longitude == null);
     const effectiveReadOnly = readOnly || poi?.is_official;
 

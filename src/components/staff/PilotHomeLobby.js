@@ -205,7 +205,7 @@ export default function PilotHomeLobby({
                         </p>
                         <h2 className="mt-1 text-[1.75rem] font-black tracking-[-0.035em]">Narraciones</h2>
                         <p className="mt-2 max-w-[18rem] text-[13px] font-medium leading-relaxed text-white/90">
-                            Explora el mapa, elige el grado y escucha la narración adecuada.
+                            Explora el mapa, abre una ficha y escucha la narración.
                         </p>
 
                         <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-white">

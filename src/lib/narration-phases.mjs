@@ -15,6 +15,11 @@ export function phaseForGrade(grade) {
     return GRADES.find(item => item.key === grade)?.phase || null;
 }
 
+export function defaultGradeForNarration(poi) {
+    if (poi?.narrative_script || poi?.audio_url) return null;
+    return PHASES.find(phase => poi?.phase_variants?.[phase.key]?.script)?.grades[0] || null;
+}
+
 export function narrationForGrade(poi, grade) {
     const phase = phaseForGrade(grade);
     const variant = phase && poi?.phase_variants?.[phase];
@@ -28,7 +33,7 @@ export function narrationForGrade(poi, grade) {
         version_phase: phase,
         version_general: false,
     };
-    if (poi?.narrative_script) return { ...poi, version_label: 'Versión general', version_phase: null, version_general: true };
+    if (poi?.narrative_script || poi?.audio_url) return { ...poi, version_label: 'Versión general', version_phase: null, version_general: true };
     return { ...poi, narrative_script: null, audio_url: null, version_label: phase ? 'Versión pendiente' : 'Sin grado elegido', version_phase: phase, version_general: false };
 }
 

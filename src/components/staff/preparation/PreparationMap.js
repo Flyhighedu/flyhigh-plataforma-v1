@@ -6,24 +6,20 @@ import 'leaflet/dist/leaflet.css';
 import { coordinates } from '@/lib/narration-preparation.mjs';
 
 // Names go to Leaflet as text nodes, never interpolated into HTML.
-export default function PreparationMap({ markers, onSelect, selectedId, onPick, picked }) {
+export default function PreparationMap({ markers, onSelect, selectedId }) {
     const container = useRef(null);
     const [tileError, setTileError] = useState(false);
     const callback = useRef(onSelect);
-    const pickCallback = useRef(onPick);
     useEffect(() => { callback.current = onSelect; }, [onSelect]);
-    useEffect(() => { pickCallback.current = onPick; }, [onPick]);
     useEffect(() => {
         const points = markers.filter(m => coordinates(m.lat, m.lng));
-        if (!container.current || (!points.length && !onPick)) return;
-        const map = L.map(container.current, { scrollWheelZoom: false }).setView(points.length ? [points[0].lat, points[0].lng] : [19.4326, -99.1332], points.length ? 14 : 5);
+        if (!container.current || !points.length) return;
+        const map = L.map(container.current, { scrollWheelZoom: false }).setView([points[0].lat, points[0].lng], 14);
         const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19,
         }).addTo(map);
         tiles.on('tileerror', () => setTileError(true));
         tiles.on('tileload', () => setTileError(false));
-        if (onPick) map.on('click', event => pickCallback.current?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }));
-        if (picked && coordinates(picked.latitude, picked.longitude)) L.circleMarker([picked.latitude, picked.longitude], { radius: 10, color: '#ffffff', weight: 3, fillColor: '#e55436', fillOpacity: 1 }).addTo(map);
         for (const point of points) {
             const label = document.createElement('span');
             label.textContent = point.name;
@@ -34,15 +30,14 @@ export default function PreparationMap({ markers, onSelect, selectedId, onPick, 
             if (String(point.id) === String(selectedId)) marker.openTooltip();
         }
         if (points.length > 1) map.fitBounds(points.map(p => [p.lat, p.lng]), { padding: [32, 32], maxZoom: 15 });
-        if (picked && coordinates(picked.latitude, picked.longitude)) map.setView([picked.latitude, picked.longitude], Math.max(map.getZoom(), 14));
         const observer = new ResizeObserver(() => map.invalidateSize());
         observer.observe(container.current);
         return () => { observer.disconnect(); map.remove(); };
-    }, [markers, selectedId, onPick, picked]);
-    if (!onPick && !markers.some(m => coordinates(m.lat, m.lng))) return <p className="rounded-2xl bg-slate-100 p-5 text-sm text-slate-600">Todavía no hay ubicaciones confirmadas para mostrar en el mapa. Puedes continuar desde la lista.</p>;
+    }, [markers, selectedId]);
+    if (!markers.some(m => coordinates(m.lat, m.lng))) return <p className="rounded-2xl bg-slate-100 p-5 text-sm text-slate-600">Todavía no hay ubicaciones confirmadas para mostrar en el mapa. Puedes continuar desde la lista.</p>;
     return <div>
         <div ref={container} role="region" aria-label="Mapa de escuelas y lugares" className="relative z-0 h-72 overflow-hidden rounded-2xl border border-slate-200 sm:h-96" />
         {tileError && <p role="status" className="mt-2 text-xs text-amber-800">No se pudo cargar parte del mapa. La lista sigue disponible.</p>}
-        <p className="mt-2 text-xs text-slate-500">{onPick ? 'Toca el mapa para colocar el punto exacto del lugar.' : 'Azul: escuela · Verde: lugar con narración. También puedes seleccionarlos desde la lista.'}</p>
+        <p className="mt-2 text-xs text-slate-500">Azul: escuela · Verde: lugar con narración. También puedes seleccionarlos desde la lista.</p>
     </div>;
 }
