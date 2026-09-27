@@ -51,8 +51,8 @@ export default function NarrationsHub() {
     }, [router, reload]);
     const switchTab = value => { setTab(value); if (value === 'explore') setMapVisited(true); };
     const onMapChange = useCallback(() => setReload(value => value + 1), []);
-    return <div className={styles.shell}>
-        <div hidden={simulatorActive}>
+    return <div className={styles.shell} data-exploring={tab === 'explore' && !simulatorActive}>
+        <div className={styles.hubBody} hidden={simulatorActive}>
             <header className={styles.header}><div className={styles.headerRow}><Link href="/staff/dashboard" aria-label="Volver al inicio"><ArrowLeft size={21}/></Link><h1>Narraciones</h1><button onClick={() => setSimulatorActive(true)}><Plane size={19}/>Simulador</button></div>
                 <div className={styles.tabs} role="tablist" aria-label="Narraciones">{[['library','Biblioteca'],['explore','Explorar']].map(([value,label], index) => <button key={value} ref={element => { tabRefs.current[index] = element; }} role="tab" id={'narrations-tab-' + value} aria-controls={'narrations-panel-' + value} aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onClick={() => switchTab(value)} onKeyDown={event => { if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1-index; switchTab(next ? 'explore' : 'library'); tabRefs.current[next]?.focus(); } }}>{tab === value && <motion.i className={styles.activeTab} layoutId="narrations-active-tab" transition={{ duration: reduced ? 0 : .24 }}/>}<span>{label}</span></button>)}</div>
             </header>
@@ -62,7 +62,7 @@ export default function NarrationsHub() {
                 {error && <div className={styles.error} role="alert">{error} <button className={styles.secondary} onClick={() => setReload(value => value + 1)}>Reintentar</button></div>}
                 {!loading && !error && <NarrationCatalog pois={pois} highlightedId={highlightedId} active={tab === 'library' && !simulatorActive && !isPoiModalOpen} onOpen={poi => { setSelectedPoi(poi); setIsPoiModalOpen(true); }}/>}
             </motion.main>
-            <div id="narrations-panel-explore" role="tabpanel" aria-labelledby="narrations-tab-explore" hidden={tab !== 'explore'}>
+            <div className={styles.explorePanel} id="narrations-panel-explore" role="tabpanel" aria-labelledby="narrations-tab-explore" hidden={tab !== 'explore'}>
                 {mapVisited && userId && <div className={styles.mapPanel}><TacticalMapScreen userId={userId} profile={profile} embedded onContentChange={onMapChange}/></div>}
                 {!userId && <div className={styles.content}>{error ? <div role="alert">{error}<button className={styles.secondary} onClick={() => setReload(value => value+1)}>Reintentar</button></div> : <p role="status">Cargando mapa…</p>}</div>}
             </div>
