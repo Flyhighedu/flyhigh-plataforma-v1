@@ -188,44 +188,42 @@ export default function PilotHomeLobby({
                     <Link href="/staff/cronograma" className="mt-4 flex min-h-11 items-center justify-between border-t border-slate-100 pt-3 text-sm font-bold text-blue-700"><span>Ver cronograma</span><ChevronRight size={17} /></Link>
                 </section>
 
-                <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#0a2b55] via-[#0d3c78] to-[#1557a9] p-5 text-white shadow-[0_22px_50px_-28px_rgba(10,43,85,0.9)]">
-                    <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-cyan-300/15 blur-2xl" aria-hidden="true" />
-                    <div className="absolute -bottom-14 left-8 h-32 w-44 rounded-full bg-blue-400/20 blur-3xl" aria-hidden="true" />
+                <section className="relative overflow-hidden rounded-[1.75rem] bg-[#1264b8] p-5 text-white shadow-[0_16px_36px_-24px_rgba(18,100,184,0.7)]">
 
                     <div className="relative">
                         <div className="flex items-start justify-between gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-cyan-200 shadow-inner">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/30 bg-white/15 text-white">
                                 <AudioLines size={24} strokeWidth={2.2} />
                             </div>
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.13em] text-emerald-200">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e55337] px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.13em] text-white">
                                 <Radio size={11} /> Acceso directo
                             </span>
                         </div>
 
-                        <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.19em] text-cyan-200">
+                        <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[0.19em] text-white">
                             Cabina del piloto
                         </p>
                         <h2 className="mt-1 text-[1.75rem] font-black tracking-[-0.035em]">Narraciones</h2>
-                        <p className="mt-2 max-w-[18rem] text-[13px] font-medium leading-relaxed text-blue-100/85">
-                            Explora lugares y temas, escucha sus narraciones y conoce lo que puedes contar.
+                        <p className="mt-2 max-w-[18rem] text-[13px] font-medium leading-relaxed text-white/90">
+                            Explora el mapa, elige el grado y escucha la narración adecuada.
                         </p>
 
-                        <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-blue-100/80">
+                        <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-white">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
-                                <CircleCheck size={12} className="text-cyan-200" /> Explorar
+                                <CircleCheck size={12} className="text-white" /> Explorar
                             </span>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
-                                <CircleCheck size={12} className="text-cyan-200" /> Escuchar
+                                <CircleCheck size={12} className="text-white" /> Escuchar
                             </span>
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/8 px-2.5 py-1.5">
-                                <CircleCheck size={12} className="text-cyan-200" /> Revisar
+                                <CircleCheck size={12} className="text-white" /> Revisar
                             </span>
                         </div>
 
                         <button
                             type="button"
                             onClick={onOpenNarrations}
-                            className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-extrabold text-[#0a2b55] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.75)] transition hover:bg-cyan-50 active:scale-[0.99]"
+                            className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-extrabold text-[#1264b8] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.5)] transition active:scale-[0.99]"
                         >
                             Abrir narraciones <ChevronRight size={17} strokeWidth={2.8} />
                         </button>

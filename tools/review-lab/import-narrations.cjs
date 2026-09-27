@@ -56,27 +56,27 @@ async function localizeAudioFiles(sourcePois, targetClient) {
   const bucket = 'poi-audio';
   await ensurePublicBucket(targetClient, bucket);
 
+  async function copyAudio(url, objectPath, name) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`No se pudo descargar el audio de ${name} (${response.status}).`);
+    const contentType = response.headers.get('content-type') || 'audio/wav';
+    if (!contentType.startsWith('audio/')) throw new Error(`El archivo de ${name} no fue reconocido como audio.`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    const { error: uploadError } = await targetClient.storage.from(bucket).upload(objectPath + fileExtension(url), bytes, { contentType, upsert: true });
+    if (uploadError) throw uploadError;
+    return targetClient.storage.from(bucket).getPublicUrl(objectPath + fileExtension(url)).data.publicUrl;
+  }
+
   const localized = [];
   for (const poi of sourcePois) {
-    const response = await fetch(poi.audio_url);
-    if (!response.ok) {
-      throw new Error(`No se pudo descargar el audio de ${poi.name} (${response.status}).`);
+    const variants = { ...(poi.phase_variants || {}) };
+    for (const phase of ['phase2', 'phase3', 'phase4', 'phase5']) {
+      if (variants[phase]?.audio_url) variants[phase] = {
+        ...variants[phase], audio_url: await copyAudio(variants[phase].audio_url, `official/${poi.id}_${phase}`, `${poi.name} (${phase})`)
+      };
     }
-
-    const contentType = response.headers.get('content-type') || 'audio/wav';
-    if (!contentType.startsWith('audio/')) {
-      throw new Error(`El archivo de ${poi.name} no fue reconocido como audio.`);
-    }
-
-    const objectPath = `official/${poi.id}${fileExtension(poi.audio_url)}`;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    const { error: uploadError } = await targetClient.storage
-      .from(bucket)
-      .upload(objectPath, bytes, { contentType, upsert: true });
-    if (uploadError) throw uploadError;
-
-    const { data: publicData } = targetClient.storage.from(bucket).getPublicUrl(objectPath);
-    localized.push({ ...poi, audio_url: publicData.publicUrl });
+    localized.push({ ...poi, phase_variants: variants,
+      audio_url: poi.audio_url ? await copyAudio(poi.audio_url, `official/${poi.id}`, poi.name) : null });
   }
 
   return localized;
@@ -110,7 +110,7 @@ async function syncNarrations() {
   if (poiError) throw poiError;
   if (!pois?.length) throw new Error('Directorio Global no contiene narraciones.');
 
-  const incomplete = pois.filter((poi) => !poi.narrative_script || !poi.audio_url);
+  const incomplete = pois.filter((poi) => !((poi.narrative_script && poi.audio_url) || ['phase2', 'phase3', 'phase4', 'phase5'].every(phase => poi.phase_variants?.[phase]?.script && poi.phase_variants?.[phase]?.audio_url)));
   if (incomplete.length) {
     throw new Error(`Importación detenida: ${incomplete.length} registros oficiales están incompletos.`);
   }
@@ -127,7 +127,7 @@ async function syncNarrations() {
     'pregunta_estudio_1', 'pregunta_estudio_2', 'pregunta_estudio_3',
     'pregunta_interaccion', 'ai_context', 'sort_order', 'created_at', 'updated_at',
     'narrative_script', 'audio_url', 'audio_duration_seconds', 'audio_generated_at',
-    'research_article', 'is_general_topic', 'trigger_keywords'
+    'research_article', 'is_general_topic', 'trigger_keywords', 'phase_variants'
   ];
 
   const { error: routeUpsertError } = await target.client
@@ -140,19 +140,17 @@ async function syncNarrations() {
     .upsert(localizedPois.map((poi) => pick(poi, poiFields)), { onConflict: 'id' });
   if (poiUpsertError) throw poiUpsertError;
 
-  const { count, error: verifyError } = await target.client
+  const { data: verified, error: verifyError } = await target.client
     .from('master_route_pois')
-    .select('*', { count: 'exact', head: true })
-    .eq('route_id', route.id)
-    .not('narrative_script', 'is', null)
-    .not('audio_url', 'is', null);
+    .select('id, narrative_script, audio_url, phase_variants')
+    .eq('route_id', route.id);
   if (verifyError) throw verifyError;
-  if (count !== localizedPois.length) {
-    throw new Error(`Verificación falló: se esperaban ${localizedPois.length} narraciones completas y se encontraron ${count}.`);
+  if (verified.length !== localizedPois.length || verified.some(poi => !((poi.narrative_script && poi.audio_url) || ['phase2', 'phase3', 'phase4', 'phase5'].every(phase => poi.phase_variants?.[phase]?.script && poi.phase_variants?.[phase]?.audio_url)))) {
+    throw new Error('Verificación falló: el catálogo importado contiene narraciones incompletas.');
   }
 
   return {
-    imported: count,
+    imported: verified.length,
     route: route.title,
     source: source.url.hostname,
     destination: target.url.hostname,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 
 // Convertir raw PCM (16-bit, 24kHz, mono) a WAV agregando header de 44 bytes
 function buildWavBuffer(pcmBuffer) {
@@ -89,8 +90,7 @@ export async function POST(request) {
             auth: { autoRefreshToken: false, persistSession: false }
         });
 
-        const timestamp = Date.now();
-        const filePath = `narratives/${poiId}/audio_${timestamp}.wav`;
+        const filePath = `narratives/${poiId}/audio_${randomUUID()}.wav`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from('poi-narratives')

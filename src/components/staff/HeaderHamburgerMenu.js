@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Menu, X, LogOut, Clock, Plane, Repeat, TrendingUp, MapPin, UserX, Sparkles } from 'lucide-react';
+import { Menu, X, LogOut, Clock, Plane, Repeat, TrendingUp, MapPin, UserX } from 'lucide-react';
 import StartDemoFab from './StartDemoFab';
 import ResetProcessButton from './ResetProcessButton';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 
-export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null, userId = null, profile = null, onOpenQuickPoi = null }) {
+export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, role = null, userId = null, profile = null }) {
     const [isOpen, setIsOpen] = useState(false);
     const [changeMissionProgress, setChangeMissionProgress] = useState(false);
     const [directOpProgress, setDirectOpProgress] = useState(false);
@@ -229,12 +229,12 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                             </div>
                         </button>
 
-                        {/* Mapeo Táctico — Pilot only */}
+                        {/* Una sola entrada para la biblioteca y la creación de narraciones. */}
                         {normalizedRole === 'pilot' && (
                             <button
                                 onClick={() => {
                                     setIsOpen(false);
-                                    router.push('/staff/mapeo');
+                                    router.push('/staff/narraciones');
                                 }}
                                 className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-cyan-50 transition-colors rounded-lg text-cyan-700 group border-t border-slate-50"
                             >
@@ -242,27 +242,8 @@ export default function HeaderHamburgerMenu({ journeyId, schoolId, onDemoStart, 
                                     <MapPin size={18} />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">Mapeo Táctico</p>
-                                    <p className="text-[10px] text-cyan-500/80 font-medium tracking-tight">Puntos de interés guardados</p>
-                                </div>
-                            </button>
-                        )}
-
-                        {/* Mis Puntos de Interés — Pilot only, overlay mode */}
-                        {normalizedRole === 'pilot' && onOpenQuickPoi && (
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    onOpenQuickPoi();
-                                }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-violet-50 transition-colors rounded-lg text-violet-700 group border-t border-slate-50"
-                            >
-                                <div className="p-2 bg-violet-50 rounded-lg transition-colors group-hover:bg-violet-100">
-                                    <Sparkles size={18} />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold">Mis Puntos de Interés</p>
-                                    <p className="text-[10px] text-violet-500/80 font-medium tracking-tight">Crear o editar POIs al instante</p>
+                                    <p className="text-sm font-semibold">Narraciones</p>
+                                    <p className="text-[10px] text-cyan-500/80 font-medium tracking-tight">Explorar lugares y temas</p>
                                 </div>
                             </button>
                         )}
