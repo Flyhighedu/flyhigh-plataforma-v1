@@ -39,7 +39,9 @@ El esquema local inicial está en `tools/review-lab/backend/supabase/migrations`
 
 La prueba automatizada de la mesa usa un servidor sintético local, no FlyHigh: `npm run review:test` y los modos `--self-test=write` / `--self-test=read` comprueban separación y persistencia de sesiones, bloqueo de producción, desconexión individual y tamaños de vista. La prueba completa de jornadas, narraciones y métricas exige que Docker y Supabase local estén activos. Cámara, GPS y audio deben comprobarse también en teléfonos físicos.
 
-El ensayo de vuelo intenta primero el motor 3D. Si WebGL no está disponible o no termina de iniciar, cambia automáticamente al mapa compatible basado en Leaflet. En ese modo permanecen disponibles los dos joysticks, los POI, el audio y el gimbal; la inclinación del gimbal se representa mediante el nivel de acercamiento. Si ambos motores fallan, se muestra un mensaje de conexión en vez de dejar la cabina vacía.
+El ensayo de vuelo habitual intenta primero MapLibre con perspectiva sobre mapa plano. Si WebGL no está disponible o no termina de iniciar, cambia automáticamente al mapa compatible basado en Leaflet. En ese modo permanecen disponibles los dos joysticks, los POI, el audio y el gimbal; la inclinación del gimbal se representa mediante el nivel de acercamiento. Si ambos motores fallan, se muestra un mensaje de conexión en vez de dejar la cabina vacía.
+
+La entrada independiente **Probar relieve 3D**, en Preparar visita, utiliza Google Photorealistic 3D Tiles mediante CesiumJS. Requiere la credencial dedicada `GOOGLE_MAP_TILES_API_KEY` en `.env.local`. Como excepción explícita para esta prueba, la API local lee únicamente esa clave y llama a Google desde el servidor; las demás integraciones permanecen aisladas. Consume la API de la cuenta con facturación y no altera datos operativos ni históricos. La calidad depende de la cobertura y el dispositivo. Ver configuración, límites y pruebas en `docs/PREPARACION_VISITAS.md`.
 
 ## Estado de instalación
 

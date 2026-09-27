@@ -50,10 +50,11 @@ function formatDistance(value) {
     return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`;
 }
 
-function RehearsalMap({ visit, pois, selectedIds, audio }) {
+function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false }) {
     const [schoolLatitude, schoolLongitude] = coordinates(visit.ubicacion_lat, visit.ubicacion_lng);
     const container = useRef(null);
     const screenRef = useRef(null);
+    const googleCredits = useRef(null);
     const immersive = useFlightFullscreen(screenRef);
     const updateCamera = useRef(null);
     const map = useRef(null);
@@ -109,6 +110,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
 
     useEffect(() => {
         let disposed = false;
+        const controller = new AbortController();
         let fallbackStarted = false;
         let loadTimer;
         let frame = 0;
@@ -211,7 +213,33 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             }
         };
 
-        import('maplibre-gl').then(maplibreModule => {
+        if (google3d) {
+            import('./google3dEngine').then(async ({ createGoogle3dEngine }) => {
+                if (disposed) return;
+                const engine = await createGoogle3dEngine({ container: container.current, credits: googleCredits.current, visitId: visit.id,
+                    initial: flight.current, gimbal: () => gimbal.current, signal: controller.signal,
+                    onError: message => { if (!disposed) { setMapError(message); setPlaying(false); } },
+                });
+                if (disposed) { engine.remove(); return; }
+                map.current = engine;
+                // Camera is the aircraft in this renderer; no redundant arrow.
+                aircraftMarker.current = { setLngLat: () => {} };
+                engine.addMarker(createMarkerElement('school', visit.nombre_escuela), { latitude: schoolLatitude, longitude: schoolLongitude });
+                const addPoi = (poi, kind) => {
+                    const element = createMarkerElement(kind, poi.name, selectedIds.has(String(poi.id)));
+                    element.addEventListener('click', event => { event.stopPropagation(); setActivePoi(poi); });
+                    return { element, marker: engine.addMarker(element, poi) };
+                };
+                for (const poi of pois) {
+                    const entry = addPoi(poi, usableAudio(poi.audio_url) ? 'audio' : 'poi');
+                    entry.element.style.display = showPoisRef.current ? 'flex' : 'none';
+                    poiMarkers.current.push(entry);
+                }
+                addRadarMarker.current = poi => addPoi(poi, 'radar').marker;
+                setReady(true);
+                beginFlightLoop(() => {}, engine.setCamera);
+            }).catch(error => { if (!disposed && error.name !== 'AbortError') setMapError(error.message || 'No se pudo abrir la prueba 3D.'); });
+        } else import('maplibre-gl').then(maplibreModule => {
             if (disposed || !container.current) return;
             const maplibregl = maplibreModule.default || maplibreModule;
             // Serve the native ESM worker and its shared module at stable URLs.
@@ -278,6 +306,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
         observer.observe(container.current);
         return () => {
             disposed = true;
+            controller.abort();
             observer.disconnect();
             clearTimeout(loadTimer);
             cancelAnimationFrame(frame);
@@ -288,7 +317,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             map.current?.remove();
             map.current = null;
         };
-    }, [pois, schoolLatitude, schoolLongitude, selectedIds, visit.nombre_escuela]);
+    }, [pois, schoolLatitude, schoolLongitude, selectedIds, visit.nombre_escuela, visit.id, google3d]);
 
     const left = useCallback(value => { controls.current.forward = value.y; controls.current.strafe = value.x; }, []);
     const right = useCallback(value => { controls.current.climb = value.y; controls.current.yaw = value.x; }, []);
@@ -311,16 +340,16 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
             contain Leaflet's high pane z-index beneath the flight controls. */}
         <div ref={container} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }} aria-label="Mapa del ensayo de vuelo" />
         <div className={styles.touchZones} aria-hidden="true"><div /><div /></div>
-        {!ready && !mapError && <div className="absolute inset-0 grid place-items-center bg-[#07121e]"><p className="animate-pulse text-sm font-semibold text-cyan-100">Preparando cabina…</p></div>}
+        {!ready && !mapError && <div className="absolute inset-0 grid place-items-center bg-[#07121e]"><p role="status" className="animate-pulse text-sm font-semibold text-cyan-100">{google3d ? 'Cargando relieve de Google…' : 'Preparando cabina…'}</p></div>}
 
         <header className={`${styles.header} pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-[max(.75rem,env(safe-area-inset-top))]`}>
             <div className="pointer-events-auto flex items-center gap-2">
                 <Link href={`/staff/visitas/${visit.id}`} onClick={audio.stop} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 backdrop-blur-md" aria-label="Volver a preparar visita"><ArrowLeft size={20} /></Link>
-                <div className="min-w-0 flex-1 [text-shadow:0_1px_4px_#000]"><p className="truncate text-sm font-black">Ensayo de vuelo</p><p className="truncate text-[10px] text-white">{visit.nombre_escuela}</p></div>
+                <div className="min-w-0 flex-1 [text-shadow:0_1px_4px_#000]"><p className="truncate text-sm font-black">{google3d ? 'Ensayo con relieve 3D' : 'Ensayo de vuelo'}</p><p className="truncate text-[10px] text-white">{visit.nombre_escuela}</p></div>
                 <button onClick={immersive.toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/25 bg-slate-950/70" aria-label={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'} title={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'}>{immersive.fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}</button>
             </div>
             <div className={`${styles.hud} pointer-events-auto mt-2 grid grid-cols-3 gap-1.5 text-center`}>
-                <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5" title="Límite del ensayo: 120 m sobre suelo plano"><p className="text-[9px] text-slate-300">ALTURA</p><p className="text-xs font-black tabular-nums">{hud.altitude.toFixed(1)} m</p><p className="text-[8px] text-slate-300">Máx. {FLIGHT_LIMITS.maximumAltitudeMeters} m</p></div>
+                <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5" title={google3d ? 'Altura virtual sobre el relieve cargado. No es un instrumento de navegación.' : 'Límite del ensayo: 120 m sobre suelo plano'}><p className="text-[9px] text-slate-300">ALTURA</p><p className="text-xs font-black tabular-nums">{hud.altitude.toFixed(1)} m</p><p className="text-[8px] text-slate-300">Máx. {FLIGHT_LIMITS.maximumAltitudeMeters} m</p></div>
                 <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5"><p className="text-[9px] text-slate-300">RUMBO</p><p className="text-xs font-black tabular-nums">{String(Math.round(hud.heading)).padStart(3, '0')}°</p></div>
                 <div className="rounded-xl border border-white/15 bg-slate-950/75 px-2 py-1.5"><p className="text-[9px] text-slate-300">GIMBAL</p><p className="text-xs font-black tabular-nums">{gimbalAngle}°</p></div>
             </div>
@@ -346,11 +375,12 @@ function RehearsalMap({ visit, pois, selectedIds, audio }) {
         <button onClick={() => setPlaying(value => !value)} className="absolute bottom-5 left-1/2 z-20 grid h-12 w-12 -translate-x-1/2 place-items-center rounded-full border border-white/30 bg-cyan-500 text-slate-950 shadow-xl" aria-label={playing ? 'Pausar simulación' : 'Continuar simulación'}>{playing ? <Pause size={21} fill="currentColor" /> : <Play size={21} fill="currentColor" />}</button>
         <FloatingJoystick controlRef={leftControl} side="left" label="Movimiento" onChange={left} />
         <FloatingJoystick controlRef={rightControl} side="right" label="Altura · giro" onChange={right} />
-        <div className={styles.credits}><span dangerouslySetInnerHTML={{ __html: BASEMAP_CREDITS }} />{ARCGIS_KEY && radar.visible && <span> · Lugares © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>
+        {google3d ? <div className={styles.googleCredits}><span className={styles.googleBrand}>Google Maps</span><div ref={googleCredits} />{radar.visible && <span>Lugares del radar © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>
+            : <div className={styles.credits}><span dangerouslySetInnerHTML={{ __html: BASEMAP_CREDITS }} />{ARCGIS_KEY && radar.visible && <span> · Lugares © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></span>}</div>}
     </main>;
 }
 
-export default function FlightRehearsalScreen({ visitId }) {
+export default function FlightRehearsalScreen({ visitId, google3d = false }) {
     const { data, loading, error, retry } = usePreparationData(visitId);
     const audio = useNarrationAudio();
     const visit = data?.visits?.[0];
@@ -372,5 +402,5 @@ export default function FlightRehearsalScreen({ visitId }) {
     if (loading) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><LoadingPreparation /></div>;
     if (error) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice></div>;
     if (!location) return <div className="min-h-[100svh] bg-[#f3f7fb] p-5 text-[#071a33]"><Link href={`/staff/visitas/${visitId}`} className={secondary}><ArrowLeft size={18} />Volver</Link><div className="mt-5"><Notice>Esta visita necesita una ubicación confirmada antes de ensayar el vuelo.</Notice></div></div>;
-    return <RehearsalMap key={`${visit.id}:${latitude}:${longitude}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} />;
+    return <RehearsalMap key={`${visit.id}:${latitude}:${longitude}:${google3d}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} google3d={google3d} />;
 }
