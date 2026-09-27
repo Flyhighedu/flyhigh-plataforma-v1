@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/utils/supabase/client';
 import { 
     Compass, Map, ChevronLeft, 
@@ -13,10 +14,14 @@ import {
 import { motion, useAnimation, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import POIDetailModal from '@/components/staff/POIDetailModal';
 import VoiceSimulatorWidget from '@/components/staff/VoiceSimulatorWidget';
-import { normalizeCommand } from '@/hooks/useVoiceCopilot';
+import { normalizeCommand } from '@/lib/normalize-command.mjs';
 import PilotDashboardHeader from '@/components/staff/PilotDashboardHeader';
-import SimulationContainer from '@/components/staff/SimulationContainer';
 import { poiImageUrlForBrowser } from '@/lib/poi-image-url.mjs';
+
+const SimulationContainer = dynamic(() => import('@/components/staff/SimulationContainer'), {
+    ssr: false,
+    loading: () => <div role="status" className="p-6 text-center text-sm text-slate-500">Cargando simulador…</div>
+});
 
 // ═══════════════════════════════════════════════════════════════
 // autoCategory — reutilizada de POIDetailModal.js

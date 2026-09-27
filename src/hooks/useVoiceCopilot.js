@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import * as tf from '@tensorflow/tfjs';
-import * as speechCommands from '@tensorflow-models/speech-commands';
 import { useRNNoise } from './useRNNoise';
+import { normalizeCommand } from '@/lib/normalize-command.mjs';
+export { normalizeCommand } from '@/lib/normalize-command.mjs';
 
 // ═══════════════════════════════════════════════════════════════
 // Helper utilities
@@ -30,19 +30,6 @@ function getAudioEnergy(buffer) {
         sum += buffer[i] * buffer[i];
     }
     return Math.sqrt(sum / buffer.length);
-}
-
-export function normalizeCommand(text) {
-    if (!text) return '';
-    return text
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .toLowerCase()
-        .trim()
-        .split(/\s+/)
-        .filter(w => w.length > 2)
-        .join(' ') || text.toLowerCase().trim().split(/\s+/)[0] || '';
 }
 
 const PHONETIC_NORMALIZATION_MAP = {
@@ -1110,6 +1097,10 @@ export default function useVoiceCopilot({
 
             if (currentMode === 'tfjs-go') {
                 console.log('[TFJS Go] Inicializando TensorFlow.js Speech Commands...');
+                const [tf, speechCommands] = await Promise.all([
+                    import('@tensorflow/tfjs'),
+                    import('@tensorflow-models/speech-commands')
+                ]);
                 try {
                     await tf.setBackend('webgl');
                     await tf.ready();
