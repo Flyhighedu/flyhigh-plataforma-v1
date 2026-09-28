@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery, buildPreparationPoiQuery } from '@/lib/cultural-pois.mjs';
 import { fetchOverpassElements } from '@/lib/map-context.mjs';
+import { coordinateSearchResult } from '@/lib/map-location-search.mjs';
 import { cookies } from 'next/headers';
 import { verifyAdminToken } from '@/lib/adminAuth';
 
@@ -31,6 +32,8 @@ export async function POST(request) {
     if (body?.kind === 'place-search') {
         const search = typeof body.query === 'string' ? body.query.trim() : '';
         if (search.length < 3 || search.length > 160) return reply({ error: 'Escribe entre 3 y 160 caracteres.' }, 400);
+        const exact = coordinateSearchResult(search);
+        if (exact) return reply({ locations: [exact] });
         try {
             const params = new URLSearchParams({ q: search, format: 'jsonv2', limit: '5', 'accept-language': 'es' });
             const response = await fetch('https://nominatim.openstreetmap.org/search?' + params, { headers: { 'User-Agent': 'FlyHigh-Narraciones/1.0' }, signal: AbortSignal.timeout(10000), next: { revalidate: 86400 } });

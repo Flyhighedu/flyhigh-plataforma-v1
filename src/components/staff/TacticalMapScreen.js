@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Lightbulb, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, List, Map, Navigation, Landmark, Edit3, Star, Lightbulb, Plus, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
@@ -15,6 +15,7 @@ import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import useNativePOITap from '@/hooks/useNativePOITap';
 import { coordinates } from '@/lib/narration-preparation.mjs';
 import { parseCulturalPois } from '@/lib/cultural-pois.mjs';
+import { discoverEducationalPlaces } from '@/lib/educational-place-search.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -59,6 +60,8 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
     const [loadError, setLoadError] = useState('');
     const [loadAttempt, setLoadAttempt] = useState(0);
     const [mapCenter, setMapCenter] = useState(() => initialCenter || null);
+    const [preparationSearchOpen, setPreparationSearchOpen] = useState(false);
+    const [searchTarget, setSearchTarget] = useState(null);
     const [loading, setLoading] = useState(!catalog);
     const [discoveryMessage, setDiscoveryMessage] = useState('');
     const [view, setView] = useState('map'); // 'map' | 'list'
@@ -317,33 +320,15 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                 ? { latitude: Number(referencePoint.latitude), longitude: Number(referencePoint.longitude) }
                 : { latitude: mapBounds.getCenter().lat, longitude: mapBounds.getCenter().lng };
             if (preparationMode) {
-                const collected = [];
-                let successfulScans = 0;
-                for (const range of ['near', 'wide']) {
-                    try {
-                        const response = await fetch('/api/staff/map-search', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ kind: 'preparation-cultural', center, range })
-                        });
-                        if (!response.ok) throw new Error('No se pudo consultar el mapa.');
-                        const data = await response.json();
-                        if (!Array.isArray(data.elements)) throw new Error('Respuesta de lugares no válida.');
-                        collected.push(...data.elements);
-                        successfulScans++;
-                        const found = parseCulturalPois(collected, center, pois, 5000)
-                            .filter(poi => !findExistingPlace(pois, poi));
+                const { places, partial } = await discoverEducationalPlaces(center, pois, {
+                    onPartial: (found, range) => {
                         setSuggestedPois(found);
                         if (range === 'near') setDiscoveryMessage('Ampliando búsqueda a 5 km…');
-                    } catch (error) {
-                        console.warn(`Preparation ${range} POI search failed:`, error);
                     }
-                }
-                if (!successfulScans) throw new Error('No se pudo consultar el mapa.');
-                const found = parseCulturalPois(collected, center, pois, 5000)
-                    .filter(poi => !findExistingPlace(pois, poi));
-                setDiscoveryMessage(successfulScans < 2
+                });
+                setDiscoveryMessage(partial
                     ? 'La búsqueda fue parcial. Reescanea para completar la zona.'
-                    : found.length ? '' : 'No encontramos más lugares en 5 km.');
+                    : places.length ? '' : 'No encontramos más lugares en 5 km.');
                 return;
             }
             const bounds = {
@@ -739,6 +724,18 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             {/* Content */}
             {view === 'map' ? (
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                    {preparationMode && <>
+                        <button type="button" aria-label="Buscar dirección o lugar" title="Buscar dirección o lugar"
+                            onClick={() => setPreparationSearchOpen(true)}
+                            style={{ position:'absolute', top:12, right:60, zIndex:500, width:40, height:40, display:'grid', placeItems:'center', border:'1px solid #d7dfea', borderRadius:8, background:'#fff', color:'#263b56', boxShadow:'0 2px 8px #0002' }}><Search size={19}/></button>
+                        {preparationSearchOpen && <div style={{ position:'absolute', top:58, left:12, right:12, zIndex:2200 }}>
+                            <NarrationMapSearch compact onClose={() => setPreparationSearchOpen(false)} onSelect={item => {
+                                setSearchTarget(item);
+                                setMapCenter({ lat:item.lat, lng:item.lng, zoom:item.zoom || 17 });
+                                setPreparationSearchOpen(false);
+                            }}/>
+                        </div>}
+                    </>}
                     {preparationMode && <p role="status" style={{ position: 'absolute', bottom: 45, left: 12, right: 12, zIndex: 450, width: 'fit-content', maxWidth: 'calc(100% - 24px)', padding: '5px 8px', borderRadius: 6, background: '#ffffffed', color: '#475569', fontSize: 11, pointerEvents: 'none' }}>{discoveryMessage}</p>}
                     <MapSurface
                         pois={pois}
@@ -747,6 +744,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                         suggestedPois={preparationMode ? suggestedPois.filter(poi => !findExistingPlace(pois, poi)) : suggestedPois}
                         userLocation={userLocation}
                         mapCenter={mapCenter}
+                        searchTarget={searchTarget}
                         onMarkerClick={handleMarkerClick}
                         onBoundsChange={rememberBounds}
                         onSuggestedPoiClick={handleSuggestedPoiClick}

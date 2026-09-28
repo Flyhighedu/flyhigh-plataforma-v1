@@ -28,14 +28,16 @@ const CAT_EMOJI = {
 
 function makeSuggestedIcon(name, category) {
     const isCity = category === 'city';
-    const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
+    const isCableway = category === 'cableway';
+    const shortName = (name && name.length > 20 ? name.substring(0, 20) + '...' : (name || ''))
+        .replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[character]);
 
     const size = isCity ? 44 : 32;
-    const emoji = isCity ? '🏙️' : '⭐';
+    const emoji = isCity ? '🏙️' : isCableway ? '🚡' : '⭐';
     const bg = isCity
         ? 'linear-gradient(135deg, #3B82F6, #1D4ED8)'
-        : 'linear-gradient(135deg, #F59E0B, #D97706)';
-    const border = isCity ? '#BFDBFE' : '#FEF08A';
+        : isCableway ? 'linear-gradient(135deg, #7453A5, #4B2D79)' : 'linear-gradient(135deg, #F59E0B, #D97706)';
+    const border = isCity ? '#BFDBFE' : isCableway ? '#DDD0F0' : '#FEF08A';
     const fontSize = isCity ? '22px' : '16px';
     const radius = isCity ? '14px' : '50%';
 
@@ -104,7 +106,7 @@ const userIcon = L.divIcon({
 });
 
 export default function TacticalMapLeaflet({
-    pois = [], suggestedPois = [], userLocation, mapCenter, referencePoint = null,
+    pois = [], suggestedPois = [], userLocation, mapCenter, referencePoint = null, searchTarget = null,
     onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap, preparation = null
 }) {
     const containerRef = useRef(null);
@@ -371,6 +373,19 @@ export default function TacticalMapLeaflet({
             suggestedMarkersRef.current.push(marker);
         });
     }, [suggestedPois, onSuggestedPoiClick, showLabels, preparation]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !coordinates(searchTarget?.lat, searchTarget?.lng)) return;
+        const marker = L.circleMarker([Number(searchTarget.lat), Number(searchTarget.lng)], {
+            radius: 9, color: '#fff', weight: 4, fillColor: '#d95136', fillOpacity: 1,
+            interactive: false, bubblingMouseEvents: false
+        }).addTo(map);
+        const label = document.createElement('span');
+        label.textContent = searchTarget.name;
+        marker.bindTooltip(label, { permanent: true, direction: 'bottom', offset: [0, 10] });
+        return () => marker.remove();
+    }, [searchTarget]);
 
     usePreparationLayers(mapRef, pois, suggestedPois, preparation, onMarkerClick, onSuggestedPoiClick);
 

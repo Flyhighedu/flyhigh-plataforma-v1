@@ -15,6 +15,7 @@ const CATEGORY_PATHS = {
     education: ['M4 21V7l8-4 8 4v14H4Z', 'M9 21v-5h6v5', 'M9 10h.01', 'M15 10h.01'],
     worship: ['M12 2v6', 'M9 5h6', 'M5 10l7-4 7 4v11H5V10Z', 'M10 21v-5h4v5'],
     bridge: ['M2 20h20', 'M4 17h16', 'M5 17c1-9 13-9 14 0', 'M5 17v3', 'M19 17v3'],
+    cableway: ['M2 5h20', 'M5 5l3 9', 'M19 5l-3 9', 'M5 14h14l-2 6H7l-2-6Z', 'M9 17h.01', 'M15 17h.01'],
     library: ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z'],
     entertainment: ['M3 4h18v16H3V4Z', 'M7 4v16', 'M17 4v16', 'M3 9h4', 'M17 9h4', 'M3 15h4', 'M17 15h4'],
     shopping: ['M5 8h14l1 13H4L5 8Z', 'M9 9V6a3 3 0 0 1 6 0v3'],
@@ -56,7 +57,7 @@ function leafletBoundsFromMap(map) {
 function markerElement(poi, kind, number, active, narrated, labelPlacement) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `${styles.pin} ${styles[kind]} ${narrated ? styles.narrated : styles.unnarrated}`;
+    button.className = `${styles.pin} ${styles[kind]} ${narrated ? styles.narrated : styles.unnarrated} ${poi.category === 'cableway' ? styles.cableway : ''}`;
     button.dataset.poiId = String(poi.id);
     button.dataset.behavior = kind;
     button.dataset.narration = narrated ? 'created' : 'missing';
@@ -91,7 +92,7 @@ function markerWrapper(button, priority = 1) {
 }
 
 export default function PreparationMapLibre(props) {
-    const { pois = [], suggestedPois = [], preparation, referencePoint, mapCenter, userLocation } = props;
+    const { pois = [], suggestedPois = [], preparation, referencePoint, mapCenter, userLocation, searchTarget } = props;
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const maplibreRef = useRef(null);
@@ -435,11 +436,22 @@ export default function PreparationMapLibre(props) {
                 markersRef.current.push(new maplibregl.Marker({ element: markerWrapper(button, 1), anchor: 'center',
                     pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([lng, lat]).addTo(map));
             }
+            if (coordinates(searchTarget?.lat, searchTarget?.lng)) {
+                const target = document.createElement('div');
+                target.className = styles.searchedLocation;
+                const dot = document.createElement('span');
+                const label = document.createElement('span');
+                label.textContent = searchTarget.name;
+                target.append(dot, label);
+                markersRef.current.push(new maplibregl.Marker({ element: target, anchor: 'center',
+                    pitchAlignment: 'viewport', rotationAlignment: 'viewport' })
+                    .setLngLat([Number(searchTarget.lng), Number(searchTarget.lat)]).addTo(map));
+            }
         };
         render();
         map.on('moveend', render);
         return () => { map.off('moveend', render); markersRef.current.forEach(marker => marker.remove()); markersRef.current = []; };
-    }, [ready, pois, suggestedPois, preparation, referencePoint]);
+    }, [ready, pois, suggestedPois, preparation, referencePoint, searchTarget]);
 
     useEffect(() => {
         const map = mapRef.current;

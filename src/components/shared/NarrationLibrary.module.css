@@ -72,6 +72,12 @@
 @media(prefers-reduced-motion:reduce) { .shell *,.catalog * { animation:none!important; transition:none!important; } }
 
 .mapSearch { position:relative; background:#f5f5f5; padding:12px 16px 0; z-index:2100; }.mapSearch .searchRow { margin-bottom:10px; }.mapResults { position:absolute; left:16px; right:16px; top:70px; background:white; border:1px solid #d4d4d4; border-radius:15px; box-shadow:0 12px 30px #13274625; padding:8px; max-height:45vh; overflow:auto; }.mapResults>button { display:block; width:100%; padding:12px; text-align:left; color:#233d60; border:0; background:white; min-height:44px; }.mapResults>button:hover { background:#163e79; }
+.compactMapSearch { padding:6px; border:1px solid #d7dfea; border-radius:12px; background:#fffffff5; box-shadow:0 4px 18px #13274630; }
+.compactMapSearch .searchRow { gap:4px; margin:0; }
+.compactMapSearch .search { padding:2px 8px; border:0; }
+.compactMapSearch .search input { min-height:40px; font-size:14px; }
+.compactMapSearch .secondary { min-height:40px; min-width:40px; padding:6px; }
+.compactMapSearch .mapResults { top:54px; left:0; right:0; }
 
 .cardActions { flex-wrap:wrap; }.headerRow h1 { min-width:0; }
 @media(max-width:380px) { .headerRow h1 { font-size:25px; }.headerRow>button { flex-direction:column; gap:3px; font-size:10px; padding:6px; }.topline { gap:8px; }.topline h2 { font-size:18px; }.topline .primary { font-size:12px; gap:5px; padding:10px; } }

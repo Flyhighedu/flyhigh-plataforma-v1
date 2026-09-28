@@ -28,3 +28,8 @@
 .label[data-placement="top"] { top:auto; bottom:37px; }
 .label[data-placement="right"] { top:50%; left:40px; transform:translateY(-50%); }
 .label[data-placement="left"] { top:50%; left:auto; right:40px; transform:translateY(-50%); }
+.cableway .symbol { border-color:#7453a5!important; color:#7453a5!important; }
+.cableway.narrated .symbol { color:white!important; box-shadow:0 0 0 2px #7453a5,0 2px 7px #173c6a40; }
+.searchedLocation { width:28px; height:28px; display:grid; place-items:center; pointer-events:none; }
+.searchedLocation>span:first-child { width:20px; height:20px; border:4px solid white; border-radius:50%; background:#d95136; box-shadow:0 1px 9px #0008; }
+.searchedLocation>span:last-child { position:absolute; top:31px; left:50%; transform:translateX(-50%); max-width:175px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:4px 7px; border-radius:7px; background:white; color:#233d60; box-shadow:0 2px 7px #0003; font:600 10px/1.2 system-ui; }

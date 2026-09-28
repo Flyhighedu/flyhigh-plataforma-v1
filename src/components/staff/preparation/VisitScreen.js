@@ -45,6 +45,15 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
     useEffect(() => { if (!plan.message) return; setFeedback(plan.message); const timer = setTimeout(() => setFeedback(''),2600); return () => clearTimeout(timer); }, [plan.message]);
     const [lastAddedId,setLastAddedId] = useState(null);
     useEffect(() => { if (!lastAddedId) return; const timer = setTimeout(() => setLastAddedId(null),900); return () => clearTimeout(timer); }, [lastAddedId]);
+    const [justAddedId,setJustAddedId] = useState(null);
+    useEffect(() => {
+        if (!justAddedId) return;
+        const timer = setTimeout(() => {
+            setJustAddedId(null);
+            setSelected(previous => previous === justAddedId ? null : previous);
+        }, 1300);
+        return () => clearTimeout(timer);
+    }, [justAddedId]);
     const lat = plan.context.school_location?.latitude, lng = plan.context.school_location?.longitude;
     const location = useMemo(() => coordinates(lat,lng), [lat,lng]);
     const suggestedSchoolLocation = coordinates(visit.ubicacion_lat,visit.ubicacion_lng);
@@ -63,13 +72,14 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
     const canConfirm = derived.canConfirm && !stale && !plan.dirty && plan.saveState === 'saved';
     const saveLabel = plan.saveState === 'saving' ? 'Guardando cambios…' : plan.saveState === 'pending' ? 'Cambios pendientes' : plan.saveState === 'conflict' ? 'Revisión necesaria' : plan.saveState === 'error' ? 'Guardado pendiente' : plan.revision ? 'Guardado' : 'Borrador';
     const previous = data.plans.filter(p => p.visit_id !== visit.id && p.items.length).sort((a,b) => b.updated_at.localeCompare(a.updated_at));
-    const select = id => { audio.stop(); setSelected(String(id)); setPendingBehavior(preferences[String(id)] || 'route'); setPreferenceState({busy:false,message:''}); setMobileView('map'); };
+    const select = id => { audio.stop(); setJustAddedId(null); setSelected(String(id)); setPendingBehavior(preferences[String(id)] || 'route'); setPreferenceState({busy:false,message:''}); setMobileView('map'); };
     const add = (poi, intent = preferences[String(poi.id)] || 'route') => {
         if (plan.locked || plan.items.length >= MAX_SEQUENCE_ITEMS || selectedIds.has(String(poi.id))) return;
         const source = catalog.find(item => String(item.id) === String(poi.id));
         if (!source) return;
         plan.edit([...plan.items,preparationItem(source,'general',intent)], undefined, `${poi.name} se agregó a la experiencia`);
         setLastAddedId(String(poi.id));
+        if (selected === String(poi.id)) setJustAddedId(String(poi.id));
     };
     const removeSelected = () => {
         if (!selectedItem || plan.locked) return;
@@ -118,12 +128,12 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
                     <div className={styles.legend} aria-label="Leyenda del mapa"><span><i className={styles.legendRoute}/> Recorrido</span><span><i className={styles.legendReady}/> Con narración</span><span><i className={styles.legendMissing}/> Sin narración</span></div>
                 </div>
                 <motion.aside ref={panelRef} layout className={styles.sidePanel} aria-label="Preparación de la experiencia" transition={{layout:reducedMotion?{duration:0}:{type:'spring',stiffness:380,damping:36}}}>
-                    {current && <section className={styles.place} aria-label="Lugar seleccionado"><div className={styles.placeHeading}><div><small>{selectedItem ? 'EN TU EXPERIENCIA' : 'LUGAR SELECCIONADO'}</small><h2>{current.name}</h2><span className={styles.narrationState} data-created={hasCreatedNarration(current)}>{hasCreatedNarration(current) ? 'Con narración' : 'Sin narración'}</span></div><button aria-label="Cerrar lugar" onClick={() => {audio.stop();setSelected(null);}}><X size={20}/></button></div>
+                    <AnimatePresence initial={false}>{current && <motion.section key={selected} className={styles.place} aria-label="Lugar seleccionado" exit={reducedMotion?{opacity:0}:{opacity:0,y:18}} transition={{duration:.18}}>{justAddedId === selected ? <motion.div className={styles.placeSuccess} role="status" initial={reducedMotion?false:{opacity:0,scale:.94}} animate={{opacity:1,scale:1}} transition={{type:'spring',stiffness:380,damping:27}}><span><Check size={19}/></span><div><strong>Agregado</strong><small>{current.name}</small></div></motion.div> : <><div className={styles.placeHeading}><div><small>{selectedItem ? 'EN TU EXPERIENCIA' : 'LUGAR SELECCIONADO'}</small><h2>{current.name}</h2><span className={styles.narrationState} data-created={hasCreatedNarration(current)}>{hasCreatedNarration(current) ? 'Con narración' : 'Sin narración'}</span></div><button aria-label="Cerrar lugar" onClick={() => {audio.stop();setSelected(null);}}><X size={20}/></button></div>
                         {!current.is_general_topic && <div className={styles.behavior}><label><input type="checkbox" checked={behavior==='reference'} disabled={plan.locked} onChange={event => changeBehavior(event.target.checked?'reference':'route')}/><span>Punto de referencia</span></label></div>}
                         {!selectedItem && <button className={styles.primary} disabled={plan.locked || plan.items.length>=MAX_SEQUENCE_ITEMS} onClick={() => add(current,behavior)}><Plus size={17}/>Agregar a la experiencia</button>}
                         {selectedItem && <div className={styles.selectedActions}><p className={styles.added}><Check size={15}/>Agregado · posición {plan.items.indexOf(selectedItem)+1}</p><button className={styles.removePoint} disabled={plan.locked} onClick={removeSelected}><Trash2 size={15}/>Quitar del recorrido</button></div>}
-                        <details className={styles.placeDetails}><summary>Detalles</summary><p className={styles.description}>{current.description || (current.is_general_topic ? 'Tema general.' : 'Lugar de la experiencia.')}</p><div className={styles.placeSecondary}>{usableAudio(current.audio_url) && <button onClick={() => audio.toggle(current)}><Headphones size={16}/>{audio.id===current.id && audio.status==='playing'?'Pausar':'Escuchar muestra'} · {durationLabel(current.audio_duration_seconds)}</button>}{!current.is_general_topic && preferences[selected]!==behavior && <button disabled={preferenceState.busy} onClick={rememberBehavior}>{preferenceState.busy?'Recordando…':'Recordar esta opción para otras visitas'}</button>}</div>{preferenceState.message && <p role="status">{preferenceState.message}</p>}</details>
-                    </section>}
+                        <details className={styles.placeDetails}><summary>Detalles</summary><p className={styles.description}>{current.description || (current.is_general_topic ? 'Tema general.' : 'Lugar de la experiencia.')}</p><div className={styles.placeSecondary}>{usableAudio(current.audio_url) && <button onClick={() => audio.toggle(current)}><Headphones size={16}/>{audio.id===current.id && audio.status==='playing'?'Pausar':'Escuchar muestra'} · {durationLabel(current.audio_duration_seconds)}</button>}{!current.is_general_topic && preferences[selected]!==behavior && <button disabled={preferenceState.busy} onClick={rememberBehavior}>{preferenceState.busy?'Recordando…':'Recordar esta opción para otras visitas'}</button>}</div>{preferenceState.message && <p role="status">{preferenceState.message}</p>}</details></>}
+                    </motion.section>}</AnimatePresence>
                     <section className={styles.sequence} aria-label="Tu experiencia" data-new-item={Boolean(lastAddedId)}><div className={styles.sequenceHeading}>{step==='map'?<button className={styles.openExperience} onClick={openReview} aria-label="Abrir recorrido para revisar y confirmar"><strong>Tu experiencia</strong><ArrowRight size={16}/></button>:<h2>Revisar recorrido</h2>}{ready && <span className={styles.ready}><Check size={14}/>Confirmada</span>}<button className={styles.libraryButton} onClick={() => {audio.stop();setPicker(true);}}><BookOpen size={16}/>Biblioteca</button></div><p>{summary}</p>
                         {stale && <Notice action={<button className={styles.secondary} disabled={plan.locked} onClick={() => plan.edit(refreshItems(plan.items),undefined,'Lugares actualizados; revisa la experiencia')}>Actualizar lugares</button>}>Cambió un lugar. Actualízalo o quítalo antes de confirmar.</Notice>}
                         {!!derived.missingLocations.length && <p className={styles.notice}>Hay {derived.missingLocations.length} lugares sin ubicación. No se dibujan como destinos; complétalos en Narraciones o quítalos.</p>}
