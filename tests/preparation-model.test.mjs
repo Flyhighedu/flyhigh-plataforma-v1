@@ -24,6 +24,13 @@ test('One narrative sequence derives school → physical stops → school, exclu
  assert.notDeepEqual(derivePreparation(moveItem(items,2,-1).reverse(),context).geometry,derived.geometry);
  assert.deepEqual(derivePreparation(items,{}).geometry,[]);
 });
+test('Removing a selected stop redraws the canonical route and shifts the remaining order',()=>{
+ const remaining=items.filter(item=>item.id!=='a');
+ const derived=derivePreparation(remaining,context);
+ assert.deepEqual(remaining.map(item=>item.id),['b','c']);
+ assert.deepEqual(derived.geometry,[context.school_location,items[2].location,context.school_location]);
+ assert.deepEqual(derived.references.map(item=>item.id),['b']);
+});
 test('Geography rejects absent, whitespace, boolean and out-of-range data, keeping valid zero',()=>{
  for(const pair of [[null,0],[' ',0],[false,0],[[],0],[91,0],[0,181],[undefined,0]]) assert.equal(coordinates(...pair),null);
  assert.deepEqual(coordinates('0','0'),[0,0]);

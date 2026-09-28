@@ -43,7 +43,7 @@
 .toolbar { justify-content:flex-end; padding:6px 20px; background:#fff; border-bottom:1px solid #e6ebf2; }
 .primary { background:#1555ba; }
 .secondary { color:#164d9c; border-color:#d6e0ee; }
-.sidePanel { width:328px; background:#f7f9fc; border-color:#e5ebf3; }
+.sidePanel { width:328px; background:#f7f9fc; border-color:#e5ebf3; transform-origin:center bottom; }
 .place { padding:16px; border-color:#e5ebf3; }
 .placeHeading h2 { font-size:19px; }
 .narrationState { display:inline-flex; align-items:center; gap:5px; margin-top:5px; color:#68788b; font-size:11px; font-weight:600; }
@@ -52,6 +52,9 @@
 .narrationState[data-created=true]:before { background:#18734f; border-color:#18734f; }
 .behavior { padding:8px 0; }
 .placeDetails { margin-top:4px; }
+.selectedActions { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.removePoint { display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:44px; padding:6px 4px; color:#a3393b; font-size:12px; font-weight:650; white-space:nowrap; }
+.removePoint:hover:not(:disabled) { color:#7f292b; text-decoration:underline; }
 .placeDetails summary { min-height:40px; display:flex; align-items:center; color:#164d9c; font-size:12px; font-weight:650; cursor:pointer; }
 .placeDetails summary::before { content:'⌄'; margin-right:7px; transition:transform .2s; }
 .placeDetails[open] summary::before { transform:rotate(180deg); }
@@ -116,6 +119,7 @@
  .planner[data-step=map] .behavior label { min-height:29px; font-size:11px; }
  .planner[data-step=map] .place>.primary { min-height:38px; padding:6px; font-size:12px; }
  .planner[data-step=map] .added { padding:3px 0; }
+ .planner[data-step=map] .removePoint { min-height:38px; font-size:11px; }
  .planner[data-step=map] .placeDetails summary { min-height:30px; }
  .planner[data-step=map] .sequence { position:sticky; bottom:0; z-index:2; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); background:#f7f9fc; box-shadow:0 -2px 8px #132a4512; }
  .planner[data-step=map] .sequenceHeading h2 { font-size:13px; }
@@ -132,7 +136,9 @@
  .planner[data-step=map] .empty { padding:6px 0; text-align:left; }
  .planner[data-step=map] .empty h3 { font-size:12px; }
  .planner[data-step=map] .empty p,.planner[data-step=map] .empty button { display:none; }
- .planner[data-step=review] .sidePanel { position:relative; max-height:none; width:100%; border-radius:0; box-shadow:none; }
+ .planner[data-step=review] .mapColumn { display:block; position:absolute; inset:0; pointer-events:none; }
+ .planner[data-step=review] .sidePanel { position:absolute; inset:0; width:100%; height:100%; max-height:none; overflow-y:auto; border-radius:0; box-shadow:none; }
+ .planner[data-step=review] .sequence { animation:none; }
  .legend { left:8px; top:8px; max-width:calc(100% - 65px); gap:4px 9px; padding:6px 8px; font-size:9px; }
 }
 @media(max-height:620px) { .header { padding-top:8px; } .heading { padding-bottom:10px; } .heading h1 { font-size:22px; } .steps button { min-height:42px; } }
