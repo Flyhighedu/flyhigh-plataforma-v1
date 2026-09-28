@@ -12,7 +12,7 @@ test('shared map search accepts signed admins and staff sessions, rejects unsign
     source = source.replace("import { createClient } from '@/utils/supabase/server';", 'const createClient = async () => ({ auth: { getUser: async () => ({ data: { user: globalThis.__mapSearchTest.user } }) } });')
         .replace("import { cookies } from 'next/headers';", 'const cookies = async () => ({ get: () => ({ value: globalThis.__mapSearchTest.cookie }) });')
         .replace("import { fetchOverpassElements } from '@/lib/map-context.mjs';", 'const fetchOverpassElements = async () => { globalThis.__mapSearchTest.calls++; if (globalThis.__mapSearchTest.fail) throw new Error("Provider timeout"); return [{ type: "node", id: 1, tags: { name: "Parque" } }]; };');
-    for (const [alias, file] of [['cultural-pois.mjs', 'cultural-pois.mjs'], ['adminAuth', 'adminAuth.js']]) source = source.replace(`from '@/lib/${alias}'`, `from '${new URL('../src/lib/' + file, import.meta.url).href}'`);
+    for (const [alias, file] of [['cultural-pois.mjs', 'cultural-pois.mjs'], ['map-location-search.mjs', 'map-location-search.mjs'], ['adminAuth', 'adminAuth.js']]) source = source.replace(`from '@/lib/${alias}'`, `from '${new URL('../src/lib/' + file, import.meta.url).href}'`);
     const { POST } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
     const body = { kind: 'cultural', bounds: { south: 19.4, west: -102.1, north: 19.5, east: -102 } };
     const request = (data = body, headers = {}) => new Request('http://localhost/api/staff/map-search', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(data) });
