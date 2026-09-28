@@ -181,7 +181,7 @@ export default function PreparationMapLibre(props) {
                 maplibregl.setWorkerUrl(new URL('/api/map-assets/maplibre-gl-worker.mjs', window.location.origin).href);
                 const center = coordinates(mapCenter?.lat, mapCenter?.lng) || coordinates(userLocation?.lat, userLocation?.lng) || [19.4326, -99.1332];
                 map = new maplibregl.Map({ container: containerRef.current, style: mapStyle(satellite),
-                    center: [center[1], center[0]], zoom: mapCenter?.zoom || 14, pitch: 0, bearing: 0,
+                    center: [center[1], center[0]], zoom: mapCenter?.zoom || 14, pitch: 35, bearing: 0,
                     minZoom: 2, maxZoom: 19, maxPitch: 60, touchPitch: true, touchZoomRotate: true,
                     dragRotate: false, attributionControl: false, pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
                     canvasContextAttributes: { antialias: false },
