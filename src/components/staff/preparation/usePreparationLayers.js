@@ -99,7 +99,7 @@ export default function usePreparationLayers(mapRef, pois, suggestedPois, prepar
         if (!map || !preparation) return;
         const control = L.control({ position: 'topright' });
         control.onAdd = () => {
-            const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Ver recorrido'; button.className = styles.fit;
+            const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Centrar ruta'; button.title = 'Mostrar todo el recorrido en el mapa'; button.className = styles.fit;
             button.onclick = () => {
                 const points = latest.current.preparation.geometry;
                 if (points.length) map.fitBounds(points.map(p => [p.latitude, p.longitude]), { padding: [55, 55], maxZoom: 16, animate: false });

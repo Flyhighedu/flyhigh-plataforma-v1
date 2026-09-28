@@ -4,14 +4,15 @@ import { Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { ArrowDown, ArrowUp, GripVertical, Trash2, Eye, MapPin } from 'lucide-react';
 import { moveItem } from '@/lib/narration-preparation.mjs';
 import styles from './VisitPlanner.module.css';
-function Row({ item, index, count, locked, onMove, onRemove, onSelect, onStart }) {
+function Row({ item, index, count, locked, onMove, onRemove, onSelect, onStart, isNew, hasNarration }) {
     const controls = useDragControls();
     const reduced = useReducedMotion();
-    return <Reorder.Item as="li" value={item} dragListener={false} dragControls={controls} className={styles.sequenceItem} onDragStart={onStart} transition={{ duration: reduced ? 0 : .18 }}>
+    return <Reorder.Item as="li" value={item} dragListener={false} dragControls={controls} className={styles.sequenceItem} data-new={isNew} onDragStart={onStart}
+        initial={isNew && !reduced ? {opacity:0} : false} animate={{opacity:1}} transition={{ duration: reduced ? 0 : .3 }}>
         <div className={styles.itemTop}>
             <button className={styles.grip} disabled={locked} aria-label={'Arrastrar ' + item.name} onPointerDown={event => { if (!locked) controls.start(event); }}><GripVertical size={17}/></button>
             <span className={item.behavior === 'reference' ? styles.referenceOrder : styles.order}>{index + 1}</span>
-            <button className={styles.itemName} onClick={onSelect}><strong>{item.name}</strong><small>{item.is_general_topic ? 'Tema general' : item.behavior === 'reference' ? 'Referencia · sin desplazamiento' : item.location ? 'Punto de ruta' : 'Ubicación pendiente'}</small></button>
+            <button className={styles.itemName} onClick={onSelect}><strong>{item.name}</strong><small>{item.is_general_topic ? 'Tema general' : item.behavior === 'reference' ? 'Referencia' : item.location ? 'Punto de ruta' : 'Ubicación pendiente'} · <em className={styles.itemNarration} data-created={hasNarration}>{hasNarration ? 'Con narración' : 'Sin narración'}</em></small></button>
         </div>
         <div className={styles.itemActions}>
             <button disabled={locked || index === 0} aria-label={'Subir ' + item.name} onClick={() => onMove(-1)}><ArrowUp size={16}/></button>
@@ -21,11 +22,11 @@ function Row({ item, index, count, locked, onMove, onRemove, onSelect, onStart }
         </div>
     </Reorder.Item>;
 }
-export default function VisitSequence({ items, locked, edit, audio, onSelect }) {
+export default function VisitSequence({ items, locked, edit, audio, onSelect, newItemId = null, narratedIds = new Set() }) {
     const draggingChanged = useRef(false);
     return <Reorder.Group as="ol" axis="y" values={items} className={styles.sequenceList} aria-label="Orden de la experiencia"
         onReorder={next => { edit(next, undefined, 'Orden actualizado', !draggingChanged.current); draggingChanged.current = true; }}>
-        {items.map((item,index) => <Row key={item.id} item={item} index={index} count={items.length} locked={locked}
+        {items.map((item,index) => <Row key={item.id} item={item} index={index} count={items.length} locked={locked} isNew={item.id===newItemId} hasNarration={narratedIds.has(item.id)}
             onStart={() => { draggingChanged.current = false; }}
             onSelect={() => onSelect(item.id)}
             onMove={direction => edit(moveItem(items,index,direction), undefined, `${item.name}: posición ${index + direction + 1}`)}
