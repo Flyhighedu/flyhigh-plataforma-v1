@@ -19,3 +19,5 @@
 .route .symbol { background:#2563eb; }.reference .symbol { background:#fff; }
 .label { top:37px; max-width:140px; color:#233d60; border:1px solid #e7ecf2; border-radius:7px; padding:3px 6px; box-shadow:0 2px 6px #173c6a1c; font:600 10px/1.2 system-ui; }
 .pin.narrated .label { color:#245d53; }.route .label,.reference .label { color:#173b75!important; }
+.school .symbol { width:40px; height:40px; background:#2462d3; border:3px solid white; box-shadow:0 3px 12px #173b7580; font:22px/1 system-ui; }
+.school .label { color:#173b75!important; }

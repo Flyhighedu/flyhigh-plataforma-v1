@@ -22,6 +22,9 @@ const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false,
         <Loader2 size={32} style={{ color: '#06B6D4', animation: 'spin 1s linear infinite' }} />
     </div>
 )});
+const PreparationMapWithNoSSR = dynamic(() => import('./preparation/PreparationMapLibre'), { ssr: false, loading: () => (
+    <div style={{ flex: 1, display: 'grid', placeItems: 'center', background: '#e4ecf0', color: '#334155' }}>Cargando mapa…</div>
+)});
 
 const PremiumRadarIcon = () => (
     <div style={{
@@ -48,6 +51,7 @@ const PremiumRadarIcon = () => (
 );
 
 export default function TacticalMapScreen({ userId, profile, onClose = null, embedded = false, onContentChange, initialCenter = null, preparationMode = false, onNarrationSelect = null, onNarrationSaved = null, referencePoint = null, catalog = null, preparation = null }) {
+    const MapSurface = preparationMode ? PreparationMapWithNoSSR : MapWithNoSSR;
     const router = useRouter();
     const handleBack = onClose || (() => router.back());
     const [storedPois, setPois] = useState([]);
@@ -708,7 +712,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             {view === 'map' ? (
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
                     {preparationMode && <p role="status" style={{ position: 'absolute', bottom: 45, left: 12, right: 12, zIndex: 450, width: 'fit-content', maxWidth: 'calc(100% - 24px)', padding: '5px 8px', borderRadius: 6, background: '#ffffffed', color: '#475569', fontSize: 11, pointerEvents: 'none' }}>{discoveryMessage}</p>}
-                    <MapWithNoSSR
+                    <MapSurface
                         pois={pois}
                         referencePoint={referencePoint}
                         preparation={preparation}

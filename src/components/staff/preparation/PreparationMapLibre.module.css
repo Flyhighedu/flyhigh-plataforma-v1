@@ -1,0 +1,9 @@
+.map { position:absolute; inset:0; width:100%; height:100%; background:#dce5e8; }
+.controls { position:absolute; z-index:440; top:12px; right:12px; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.controls button { min-width:40px; min-height:40px; border:1px solid #d7dfea; border-radius:8px; background:#fff; color:#263b56; box-shadow:0 2px 8px #0002; font:700 20px/1 system-ui; cursor:pointer; }
+.controls .fit { padding:0 9px; font:600 11px/1 system-ui; }
+.controls button:focus-visible { outline:3px solid #173b75; outline-offset:2px; }
+.attribution { position:absolute; z-index:430; bottom:3px; left:6px; max-width:calc(100% - 180px); display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:3px 6px; border-radius:4px; background:#fffffff0; color:#263b56; font:500 11px/1.2 system-ui; }
+.attribution a { color:inherit; text-decoration:none; }
+.google { font-size:12px; font-weight:800; white-space:nowrap; }
+.notice { position:absolute; z-index:440; top:12px; left:12px; max-width:calc(100% - 90px); margin:0; padding:6px 8px; border-radius:6px; background:#fffffff0; color:#334155; font:600 11px/1.3 system-ui; box-shadow:0 2px 8px #0002; }
