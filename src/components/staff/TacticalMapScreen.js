@@ -14,7 +14,7 @@ import { findExistingPlace } from '@/lib/narration-catalog.mjs';
 import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import useNativePOITap from '@/hooks/useNativePOITap';
 import { coordinates } from '@/lib/narration-preparation.mjs';
-import { parseCulturalPois } from '@/lib/cultural-pois.mjs';
+import { parseCulturalPois, radarBounds } from '@/lib/cultural-pois.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -298,7 +298,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
     });
 
     // ═══ Overpass Cultural POI Search (unchanged) ═══
-    const handleSearchCulturalPois = async () => {
+    const handleSearchCulturalPois = async ({ initial = false } = {}) => {
         // Toggle: Si ya hay puntos, los borramos (apagar radar)
         if (suggestedPois.length > 0 && !preparationMode) {
             setSuggestedPois([]);
@@ -313,14 +313,19 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
         setIsSearchingCulturalPois(true);
         setDiscoveryMessage('Buscando lugares cercanos…');
         try {
-            const sw = mapBounds._southWest;
-            const ne = mapBounds._northEast;
+            const center = initial && coordinates(referencePoint?.latitude, referencePoint?.longitude)
+                ? { latitude: Number(referencePoint.latitude), longitude: Number(referencePoint.longitude) }
+                : { latitude: mapBounds.getCenter().lat, longitude: mapBounds.getCenter().lng };
+            const bounds = preparationMode ? radarBounds(center, 5000) : {
+                south: mapBounds._southWest.lat, west: mapBounds._southWest.lng,
+                north: mapBounds._northEast.lat, east: mapBounds._northEast.lng,
+            };
             const res = await fetch('/api/staff/map-search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     kind: 'cultural',
-                    bounds: { south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng }
+                    bounds,
                 })
             });
 
@@ -330,9 +335,9 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             }
             const data = await res.json();
             if (preparationMode) {
-                const found = parseCulturalPois(data.elements, { latitude: (sw.lat + ne.lat) / 2, longitude: (sw.lng + ne.lng) / 2 }, pois, Infinity);
+                const found = parseCulturalPois(data.elements, center, pois, 5000);
                 setSuggestedPois(found.filter(poi => !findExistingPlace(pois, poi)));
-                setDiscoveryMessage(found.length ? 'Los puntos pequeños son lugares disponibles.' : 'No encontramos lugares adicionales aquí. Puedes buscar en la biblioteca.');
+                setDiscoveryMessage(found.length ? '' : 'No encontramos más lugares en 5 km.');
                 return;
             }
 
@@ -512,7 +517,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
     useEffect(() => {
         if (!preparationMode || preparationRadarStarted.current || !mapBounds || loading) return;
         preparationRadarStarted.current = true;
-        void handleSearchCulturalPois();
+        void handleSearchCulturalPois({ initial: true });
         // The initial preparation radar intentionally runs once for the school view.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [preparationMode, mapBounds, loading]);
@@ -749,7 +754,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                             </>
                         )}
                         <button
-                            onClick={handleSearchCulturalPois}
+                            onClick={() => handleSearchCulturalPois()}
                             disabled={isSearchingCulturalPois}
                             style={{
                                 position: 'relative',
@@ -766,9 +771,9 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                                 overflow: 'hidden',
                                 padding: isSearchingCulturalPois ? '0 20px' : 0
                             }}
-                            title="Buscar sitios culturales e históricos"
+                            title={preparationMode ? 'Reescanear lugares a 5 km del centro del mapa' : 'Buscar sitios culturales e históricos'}
                         >
-                            {preparationMode ? <span style={{ fontSize:12, fontWeight:600 }}>{isSearchingCulturalPois ? 'Buscando lugares…' : 'Buscar en esta zona'}</span> : isSearchingCulturalPois ? (
+                            {preparationMode ? <span style={{ fontSize:12, fontWeight:600 }}>{isSearchingCulturalPois ? 'Buscando lugares…' : 'Reescanear · 5 km'}</span> : isSearchingCulturalPois ? (
                                 <>
                                     <PremiumRadarIcon />
                                     <span key={radarTextIndex} style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', animation: 'poiSlideText 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>

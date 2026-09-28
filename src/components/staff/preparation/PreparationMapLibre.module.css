@@ -6,4 +6,3 @@
 .attribution { position:absolute; z-index:430; bottom:3px; left:6px; max-width:calc(100% - 180px); display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:3px 6px; border-radius:4px; background:#fffffff0; color:#263b56; font:500 11px/1.2 system-ui; }
 .attribution a { color:inherit; text-decoration:none; }
 .google { font-size:12px; font-weight:800; white-space:nowrap; }
-.notice { position:absolute; z-index:440; top:12px; left:12px; max-width:calc(100% - 90px); margin:0; padding:6px 8px; border-radius:6px; background:#fffffff0; color:#334155; font:600 11px/1.3 system-ui; box-shadow:0 2px 8px #0002; }

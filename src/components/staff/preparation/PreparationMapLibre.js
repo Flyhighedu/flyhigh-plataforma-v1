@@ -10,6 +10,7 @@ import surface from './PreparationMapLibre.module.css';
 
 const LeafletFallback = dynamic(() => import('../TacticalMapLeaflet'), { ssr: false });
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const wrapLongitude = value => ((value + 180) % 360 + 360) % 360 - 180;
 
 function mapStyle(session) {
     const query = session ? new URLSearchParams({ kind: 'tile', session: session.session,
@@ -75,7 +76,7 @@ export default function PreparationMapLibre(props) {
     const [leaflet, setLeaflet] = useState(false);
     const [provider, setProvider] = useState('osm');
     const [copyright, setCopyright] = useState('');
-    const [notice, setNotice] = useState('');
+    const [creditsReady, setCreditsReady] = useState(false);
 
     useEffect(() => {
         if (!containerRef.current || leaflet) return;
@@ -88,6 +89,8 @@ export default function PreparationMapLibre(props) {
         let pressPoint = null;
         let creditAbort = null;
         let creditTimer = null;
+        let tileRetryTimer = null;
+        let tileRetryCount = 0;
         const controller = new AbortController();
         const stopPress = () => { clearTimeout(pressTimer); pressTimer = null; };
         const suppressNextTap = () => {
@@ -100,6 +103,7 @@ export default function PreparationMapLibre(props) {
             stopPress();
             clearTimeout(loadTimer);
             clearTimeout(creditTimer);
+            clearTimeout(tileRetryTimer);
             creditAbort?.abort();
             observer?.disconnect();
             map?.remove();
@@ -111,36 +115,54 @@ export default function PreparationMapLibre(props) {
             if (disposed || providerRef.current === 'osm') return;
             providerRef.current = 'osm';
             sessionRef.current = null;
+            clearTimeout(tileRetryTimer);
             setProvider('osm');
             setCopyright('');
-            setNotice('Vista satelital no disponible. Mostramos el mapa alternativo.');
+            setCreditsReady(false);
             map?.setStyle(mapStyle(null));
         };
         const updateCredits = () => {
             if (!map || providerRef.current !== 'google' || !sessionRef.current) return;
             clearTimeout(creditTimer);
-            creditTimer = setTimeout(async () => {
-                creditAbort?.abort();
-                creditAbort = new AbortController();
+            creditAbort?.abort();
+            creditAbort = new AbortController();
+            const signal = creditAbort.signal;
+            let attempts = 0;
+            const refresh = async () => {
+                if (signal.aborted || !map || providerRef.current !== 'google') return;
                 const bounds = map.getBounds();
+                const wholeWorld = bounds.getEast() - bounds.getWest() >= 360;
                 const params = new URLSearchParams({ kind: 'viewport', session: sessionRef.current.session,
                     expires: String(sessionRef.current.expires), permit: sessionRef.current.permit,
                     zoom: String(Math.min(19, Math.max(0, Math.round(map.getZoom())))),
                     north: String(Math.min(85.05113, bounds.getNorth())),
                     south: String(Math.max(-85.05113, bounds.getSouth())),
-                    east: String(bounds.getEast()), west: String(bounds.getWest()),
+                    east: String(wholeWorld ? 180 : wrapLongitude(bounds.getEast())),
+                    west: String(wholeWorld ? -180 : wrapLongitude(bounds.getWest())),
                 });
                 try {
-                    const response = await fetch(`/api/staff/preparation-map?${params}`, { signal: creditAbort.signal });
+                    const response = await fetch(`/api/staff/preparation-map?${params}`, { signal });
                     if (!response.ok) throw new Error('credits');
                     const data = await response.json();
-                    if (!data.copyright) throw new Error('credits');
-                    if (!disposed && providerRef.current === 'google') setCopyright(data.copyright);
-                } catch (error) { if (!disposed && error.name !== 'AbortError') switchToOsm(); }
-            }, 250);
+                    if (typeof data.copyright !== 'string') throw new Error('credits');
+                    if (!disposed && providerRef.current === 'google') {
+                        setCopyright(data.copyright);
+                        setCreditsReady(true);
+                    }
+                } catch {
+                    if (disposed || signal.aborted) return;
+                    const delays = [1200, 3000, 6000];
+                    if (attempts < delays.length) creditTimer = setTimeout(refresh, delays[attempts++]);
+                    else switchToOsm();
+                }
+            };
+            creditTimer = setTimeout(refresh, 250);
         };
         const reportBounds = () => {
             if (!map) return;
+            clearTimeout(tileRetryTimer);
+            tileRetryTimer = null;
+            tileRetryCount = 0;
             latest.current.onBoundsChange?.(leafletBoundsFromMap(map));
             updateCredits();
         };
@@ -160,7 +182,7 @@ export default function PreparationMapLibre(props) {
                 const center = coordinates(mapCenter?.lat, mapCenter?.lng) || coordinates(userLocation?.lat, userLocation?.lng) || [19.4326, -99.1332];
                 map = new maplibregl.Map({ container: containerRef.current, style: mapStyle(satellite),
                     center: [center[1], center[0]], zoom: mapCenter?.zoom || 14, pitch: 0, bearing: 0,
-                    minZoom: 2, maxZoom: 19, maxPitch: 45, touchPitch: true, touchZoomRotate: true,
+                    minZoom: 2, maxZoom: 19, maxPitch: 60, touchPitch: true, touchZoomRotate: true,
                     dragRotate: false, attributionControl: false, pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
                     canvasContextAttributes: { antialias: false },
                 });
@@ -169,16 +191,22 @@ export default function PreparationMapLibre(props) {
                     sessionRef.current = satellite;
                     providerRef.current = 'google';
                     setProvider('google');
-                } else setNotice('Vista satelital no disponible. Mostramos el mapa alternativo.');
+                }
                 observer = new ResizeObserver(() => map?.resize());
                 observer.observe(containerRef.current);
-                loadTimer = setTimeout(switchToLeaflet, 15000);
+                loadTimer = setTimeout(switchToLeaflet, 35000);
                 map.on('load', () => { clearTimeout(loadTimer); if (!disposed) { setReady(true); reportBounds(); } });
                 map.on('moveend', reportBounds);
                 map.on('error', event => {
                     const message = event?.error?.message || '';
                     if (/webgl|worker|context/i.test(message)) switchToLeaflet();
-                    else if (providerRef.current === 'google') switchToOsm();
+                    else if (providerRef.current === 'google' && tileRetryCount < 2 && !tileRetryTimer) {
+                        const delay = tileRetryCount++ === 0 ? 1200 : 4000;
+                        tileRetryTimer = setTimeout(() => {
+                            tileRetryTimer = null;
+                            if (map?.getSource('basemap')) map.refreshTiles('basemap');
+                        }, delay);
+                    }
                 });
                 map.on('webglcontextlost', switchToLeaflet);
                 map.on('click', event => {
@@ -231,6 +259,7 @@ export default function PreparationMapLibre(props) {
             creditAbort?.abort();
             clearTimeout(loadTimer);
             clearTimeout(creditTimer);
+            clearTimeout(tileRetryTimer);
             clearTimeout(suppressTimer);
             stopPress();
             observer?.disconnect();
@@ -328,7 +357,7 @@ export default function PreparationMapLibre(props) {
                 .filter(poi => !selected.has(String(poi.id)) && !poi.is_general_topic &&
                     coordinates(poi.latitude, poi.longitude) && bounds.contains([Number(poi.longitude), Number(poi.latitude)]));
             const groups = clusterMapPoints(visible, poi => map.project([Number(poi.longitude), Number(poi.latitude)]),
-                map.getZoom() >= 17 ? 72 : 112);
+                map.getZoom() >= 17 ? 56 : 80);
             for (const group of groups.filter(group => group.length === 1 && hasCreatedNarration(group[0])))
                 addMarker(group[0], group[0]._kind);
             for (const group of groups.filter(group => group.length === 1 && !hasCreatedNarration(group[0])))
@@ -378,7 +407,7 @@ export default function PreparationMapLibre(props) {
     if (leaflet) return <LeafletFallback {...props} />;
     return <>
         <div ref={containerRef} className={surface.map}
-            style={{ visibility: provider === 'google' && !copyright ? 'hidden' : 'visible' }} />
+            style={{ visibility: provider === 'google' && !creditsReady ? 'hidden' : 'visible' }} />
         {ready && <div className={surface.controls} aria-label="Controles del mapa">
             <button type="button" aria-label="Acercar" onClick={() => mapRef.current?.zoomIn()}>+</button>
             <button type="button" aria-label="Alejar" onClick={() => mapRef.current?.zoomOut()}>−</button>
@@ -390,7 +419,6 @@ export default function PreparationMapLibre(props) {
                     { padding: 55, maxZoom: 16, duration: 350 });
             }}>Centrar ruta</button>
         </div>}
-        {notice && <p className={surface.notice} role="status">{notice}</p>}
         <div className={surface.attribution} aria-label="Créditos del mapa">
             {provider === 'google' ? <><span className={surface.google}>Google Maps</span>{copyright && <span>{copyright}</span>}</> :
                 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>}

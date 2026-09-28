@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 import { createClient } from '@/utils/supabase/server';
-import { signTilePermit, tileCoordinates, validTilePermit, viewportParameters } from '@/lib/preparation-map-tiles.mjs';
+import { fetchMapResource, signTilePermit, tileCoordinates, validTilePermit, viewportParameters } from '@/lib/preparation-map-tiles.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,12 +38,12 @@ export async function GET(request) {
 
     if (kind === 'session') {
         try {
-            const upstream = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
+            const upstream = await fetchMapResource(() => fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mapType: 'satellite', language: 'es-MX', region: 'MX', imageFormat: 'jpeg' }),
-                cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]),
-            });
-            if (!upstream.ok) { await upstream.body?.cancel(); return fail('Google no habilitó la imagen satelital. Se mostrará el mapa alternativo.', 502); }
+                cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
+            }), request.signal);
+            if (!upstream.ok) { await upstream.body?.cancel(); return fail('Google no habilitó la imagen satelital.', 502); }
             const data = await upstream.json();
             const expires = Math.min(Number(data.expiry) * 1000, Date.now() + 6 * 60 * 60 * 1000);
             if (!data.session || !Number.isFinite(expires) || expires <= Date.now() || ![256, 512].includes(data.tileWidth))
@@ -64,7 +64,9 @@ export async function GET(request) {
         const target = new URL(`https://tile.googleapis.com/v1/2dtiles/${point.zoom}/${point.column}/${point.row}`);
         target.search = new URLSearchParams({ session, key }).toString();
         try {
-            const upstream = await fetch(target, { cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]) });
+            const upstream = await fetchMapResource(() => fetch(target, {
+                cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
+            }), request.signal);
             if (!upstream.ok) { await upstream.body?.cancel(); return fail('No se pudo cargar la imagen satelital.', 502); }
             return new Response(upstream.body, { headers: {
                 'Content-Type': upstream.headers.get('content-type') || 'image/jpeg',
@@ -79,7 +81,9 @@ export async function GET(request) {
     const target = new URL('https://tile.googleapis.com/tile/v1/viewport');
     target.search = new URLSearchParams({ session, key, ...Object.fromEntries(Object.entries(bounds).map(([name, value]) => [name, String(value)])) }).toString();
     try {
-        const upstream = await fetch(target, { cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]) });
+        const upstream = await fetchMapResource(() => fetch(target, {
+            cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
+        }), request.signal);
         if (!upstream.ok) { await upstream.body?.cancel(); return fail('No se pudieron cargar los créditos del mapa.', 502); }
         const data = await upstream.json();
         return Response.json({ copyright: String(data.copyright || '') }, { headers: { 'Cache-Control': 'private, no-store' } });

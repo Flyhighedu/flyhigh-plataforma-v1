@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { signTilePermit, tileCoordinates, validTilePermit, viewportParameters } from './preparation-map-tiles.mjs';
+import { fetchMapResource, signTilePermit, tileCoordinates, validTilePermit, viewportParameters } from './preparation-map-tiles.mjs';
 
 test('the tile permit only admits its own session before expiration', () => {
     const key = 'test-key';
@@ -21,4 +21,18 @@ test('tile and viewport requests reject invalid coordinates', () => {
     assert.deepEqual(viewportParameters(new URLSearchParams('zoom=15&north=20&south=19&east=-101&west=-103')),
         { zoom: 15, north: 20, south: 19, east: -101, west: -103 });
     assert.equal(viewportParameters(new URLSearchParams('zoom=15&north=19&south=20&east=-101&west=-103')), null);
+});
+
+test('temporary imagery failures retry without retrying denied access', async () => {
+    let calls = 0;
+    const recovered = await fetchMapResource(async () => {
+        calls++;
+        return { ok: calls === 3, status: calls === 3 ? 200 : 503, body: { cancel: async () => {} } };
+    }, null, async () => {});
+    assert.equal(recovered.status, 200);
+    assert.equal(calls, 3);
+    calls = 0;
+    const denied = await fetchMapResource(async () => { calls++; return { ok: false, status: 403 }; }, null, async () => {});
+    assert.equal(denied.status, 403);
+    assert.equal(calls, 1);
 });

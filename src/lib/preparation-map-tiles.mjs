@@ -33,3 +33,21 @@ export function viewportParameters(params) {
         Math.abs(east) > 180 || Math.abs(west) > 180) return null;
     return { zoom, north, south, east, west };
 }
+
+// A brief upstream interruption should not make MapLibre abandon its imagery.
+// Retry only temporary failures; authentication and invalid requests fail fast.
+export async function fetchMapResource(load, signal, wait = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (signal?.aborted) throw new Error('Map request cancelled');
+        let response;
+        try { response = await load(); }
+        catch (error) {
+            if (signal?.aborted || attempt === 2) throw error;
+            await wait(300 * 2 ** attempt);
+            continue;
+        }
+        if (response.ok || ![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) return response;
+        await response.body?.cancel();
+        await wait(300 * 2 ** attempt);
+    }
+}
