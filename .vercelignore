@@ -1,0 +1,12 @@
+# CLI deployments contain only the Next.js application and its build inputs.
+/*
+!src
+!public
+!scripts
+!package.json
+!package-lock.json
+!next.config.mjs
+!postcss.config.mjs
+!jsconfig.json
+!vercel.json
+!.vercelignore
