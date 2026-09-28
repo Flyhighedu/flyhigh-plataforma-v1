@@ -104,7 +104,6 @@ export async function PUT(request) {
             }
             if (body.context !== undefined) {
                 context = preparationContext(body.context);
-                if (items.some(item => (item.phase_id || 'general') !== context.phase_id)) throw new Error('Las narraciones deben corresponder al nivel elegido.');
             }
             if (body.status === 'ready' && !context.school_location) throw new Error('Confirma la ubicación de la escuela antes de confirmar el recorrido.');
             // Reserved for later review stages; no client can assert a 3D review.
@@ -112,7 +111,7 @@ export async function PUT(request) {
         }
         catch (error) { return json({ error: error.message }, 400); }
         if (body.status === 'ready' && JSON.stringify(body.fingerprints) !== JSON.stringify(items.map(body.modelVersion === 2 ? preparationItemFingerprint : fingerprint))) {
-            return json({ error: 'Una narración cambió. Actualiza el contenido y revisa la secuencia antes de confirmarla.' }, 409);
+            return json({ error: 'Un lugar cambió. Actualiza el contenido y revisa el recorrido antes de confirmarlo.' }, 409);
         }
         const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
         const row = {

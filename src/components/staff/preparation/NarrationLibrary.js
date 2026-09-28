@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, Headphones, Loader2, Pause, Play, Plus, Search, X } from 'lucide-react';
 import { narrationReadiness } from '@/lib/narration-workflow.mjs';
+import { hasCreatedNarration } from '@/lib/preparation-model.mjs';
 import { readNarrations } from '@/lib/narrative-versions.mjs';
 import { coordinates, distanceKm, durationLabel, usableAudio } from '@/lib/narration-preparation.mjs';
 import { Notice, secondary } from './PreparationUI';
@@ -34,24 +35,24 @@ export default function NarrationLibrary({ catalog, selectedIds = [], onAdd, add
         .filter(p => (category === 'all' || (category === 'general' ? p.is_general_topic : !p.is_general_topic)) && `${p.name} ${p.description || ''}`.toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es')))
         .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity) || a.name.localeCompare(b.name, 'es')), [catalog, category, query, schoolLocation]);
     return <>
-        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-400"><Search size={19} /><input aria-label="Buscar narraciones" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar una narración" className="min-w-0 flex-1 bg-transparent text-base text-slate-900 outline-none" />{query && <button onClick={() => setQuery('')} aria-label="Limpiar búsqueda"><X size={18} /></button>}</label>
+        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-400"><Search size={19} /><input aria-label="Buscar lugares" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar un lugar" className="min-w-0 flex-1 bg-transparent text-base text-slate-900 outline-none" />{query && <button onClick={() => setQuery('')} aria-label="Limpiar búsqueda"><X size={18} /></button>}</label>
         <div className="flex flex-wrap gap-2" aria-label="Tipo de narración">
             {[['all', 'Todas'], ['places', 'Lugares'], ['general', 'Temas generales']].map(([key, label]) => <button key={key} onClick={() => setCategory(key)} aria-pressed={category === key} className={`min-h-10 rounded-full px-4 text-xs font-bold ${category === key ? 'bg-[#071a33] text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>{label}</button>)}
         </div>
         {schoolLocation && <p className="text-xs text-slate-500">Lugares ordenados por distancia aproximada a la escuela, en línea recta.</p>}
         {audio.error && <Notice>{audio.error}</Notice>}
-        {!entries.length && <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center"><Search size={25} className="mx-auto mb-3 text-slate-400" /><p className="font-bold">No encontramos narraciones</p><p className="mt-1 text-sm text-slate-500">Prueba otro nombre o cambia el filtro.</p></div>}
+        {!entries.length && <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center"><Search size={25} className="mx-auto mb-3 text-slate-400" /><p className="font-bold">No encontramos lugares</p><p className="mt-1 text-sm text-slate-500">Prueba otro nombre.</p></div>}
         <div className="space-y-3">{entries.map(p => {
             const selected = selectedIds.includes(String(p.id));
             const playing = audio.id === p.id && audio.status === 'playing';
             const loading = audio.id === p.id && audio.status === 'loading';
             const available = usableAudio(p.audio_url);
             return <article key={p.id} className={`rounded-2xl border bg-white p-4 ${selected ? 'border-blue-700' : 'border-slate-200'}`}>
-                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-700 p-2.5 text-white"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
+                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-700 p-2.5 text-white"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{hasCreatedNarration(p) ? 'Con narración' : 'Sin narración'}</p></div></div>
                 {p.is_official && !narrationReadiness(readNarrations(p)).ready && <details className="mt-2 text-xs text-amber-800"><summary className="min-h-11 cursor-pointer py-3">Versiones por nivel pendientes</summary><p>Solicita a tu coordinación completar estos niveles.</p></details>}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button disabled={!available || loading} onClick={() => audio.toggle(p)} aria-label={`${playing ? 'Pausar' : 'Escuchar'} ${p.name}`} className={secondary}>{loading ? <Loader2 size={16} className="animate-spin" /> : playing ? <Pause size={16} /> : <Play size={16} />}{playing ? 'Pausar' : 'Escuchar'}</button>
-                    {onAdd && <button disabled={selected || !available || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-3 text-sm font-bold text-white disabled:bg-neutral-200 disabled:text-neutral-600">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregada' : 'Agregar'}</button>}
+                    {onAdd && <button disabled={selected || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-3 text-sm font-bold text-white disabled:bg-neutral-200 disabled:text-neutral-600">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregado' : 'Agregar'}</button>}
                     {p.narrative_script && <button onClick={() => setExpanded(expanded === p.id ? null : p.id)} aria-expanded={expanded === p.id} className="min-h-11 px-2 text-xs font-semibold text-slate-600">{expanded === p.id ? 'Cerrar guion' : 'Ver guion'}</button>}
                 </div>
                 {expanded === p.id && <p className="mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600">{p.narrative_script}</p>}

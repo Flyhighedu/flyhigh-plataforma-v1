@@ -21,7 +21,10 @@ export function preparationItem(poi, phase = 'general', behavior = 'route') {
         is_general_topic: Boolean(poi.is_general_topic) };
 }
 export function buildPreparationSequence(selections, catalog, status, previous = []) {
-    const narrations = buildSequence(selections, catalog, status);
+    // Preparation chooses places. The operation screen will resolve the narration
+    // for the person flying, so an unfinished audio must not block a place.
+    const narrations = buildSequence(selections, catalog, status === 'ready' ? 'draft' : status);
+    if (status === 'ready' && !narrations.length) throw new Error('Agrega al menos un lugar antes de confirmar.');
     const byId = new Map(catalog.map(poi => [String(poi.id), poi]));
     const old = new Map(previous.map(item => [item.id, item]));
     const items = narrations.map((item, index) => preparationItem(byId.get(item.id), item.phase_id || 'general',
@@ -41,8 +44,8 @@ export function normalizePreparationItems(items = [], catalog = []) {
     });
 }
 export function preparationItemFingerprint(item) {
-    return JSON.stringify([fingerprint(item), item.audio_duration_seconds || null,
-        poiBehavior(item.behavior), Boolean(item.is_general_topic), poiLocation(item.location)]);
+    return JSON.stringify([String(item.id), item.name, poiBehavior(item.behavior),
+        Boolean(item.is_general_topic), poiLocation(item.location)]);
 }
 export function preparationContentChanged(items, catalog) {
     const sources = new Map(catalog.map(poi => [String(poi.id), poi]));
@@ -63,7 +66,7 @@ export function derivePreparation(items, context) {
     // Only physical stops define the circuit. Narrative order remains in items.
     const geometry = home ? [home, ...points.map(item => item.location), home] : [];
     return { home, points, references, missingLocations, geometry,
-        canConfirm: Boolean(home && items.length && !missingLocations.length && items.every(item => usableAudio(item.audio_url))) };
+        canConfirm: Boolean(home && items.length && !missingLocations.length) };
 }
 export function preparationFingerprint(items, context) {
     return JSON.stringify([preparationContext(context), items.map(preparationItemFingerprint)]);

@@ -41,11 +41,19 @@ test('Legacy metadata upgrades without replacing narratives or ordering; explici
  assert.equal(buildPreparationSequence([{id:'b',behavior:'route'}],catalog,'draft',[items[1]])[0].behavior,'route');
  assert.throws(()=>buildPreparationSequence([{id:'a',behavior:'fly'}],catalog,'draft'));
 });
-test('Confirmation detects geography, duration, audio, topic or deleted source changes',()=>{
+test('Place preparation detects geography, name, topic or deleted source changes, independently of audio',()=>{
  assert.equal(preparationContentChanged(items,catalog),false);
- for(const change of [{latitude:20},{audio_duration_seconds:21},{audio_url:'https://example.test/new.wav'},{is_general_topic:true}]) assert.equal(preparationContentChanged(items,[{...catalog[0],...change},...catalog.slice(1)]),true);
+ for(const change of [{latitude:20},{name:'Otro nombre'},{is_general_topic:true}]) assert.equal(preparationContentChanged(items,[{...catalog[0],...change},...catalog.slice(1)]),true);
+ for(const change of [{audio_duration_seconds:21},{audio_url:'https://example.test/new.wav'}]) assert.equal(preparationContentChanged(items,[{...catalog[0],...change},...catalog.slice(1)]),false);
  assert.equal(preparationContentChanged(items,catalog.slice(1)),true);
  const merged=mergePreparedSources(catalog,[items[1]]);assert.equal(merged[1].behavior,undefined);assert.equal(merged[1].location,undefined);
+});
+test('A place without audio can be added and confirmed; location and a nonempty route are still required',()=>{
+ const silent={...catalog[0],audio_url:null,narrative_script:null};
+ const prepared=buildPreparationSequence([{id:'a',behavior:'route'}],[silent],'ready');
+ assert.equal(prepared[0].audio_url,null);
+ assert.equal(derivePreparation(prepared,context).canConfirm,true);
+ assert.throws(()=>buildPreparationSequence([],catalog,'ready'),/al menos un lugar/);
 });
 test('Display clustering neither loses POIs nor changes canonical order',()=>{
  const groups=clusterMapPoints(catalog.slice(0,3),p=>({x:p.id==='c'?200:1,y:1}),64);

@@ -16,8 +16,8 @@ export default function useSequencePlan({ visit, userId, initialPlan, catalog = 
             persist: async (state, status) => {
                 const response = await fetch('/api/staff/preparation', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ modelVersion: 2, visitId: visit.id, visitDate: visit.fecha_programada, revision: state.revision,
-                        selections: state.items.map(item => ({ id: item.id, phase_id: item.phase_id || 'general', behavior: item.behavior })),
-                        context: state.context, status, fingerprints: state.items.map(preparationItemFingerprint) }) });
+                        selections: state.items.map(item => ({ id: item.id, behavior: item.behavior })),
+                        context: { ...state.context, phase_id: 'general' }, status, fingerprints: state.items.map(preparationItemFingerprint) }) });
                 const result = await response.json();
                 if (!response.ok) throw Object.assign(new Error(result.error || 'No se pudo guardar. Tu borrador se conserva.'), { status: response.status });
                 return result.plan;
