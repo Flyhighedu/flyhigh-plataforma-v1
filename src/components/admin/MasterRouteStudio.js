@@ -19,6 +19,7 @@ import NarrationCatalog from '@/components/shared/NarrationCatalog';
 import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import MapPlacePreview from '@/components/shared/MapPlacePreview';
 import { findExistingPlace } from '@/lib/narration-catalog.mjs';
+import { discoverEducationalPlaces } from '@/lib/educational-place-search.mjs';
 import CreateNarrationDialog from '@/components/shared/CreateNarrationDialog';
 import { motion, useReducedMotion } from 'framer-motion';
 import libraryStyles from '@/components/shared/NarrationLibrary.module.css';
@@ -160,7 +161,7 @@ export default function MasterRouteStudio() {
     };
 
     // ═══ ADD POI FROM MAP (MEMORY ONLY) ═══
-    const addPoiFromMap = useCallback((name, lat, lng, description, origin) => {
+    const addPoiFromMap = useCallback((name, lat, lng, description, origin, category) => {
         if (!activeRoute) return;
         setIsAwaitingSelection(false);
         setEditingPoi({
@@ -168,6 +169,7 @@ export default function MasterRouteStudio() {
             id: `temp-${Date.now()}`,
             name,
             description,
+            category,
             latitude: lat,
             longitude: lng
         });
@@ -203,107 +205,25 @@ export default function MasterRouteStudio() {
         enabled: !!activeRoute
     });
 
-    // ═══ MAP: RADAR SEARCH (Overpass Cultural POIs) ═══
+    // ═══ MAP: EDUCATIONAL RADAR (shared with preparation) ═══
     const handleSearchCulturalPois = async () => {
         if (suggestedPois.length > 0) { setSuggestedPois([]); return; }
         if (!mapBounds) { setSearchError('Mueve el mapa para detectar la zona.'); return; }
         setSearchError('');
         setIsSearchingPois(true);
         try {
-            const sw = mapBounds._southWest, ne = mapBounds._northEast;
-            const res = await fetch('/api/staff/map-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'cultural', bounds: { south: sw.lat, west: sw.lng, north: ne.lat, east: ne.lng } }) });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'No se pudo consultar el mapa.');
-            const newPois = data.elements.map(el => {
-                const lat = el.type === 'node' ? el.lat : el.center?.lat;
-                const lon = el.type === 'node' ? el.lon : el.center?.lon;
-                const name = el.tags?.name;
-                const historicType = el.tags?.historic;
-                const tourismType = el.tags?.tourism;
-                const amenityType = el.tags?.amenity;
-                const naturalType = el.tags?.natural;
-                const aeroType = el.tags?.aeroway;
-                const waterType = el.tags?.waterway;
-                const leisureType = el.tags?.leisure;
-                const manMadeType = el.tags?.man_made;
-                const powerType = el.tags?.power;
-                const railwayType = el.tags?.railway;
-                const placeType = el.tags?.place;
-                const landuseType = el.tags?.landuse;
-                const shopType = el.tags?.shop;
-
-                if (!lat || !lon || !name) return null;
-
-                let desc = 'Punto de interés geográfico, cultural o recreativo.';
-                let cat = 'landmark';
-
-                if (placeType) {
-                    if (placeType === 'city') desc = 'Ciudad Principal.';
-                    else if (placeType === 'town') desc = 'Población / Villa.';
-                    else if (placeType === 'village') desc = 'Pueblo.';
-                    else if (placeType === 'suburb') desc = 'Colonia / Barrio.';
-                    else desc = 'Localidad.';
-                    cat = 'city';
-                }
-                else if (historicType) desc = historicType === 'monument' ? 'Monumento Histórico.' : historicType === 'archaeological_site' ? 'Sitio Arqueológico.' : 'Lugar Histórico.';
-                else if (tourismType) {
-                    if (tourismType === 'museum') desc = 'Museo.';
-                    else if (tourismType === 'artwork') desc = 'Obra de arte pública.';
-                    else if (tourismType === 'theme_park') desc = 'Parque de Atracciones.';
-                    else if (tourismType === 'zoo') desc = 'Zoológico.';
-                    else if (tourismType === 'aquarium') desc = 'Acuario.';
-                    else if (tourismType === 'viewpoint') desc = 'Mirador.';
-                    else desc = 'Atracción turística.';
-                }
-                else if (amenityType) {
-                    if (amenityType === 'place_of_worship') desc = 'Templo / Lugar de culto.';
-                    else if (amenityType === 'university' || amenityType === 'college') desc = 'Institución Educativa Superior.';
-                    else if (amenityType === 'library') desc = 'Biblioteca.';
-                    else if (amenityType === 'theatre') desc = 'Teatro.';
-                    else if (amenityType === 'grave_yard') desc = 'Panteón / Cementerio.';
-                    else if (amenityType === 'hospital') desc = 'Hospital / Clínica.';
-                    else desc = 'Edificio o Espacio Público.';
-                }
-                else if (naturalType) {
-                    if (naturalType === 'peak' || naturalType === 'volcano') desc = `Elevación Natural (${el.tags?.ele ? el.tags.ele + 'm' : 'Cerro/Montaña'}).`;
-                    else if (naturalType === 'water') desc = 'Cuerpo de Agua (Lago/Laguna).';
-                    else desc = 'Área Natural.';
-                }
-                else if (waterType) {
-                    if (waterType === 'dam') desc = 'Presa / Infraestructura hidráulica.';
-                    else if (waterType === 'river') desc = 'Río / Corriente de agua.';
-                    else if (waterType === 'waterfall') desc = 'Cascada / Salto de agua.';
-                    else desc = 'Cuerpo de Agua.';
-                }
-                else if (leisureType) {
-                    if (leisureType === 'park' || leisureType === 'nature_reserve') desc = 'Parque o Reserva Natural.';
-                    else if (leisureType === 'sports_centre' || leisureType === 'stadium') desc = 'Unidad Deportiva / Estadio.';
-                    else desc = 'Espacio Recreativo.';
-                }
-                else if (manMadeType) {
-                    if (manMadeType === 'wastewater_plant' || manMadeType === 'water_works') desc = 'Planta de Tratamiento / Infraestructura de Agua.';
-                    else if (manMadeType === 'observatory') desc = 'Observatorio.';
-                    else if (manMadeType === 'lighthouse') desc = 'Faro.';
-                    else desc = 'Infraestructura Civil.';
-                }
-                else if (powerType === 'plant') desc = 'Planta de Energía / Central Eléctrica.';
-                else if (railwayType === 'station') desc = 'Estación de Ferrocarril.';
-                else if (aeroType === 'aerodrome') desc = 'Aeropuerto / Pista de aterrizaje.';
-                else if (landuseType) {
-                    if (landuseType === 'cemetery') desc = 'Panteón / Cementerio.';
-                    else if (landuseType === 'commercial') desc = 'Zona Comercial.';
-                    else if (landuseType === 'industrial') desc = 'Zona Industrial.';
-                }
-                else if (shopType === 'mall') desc = 'Centro Comercial.';
-
-                return { id: el.id, name, description: desc, category: cat, latitude: lat, longitude: lon };
-            }).filter(Boolean);
-            if (newPois.length === 0) { setSearchError('No encontramos sitios aquí. Puedes mantener presionado el mapa para crear uno.'); return; }
-            setSuggestedPois(newPois);
-        } catch (err) { console.error(err); setSearchError(err.message || 'No se pudo consultar el mapa.'); }
-        finally { setIsSearchingPois(false); }
+            const { lat, lng } = mapBounds.getCenter();
+            const { places, partial } = await discoverEducationalPlaces(
+                { latitude: lat, longitude: lng }, pois,
+                { onPartial: found => setSuggestedPois(found) }
+            );
+            if (partial) setSearchError('La búsqueda fue parcial. Reintenta para completar la zona.');
+            else if (!places.length) setSearchError('No encontramos sitios aquí. Puedes mantener presionado el mapa para crear uno.');
+        } catch (err) {
+            console.error(err);
+            setSearchError(err.message || 'No se pudo consultar el mapa.');
+        } finally { setIsSearchingPois(false); }
     };
-
     // ═══ MAP: CLICK SUGGESTED POI → ADD TO ROUTE ═══
     const handleSuggestedPoiClick = useCallback((poi) => {
         if (!activeRoute) return;
@@ -377,7 +297,7 @@ export default function MasterRouteStudio() {
                                         onClick={handleSearchCulturalPois}
                                         disabled={isSearchingPois}
                                         style={{ position: 'relative', width: 56, height: 56, borderRadius: '50%', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: suggestedPois.length > 0 ? '#EF4444' : 'linear-gradient(135deg, #F43F5E, #8B5CF6)', color: '#fff', boxShadow: '0 8px 24px rgba(244,63,94,0.4)', fontSize: 24, transition: 'all 0.2s', zIndex: 10 }}
-                                        title={suggestedPois.length > 0 ? 'Limpiar sugerencias' : 'Buscar sitios culturales'}
+                                        title={suggestedPois.length > 0 ? 'Limpiar sugerencias' : 'Buscar lugares de interés'}
                                     >
                                         {isSearchingPois ? <Loader2 size={24} className="animate-spin" /> : suggestedPois.length > 0 ? <X size={24} /> : '📡'}
                                     </button>
@@ -510,7 +430,7 @@ export default function MasterRouteStudio() {
                 </>
             )}
 
-            {candidate && <MapPlacePreview poi={candidate} existing={findExistingPlace(pois, candidate)} onClose={() => setCandidate(null)} onContinue={existing => { const point = candidate; setCandidate(null); if (existing) openOfficial(existing); else addPoiFromMap(point.name, point.latitude, point.longitude, point.description, point._origin); }}/>}
+            {candidate && <MapPlacePreview poi={candidate} existing={findExistingPlace(pois, candidate)} onClose={() => setCandidate(null)} onContinue={existing => { const point = candidate; setCandidate(null); if (existing) openOfficial(existing); else addPoiFromMap(point.name, point.latitude, point.longitude, point.description, point._origin, point.category); }}/>}
             <style>{`
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px) scale(0.95); }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery, buildPreparationPoiQuery, parseCulturalPois, radarBounds } from '../src/lib/cultural-pois.mjs';
+import { discoverEducationalPlaces } from '../src/lib/educational-place-search.mjs';
 
 const center = { latitude: 19.4, longitude: -102.1 };
 test('Shared radar query includes the editor categories and validates bounds', () => {
@@ -23,7 +24,7 @@ test('Preparation scans the school vicinity before a geographically spread 5 km 
     const near = buildPreparationPoiQuery(center, 'near');
     const wide = buildPreparationPoiQuery(center, 'wide');
     for (const query of [near, wide]) {
-        for (const tag of ['place_of_worship', 'school', 'cinema', 'fast_food', 'supermarket', 'department_store', 'bridge:name']) {
+        for (const tag of ['place_of_worship', 'school', 'cinema', 'fast_food', 'supermarket', 'department_store', 'bridge:name', 'aerialway']) {
             assert.ok(query.includes(tag), `${tag} must be discoverable`);
         }
         assert.ok(query.includes('relation["amenity"'));
@@ -55,10 +56,28 @@ test('Preparation places retain their kind and use the bridge name when availabl
         { type: 'node', id: 13, lat: 19.402, lon: -102.1, tags: { name: 'Cinépolis', amenity: 'cinema' } },
         { type: 'node', id: 14, lat: 19.403, lon: -102.1, tags: { name: "McDonald's", amenity: 'fast_food' } },
         { type: 'relation', id: 15, center: { lat: 19.404, lon: -102.1 }, tags: { name: 'Centro Comercial', shop: 'mall' } },
+        { type: 'node', id: 16, lat: 19.405, lon: -102.1, tags: { name: 'Estación Centro', aerialway: 'station' } },
     ];
     const places = parseCulturalPois(elements, center);
     assert.deepEqual(places.map(poi => [poi.name, poi.category]), [
         ['Puente Vehicular Central', 'bridge'], ['Parroquia', 'worship'],
-        ['Cinépolis', 'entertainment'], ["McDonald's", 'food'], ['Centro Comercial', 'shopping']
+        ['Cinépolis', 'entertainment'], ["McDonald's", 'food'], ['Centro Comercial', 'shopping'],
+        ['Estación Centro', 'cableway']
     ]);
+});
+test('Staff preparation and admin can share nearby and wide discovery without losing partial results', async () => {
+    const ranges = [];
+    const fetcher = async (_, options) => {
+        const { range } = JSON.parse(options.body);
+        ranges.push(range);
+        return { ok: range === 'near', json: async () => range === 'near'
+            ? { elements: [{ type: 'node', id: 21, lat: 19.401, lon: -102.1, tags: { name: 'Cinépolis', amenity: 'cinema' } }] }
+            : { error: 'Overpass unavailable' } };
+    };
+    const partial = [];
+    const result = await discoverEducationalPlaces(center, [], { fetcher, onPartial: places => partial.push(places.map(poi => poi.name)) });
+    assert.deepEqual(ranges, ['near', 'wide']);
+    assert.deepEqual(partial, [['Cinépolis']]);
+    assert.equal(result.partial, true);
+    assert.deepEqual(result.places.map(poi => poi.category), ['entertainment']);
 });

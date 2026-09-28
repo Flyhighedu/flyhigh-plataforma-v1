@@ -28,6 +28,7 @@ const PREPARATION_FILTERS = [
     '["building"~"church|chapel|cathedral|mosque|temple|synagogue|school|university|college"]',
     '["man_made"="bridge"]',
     '["shop"~"supermarket|department_store|mall"]',
+    '["aerialway"="station"]',
 ];
 
 function namedStatements(filters, bounds, types = ['node', 'way']) {
@@ -87,7 +88,8 @@ export function parseCulturalPois(elements, center, saved = [], radius = 3000) {
         const name = bridgeName || (isBridge && tags.highway && standardName && !/^(puente|viaducto)/i.test(standardName)
             ? `Puente en ${standardName}` : standardName);
         if (!location || !name || !['node', 'way', 'relation'].includes(element.type) || !Number.isFinite(element.id)) return [];
-        const category = isBridge ? 'bridge'
+        const category = tags.aerialway === 'station' ? 'cableway'
+            : isBridge ? 'bridge'
             : tags.amenity === 'place_of_worship' || /^(church|chapel|cathedral|mosque|temple|synagogue)$/.test(tags.building) ? 'worship'
             : /^(school|kindergarten|college|university|research_institute)$/.test(tags.amenity) || /^(school|college|university)$/.test(tags.building) ? 'education'
             : tags.amenity === 'library' ? 'library'
