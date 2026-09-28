@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery } from '@/lib/cultural-pois.mjs';
+import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery, buildPreparationPoiQuery } from '@/lib/cultural-pois.mjs';
 import { fetchOverpassElements } from '@/lib/map-context.mjs';
 import { cookies } from 'next/headers';
 import { verifyAdminToken } from '@/lib/adminAuth';
@@ -54,6 +54,8 @@ export async function POST(request) {
                 return reply({ error: 'Acerca un poco el mapa para buscar lugares.' }, 400);
             }
             query = buildCulturalPoiQuery(normalizedBounds);
+        } else if (body?.kind === 'preparation-cultural') {
+            query = buildPreparationPoiQuery(body.center, body.range);
         } else if (body?.kind === 'nearby-name') {
             if (body.latitude == null || body.longitude == null || body.latitude === '' || body.longitude === '') {
                 return reply({ error: 'Ubicación no válida.' }, 400);

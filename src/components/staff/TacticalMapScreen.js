@@ -14,7 +14,7 @@ import { findExistingPlace } from '@/lib/narration-catalog.mjs';
 import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import useNativePOITap from '@/hooks/useNativePOITap';
 import { coordinates } from '@/lib/narration-preparation.mjs';
-import { parseCulturalPois, radarBounds } from '@/lib/cultural-pois.mjs';
+import { parseCulturalPois } from '@/lib/cultural-pois.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -316,7 +316,37 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             const center = initial && coordinates(referencePoint?.latitude, referencePoint?.longitude)
                 ? { latitude: Number(referencePoint.latitude), longitude: Number(referencePoint.longitude) }
                 : { latitude: mapBounds.getCenter().lat, longitude: mapBounds.getCenter().lng };
-            const bounds = preparationMode ? radarBounds(center, 5000) : {
+            if (preparationMode) {
+                const collected = [];
+                let successfulScans = 0;
+                for (const range of ['near', 'wide']) {
+                    try {
+                        const response = await fetch('/api/staff/map-search', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ kind: 'preparation-cultural', center, range })
+                        });
+                        if (!response.ok) throw new Error('No se pudo consultar el mapa.');
+                        const data = await response.json();
+                        if (!Array.isArray(data.elements)) throw new Error('Respuesta de lugares no válida.');
+                        collected.push(...data.elements);
+                        successfulScans++;
+                        const found = parseCulturalPois(collected, center, pois, 5000)
+                            .filter(poi => !findExistingPlace(pois, poi));
+                        setSuggestedPois(found);
+                        if (range === 'near') setDiscoveryMessage('Ampliando búsqueda a 5 km…');
+                    } catch (error) {
+                        console.warn(`Preparation ${range} POI search failed:`, error);
+                    }
+                }
+                if (!successfulScans) throw new Error('No se pudo consultar el mapa.');
+                const found = parseCulturalPois(collected, center, pois, 5000)
+                    .filter(poi => !findExistingPlace(pois, poi));
+                setDiscoveryMessage(successfulScans < 2
+                    ? 'La búsqueda fue parcial. Reescanea para completar la zona.'
+                    : found.length ? '' : 'No encontramos más lugares en 5 km.');
+                return;
+            }
+            const bounds = {
                 south: mapBounds._southWest.lat, west: mapBounds._southWest.lng,
                 north: mapBounds._northEast.lat, east: mapBounds._northEast.lng,
             };
@@ -334,13 +364,6 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                 throw new Error(failure.error || 'No se pudo consultar el mapa.');
             }
             const data = await res.json();
-            if (preparationMode) {
-                const found = parseCulturalPois(data.elements, center, pois, 5000);
-                setSuggestedPois(found.filter(poi => !findExistingPlace(pois, poi)));
-                setDiscoveryMessage(found.length ? '' : 'No encontramos más lugares en 5 km.');
-                return;
-            }
-
             let newPois = (Array.isArray(data.elements) ? data.elements : []).map(el => {
                 const lat = el.type === 'node' ? el.lat : el.center?.lat;
                 const lon = el.type === 'node' ? el.lon : el.center?.lon;

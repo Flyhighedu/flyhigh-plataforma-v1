@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery, parseCulturalPois, radarBounds } from '../src/lib/cultural-pois.mjs';
+import { buildCulturalPoiQuery, buildNearbyNamedPoiQuery, buildPreparationPoiQuery, parseCulturalPois, radarBounds } from '../src/lib/cultural-pois.mjs';
 
 const center = { latitude: 19.4, longitude: -102.1 };
 test('Shared radar query includes the editor categories and validates bounds', () => {
@@ -19,6 +19,23 @@ test('Nearby-name query accepts only bounded coordinates and radius', () => {
     assert.throws(() => buildNearbyNamedPoiQuery({ latitude: 100, longitude: 0, radius: 150 }));
     assert.throws(() => buildNearbyNamedPoiQuery({ latitude: 19, longitude: -102, radius: 5000 }));
 });
+test('Preparation scans the school vicinity before a geographically spread 5 km search', () => {
+    const near = buildPreparationPoiQuery(center, 'near');
+    const wide = buildPreparationPoiQuery(center, 'wide');
+    for (const query of [near, wide]) {
+        for (const tag of ['place_of_worship', 'school', 'cinema', 'fast_food', 'supermarket', 'department_store', 'bridge:name']) {
+            assert.ok(query.includes(tag), `${tag} must be discoverable`);
+        }
+        assert.ok(query.includes('relation["amenity"'));
+    }
+    assert.ok(near.includes('way["highway"]["bridge"~"yes|viaduct|movable"]["name"]'));
+    assert.ok(near.endsWith('out center qt;'));
+    assert.ok(wide.endsWith('out center qt 1500;'));
+    assert.ok(!wide.includes('way["highway"]["bridge"~"yes|viaduct|movable"]["name"]'));
+    assert.equal(buildPreparationPoiQuery({ latitude: '19.4', longitude: '-102.1' }, 'near'), near);
+    assert.throws(() => buildPreparationPoiQuery({ latitude: 100, longitude: 0 }));
+    assert.throws(() => buildPreparationPoiQuery(center, 'unbounded'));
+});
 test('Radar keeps nearby named places, avoids catalog duplicates and never conflates OSM types', () => {
     const node = (id, name, lat = 19.4, lon = -102.1) => ({ type: 'node', id, lat, lon, tags: { name } });
     const elements = [node(1, 'Museo'), node(2, 'Parque'), node(3, ''), node(4, 'Lejos', 20), node(5, 'Inválido', null),
@@ -30,4 +47,18 @@ test('Radar keeps nearby named places, avoids catalog duplicates and never confl
     assert.deepEqual(elements, original);
     assert.throws(() => parseCulturalPois(null, center));
     assert.deepEqual(parseCulturalPois([], center), []);
+});
+test('Preparation places retain their kind and use the bridge name when available', () => {
+    const elements = [
+        { type: 'way', id: 11, center: { lat: 19.4, lon: -102.1 }, tags: { highway: 'primary', bridge: 'yes', name: 'Avenida Central', 'bridge:name': 'Puente Vehicular Central' } },
+        { type: 'node', id: 12, lat: 19.401, lon: -102.1, tags: { name: 'Parroquia', amenity: 'place_of_worship' } },
+        { type: 'node', id: 13, lat: 19.402, lon: -102.1, tags: { name: 'Cinépolis', amenity: 'cinema' } },
+        { type: 'node', id: 14, lat: 19.403, lon: -102.1, tags: { name: "McDonald's", amenity: 'fast_food' } },
+        { type: 'relation', id: 15, center: { lat: 19.404, lon: -102.1 }, tags: { name: 'Centro Comercial', shop: 'mall' } },
+    ];
+    const places = parseCulturalPois(elements, center);
+    assert.deepEqual(places.map(poi => [poi.name, poi.category]), [
+        ['Puente Vehicular Central', 'bridge'], ['Parroquia', 'worship'],
+        ['Cinépolis', 'entertainment'], ["McDonald's", 'food'], ['Centro Comercial', 'shopping']
+    ]);
 });
