@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { coordinates, snapshot, moveItem, mergePreparedSources } from '../src/lib/narration-preparation.mjs';
-import { preparationItem as item, buildPreparationSequence, derivePreparation, normalizePreparationItems, preparationContentChanged, clusterMapPoints, hasCreatedNarration } from '../src/lib/preparation-model.mjs';
+import { preparationItem as item, buildPreparationSequence, derivePreparation, normalizePreparationItems, preparationContentChanged, clusterMapPoints, groupPreparationMapPoints, hasCreatedNarration } from '../src/lib/preparation-model.mjs';
 import { createPreparationStore, restorePreparation } from '../src/lib/preparation-store.mjs';
 const catalog = [
  {id:'a',name:'Huatápera',latitude:19.417,longitude:-102.055,audio_url:'https://example.test/a.wav',narrative_script:'Museo',audio_duration_seconds:20},
@@ -65,6 +65,16 @@ test('A place without audio can be added and confirmed; location and a nonempty 
 test('Display clustering neither loses POIs nor changes canonical order',()=>{
  const groups=clusterMapPoints(catalog.slice(0,3),p=>({x:p.id==='c'?200:1,y:1}),64);
  assert.deepEqual(groups.map(g=>g.map(p=>p.id)),[['a','b'],['c']]);assert.deepEqual(items.map(p=>p.id),['a','b','c']);
+});
+test('A narrated place stays visible while only unexplored places cluster at distant zoom',()=>{
+ const points=[catalog[0],{id:'new-1',name:'Iglesia',source:'osm-radar'},
+  {id:'new-2',name:'Puente',source:'osm-radar'}];
+ const project=()=>({x:1,y:1});
+ const far=groupPreparationMapPoints(points,project,12);
+ assert.deepEqual(far.narrated.map(p=>p.id),['a']);
+ assert.deepEqual(far.groups.map(group=>group.map(p=>p.id)),[['new-1','new-2']]);
+ const close=groupPreparationMapPoints(points,project,14);
+ assert.deepEqual(close.groups.map(group=>group.map(p=>p.id)),[['new-1'],['new-2']]);
 });
 test('Map distinguishes created narration from an unexplored place across educational versions',()=>{
  assert.equal(hasCreatedNarration(catalog[0]),true);

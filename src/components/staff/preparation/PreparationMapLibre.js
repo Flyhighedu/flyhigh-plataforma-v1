@@ -4,13 +4,39 @@ import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
 import { coordinates } from '@/lib/narration-preparation.mjs';
-import { clusterMapPoints, hasCreatedNarration } from '@/lib/preparation-model.mjs';
+import { groupPreparationMapPoints, hasCreatedNarration } from '@/lib/preparation-model.mjs';
 import styles from './PreparationLayers.module.css';
 import surface from './PreparationMapLibre.module.css';
 
 const LeafletFallback = dynamic(() => import('../TacticalMapLeaflet'), { ssr: false });
 const OSM_TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const wrapLongitude = value => ((value + 180) % 360 + 360) % 360 - 180;
+const CATEGORY_PATHS = {
+    education: ['M4 21V7l8-4 8 4v14H4Z', 'M9 21v-5h6v5', 'M9 10h.01', 'M15 10h.01'],
+    worship: ['M12 2v6', 'M9 5h6', 'M5 10l7-4 7 4v11H5V10Z', 'M10 21v-5h4v5'],
+    bridge: ['M2 20h20', 'M4 17h16', 'M5 17c1-9 13-9 14 0', 'M5 17v3', 'M19 17v3'],
+    library: ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z'],
+    entertainment: ['M3 4h18v16H3V4Z', 'M7 4v16', 'M17 4v16', 'M3 9h4', 'M17 9h4', 'M3 15h4', 'M17 15h4'],
+    shopping: ['M5 8h14l1 13H4L5 8Z', 'M9 9V6a3 3 0 0 1 6 0v3'],
+    food: ['M4 3v7a3 3 0 0 0 6 0V3', 'M7 3v18', 'M17 3v18', 'M17 3c3 2 4 6 0 8'],
+    nature: ['M12 3 5 14h14L12 3Z', 'M12 9 4 19h16L12 9Z', 'M12 19v3'],
+    museum: ['M3 10h18', 'M5 10v10', 'M10 10v10', 'M14 10v10', 'M19 10v10', 'M3 20h18', 'M2 7l10-4 10 4'],
+    landmark: ['M3 10h18', 'M5 10v10', 'M10 10v10', 'M14 10v10', 'M19 10v10', 'M3 20h18', 'M2 7l10-4 10 4'],
+};
+
+function categoryIcon(category) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '15'); svg.setAttribute('height', '15');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round'); svg.setAttribute('aria-hidden', 'true');
+    for (const d of CATEGORY_PATHS[category] || CATEGORY_PATHS.landmark) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d); svg.append(path);
+    }
+    return svg;
+}
 
 function mapStyle(session) {
     const query = session ? new URLSearchParams({ kind: 'tile', session: session.session,
@@ -27,7 +53,7 @@ function leafletBoundsFromMap(map) {
     return { _southWest: sw, _northEast: ne, getCenter: () => bounds.getCenter(), isValid: () => true };
 }
 
-function markerElement(poi, kind, number, active, narrated, labelVisible) {
+function markerElement(poi, kind, number, active, narrated, labelPlacement) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `${styles.pin} ${styles[kind]} ${narrated ? styles.narrated : styles.unnarrated}`;
@@ -36,24 +62,28 @@ function markerElement(poi, kind, number, active, narrated, labelVisible) {
     button.dataset.narration = narrated ? 'created' : 'missing';
     button.setAttribute('aria-label', `${number ? `${number}. ` : ''}${poi.name}${kind === 'school' ? ', inicio y regreso' : kind === 'route' ? ', punto de ruta' : kind === 'reference' ? ', referencia' : narrated ? ', con narración' : ', sin narración'}`);
     button.setAttribute('aria-pressed', String(active));
+    button.title = poi.name;
     const symbol = document.createElement('span');
     symbol.className = styles.symbol;
-    symbol.textContent = number || (kind === 'school' ? '🏫' : kind === 'discovery' ? '+' : '');
+    if (number || kind === 'school') symbol.textContent = number || '🏫';
+    else symbol.append(categoryIcon(poi.category));
     button.append(symbol);
-    if (labelVisible) {
+    if (labelPlacement) {
         const label = document.createElement('span');
         label.className = styles.label;
+        label.dataset.placement = labelPlacement;
         label.textContent = poi.name;
         button.append(label);
     }
     return button;
 }
 
-function markerWrapper(button) {
+function markerWrapper(button, priority = 1) {
     const wrapper = document.createElement('div');
     wrapper.className = styles.marker;
     wrapper.style.width = '44px';
     wrapper.style.height = '44px';
+    wrapper.style.zIndex = String(priority);
     wrapper.append(button);
     for (const type of ['mousedown', 'touchstart', 'pointerdown'])
         button.addEventListener(type, event => event.stopPropagation());
@@ -320,35 +350,50 @@ export default function PreparationMapLibre(props) {
             const labelFits = (poi, force = false) => {
                 const pixel = map.project([Number(poi.longitude), Number(poi.latitude)]);
                 const width = Math.min(140, Math.max(45, (poi.name || '').length * 6 + 14));
-                const area = { left: pixel.x - width / 2 - 3, right: pixel.x + width / 2 + 3,
-                    top: pixel.y + 17, bottom: pixel.y + 45 };
-                if (!force && (area.left < 2 || area.right > map.getCanvas().clientWidth - 2 ||
-                    labelAreas.some(other => area.left < other.right && area.right > other.left && area.top < other.bottom && area.bottom > other.top))) return false;
-                labelAreas.push(area);
-                return true;
+                const candidates = [
+                    ['bottom', pixel.x - width / 2, pixel.y + 16],
+                    ['top', pixel.x - width / 2, pixel.y - 38],
+                    ['right', pixel.x + 19, pixel.y - 11],
+                    ['left', pixel.x - width - 19, pixel.y - 11],
+                ];
+                let fallback = null;
+                for (const [placement, left, top] of candidates) {
+                    const area = { left: left - 3, right: left + width + 3, top: top - 2, bottom: top + 24 };
+                    if (!force && (area.left < 2 || area.right > map.getCanvas().clientWidth - 2 ||
+                        area.top < 2 || area.bottom > map.getCanvas().clientHeight - 2)) continue;
+                    if (!fallback) fallback = { placement, area };
+                    if (!force && labelAreas.some(other => area.left < other.right && area.right > other.left &&
+                        area.top < other.bottom && area.bottom > other.top)) continue;
+                    labelAreas.push(area);
+                    return placement;
+                }
+                if (map.getZoom() >= 15 && fallback) {
+                    labelAreas.push(fallback.area);
+                    return fallback.placement;
+                }
+                return null;
             };
             const addMarker = (poi, kind, number = '', forced = false) => {
                 const active = String(poi.id) === String(preparation.activeId);
                 const narrated = hasCreatedNarration(pois.find(item => String(item.id) === String(poi.id)) || poi);
-                const button = markerElement(poi, kind, number, active, narrated, forced || labelFits(poi));
+                const button = markerElement(poi, kind, number, active, narrated, labelFits(poi, forced));
                 button.addEventListener('click', event => {
                     event.stopPropagation();
                     if (kind !== 'school') (kind === 'discovery' ? latest.current.onSuggestedPoiClick : latest.current.onMarkerClick)?.(
                         { ...poi, _origin: narrationOrigin(button) });
                 });
-                const marker = new maplibregl.Marker({ element: markerWrapper(button), anchor: 'center',
+                const priority = kind === 'school' || kind === 'route' || kind === 'reference' ? 5 : narrated ? 4 : 2;
+                const marker = new maplibregl.Marker({ element: markerWrapper(button, priority), anchor: 'center',
                     pitchAlignment: 'viewport', rotationAlignment: 'viewport' })
                     .setLngLat([Number(poi.longitude), Number(poi.latitude)]).addTo(map);
                 markersRef.current.push(marker);
             };
             if (coordinates(referencePoint?.latitude, referencePoint?.longitude)) {
-                labelFits(referencePoint, true);
                 addMarker(referencePoint, 'school', '', true);
             }
             preparation.items.forEach((item, index) => {
                 if (item.is_general_topic || !coordinates(item.location?.latitude, item.location?.longitude)) return;
                 const poi = { ...item, ...item.location };
-                labelFits(poi, true);
                 addMarker(poi, item.behavior, String(index + 1), true);
             });
             const bounds = map.getBounds();
@@ -356,11 +401,11 @@ export default function PreparationMapLibre(props) {
                 ...suggestedPois.map(poi => ({ ...poi, _kind: 'discovery' }))]
                 .filter(poi => !selected.has(String(poi.id)) && !poi.is_general_topic &&
                     coordinates(poi.latitude, poi.longitude) && bounds.contains([Number(poi.longitude), Number(poi.latitude)]));
-            const groups = clusterMapPoints(visible, poi => map.project([Number(poi.longitude), Number(poi.latitude)]),
-                map.getZoom() >= 17 ? 56 : 80);
-            for (const group of groups.filter(group => group.length === 1 && hasCreatedNarration(group[0])))
-                addMarker(group[0], group[0]._kind);
-            for (const group of groups.filter(group => group.length === 1 && !hasCreatedNarration(group[0])))
+            const { narrated, groups } = groupPreparationMapPoints(visible,
+                poi => map.project([Number(poi.longitude), Number(poi.latitude)]), map.getZoom());
+            // Give narration labels the first claim on space. Clusters never absorb a narrated place.
+            for (const poi of narrated) addMarker(poi, poi._kind);
+            for (const group of groups.filter(group => group.length === 1))
                 addMarker(group[0], group[0]._kind);
             for (const group of groups.filter(group => group.length > 1)) {
                 const lng = group.reduce((sum, poi) => sum + Number(poi.longitude), 0) / group.length;
@@ -387,7 +432,7 @@ export default function PreparationMapLibre(props) {
                         popupRef.current = new maplibregl.Popup({ maxWidth: '260px' }).setLngLat([lng, lat]).setDOMContent(list).addTo(map);
                     }
                 });
-                markersRef.current.push(new maplibregl.Marker({ element: markerWrapper(button), anchor: 'center',
+                markersRef.current.push(new maplibregl.Marker({ element: markerWrapper(button, 1), anchor: 'center',
                     pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([lng, lat]).addTo(map));
             }
         };

@@ -83,3 +83,11 @@ export function clusterMapPoints(points, project, cellSize = 64) {
     }
     return [...cells.values()];
 }
+
+export function groupPreparationMapPoints(points, project, zoom) {
+    const narrated = points.filter(hasCreatedNarration);
+    const unexplored = points.filter(point => !hasCreatedNarration(point));
+    return { narrated, groups: zoom >= 14
+        ? unexplored.map(point => [point])
+        : clusterMapPoints(unexplored, project, 80) };
+}
