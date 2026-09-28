@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { coordinates, snapshot, moveItem, mergePreparedSources } from '../src/lib/narration-preparation.mjs';
-import { preparationItem as item, buildPreparationSequence, derivePreparation, normalizePreparationItems, preparationContentChanged, clusterMapPoints } from '../src/lib/preparation-model.mjs';
+import { preparationItem as item, buildPreparationSequence, derivePreparation, normalizePreparationItems, preparationContentChanged, clusterMapPoints, hasCreatedNarration } from '../src/lib/preparation-model.mjs';
 import { createPreparationStore, restorePreparation } from '../src/lib/preparation-store.mjs';
 const catalog = [
  {id:'a',name:'Huatápera',latitude:19.417,longitude:-102.055,audio_url:'https://example.test/a.wav',narrative_script:'Museo',audio_duration_seconds:20},
@@ -50,6 +50,13 @@ test('Confirmation detects geography, duration, audio, topic or deleted source c
 test('Display clustering neither loses POIs nor changes canonical order',()=>{
  const groups=clusterMapPoints(catalog.slice(0,3),p=>({x:p.id==='c'?200:1,y:1}),64);
  assert.deepEqual(groups.map(g=>g.map(p=>p.id)),[['a','b'],['c']]);assert.deepEqual(items.map(p=>p.id),['a','b','c']);
+});
+test('Map distinguishes created narration from an unexplored place across educational versions',()=>{
+ assert.equal(hasCreatedNarration(catalog[0]),true);
+ assert.equal(hasCreatedNarration({...catalog[0],narrative_script:null,audio_url:null}),false);
+ assert.equal(hasCreatedNarration({id:'phase-only',narrative_versions:{phase_2:{narrative_script:'Historia'}}}),true);
+ assert.equal(hasCreatedNarration({id:'osm_node_1',source:'osm-radar',narrative_script:'untrusted'}),false);
+ assert.equal(hasCreatedNarration({id:'empty',narrative_script:'  '}),false);
 });
 test('A late acknowledgment preserves newer edits and serializes the next write with the new revision',async()=>{
  const calls=[];let resolveFirst;

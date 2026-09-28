@@ -1,6 +1,11 @@
 import { buildSequence, coordinates, fingerprint, preparationContext, snapshot, usableAudio } from './narration-preparation.mjs';
+import { readNarrations } from './narrative-versions.mjs';
 
 export const PREPARATION_MODEL_VERSION = 2;
+export function hasCreatedNarration(poi) {
+    if (!poi || poi.source === 'osm-radar') return false;
+    return Object.values(readNarrations(poi)).some(version => Boolean(version.narrative_script?.trim() || usableAudio(version.audio_url)));
+}
 export function poiLocation(poi) {
     const pair = coordinates(poi?.latitude, poi?.longitude);
     return pair ? { latitude: pair[0], longitude: pair[1] } : null;

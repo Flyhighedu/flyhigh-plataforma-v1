@@ -59,3 +59,11 @@ El usuario pidió detener las pruebas mediante la aplicación y realizará las r
 ## Siguiente etapa
 
 El modelo canónico queda disponible para conectar futuras propuestas o revisión 3D. No se implementó recomendador, observación automática, tiempos de vuelo, nueva operación ni integración 3D completa. El ensayo libre existente permanece separado; esta iteración no valida su integración con la nueva preparación.
+
+## Ajuste posterior: mapa y pasos de preparación
+
+A petición del piloto, la pantalla adopta el patrón de tres pasos del editor de narraciones: Escuela → Mapa → Experiencia. El mapa tiene todo el espacio de la segunda fase y la ficha móvil se limita a una franja compacta. La secuencia y su confirmación se presentan en la tercera fase; sigue siendo la misma preparación canónica.
+
+Los POI individuales muestran una etiqueta discreta con su nombre. Un punto verde tenue indica que ya existe al menos un guion o audio en alguna versión educativa; un círculo vacío indica que todavía no tiene narración. Esta señal refleja el contenido real del catálogo. Los puntos cercanos se agrupan para evitar etiquetas solapadas, y el grupo permite consultar sus nombres. La ficha repite el estado en texto.
+
+Verificación de este ajuste: 106 pruebas automáticas y ESLint sin errores. No se realizó una nueva inspección de la aplicación porque el usuario prefirió hacerla personalmente. Los tamaños y la interacción en un dispositivo físico quedan por validar con él.

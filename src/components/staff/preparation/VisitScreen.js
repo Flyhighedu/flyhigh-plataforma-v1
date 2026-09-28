@@ -2,9 +2,9 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, BookOpen, Check, Headphones, MapPin, Plus, X, Undo2, Eye } from 'lucide-react';
+import { ArrowLeft, BookOpen, Check, Headphones, MapPin, Plus, X, Undo2 } from 'lucide-react';
 import { coordinates, durationLabel, MAX_SEQUENCE_ITEMS, snapshot, usableAudio, visitLabel, mergePreparedSources } from '@/lib/narration-preparation.mjs';
-import { preparationItem, preparationContentChanged, derivePreparation, normalizePreparationItems } from '@/lib/preparation-model.mjs';
+import { preparationItem, preparationContentChanged, derivePreparation, normalizePreparationItems, hasCreatedNarration } from '@/lib/preparation-model.mjs';
 import { EDUCATION_PHASES, educationPhase } from '@/lib/education-phases.mjs';
 import { PreparationShell, LoadingPreparation, Notice, usePreparationData, secondary } from './PreparationUI';
 import NarrationLibrary, { PreparationDialog } from './NarrationLibrary';
@@ -91,11 +91,13 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
     });
     const changePhase = next => { audio.stop(); plan.edit(refreshItems(plan.items,next),{...plan.context,phase_id:next},'Nivel de narraciones actualizado'); setLevelChange(null); };
     const summary = `${derived.points.length} ${derived.points.length === 1 ? 'punto de ruta' : 'puntos de ruta'} · ${derived.references.length} ${derived.references.length === 1 ? 'referencia' : 'referencias'}`;
-    return <main className={styles.planner} data-mobile-view={mobileView}>
+    const step = choosing ? 'school' : mobileView === 'sequence' ? 'review' : 'map';
+    return <main className={styles.planner} data-step={step} data-mobile-view={mobileView}>
         <header className={styles.header}>
-            <div className={styles.heading}><Link href="/staff/cronograma" aria-label="Volver al cronograma"><ArrowLeft size={20}/></Link><div><small>PREPARAR EXPERIENCIA · {visitLabel(visit.fecha_programada)}</small><h1>{visit.nombre_escuela}</h1></div>
-                {location && <button disabled={plan.locked} onClick={() => {audio.stop();setLocating(true);setMobileView('map');}} aria-label="Cambiar ubicación de la escuela"><MapPin size={20}/></button>}
-            </div>
+            <div className={styles.heading}><Link href="/staff/cronograma" aria-label="Volver al cronograma"><ArrowLeft size={20}/></Link><div><small>PREPARAR EXPERIENCIA · {visitLabel(visit.fecha_programada)}</small><h1>{visit.nombre_escuela}</h1></div></div>
+            <nav className={styles.steps} aria-label="Pasos para preparar la experiencia">
+                {[['school','Escuela'],['map','Mapa'],['review','Experiencia']].map(([key,label],index) => <button key={key} type="button" aria-current={step===key?'step':undefined} disabled={(index>0&&!location)||(key==='school'&&plan.locked)} onClick={() => {audio.stop();if(key==='school'){setLocating(true);setMobileView('map');}else{setLocating(false);setMobileView(key==='review'?'sequence':'map');}}}><span>{index===0&&location?<Check size={13}/>:index+1}</span><b>{label}</b>{key==='review'&&plan.items.length>0&&<small>· {plan.items.length}</small>}</button>)}
+            </nav>
         </header>
         <div className={styles.statusBar}><p role="status" aria-live="polite">{plan.message || (school ? 'La escuela es el inicio y el regreso.' : 'Confirma dónde está la escuela.')}</p><button className={styles.undo} disabled={!plan.canUndo || plan.locked} onClick={plan.undo}><Undo2 size={16}/>Deshacer</button><span className={styles.save}>{saveLabel}</span></div>
         {plan.error && <div className={styles.notice} role="alert">{plan.error}<button onClick={plan.saveState === 'conflict' ? plan.loadSaved : plan.retry}>{plan.saveState === 'conflict' ? 'Revisar versión guardada' : 'Reintentar guardado'}</button></div>}
@@ -103,13 +105,13 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
         {plan.recoverable && <div className={styles.notice}>Conservamos tu borrador anterior. Puedes usarlo para reemplazar esta versión.<button disabled={plan.locked} onClick={plan.recover}>Usar mi borrador</button></div>}
         {choosing ? <section className={styles.locationPicker}><p className={styles.locationHint}>Coloca la escuela bajo el marcador. Será el inicio y el regreso de tu experiencia.</p><TakeoffMap purpose="school" schoolName={visit.nombre_escuela} initial={location ? {latitude:lat,longitude:lng} : suggestedSchoolLocation ? {latitude:suggestedSchoolLocation[0],longitude:suggestedSchoolLocation[1]} : null} busy={plan.locked} onCancel={location ? () => setLocating(false) : undefined} onConfirm={point => {plan.edit(plan.items,{...plan.context,school_location:point},'Escuela confirmada como inicio y regreso');setLocating(false);}}/></section>
         : <>
-            <div className={styles.toolbar}><label><Headphones size={16}/><select aria-label="Nivel de las narraciones" value={phaseId} disabled={plan.locked} onChange={event => plan.items.length ? setLevelChange(event.target.value) : changePhase(event.target.value)}>{EDUCATION_PHASES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><button className={styles.secondary} onClick={() => {audio.stop();setPicker(true);}}><Plus size={17}/>Agregar lugares</button><div className={styles.mobileTabs} aria-label="Vista de preparación"><button aria-pressed={mobileView==='map'} onClick={() => setMobileView('map')}>Mapa</button><button aria-pressed={mobileView==='sequence'} onClick={() => setMobileView('sequence')}>Secuencia · {plan.items.length}</button></div></div>
+            <div className={styles.toolbar}><label><Headphones size={16}/><select aria-label="Nivel de las narraciones" value={phaseId} disabled={plan.locked} onChange={event => plan.items.length ? setLevelChange(event.target.value) : changePhase(event.target.value)}>{EDUCATION_PHASES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><button className={styles.secondary} onClick={() => {audio.stop();setPicker(true);}}><Plus size={17}/>Agregar lugares</button></div>
             <div className={styles.workspace}>
                 <div className={styles.mapColumn}><PreparationMap userId={data.userId} schoolLocation={location} schoolName={visit.nombre_escuela} catalog={catalog} preparation={mapPreparation} onSelect={poi => select(poi.id)} onNarrationSaved={poi => {if(!poi?.id)return;setCatalogUpdates(previous => [...previous.filter(item => String(item.id)!==String(poi.id)),poi]);select(poi.id);}}/>
-                    <div className={styles.legend}><span><i/> Recorrido físico</span><span><Eye size={13}/> Referencia: sin desplazamiento</span></div>
+                    <div className={styles.legend} aria-label="Leyenda del mapa"><span><i className={styles.legendRoute}/> Recorrido</span><span><i className={styles.legendReady}/> Con narración</span><span><i className={styles.legendMissing}/> Sin narración</span></div>
                 </div>
                 <aside className={styles.sidePanel} aria-label="Preparación de la experiencia">
-                    {current && <section className={styles.place} aria-label="Lugar seleccionado"><div className={styles.placeHeading}><div><small>{selectedItem ? 'EN TU EXPERIENCIA' : 'LUGAR SELECCIONADO'}</small><h2>{current.name}</h2></div><button aria-label="Cerrar lugar" onClick={() => {audio.stop();setSelected(null);}}><X size={20}/></button></div>
+                    {current && <section className={styles.place} aria-label="Lugar seleccionado"><div className={styles.placeHeading}><div><small>{selectedItem ? 'EN TU EXPERIENCIA' : 'LUGAR SELECCIONADO'}</small><h2>{current.name}</h2><span className={styles.narrationState} data-created={hasCreatedNarration(current)}>{hasCreatedNarration(current) ? 'Con narración' : 'Sin narración'}</span></div><button aria-label="Cerrar lugar" onClick={() => {audio.stop();setSelected(null);}}><X size={20}/></button></div>
                         <p className={styles.description}>{current.description || (current.is_general_topic ? 'Una narración para acompañar la experiencia.' : 'Un lugar para incluir en la experiencia de la escuela.')}</p>
                         {!current.is_general_topic && <div className={styles.behavior}><label><input type="checkbox" checked={behavior==='reference'} disabled={plan.locked} onChange={event => changeBehavior(event.target.checked?'reference':'route')}/><span>Punto de referencia</span></label><p>{behavior==='reference'?'Se incluye en la narración. El recorrido no pasa por sus coordenadas.':'El recorrido se aproxima a este lugar.'}</p></div>}
                         {!selectedItem && <button className={styles.primary} disabled={plan.locked || !usableAudio(current.audio_url) || plan.items.length>=MAX_SEQUENCE_ITEMS} onClick={() => add(current,behavior)}><Plus size={17}/>{usableAudio(current.audio_url)?'Agregar a la experiencia':'Audio pendiente para este nivel'}</button>}
@@ -130,7 +132,6 @@ function VisitEditor({ visit, data, flightRehearsalEnabled }) {
                     </section>
                 </aside>
             </div>
-            <button className={styles.sequencePeek} onClick={() => setMobileView('sequence')}><span><strong>{plan.items.length} lugares y temas</strong><small>{summary}</small></span><span>Ver secuencia →</span></button>
         </>}
         {audio.error && <p className={styles.notice} role="alert">{audio.error}</p>}
         {picker && <PreparationDialog title="Agregar a la experiencia" onClose={() => {audio.stop();setPicker(false);}}><NarrationLibrary catalog={versions} selectedIds={plan.items.map(item=>item.id)} onAdd={add} addDisabled={plan.locked || plan.items.length>=MAX_SEQUENCE_ITEMS} audio={audio} schoolLocation={location}/><button className={styles.primary} onClick={() => {audio.stop();setPicker(false);}}>Listo</button></PreparationDialog>}
