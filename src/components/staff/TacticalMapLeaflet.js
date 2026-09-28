@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css';
 
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const hasCoordinates = poi => Number.isFinite(Number(poi?.latitude)) && Number.isFinite(Number(poi?.longitude));
 
 const CAT_COLORS = {
     school: '#3B82F6', parking: '#8B5CF6', hazard: '#EF4444',
@@ -60,6 +61,15 @@ function makeIcon(poi, showLabels) {
     const name = showLabels ? poi.name : null;
     const shortName = name && name.length > 20 ? name.substring(0, 20) + '...' : (name || '');
 
+    if (poi._reference) {
+        return L.divIcon({
+            className: 'poi-marker-container',
+            html: `<div class="poi-pin poi-pin--school">🏫</div><div class="poi-marker-label poi-marker-label--school">ESCUELA</div>`,
+            iconSize: [44, 54],
+            iconAnchor: [22, 44]
+        });
+    }
+
     if (isOfficial) {
         return L.divIcon({
             className: 'poi-marker-container',
@@ -92,7 +102,7 @@ const userIcon = L.divIcon({
 });
 
 export default function TacticalMapLeaflet({
-    pois = [], suggestedPois = [], userLocation, mapCenter,
+    pois = [], suggestedPois = [], userLocation, mapCenter, referencePoint = null,
     onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap
 }) {
     const containerRef = useRef(null);
@@ -104,6 +114,7 @@ export default function TacticalMapLeaflet({
     useEffect(() => { latestPoisRef.current = pois; }, [pois]);
     const suggestedMarkersRef = useRef([]);
     const userMarkerRef = useRef(null);
+    const referenceMarkerRef = useRef(null);
     const markerClickedRef = useRef(false);
     const longPressedRef = useRef(false);
     const onMapTapRef = useRef(onMapTap);
@@ -113,14 +124,14 @@ export default function TacticalMapLeaflet({
     useEffect(() => { onMapTapRef.current = onMapTap; }, [onMapTap]);
 
     useEffect(() => {
-        if (mapRef.current && mapCenter) mapRef.current.flyTo([mapCenter.lat, mapCenter.lng], mapCenter.zoom || 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .4 });
+        if (mapRef.current && Number.isFinite(Number(mapCenter?.lat)) && Number.isFinite(Number(mapCenter?.lng))) mapRef.current.flyTo([Number(mapCenter.lat), Number(mapCenter.lng)], mapCenter.zoom || 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .4 });
     }, [mapCenter]);
 
     // Initialize map once
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        const center = mapCenter ? [mapCenter.lat, mapCenter.lng] : userLocation ? [userLocation.lat, userLocation.lng] : [19.4326, -99.1332];
+        const center = Number.isFinite(Number(mapCenter?.lat)) && Number.isFinite(Number(mapCenter?.lng)) ? [Number(mapCenter.lat), Number(mapCenter.lng)] : Number.isFinite(Number(userLocation?.lat)) && Number.isFinite(Number(userLocation?.lng)) ? [Number(userLocation.lat), Number(userLocation.lng)] : [19.4326, -99.1332];
         const map = L.map(containerRef.current, {
             center, zoom: 14, zoomControl: false,
             attributionControl: false
@@ -214,6 +225,14 @@ export default function TacticalMapLeaflet({
         });
 
         mapRef.current = map;
+        if (referencePoint && Number.isFinite(Number(referencePoint.latitude)) && Number.isFinite(Number(referencePoint.longitude))) {
+            referenceMarkerRef.current = L.marker([Number(referencePoint.latitude), Number(referencePoint.longitude)], {
+                icon: makeIcon({ ...referencePoint, _reference: true }, true),
+                interactive: false,
+                keyboard: false,
+                zIndexOffset: 5000,
+            }).addTo(map);
+        }
         const initialBoundsTimeout = setTimeout(() => {
             if (mapRef.current) {
                 try {
@@ -235,6 +254,7 @@ export default function TacticalMapLeaflet({
             resizeObserver.disconnect();
             markersLayerRef.current = null;
             suggestedLayerRef.current = null;
+            referenceMarkerRef.current = null;
             map.remove();
             mapRef.current = null;
         };
@@ -244,7 +264,7 @@ export default function TacticalMapLeaflet({
     // Sync user location marker
     useEffect(() => {
         const map = mapRef.current;
-        if (!map || !userLocation) return;
+        if (!map || !Number.isFinite(Number(userLocation?.lat)) || !Number.isFinite(Number(userLocation?.lng))) return;
 
         if (userMarkerRef.current) {
             userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
@@ -255,6 +275,29 @@ export default function TacticalMapLeaflet({
         }
     }, [userLocation]);
 
+    // Keep the confirmed school visible independently from the POI catalog.
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        if (!referencePoint || !Number.isFinite(Number(referencePoint.latitude)) || !Number.isFinite(Number(referencePoint.longitude))) {
+            referenceMarkerRef.current?.remove();
+            referenceMarkerRef.current = null;
+            return;
+        }
+        const point = [Number(referencePoint.latitude), Number(referencePoint.longitude)];
+        if (referenceMarkerRef.current) {
+            referenceMarkerRef.current.setLatLng(point);
+            referenceMarkerRef.current.setIcon(makeIcon({ ...referencePoint, _reference: true }, true));
+        } else {
+            referenceMarkerRef.current = L.marker(point, {
+                icon: makeIcon({ ...referencePoint, _reference: true }, true),
+                interactive: false,
+                keyboard: false,
+                zIndexOffset: 5000,
+            }).addTo(map);
+        }
+    }, [referencePoint]);
+
     // Sync saved POI markers — optimized: update icons in-place when only labels change
     const poisKeyRef = useRef('');
     useEffect(() => {
@@ -263,8 +306,8 @@ export default function TacticalMapLeaflet({
         if (!map || !layer) return;
 
         // Build a key representing the POI data (not label state)
-        const dataKey = pois.filter(p => p.latitude != null && p.longitude != null)
-            .map(p => `${p.id || p.name}:${p.latitude}:${p.longitude}:${p.is_official ? 1 : 0}`)
+        const dataKey = pois.filter(hasCoordinates)
+            .map(p => `${p.id || p.name}:${Number(p.latitude)}:${Number(p.longitude)}:${p.is_official ? 1 : 0}:${p._reference ? 1 : 0}`)
             .join('|');
         
         const dataChanged = dataKey !== poisKeyRef.current;
@@ -275,10 +318,10 @@ export default function TacticalMapLeaflet({
             layer.clearLayers();
             markersRef.current = [];
 
-            pois.filter(p => p.latitude != null && p.longitude != null).forEach(poi => {
-                const marker = L.marker([poi.latitude, poi.longitude], {
+            pois.filter(hasCoordinates).forEach(poi => {
+                const marker = L.marker([Number(poi.latitude), Number(poi.longitude)], {
                     icon: makeIcon(poi, showLabels),
-                    zIndexOffset: poi.is_official ? 3000 : 0
+                    zIndexOffset: poi._reference ? 5000 : poi.is_official ? 3000 : 0
                 });
 
                 marker.on('click', () => {
@@ -311,8 +354,8 @@ export default function TacticalMapLeaflet({
         layer.clearLayers();
         suggestedMarkersRef.current = [];
 
-        suggestedPois.forEach(poi => {
-            const marker = L.marker([poi.latitude, poi.longitude], {
+        suggestedPois.filter(hasCoordinates).forEach(poi => {
+            const marker = L.marker([Number(poi.latitude), Number(poi.longitude)], {
                 icon: makeSuggestedIcon(showLabels ? poi.name : null, poi.category),
                 zIndexOffset: poi.category === 'city' ? 2000 : 1000
             });
@@ -351,6 +394,14 @@ export default function TacticalMapLeaflet({
                     font-size: 16px; cursor: pointer;
                     will-change: transform;
                 }
+                .poi-pin--school {
+                    width: 44px; height: 44px; border-radius: 50%;
+                    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+                    border: 4px solid white;
+                    font-size: 21px;
+                    box-shadow: 0 5px 18px rgba(37,99,235,.48), 0 0 0 5px rgba(37,99,235,.16);
+                    cursor: default;
+                }
                 .poi-pin--official {
                     width: 40px; height: 40px; border-radius: 50%;
                     background: linear-gradient(135deg, #2563EB, #1D4ED8);
@@ -370,6 +421,11 @@ export default function TacticalMapLeaflet({
                     padding: 2px 4px;
                     white-space: nowrap;
                     pointer-events: none;
+                }
+                .poi-marker-label--school {
+                    margin-top: 3px; padding: 3px 7px; border-radius: 999px;
+                    background: #1D4ED8; border-color: #93C5FD; color: white;
+                    font-size: 9px; letter-spacing: .08em; font-weight: 900;
                 }
                 .poi-marker-label--official {
                     font-size: 12px; padding: 4px 8px;

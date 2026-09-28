@@ -1,29 +1,13 @@
-const fs = require('node:fs');
-
-function createLocationPermissions(file) {
-  let choices;
-  try { choices = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { choices = {}; }
-  if (!choices || typeof choices !== 'object' || Array.isArray(choices)) choices = {};
-  const key = (config, role) => JSON.stringify([config.baseURL, config.backendOrigin, role]);
-  function save(next) {
-    fs.writeFileSync(file, JSON.stringify(next, null, 2));
-    choices = next;
-  }
-  return {
-    get(config, role) {
-      const value = choices[key(config, role)];
-      return typeof value === 'boolean' ? value : undefined;
-    },
-    set(config, role, allowed) {
-      if (typeof allowed !== 'boolean') throw new Error('Invalid permission choice');
-      save({ ...choices, [key(config, role)]: allowed });
-    },
-    clear(config, role) {
-      const next = { ...choices };
-      delete next[key(config, role)];
-      save(next);
-    },
-  };
+// Location in the desktop review workbench always targets a local test app.
+// The origin check in main.cjs limits the grant to that app's own pages.
+function reviewLocationAllowed(config) {
+  if (config?.baseURL !== 'http://localhost:3100') return false;
+  try {
+    const backend = new URL(config.backendOrigin);
+    return backend.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(backend.hostname) &&
+      backend.port === '54321' && backend.pathname === '/' && !backend.username && !backend.password &&
+      !backend.search && !backend.hash;
+  } catch { return false; }
 }
 
-module.exports = { createLocationPermissions };
+module.exports = { reviewLocationAllowed };

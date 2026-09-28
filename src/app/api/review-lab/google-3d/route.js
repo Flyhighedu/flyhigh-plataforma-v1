@@ -34,10 +34,12 @@ export async function GET(request) {
         try { const verified = verifyTileResource(params.get('resource'), user.id, secret); target = verified.url; expires = verified.expires; }
         catch { return fail('La sesión 3D expiró o el recurso no es válido. Vuelve a abrir la prueba.', 403); }
     } else {
+        if (params.get('mode') !== 'free') {
         const visit = params.get('visit');
         if (!/^\d+$/.test(visit || '')) return fail('Visita inválida.', 400);
         const { data } = await db.from('proximas_escuelas').select('id').eq('id', visit).eq('is_archived', false).maybeSingle();
         if (!data) return fail('Visita no disponible.', 404);
+        }
         target = new URL('https://tile.googleapis.com/v1/3dtiles/root.json');
     }
     target.searchParams.set('key', key);

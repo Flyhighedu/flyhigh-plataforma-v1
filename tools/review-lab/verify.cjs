@@ -8,6 +8,32 @@ const { once } = require('node:events');
 const { ROLES } = require('./core.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function verify({ phase, attach, panes, act, addNote, win, dataDir }) {
+  if (phase === 'location') {
+    const { dialog } = require('electron');
+    const { config } = require('./server.cjs').configuration();
+    const original = dialog.showMessageBox;
+    let locationDialogs = 0;
+    dialog.showMessageBox = async (...args) => {
+      if (String(args.at(-1)?.message || '').includes('ubicación')) locationDialogs++;
+      return { response: 0 };
+    };
+    try {
+      await attach(config);
+      for (const role of ROLES) {
+        const contents = panes.get(role.id).view.webContents;
+        for (let i = 0; i < 100 && contents.isLoading(); i++) await delay(100);
+        const query = "navigator.permissions.query({name:'geolocation'}).then(result=>result.state)";
+        assert.equal(await contents.executeJavaScript(query), 'granted', role.id + ': permiso inicial');
+        await contents.executeJavaScript("new Promise(resolve=>navigator.geolocation.getCurrentPosition(()=>resolve('ok'),error=>resolve(String(error.code)),{timeout:4000}))");
+        assert.equal(locationDialogs, 0, role.id + ': apareció el cuadro de ubicación');
+        contents.reload();
+        for (let i = 0; i < 100 && contents.isLoading(); i++) await delay(100);
+        assert.equal(await contents.executeJavaScript(query), 'granted', role.id + ': permiso tras recargar');
+      }
+      assert.equal(locationDialogs, 0);
+      return;
+    } finally { dialog.showMessageBox = original; }
+  }
   if (phase === 'local' || phase === 'viewport') {
     win.show();
     const { config } = require('./server.cjs').configuration();

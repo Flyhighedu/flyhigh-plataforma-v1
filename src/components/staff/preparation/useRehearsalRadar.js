@@ -26,7 +26,13 @@ export default function useRehearsalRadar(flight, saved, kind = 'pois') {
             if (!response.ok) throw new Error('Radar no disponible');
             const data = await response.json();
             if (!Array.isArray(data.items)) throw new Error('Consulta incompleta');
-            const found = kind === 'streets' ? data.items : data.items.filter(poi => !saved.some(other => other.name?.trim().toLocaleLowerCase('es') === poi.name.toLocaleLowerCase('es') && distanceMeters(other, poi) < 75));
+            const found = kind === 'streets' ? data.items : data.items
+                .filter(poi => !saved.some(other => other.name?.trim().toLocaleLowerCase('es') === poi.name.toLocaleLowerCase('es') && distanceMeters(other, poi) < 75))
+                .map(poi => ({ poi, distance: distanceMeters(center, poi) }))
+                .filter(entry => Number.isFinite(entry.distance) && entry.distance <= 3000)
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 48)
+                .map(entry => entry.poi);
             if (request.current !== controller) return;
             cached.current = true;
             cachedCenter.current = center;

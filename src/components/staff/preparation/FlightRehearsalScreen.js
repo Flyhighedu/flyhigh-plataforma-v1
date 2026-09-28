@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Crosshair, Eye, EyeOff, Headphones, MapPin, Maximize2, Minimize2, Pause, Play, Radar, Loader2, SlidersHorizontal, Layers } from 'lucide-react';
+import { ArrowLeft, Crosshair, Eye, EyeOff, Headphones, MapPin, Maximize2, Minimize2, Pause, Play, Loader2, SlidersHorizontal, Layers } from 'lucide-react';
 import { coordinates, distanceKm, usableAudio } from '@/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, FLIGHT_LIMITS, FLIGHT_SPEEDS, flightLimitsForSpeed } from '@/lib/flight-rehearsal.mjs';
+import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, FLIGHT_LIMITS, FLIGHT_SPEEDS, flightLimitsForSpeed, selectFlightPois } from '@/lib/flight-rehearsal.mjs';
 import { advanceGimbal, createFlightProfiles, DEFAULT_PROFILES, tuneControls, virtualLimits } from '@/lib/flight-cockpit.mjs';
 import FlightSettings from './FlightSettings';
 import TakeoffMap from './TakeoffMap';
@@ -44,8 +44,9 @@ function createMarkerElement(kind, name, selected = false) {
     element.setAttribute('aria-label', name);
     element.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;border:3px solid white;box-shadow:0 5px 16px rgba(0,0,0,.35);color:white;font-weight:900;cursor:pointer;';
     element.dataset.poiKind = kind;
-    element.style.background = kind === 'school' ? '#2563eb' : selected ? '#f59e0b' : kind === 'radar' ? '#7c3aed' : kind === 'audio' ? '#0891b2' : '#64748b';
-    element.textContent = kind === 'school' ? 'E' : selected ? '★' : kind === 'radar' ? '◇' : '•';
+    element.style.background = kind === 'home' ? '#FACC15' : kind === 'school' ? '#2563eb' : selected ? '#f59e0b' : kind === 'radar' ? '#7c3aed' : kind === 'audio' ? '#0891b2' : '#64748b';
+    element.style.color = kind === 'home' ? '#111827' : 'white';
+    element.textContent = kind === 'home' ? 'H' : kind === 'school' ? 'E' : selected ? '★' : kind === 'radar' ? '◇' : '•';
     return element;
 }
 
@@ -53,11 +54,17 @@ function formatDistance(value) {
     return value < 1000 ? `${Math.round(value)} m` : `${(value / 1000).toFixed(1)} km`;
 }
 
-function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, departure }) {
-    const confirmedLocation = coordinates(visit.ubicacion_lat, visit.ubicacion_lng);
+export function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, departure, schoolLocation, selectedOrder = [], onAdd, addDisabled, onExit, onOpenRoute, paused = false, freeFlight = false }) {
+    const confirmedLocation = schoolLocation || coordinates(visit.ubicacion_lat, visit.ubicacion_lng);
+    const markerLatitude = confirmedLocation?.[0];
+    const markerLongitude = confirmedLocation?.[1];
+    const selectionRef = useRef(selectedIds);
+    selectionRef.current = selectedIds;
+    const backHref = freeFlight ? "/staff/dashboard" : `/staff/visitas/${visit.id}`;
     const needsOrigin = google3d && !confirmedLocation && !departure;
     // Reference view only; a missing school location requires explicit takeoff.
     const [schoolLatitude, schoolLongitude] = departure ? [departure.latitude, departure.longitude] : confirmedLocation || [19.4169, -102.0555];
+    const displayPois = useMemo(() => selectFlightPois(pois, { latitude: schoolLatitude, longitude: schoolLongitude }), [pois, schoolLatitude, schoolLongitude]);
     const container = useRef(null);
     const screenRef = useRef(null);
     const googleCredits = useRef(null);
@@ -91,13 +98,13 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
     const speedLimits = useRef(flightLimitsForSpeed('normal'));
     const running = useRef(true);
     const gimbal = useRef(DEFAULT_GIMBAL);
-    const showPoisRef = useRef(true);
+    const showPoisRef = useRef(false);
     const [ready, setReady] = useState(false);
     const [loadStage, setLoadStage] = useState('Preparando la vista 3D');
     const [mapError, setMapError] = useState('');
     const [mapMode, setMapMode] = useState('3d');
     const [playing, setPlaying] = useState(true);
-    const [showPois, setShowPois] = useState(true);
+    const [showPois, setShowPois] = useState(false);
     const [gimbalAngle, setGimbalAngle] = useState(DEFAULT_GIMBAL);
     const [hud, setHud] = useState({ altitude: 24, heading: 0, nearest: null });
     const [activePoi, setActivePoi] = useState(null);
@@ -116,9 +123,17 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
     }, []);
 
     useEffect(() => {
-        running.current = playing && !settingsOpen && !picking;
+        running.current = playing && !settingsOpen && !picking && !activePoi && !paused;
         if (!running.current) { leftControl.current?.stop(); rightControl.current?.stop(); controls.current = { forward: 0, strafe: 0, climb: 0, yaw: 0 }; filteredControls.current = {}; gimbalTarget.current = gimbal.current; gimbalMotion.current = { angle: gimbal.current, velocity: 0 }; }
-    }, [playing, settingsOpen, picking]);
+    }, [playing, settingsOpen, picking, activePoi, paused]);
+    useEffect(() => {
+        poiMarkers.current.forEach(({ id, element }) => {
+            const position = selectedOrder.indexOf(id);
+            const chosen = selectedIds.has(id);
+            element.style.background = chosen ? '#15803d' : element.dataset.poiKind === 'audio' ? '#0891b2' : '#64748b';
+            element.textContent = chosen ? (position >= 0 ? String(position + 1) : '✓') : '•';
+        });
+    }, [selectedIds, selectedOrder, ready]);
     useEffect(() => { tuningRef.current = profiles[speedId]; }, [profiles, speedId]);
     useEffect(() => {
         const stop = () => { controls.current = { forward: 0, strafe: 0, climb: 0, yaw: 0 }; filteredControls.current = {}; gimbalTarget.current = gimbal.current; gimbalMotion.current = { angle: gimbal.current, velocity: 0 }; };
@@ -133,10 +148,10 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
     }, [speedId, ceiling, google3d, profiles]);
     useEffect(() => { qualityRef.current = quality; map.current?.setQuality?.(quality); }, [quality]);
     useEffect(() => {
-        if (!ready || !radar.visible || !addRadarMarker.current) return;
+        if (!ready || !showPois || !radar.visible || !addRadarMarker.current) return;
         const markers = radar.items.map(poi => addRadarMarker.current(poi));
         return () => markers.forEach(marker => marker.remove());
-    }, [ready, radar.visible, radar.items]);
+    }, [ready, showPois, radar.visible, radar.items]);
     useEffect(() => {
         if (!ready || !google3d) return;
         map.current?.setStreets?.(streets.visible ? streets.items : []);
@@ -148,6 +163,12 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
         showPoisRef.current = showPois;
         poiMarkers.current.forEach(entry => { entry.element.style.display = showPois ? 'flex' : 'none'; });
     }, [showPois]);
+    const togglePois = useCallback(() => {
+        const next = !showPois;
+        setShowPois(next);
+        if (next && !radar.visible) radar.toggle();
+        if (!next && radar.visible) radar.toggle();
+    }, [showPois, radar]);
 
     useEffect(() => {
         let disposed = false;
@@ -190,7 +211,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
                         latestHud = time;
                         if (google3d) setGimbalAngle(Math.round(gimbal.current * 10) / 10);
                         const actual = flight.current;
-                        setHud({ altitude: actual.altitude, heading: actual.heading, nearest: closestPoi(actual, pois, 3000), distance: distanceMeters(actual, origin.current), horizontal: elapsed ? distanceMeters(actual, previous) / elapsed : 0, vertical: elapsed ? (actual.altitude - previous.altitude) / elapsed : 0 });
+                        setHud({ altitude: actual.altitude, heading: actual.heading, nearest: closestPoi(actual, displayPois, 3000), distance: distanceMeters(actual, origin.current), horizontal: elapsed ? distanceMeters(actual, previous) / elapsed : 0, vertical: elapsed ? (actual.altitude - previous.altitude) / elapsed : 0 });
                     }
                 }
                 frame = requestAnimationFrame(tick);
@@ -239,18 +260,23 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
                 aircraftArrow.current = aircraft.getElement()?.querySelector('[data-aircraft-arrow]') || null;
                 aircraftMarker.current = { setLngLat: ([lng, lat]) => aircraft.setLatLng([lat, lng]) };
 
-                L.marker([schoolLatitude, schoolLongitude], {
+                const homePoint = { latitude: origin.current.latitude, longitude: origin.current.longitude };
+                if (google3d) L.marker([homePoint.latitude, homePoint.longitude], {
+                    icon: L.divIcon({ className: '', html: createMarkerElement('home', 'Punto de inicio').outerHTML, iconSize: [38, 38], iconAnchor: [19, 38] }),
+                    zIndexOffset: 5000,
+                }).addTo(instance);
+                if (markerLatitude != null && (!google3d || distanceMeters(homePoint, { latitude: markerLatitude, longitude: markerLongitude }) > 5)) L.marker([markerLatitude, markerLongitude], {
                     icon: L.divIcon({ className: '', html: createMarkerElement('school', visit.nombre_escuela).outerHTML, iconSize: [34, 34], iconAnchor: [17, 34] }),
                 }).addTo(instance);
-                for (const poi of pois) {
-                    const sourceElement = createMarkerElement(usableAudio(poi.audio_url) ? 'audio' : 'poi', poi.name, selectedIds.has(String(poi.id)));
+                for (const poi of displayPois) {
+                    const sourceElement = createMarkerElement(usableAudio(poi.audio_url) ? 'audio' : 'poi', poi.name, selectionRef.current.has(String(poi.id)));
                     const marker = L.marker([poi.latitude, poi.longitude], {
                         icon: L.divIcon({ className: '', html: sourceElement.outerHTML, iconSize: [34, 34], iconAnchor: [17, 34] }),
                     }).addTo(instance);
                     const renderedElement = marker.getElement()?.querySelector('button') || marker.getElement();
                     if (renderedElement) renderedElement.style.display = showPoisRef.current ? 'flex' : 'none';
                     marker.on('click', () => setActivePoi(poi));
-                    poiMarkers.current.push({ marker, element: renderedElement || sourceElement });
+                    poiMarkers.current.push({ id:String(poi.id), marker, element: renderedElement || sourceElement });
                 }
                 setMapMode('compatible');
                 setMapError('');
@@ -268,7 +294,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
         if (google3d) {
             import('./google3dEngine').then(async ({ createGoogle3dEngine }) => {
                 if (disposed) return;
-                const engine = await createGoogle3dEngine({ container: container.current, credits: googleCredits.current, visitId: visit.id,
+                const engine = await createGoogle3dEngine({ container: container.current, credits: googleCredits.current, visitId: visit.id, freeFlight,
                     initial: flight.current, gimbal: () => gimbal.current, signal: controller.signal,
                     onError: message => { if (!disposed) { setMapError(message); setPlaying(false); } },
                     onCorrection: corrected => {
@@ -282,14 +308,15 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
                 });
                 if (disposed) { engine.remove(); return; }
                 map.current = engine;
+                if (markerLatitude != null && distanceMeters({ latitude: schoolLatitude, longitude: schoolLongitude }, { latitude: markerLatitude, longitude: markerLongitude }) > 5) engine.addMarker(createMarkerElement('school', visit.nombre_escuela), { latitude:markerLatitude, longitude:markerLongitude });
                 // Camera is the aircraft in this renderer; no redundant arrow.
                 aircraftMarker.current = { setLngLat: () => {} };
                 const addPoi = (poi, kind) => {
-                    const element = createMarkerElement(kind, poi.name, selectedIds.has(String(poi.id)));
+                    const element = createMarkerElement(kind, poi.name, selectionRef.current.has(String(poi.id)));
                     element.addEventListener('click', event => { event.stopPropagation(); setActivePoi(poi); });
-                    return { element, marker: engine.addMarker(element, poi) };
+                    return { id:String(poi.id), element, marker: engine.addMarker(element, poi) };
                 };
-                for (const poi of pois) {
+                for (const poi of displayPois) {
                     const entry = addPoi(poi, usableAudio(poi.audio_url) ? 'audio' : 'poi');
                     entry.element.style.display = showPoisRef.current ? 'flex' : 'none';
                     poiMarkers.current.push(entry);
@@ -343,13 +370,13 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
                 aircraftMarker.current = new maplibregl.Marker({ element: aircraft, anchor: 'center' }).setLngLat([schoolLongitude, schoolLatitude]).addTo(instance);
 
                 const school = createMarkerElement('school', visit.nombre_escuela);
-                new maplibregl.Marker({ element: school }).setLngLat([schoolLongitude, schoolLatitude]).addTo(instance);
-                for (const poi of pois) {
-                    const element = createMarkerElement(usableAudio(poi.audio_url) ? 'audio' : 'poi', poi.name, selectedIds.has(String(poi.id)));
+                if (markerLatitude != null) new maplibregl.Marker({ element: school }).setLngLat([markerLongitude, markerLatitude]).addTo(instance);
+                for (const poi of displayPois) {
+                    const element = createMarkerElement(usableAudio(poi.audio_url) ? 'audio' : 'poi', poi.name, selectionRef.current.has(String(poi.id)));
                     element.style.display = showPoisRef.current ? 'flex' : 'none';
                     element.addEventListener('click', event => { event.stopPropagation(); setActivePoi(poi); });
                     const marker = new maplibregl.Marker({ element }).setLngLat([poi.longitude, poi.latitude]).addTo(instance);
-                    poiMarkers.current.push({ marker, element });
+                    poiMarkers.current.push({ id:String(poi.id), marker, element });
                 }
                 beginFlightLoop(current => {
                     aircraftMarker.current?.setLngLat([current.longitude, current.latitude]);
@@ -377,7 +404,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
             map.current?.remove();
             map.current = null;
         };
-    }, [pois, schoolLatitude, schoolLongitude, selectedIds, visit.nombre_escuela, visit.id, google3d, needsOrigin]);
+    }, [displayPois, schoolLatitude, schoolLongitude, markerLatitude, markerLongitude, visit.nombre_escuela, visit.id, google3d, needsOrigin, freeFlight]);
 
     const left = useCallback(value => { controls.current.forward = value.y; controls.current.strafe = value.x; }, []);
     const right = useCallback(value => { controls.current.climb = value.y; controls.current.yaw = value.x; }, []);
@@ -399,7 +426,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
     };
     return <main ref={screenRef} className={`${styles.screen} ${google3d ? styles.googleLayout : ''}`}
         onPointerDown={event => {
-            if (picking || settingsOpen || !ready) return;
+            if (picking || settingsOpen || activePoi || paused || !ready) return;
             if (event.button !== 0 || event.target.closest('button, a, input, select, label, header, section, [role="slider"]')) return;
             const bounds = event.currentTarget.getBoundingClientRect();
             if (event.clientY - bounds.top < bounds.height * 0.42) return;
@@ -420,13 +447,13 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
                 <h2>{mapError ? 'No pudimos preparar el entorno' : 'Preparando tu despegue'}</h2>
                 <p role="status">{mapError || (google3d ? loadStage : 'Cargando el mapa')}</p>
                 {!mapError && <small>Activaremos los controles cuando la vista esté lista.</small>}
-                <div>{mapError && <button onClick={() => window.location.reload()}>Reintentar</button>}<Link href={`/staff/visitas/${visit.id}`}>Volver a la visita</Link></div>
+                <div>{mapError && <button onClick={() => window.location.reload()}>Reintentar</button>}{onExit ? <button onClick={onExit}>Volver al mapa</button> : <Link href={backHref}>Volver</Link>}</div>
             </div>
         </section>}
 
         <header className={`${styles.header} pointer-events-none absolute inset-x-0 top-0 z-10 px-3 pt-[max(.75rem,env(safe-area-inset-top))]`}>
             <div className="pointer-events-auto flex items-center gap-2">
-                <Link href={`/staff/visitas/${visit.id}`} onClick={audio.stop} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 backdrop-blur-md" aria-label="Volver a preparar visita"><ArrowLeft size={20} /></Link>
+                <Link href={backHref} onClick={event => { audio.stop(); if (onExit) { event.preventDefault(); onExit(); } }} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 backdrop-blur-md" aria-label="Volver a preparar visita"><ArrowLeft size={20} /></Link>
                 <div className="min-w-0 flex-1 [text-shadow:0_1px_4px_#000]"><p className="truncate text-sm font-black">{google3d ? 'Ensayo con relieve 3D' : 'Ensayo de vuelo'}</p><p className="truncate text-[10px] text-white">{temporaryOrigin ? 'Despegue temporal · ' : ''}{visit.nombre_escuela}</p></div>
                 {google3d && !picking && <button onClick={() => setSettingsOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/25 bg-slate-950/70" aria-label="Ajustes del ensayo"><SlidersHorizontal size={19} /></button>}
                 <button onClick={immersive.toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/25 bg-slate-950/70" aria-label={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'} title={immersive.fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa horizontal'}>{immersive.fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}</button>
@@ -438,6 +465,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
             </div>}
         </header>
 
+        {onOpenRoute && !picking && <button className={styles.routeAccess} onClick={onOpenRoute}>Tu recorrido · {selectedIds.size}</button>}
         {google3d && !picking && <section className={styles.telemetry} aria-label="Telemetría del ensayo">
             <div title="Altura respecto al despegue"><p>ALTURA</p><strong>{hud.altitude.toFixed(1)} m</strong><small>Máx. {ceiling} m</small></div>
             <div title="Distancia al despegue"><p>DISTANCIA</p><strong>{formatDistance(hud.distance || 0)}</strong></div>
@@ -447,8 +475,7 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
         </section>}
 
         {ready && !picking && <><div className={`${styles.tools} absolute right-3 top-36 z-10 flex flex-col gap-2`}>
-            <button onClick={() => setShowPois(value => !value)} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-pressed={showPois} title="Lugares guardados y narraciones" aria-label={showPois ? 'Ocultar puntos de interés' : 'Mostrar puntos de interés'}>{showPois ? <Eye size={19} /> : <EyeOff size={19} />}</button>
-            <button onClick={radar.toggle} className={`grid h-11 w-11 place-items-center rounded-2xl border border-white/20 shadow-lg ${radar.visible ? 'bg-violet-700' : 'bg-slate-950/75'}`} aria-pressed={radar.visible} aria-label={radar.visible ? 'Ocultar radar de lugares' : 'Explorar lugares cercanos'} title="Radar cultural · 3 km">{radar.status === 'loading' ? <Loader2 size={19} className="animate-spin" /> : <Radar size={19} />}</button>
+            <button onClick={togglePois} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-pressed={showPois} title="Puntos guardados y lugares por descubrir" aria-label={showPois ? 'Ocultar puntos de interés' : 'Mostrar puntos de interés guardados y por descubrir'}>{radar.status === 'loading' && showPois ? <Loader2 size={19} className="animate-spin" /> : showPois ? <Eye size={19} /> : <EyeOff size={19} />}</button>
             <button onClick={reset} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-label={google3d ? 'Regresar al despegue' : 'Regresar a la escuela'}><Crosshair size={19} /></button>
             {google3d && <button disabled={!ready} onClick={chooseOrigin} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-label="Elegir despegue en el mapa"><MapPin size={19} /></button>}
             {google3d && <button disabled={!ready} onClick={streets.toggle} aria-pressed={streets.visible} className="grid h-11 w-11 place-items-center rounded-2xl border border-white/20 bg-slate-950/65 shadow-lg" aria-label={streets.visible ? 'Ocultar calles y nombres' : 'Mostrar calles y nombres'} title="Vista híbrida">{streets.status === 'loading' ? <Loader2 size={19} className="animate-spin" /> : <Layers size={19} />}</button>}
@@ -456,14 +483,15 @@ function RehearsalMap({ visit, pois, selectedIds, audio, google3d = false, depar
 
         <RelativeGimbal value={gimbalAngle} onChange={google3d ? value => { gimbalTarget.current = value; } : setGimbalAngle} />
         <label className={styles.speed}><span>{google3d ? 'Modo de vuelo' : 'Velocidad'}</span><select aria-label="Velocidad del ensayo" value={speedId} onChange={event => setSpeedId(event.target.value)}>{FLIGHT_SPEEDS.map(speed => <option key={speed.id} value={speed.id}>{google3d ? { slow: 'C · Cine', normal: 'N · Normal', fast: 'S · Sport' }[speed.id] : speed.label} · {google3d ? profiles[speed.id].horizontal : speed.horizontalMetersPerSecond} m/s</option>)}</select></label></>}
-        {radar.visible && <section className={styles.radarStatus} aria-label="Estado del radar"><p role="status">{radar.status === 'loading' ? 'Buscando lugares a 3 km…' : radar.status === 'error' ? 'El radar no respondió. Intenta de nuevo.' : radar.status === 'empty' ? 'Sin lugares adicionales a 3 km.' : `${radar.items.length} lugares · radio 3 km`}</p><button disabled={radar.status === 'loading'} onClick={radar.search}>Buscar aquí</button></section>}
+        {showPois && radar.visible && <section className={styles.radarStatus} aria-label="Estado de puntos de interés"><p role="status">{radar.status === 'loading' ? 'Buscando lugares cercanos…' : radar.status === 'error' ? 'No pudimos cargar los lugares por descubrir.' : radar.status === 'empty' ? `Mostrando ${displayPois.length} narraciones guardadas. No encontramos lugares adicionales aquí.` : `${displayPois.length} guardados · ${radar.items.length} por descubrir`}</p><button disabled={radar.status === 'loading'} onClick={radar.search}>Actualizar aquí</button></section>}
         {google3d && streets.visible && ['error', 'empty'].includes(streets.status) && <section className={styles.streetStatus} aria-label="Estado de calles"><p role="status">{streets.status === 'error' ? 'No se pudieron cargar las calles.' : 'Sin calles con nombre en esta zona.'}</p><button onClick={streets.search}>Reintentar</button></section>}
 
         {(mapError || surfaceStatus || immersive.notice || mapMode === 'compatible') && <p role="status" className={`${styles.status} absolute left-3 right-16 top-36 z-10 rounded-xl border border-cyan-300/25 bg-slate-950/85 px-3 py-2 text-xs text-cyan-50`}>{mapError || surfaceStatus || immersive.notice || 'Vista compatible: altura y gimbal se representan con acercamiento.'}</p>}
 
         {!picking && currentPoi && <section className={`${styles.poi} absolute bottom-40 left-1/2 z-10 w-[min(82vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/20 bg-slate-950/80 p-3 shadow-2xl backdrop-blur-xl sm:bottom-44`}>
-            <div className="flex items-start gap-2"><MapPin size={17} className="mt-0.5 shrink-0 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{currentPoi.name}</p><p className="mt-0.5 text-[10px] text-slate-300">{currentPoi.source === 'osm-radar' ? 'Radar cultural · Sin narración' : selectedIds.has(String(currentPoi.id)) ? 'En tu secuencia' : usableAudio(currentPoi.audio_url) ? 'Narración disponible' : 'Audio pendiente'}{currentDistance != null && ` · ${formatDistance(currentDistance)}`}</p></div>{activePoi && <button onClick={() => setActivePoi(null)} className="px-1 text-xs text-slate-300">Cerrar</button>}</div>
+            <div className="flex items-start gap-2"><MapPin size={17} className="mt-0.5 shrink-0 text-cyan-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{currentPoi.name}</p><p className="mt-0.5 text-[10px] text-slate-300">{currentPoi.source === 'osm-radar' ? 'Radar cultural · Sin narración' : selectedIds.has(String(currentPoi.id)) ? `En tu recorrido · ${selectedOrder.indexOf(String(currentPoi.id)) + 1}` : usableAudio(currentPoi.audio_url) ? 'Narración disponible' : 'Audio pendiente'}{currentDistance != null && ` · ${formatDistance(currentDistance)}`}</p></div>{activePoi && <button onClick={() => setActivePoi(null)} className="px-1 text-xs text-slate-300">Cerrar</button>}</div>
             {usableAudio(currentPoi.audio_url) && <button onClick={() => audio.toggle(currentPoi)} aria-label={audio.id === currentPoi.id && audio.status === 'playing' ? 'Pausar narración' : 'Escuchar narración'} className={styles.narrationButton}>{audio.id === currentPoi.id && audio.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : audio.id === currentPoi.id && audio.status === 'playing' ? <Pause size={18} /> : <Headphones size={18} />}</button>}
+            {onAdd && currentPoi.source !== 'osm-radar' && <button className={styles.planAction} disabled={addDisabled || selectedIds.has(String(currentPoi.id)) || !usableAudio(currentPoi.audio_url)} onClick={() => onAdd(currentPoi)}>{selectedIds.has(String(currentPoi.id)) ? 'Agregado al recorrido' : usableAudio(currentPoi.audio_url) ? 'Agregar al recorrido' : 'Audio pendiente'}</button>}
             {audio.id === currentPoi.id && audio.error && <p role="alert" className={styles.audioError}>{audio.error}</p>}
         </section>}
 
@@ -482,12 +510,15 @@ export default function FlightRehearsalScreen({ visitId, google3d = false }) {
     const { data, loading, error, retry } = usePreparationData(visitId);
     const audio = useNarrationAudio();
     const visit = data?.visits?.[0];
-    const location = coordinates(visit?.ubicacion_lat, visit?.ubicacion_lng);
+    const plan = data?.plans?.find(item => item.visit_id === visit?.id);
+    const preparedLocation = coordinates(plan?.preparation_context?.school_location?.latitude, plan?.preparation_context?.school_location?.longitude);
+    const recordedLocation = coordinates(visit?.ubicacion_lat, visit?.ubicacion_lng);
+    const location = preparedLocation || (!google3d ? recordedLocation : null);
     const latitude = location?.[0];
     const longitude = location?.[1];
     // Metadata polling replaces visits every four seconds. Keep map inputs tied
     // to their actual source fields so that a refresh never tears down WebGL.
-    const selectedIds = useMemo(() => new Set((data?.plans?.find(item => item.visit_id === visit?.id)?.items || []).map(item => String(item.id))), [data?.plans, visit?.id]);
+    const selectedIds = useMemo(() => new Set((plan?.items || []).map(item => String(item.id))), [plan?.items]);
     const pois = useMemo(() => {
         if (!google3d && (latitude == null || longitude == null)) return [];
         return (data?.catalog || [])
@@ -500,6 +531,7 @@ export default function FlightRehearsalScreen({ visitId, google3d = false }) {
     if (loading) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><LoadingPreparation /></div>;
     if (error) return <div className="min-h-[100svh] bg-slate-950 p-5 text-white"><Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice></div>;
     if (!location && !google3d) return <div className="min-h-[100svh] bg-[#f3f7fb] p-5 text-[#071a33]"><Link href={`/staff/visitas/${visitId}`} className={secondary}><ArrowLeft size={18} />Volver</Link><div className="mt-5"><Notice>Esta visita necesita una ubicación confirmada antes de ensayar el vuelo.</Notice></div></div>;
-    if (google3d && !departure) return <main className={styles.screen}><TakeoffMap initial={location ? { latitude, longitude } : null} onConfirm={setDeparture} onCancel={() => { window.location.href = `/staff/visitas/${visitId}`; }} /></main>;
-    return <RehearsalMap key={`${visit.id}:${latitude}:${longitude}:${google3d}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} google3d={google3d} departure={departure} />;
+    const confirmedDeparture = preparedLocation ? { latitude: preparedLocation[0], longitude: preparedLocation[1] } : departure;
+    if (google3d && !confirmedDeparture) return <main className={styles.screen}><TakeoffMap initial={recordedLocation ? { latitude: recordedLocation[0], longitude: recordedLocation[1] } : null} onConfirm={setDeparture} onCancel={() => { window.location.href = `/staff/visitas/${visitId}`; }} /></main>;
+    return <RehearsalMap key={`${visit.id}:${confirmedDeparture?.latitude ?? latitude}:${confirmedDeparture?.longitude ?? longitude}:${google3d}`} visit={visit} pois={pois} selectedIds={selectedIds} audio={audio} google3d={google3d} schoolLocation={preparedLocation} departure={confirmedDeparture} />;
 }

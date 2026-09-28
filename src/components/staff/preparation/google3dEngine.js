@@ -23,13 +23,13 @@ function loadCesium() {
     return library;
 }
 
-export async function createGoogle3dEngine({ container, credits, visitId, initial, gimbal, signal, onError, onCorrection, onCandidate, onSurfaceStatus, onLoadStage, quality = 'high' }) {
+export async function createGoogle3dEngine({ container, credits, visitId, freeFlight = false, initial, gimbal, signal, onError, onCorrection, onCandidate, onSurfaceStatus, onLoadStage, quality = 'high' }) {
     onLoadStage?.('Preparando la vista 3D');
     const C = await loadCesium();
     signal.throwIfAborted();
     // Check authorization/configuration before creating a WebGL context. This
     // fetch is the only root request; Cesium consumes its already-fetched JSON.
-    const rootUrl = `/api/review-lab/google-3d?visit=${encodeURIComponent(visitId)}`;
+    const rootUrl = freeFlight ? "/api/review-lab/google-3d?mode=free" : `/api/review-lab/google-3d?visit=${encodeURIComponent(visitId)}`;
     onLoadStage?.('Conectando con Google Maps');
     const response = await fetch(rootUrl, { signal, cache: 'no-store' });
     const root = await response.json();
@@ -73,6 +73,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
     let surfaceDirty = false;
     let markerCursor = 0;
     let markerHeightTime = 0;
+    let markerLayoutTime = 0;
     let markerHeightRevision = 0;
     const markerPoint = new C.Cartesian3();
     const markerDirection = new C.Cartesian3();
@@ -192,14 +193,13 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
                 surfaceDirty = false; guardQueued = true;
                 queueMicrotask(() => { guardQueued = false; guardSurface(); });
             }
-            const markers = [...entries];
-            const labelPositions = [];
-            // Height picking is expensive. Budget one relevant label every
-            // 120 ms, cache until streamed geometry changes, never raycast
-            // hidden/distant labels on every rendered frame.
+            // Marker overlays are deliberately cheaper than the 3D camera.
+            // Height sampling runs at ~8 Hz, while DOM marker layout is capped
+            // at 30 Hz so a dense POI view cannot consume the 60 fps budget.
             const now = performance.now();
             if (now - markerHeightTime > 120) {
                 markerHeightTime = now;
+                const markers = [...entries];
                 for (let n = 0; n < markers.length; n++) {
                     const entry = markers[markerCursor++ % markers.length];
                     if (entry.element.style.display === 'none' || distanceMeters(current, entry) > 3500 || entry.revision === markerHeightRevision || now - entry.sampledAt < 2000) continue;
@@ -209,8 +209,15 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
                     break;
                 }
             }
-            for (const entry of markers) {
+            if (now - markerLayoutTime < 1000 / 30) return;
+            markerLayoutTime = now;
+            const labelPositions = [];
+            for (const entry of entries) {
                 if (entry.element.style.display === 'none') continue;
+                if (!entry.street && !entry.home && distanceMeters(current, entry) > 4000) {
+                    if (entry.visible !== false) { entry.element.style.visibility = 'hidden'; entry.visible = false; }
+                    continue;
+                }
                 const point = C.Cartesian3.fromDegrees(entry.longitude, entry.latitude, (entry.height ?? baseHeight) + 3, undefined, markerPoint);
                 const direction = C.Cartesian3.subtract(point, scene.camera.positionWC, markerDirection);
                 const xy = scene.cartesianToCanvasCoordinates(point, markerPixel);
@@ -229,10 +236,10 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         const addMarker = (element, poi) => {
             element.style.position = 'absolute'; element.style.left = '0'; element.style.top = '0'; element.style.pointerEvents = 'auto';
             element.classList.add('flight-google-marker');
-            const entry = { element, latitude: poi.latitude, longitude: poi.longitude, street: poi.source === 'osm-street', cartographic: C.Cartographic.fromDegrees(poi.longitude, poi.latitude), sampledAt: -Infinity, revision: -1 };
+            const entry = { element, latitude: poi.latitude, longitude: poi.longitude, street: poi.source === 'osm-street', home: poi.source === 'home', cartographic: C.Cartographic.fromDegrees(poi.longitude, poi.latitude), sampledAt: -Infinity, revision: -1 };
             if (entry.street) element.style.pointerEvents = 'none';
-            entries.add(entry); overlay.append(element); scene.requestRender();
-            return { remove: () => { entries.delete(entry); element.remove(); if (!disposed) scene.requestRender(); } };
+            entries.add(entry); overlay.append(element); container.dataset.overlayMarkerCount = String(entries.size); scene.requestRender();
+            return { remove: () => { entries.delete(entry); element.remove(); container.dataset.overlayMarkerCount = String(entries.size); if (!disposed) scene.requestRender(); } };
         };
         let streetPrimitive;
         let streetMarkers = [];
@@ -262,9 +269,11 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
         };
         const homeElement = document.createElement('span');
         homeElement.textContent = 'H';
-        homeElement.style.cssText = 'display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#facc15;color:#111827;border:2px solid white;font-weight:900';
-        homeElement.title = 'Despegue del ensayo';
-        let homePin = addMarker(homeElement, takeoff);
+        homeElement.style.cssText = 'display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#facc15;color:#111827;border:3px solid white;font:900 18px/1 sans-serif;box-shadow:0 0 0 5px rgba(250,204,21,.22),0 8px 24px rgba(0,0,0,.35);pointer-events:none';
+        homeElement.title = 'Punto de inicio · escuela';
+        homeElement.setAttribute('aria-label', 'Punto de inicio · escuela');
+        const homePosition = position => ({ ...position, source: 'home' });
+        let homePin = addMarker(homeElement, homePosition(takeoff));
         const beginSelection = () => {
             if (disposed) return;
             selecting = true; candidate = null; onCandidate?.(null);
@@ -299,7 +308,7 @@ export async function createGoogle3dEngine({ container, credits, visitId, initia
             if (disposed || !selecting || candidate?.latitude !== selected.latitude || candidate?.longitude !== selected.longitude) throw new Error('El punto cambió. Confirma otra vez.');
             baseHeight = surfaceEnvelope(height, visibleSurface(selected)); surface = baseHeight;
             takeoff = { ...selected }; probed = null;
-            homePin.remove(); homePin = addMarker(homeElement, takeoff);
+            homePin.remove(); homePin = addMarker(homeElement, homePosition(takeoff));
             current = { ...takeoff, altitude: 24, heading: 0 };
             cancelSelection();
             return { ...current };

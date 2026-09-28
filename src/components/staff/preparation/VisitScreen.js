@@ -1,108 +1,106 @@
 'use client';
-
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ArrowDown, ArrowUp, Check, ChevronRight, Gamepad2, Headphones, MapPin, Plus, Trash2 } from 'lucide-react';
-import { coordinates, distanceKm, durationLabel, MAX_SEQUENCE_ITEMS, moveItem, sequenceChanged, snapshot, usableAudio, visitLabel } from '@/lib/narration-preparation.mjs';
-import { PreparationShell, LoadingPreparation, Notice, usePreparationData, primary, secondary, card } from './PreparationUI';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ArrowLeft, BookOpen, Check, ChevronRight, Headphones, MapPin, Plus, X } from 'lucide-react';
+import { coordinates, durationLabel, MAX_SEQUENCE_ITEMS, sequenceChanged, snapshot, usableAudio, visitLabel, mergePreparedSources } from '@/lib/narration-preparation.mjs';
+import { EDUCATION_PHASES, educationPhase } from '@/lib/education-phases.mjs';
+import { PreparationShell, LoadingPreparation, Notice, usePreparationData, secondary } from './PreparationUI';
 import NarrationLibrary, { PreparationDialog } from './NarrationLibrary';
 import Rehearsal from './Rehearsal';
+import VisitSequence from './VisitSequence';
+import TakeoffMap from './TakeoffMap';
 import useNarrationAudio from './useNarrationAudio';
 import useSequencePlan from './useSequencePlan';
-
-const PreparationMap = dynamic(() => import('./PreparationMap'), { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-2xl bg-slate-200" /> });
-
+import styles from './VisitPlanner.module.css';
+const PreparationMap = dynamic(() => import('./PreparationMap'), { ssr:false, loading:() => <p role="status">Cargando mapa…</p> });
+const RehearsalMap = dynamic(() => import('./FlightRehearsalScreen').then(module => module.RehearsalMap), { ssr:false, loading:() => <p role="status">Preparando relieve…</p> });
 export default function VisitScreen({ visitId, flightRehearsalEnabled = false }) {
     const { data, loading, error, retry } = usePreparationData(visitId);
-    return <PreparationShell title="Preparar visita" subtitle="Elige qué contar, define el orden y déjalo preparado." back="/staff/cronograma" backLabel="Cronograma">
-        {loading ? <LoadingPreparation /> : error ? <Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice> : <VisitEditor key={`${visitId}:${data.userId}`} visit={data.visits[0]} data={data} flightRehearsalEnabled={flightRehearsalEnabled} />}
-    </PreparationShell>;
+    if (loading || error) return <PreparationShell title="Preparar visita" back="/staff/cronograma" backLabel="Cronograma">{loading ? <LoadingPreparation/> : <Notice action={<button className={secondary} onClick={retry}>Reintentar</button>}>{error}</Notice>}</PreparationShell>;
+    return <VisitEditor key={visitId + ':' + data.userId} visit={data.visits[0]} data={data} flightRehearsalEnabled={flightRehearsalEnabled}/>;
 }
-
 function VisitEditor({ visit, data, flightRehearsalEnabled }) {
     const initialPlan = data.plans.find(p => p.visit_id === visit.id);
-    const plan = useSequencePlan({ visit, userId: data.userId, initialPlan });
-    const catalog = useMemo(() => data.catalog.map(source => ({ ...source, ...plan.savedSources.find(item => item.id === String(source.id)) })), [data.catalog, plan.savedSources]);
+    const plan = useSequencePlan({ visit, userId:data.userId, initialPlan });
+    const [catalogUpdates,setCatalogUpdates] = useState([]);
+    const catalog = useMemo(() => {
+        const byId = new Map(data.catalog.map(poi => [String(poi.id),poi]));
+        catalogUpdates.forEach(poi => byId.set(String(poi.id),poi));
+        return mergePreparedSources([...byId.values()], plan.savedSources);
+    }, [data.catalog,plan.savedSources,catalogUpdates]);
     const audio = useNarrationAudio();
-    const [picker, setPicker] = useState(false);
-    const [pickerQuery, setPickerQuery] = useState('');
-    const [rehearsing, setRehearsing] = useState(false);
-    const [mapOpen, setMapOpen] = useState(false);
-    const [mapSelected, setMapSelected] = useState(null);
-    const [reusing, setReusing] = useState(false);
-    const schoolLocation = useMemo(() => coordinates(visit.ubicacion_lat, visit.ubicacion_lng), [visit.ubicacion_lat, visit.ubicacion_lng]);
-    const nearby = useMemo(() => !schoolLocation ? [] : catalog.filter(p => !p.is_general_topic && usableAudio(p.audio_url)).map(p => ({ ...p, distance: distanceKm(schoolLocation, coordinates(p.latitude, p.longitude)) })).filter(p => p.distance != null && p.distance <= 10).sort((a, b) => a.distance - b.distance), [catalog, schoolLocation]);
-    const markers = useMemo(() => !schoolLocation ? [] : [{ id: `school-${visit.id}`, name: visit.nombre_escuela, school: true, lat: schoolLocation[0], lng: schoolLocation[1] }, ...nearby.map(p => ({ id: p.id, name: p.name, lat: p.latitude, lng: p.longitude }))], [nearby, schoolLocation, visit.id, visit.nombre_escuela]);
-    const selectedPoi = nearby.find(p => p.id === mapSelected);
-    const stale = sequenceChanged(plan.items, catalog);
-    const available = plan.items.length > 0 && plan.items.every(p => usableAudio(p.audio_url)) && !stale;
+    const reduced = useReducedMotion();
+    const [tab,setTab] = useState('explore');
+    const [picker,setPicker] = useState(false);
+    const [rehearsing,setRehearsing] = useState(false);
+    const [locating,setLocating] = useState(false);
+    const [selected,setSelected] = useState(null);
+    const [flight,setFlight] = useState(false);
+    const [flightRoute,setFlightRoute] = useState(false);
+    const [reusing,setReusing] = useState(false);
+    const [levelChange,setLevelChange] = useState(null);
+    const tabRefs = useRef([]);
+    const phaseId = plan.context.phase_id;
+    const phase = educationPhase(phaseId);
+    const school = plan.context.school_location;
+    const suggestedSchoolLocation = useMemo(() => coordinates(visit.ubicacion_lat,visit.ubicacion_lng), [visit.ubicacion_lat,visit.ubicacion_lng]);
+    const location = useMemo(() => school ? coordinates(school.latitude,school.longitude) : null, [school]);
+    const choosing = locating || !location;
+    const versions = useMemo(() => catalog.map(poi => ({ ...poi, ...snapshot(poi,phaseId) })), [catalog,phaseId]);
+    // Engine inputs deliberately ignore save acknowledgments and selection changes.
+    const flightPois = useMemo(() => catalog.filter(poi => !poi.is_general_topic && coordinates(poi.latitude,poi.longitude)).map(poi => ({ ...poi, ...snapshot(poi,phaseId), latitude:Number(poi.latitude), longitude:Number(poi.longitude) })), [catalog,phaseId]);
+    const selectedIds = useMemo(() => new Set(plan.items.map(item => item.id)), [plan.items]);
+    const current = versions.find(poi => String(poi.id) === String(selected));
+    const stale = sequenceChanged(plan.items,catalog);
     const ready = plan.status === 'ready' && !plan.dirty && !stale;
-    const total = plan.items.reduce((sum, p) => sum + (Number(p.audio_duration_seconds) || 0), 0);
-    const allDurations = plan.items.every(p => Number(p.audio_duration_seconds) > 0);
-    const previous = data.plans.filter(p => p.visit_id !== visit.id && p.items.length > 0).sort((a, b) => Number(Boolean(visit.cct && b.visit?.cct === visit.cct)) - Number(Boolean(visit.cct && a.visit?.cct === visit.cct)) || b.updated_at.localeCompare(a.updated_at));
+    const playable = plan.items.length > 0 && plan.items.every(item => usableAudio(item.audio_url)) && !stale;
+    const canConfirm = playable && !!location && !plan.locked && !plan.dirty && plan.saveState === 'saved';
+    const total = plan.items.reduce((sum,item) => sum + Number(item.audio_duration_seconds || 0),0);
+    const duration = plan.items.length && plan.items.every(item => Number(item.audio_duration_seconds)>0) ? durationLabel(total) + ' de narración' : 'Duración por confirmar';
+    const saveLabel = plan.saveState === 'saving' ? 'Guardando…' : plan.saveState === 'pending' ? 'Cambios pendientes' : ['error','conflict'].includes(plan.saveState) ? 'No se pudo guardar' : plan.revision ? 'Guardado' : 'Borrador';
+    const previous = data.plans.filter(p => p.visit_id !== visit.id && p.items.length).sort((a,b) => b.updated_at.localeCompare(a.updated_at));
     const add = poi => {
-        if (plan.items.length >= MAX_SEQUENCE_ITEMS || plan.items.some(p => p.id === String(poi.id))) return;
-        plan.edit([...plan.items, snapshot(poi)]);
+        if (plan.locked || plan.items.length >= MAX_SEQUENCE_ITEMS || selectedIds.has(String(poi.id))) return;
+        const source = catalog.find(item => String(item.id) === String(poi.id));
+        if (!source || !usableAudio(snapshot(source,phaseId).audio_url)) return;
+        plan.edit([...plan.items,snapshot(source,phaseId)]);
     };
-    const openPicker = (query = '') => { audio.stop(); setPickerQuery(query); setPicker(true); };
-    const closePicker = () => { audio.stop(); setPicker(false); };
-    return <>
-        <section className={card}>
-            <p className="text-xs font-bold capitalize text-blue-700">{visitLabel(visit.fecha_programada)}{visit.turno ? ` · ${visit.turno}` : ''}</p>
-            <h2 className="mt-2 text-2xl font-extrabold leading-tight tracking-tight">{visit.nombre_escuela}</h2>
-            <p className="mt-3 flex items-start gap-2 text-sm text-slate-500"><MapPin size={17} className="shrink-0" />{visit.colonia || 'Dirección por confirmar'}</p>
-        </section>
-
-        {flightRehearsalEnabled && <section className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-blue-50 p-5 shadow-[0_12px_36px_-28px_rgba(7,26,51,0.35)]">
-            <div className="flex items-start gap-3"><span className="rounded-2xl bg-cyan-600 p-3 text-white"><Gamepad2 size={22} /></span><div><h2 className="font-extrabold text-cyan-950">Ensayo de vuelo</h2><p className="mt-1 text-sm leading-relaxed text-cyan-900/70">Explora el entorno con controles Modo 3 y visualiza tus puntos de interés.</p></div></div>
-            {schoolLocation
-                ? <Link href={`/staff/visitas/${visit.id}/simulacion`} onClick={audio.stop} className={`${primary} mt-4 w-full !bg-cyan-700 hover:!bg-cyan-800`}><Gamepad2 size={18} />Abrir simulador</Link>
-                : <button disabled className={`${secondary} mt-4 w-full`}><MapPin size={18} />Requiere ubicación confirmada</button>}
-            <Link href={`/staff/visitas/${visit.id}/simulacion-3d`} onClick={audio.stop} className={`${secondary} mt-3 w-full`}><MapPin size={18} />{schoolLocation ? 'Probar relieve 3D' : 'Elegir despegue y probar 3D'}</Link><p className="mt-2 text-xs text-cyan-900/75">Google Maps · Prueba local con consumo de API. Puedes elegir un despegue temporal sin cambiar la ubicación escolar. No sirve para navegar un dron real.</p>
-        </section>}
-
-        <section className={card} aria-labelledby="sequence-heading">
-            <div className="flex items-start justify-between gap-3"><div><h2 id="sequence-heading" className="text-xl font-extrabold">Tu secuencia</h2><p className="mt-1 text-sm text-slate-500">Se reproducirá en este orden.</p></div><span className={`rounded-full px-3 py-1.5 text-xs font-bold ${ready ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{ready ? 'Lista' : 'Borrador'}</span></div>
-            <p role="status" aria-live="polite" className="mt-3 text-xs text-slate-500">{plan.saveState === 'saving' ? 'Guardando…' : plan.saveState === 'pending' ? 'Cambios pendientes de guardar…' : plan.saveState === 'error' || plan.saveState === 'conflict' ? 'No se han guardado los cambios' : plan.revision ? 'Guardado' : 'Aún no has preparado esta visita'}</p>
-            {plan.error && <div className="mt-4"><Notice action={plan.saveState === 'conflict' ? <button className={secondary} onClick={plan.discardLocal}>Descartar cambios locales y cargar lo guardado</button> : <div className="flex flex-wrap gap-2"><button className={secondary} onClick={plan.retry}>Reintentar guardado</button><button className={secondary} onClick={() => window.location.reload()}>Recargar biblioteca</button></div>}>{plan.error}</Notice></div>}
-            {plan.localError && <div className="mt-3"><Notice>{plan.localError}</Notice></div>}
-            {stale && <div className="mt-4"><Notice action={<button disabled={plan.locked} className={secondary} onClick={() => plan.edit(plan.items.map(item => { const latest = catalog.find(p => String(p.id) === item.id); return latest ? snapshot(latest) : item; }))}>Actualizar contenido seleccionado</button>}>Una narración cambió o ya no está disponible. Revisa su contenido y elimina las que no estén disponibles antes de confirmar.</Notice></div>}
-            {initialPlan && initialPlan.visit_date !== visit.fecha_programada && <p className="mt-3 text-sm text-amber-800">Esta visita cambió de fecha. Revisa la secuencia y confírmala para el nuevo día.</p>}
-            {!plan.items.length ? <div className="my-5 rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center"><Headphones size={30} className="mx-auto text-blue-500" /><h3 className="mt-3 font-bold">¿Qué vas a contar en esta visita?</h3><p className="mt-2 text-sm leading-relaxed text-slate-500">Agrega narraciones y acomódalas como las utilizarás. Puedes ensayar antes de dejarlas listas.</p></div> : <ol className="mt-5 space-y-3">{plan.items.map((item, index) => <li key={item.id} className="rounded-2xl border border-slate-200 p-3">
-                <div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-sm font-extrabold text-blue-700">{index + 1}</span><div className="min-w-0 flex-1"><h3 className="text-sm font-bold leading-snug">{item.name}</h3><p className="mt-1 text-xs text-slate-500">{durationLabel(item.audio_duration_seconds)}</p>{!catalog.some(p => String(p.id) === item.id) && <p className="mt-1 text-xs text-red-700">Ya no está disponible. Quítala de la secuencia.</p>}</div></div>
-                <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-2"><button className={secondary} aria-label={`Subir ${item.name}`} disabled={index === 0 || plan.locked} onClick={() => plan.edit(moveItem(plan.items, index, -1))}><ArrowUp size={17} /></button><button className={secondary} aria-label={`Bajar ${item.name}`} disabled={index === plan.items.length - 1 || plan.locked} onClick={() => plan.edit(moveItem(plan.items, index, 1))}><ArrowDown size={17} /></button><button disabled={plan.locked} onClick={() => plan.edit(plan.items.filter(p => p.id !== item.id))} aria-label={`Quitar ${item.name} de la secuencia`} className={`${secondary} ml-auto !border-transparent !px-3`}><Trash2 size={16} /><span className="text-xs">Quitar</span></button></div>
-            </li>)}</ol>}
-            <button onClick={() => openPicker()} disabled={plan.locked || plan.items.length >= MAX_SEQUENCE_ITEMS} className={`${secondary} mt-4 w-full`}><Plus size={18} />Agregar narración</button>
-            {plan.items.length >= MAX_SEQUENCE_ITEMS && <p className="mt-2 text-xs text-slate-500">Puedes incluir hasta 40 narraciones.</p>}
-            {plan.items.length > 0 && <p className="mt-3 text-center text-xs text-slate-500">{plan.items.length} narraciones · {allDurations ? `${durationLabel(total)} de audio` : 'Duración total por confirmar'}</p>}
-            {previous.length > 0 && <button disabled={plan.locked} onClick={() => setReusing(true)} className="mt-4 min-h-11 w-full text-sm font-semibold text-blue-700">Reutilizar una preparación anterior</button>}
-        </section>
-
-        <section className={`${card} space-y-3`}>
-            <button className={`${secondary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved'} onClick={() => { audio.stop(); setRehearsing(true); }}><Headphones size={18} />Ensayar secuencia</button>
-            <button className={`${primary} w-full`} disabled={!available || plan.locked || plan.dirty || plan.saveState !== 'saved' || ready} onClick={() => plan.save('ready')}><Check size={18} />{ready ? 'Secuencia lista' : 'Dejar lista la secuencia'}</button>
-            <p className="text-center text-xs leading-relaxed text-slate-500">{ready ? 'El orden está confirmado. Puedes reutilizarlo con los grupos de esta visita. Si lo modificas, volverá a borrador.' : 'Guardar conserva tus cambios. Confirmar deja preparado el orden que utilizarás.'}</p>
-        </section>
-
-        <section className={card}><h2 className="text-lg font-extrabold">Alrededor de la escuela</h2><p className="mt-2 text-sm text-slate-500">Explora lugares con narración a menos de 10 km. La distancia es aproximada, en línea recta.</p>
-            {!schoolLocation ? <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">La escuela aún no tiene ubicación confirmada. Puedes preparar tu secuencia desde la biblioteca.</p> : <>
-                <button onClick={() => setMapOpen(v => !v)} aria-expanded={mapOpen} className={`${secondary} mt-4 w-full`}><MapPin size={17} />{mapOpen ? 'Cerrar mapa' : `Explorar lugares cercanos (${nearby.length})`}</button>
-                {mapOpen && <div className="mt-4 space-y-3"><PreparationMap markers={markers} selectedId={mapSelected} onSelect={setMapSelected} />{!nearby.length && <p className="text-sm text-slate-500">Todavía no hay narraciones de lugares en este radio. Explora la biblioteca para agregar otros lugares o temas generales.</p>}
-                    {selectedPoi && <button className={`${primary} w-full`} disabled={plan.locked} onClick={() => openPicker(selectedPoi.name)}>Escuchar y agregar: {selectedPoi.name}<ChevronRight size={16} /></button>}
-                    <ul className="divide-y divide-slate-100">{nearby.map(p => <li key={p.id}><button disabled={plan.locked} onClick={() => openPicker(p.name)} className="flex min-h-14 w-full items-center justify-between gap-3 py-3 text-left"><span className="text-sm font-semibold">{p.name}<span className="mt-1 block text-xs font-normal text-slate-500">{p.distance.toFixed(1)} km · {durationLabel(p.audio_duration_seconds)}</span></span><ChevronRight size={17} className="shrink-0 text-blue-600" /></button></li>)}</ul>
-                </div>}
+    const changePhase = next => {
+        audio.stop();
+        plan.edit(plan.items.map(item => { const source = catalog.find(poi => String(poi.id) === item.id); return source ? snapshot(source,next) : item; }), { ...plan.context,phase_id:next });
+        setLevelChange(null);
+    };
+    const stopAndTab = value => { audio.stop(); setTab(value); };
+    const route = <div className={styles.sequence}>
+        <h2>Tu recorrido</h2><p>{plan.items.length} narraciones · {duration}</p>{ready && <span className={styles.ready}><Check size={13}/> Recorrido confirmado</span>}
+        {stale && <Notice action={<button className={styles.secondary} disabled={plan.locked} onClick={() => plan.edit(plan.items.map(item => { const latest = catalog.find(poi => String(poi.id) === item.id); return latest ? snapshot(latest,item.phase_id || 'general') : item; }))}>Actualizar narraciones</button>}>Hay contenido que cambió o ya no está disponible. Actualiza o quítalo antes de confirmar.</Notice>}
+        {plan.items.some(item => !usableAudio(item.audio_url)) && <div className={styles.notice}>Hay narraciones sin audio para este nivel. Puedes quitarlas o elegir otro nivel.</div>}
+        {!plan.items.length ? <div className={styles.empty}><Headphones size={28}/><h3>Elige tu primera narración</h3><p>Toca un lugar en el mapa o abre la biblioteca.</p></div> : <VisitSequence items={plan.items} locked={plan.locked} edit={plan.edit} audio={audio}/>}
+        <div className={styles.actions}><button className={styles.secondary} onClick={() => { audio.stop(); setPicker(true); }}><Plus size={17}/>Agregar tema o narración</button>{previous.length > 0 && <button className={styles.textButton} disabled={plan.locked} onClick={() => setReusing(true)}>Reutilizar recorrido</button>}</div>
+        <div className={styles.sequenceFooter}><button className={styles.secondary} disabled={!playable} onClick={() => { audio.stop(); setRehearsing(true); }}><Headphones size={17}/>Escuchar recorrido</button><button className={styles.primary} disabled={!canConfirm || ready} onClick={() => plan.save('ready')}><Check size={17}/>{ready ? 'Confirmado' : 'Confirmar recorrido'}</button></div>
+        {audio.error && <p role="alert">{audio.error}</p>}
+    </div>;
+    const errors = <>{plan.error && <div className={styles.notice} role="alert">{plan.error}<button className={styles.textButton} onClick={plan.saveState === 'conflict' ? plan.discardLocal : plan.retry}>{plan.saveState === 'conflict' ? 'Cargar versión guardada' : 'Reintentar'}</button></div>}{plan.localError && <div role="alert" className={styles.notice}>{plan.localError}</div>}</>;
+    return <div className={styles.planner}>
+        <header className={styles.header}><div className={styles.heading}><Link href="/staff/cronograma" aria-label="Volver al cronograma"><ArrowLeft size={20}/></Link><div><small>PREPARAR VISITA · {visitLabel(visit.fecha_programada)}</small><h1>{visit.nombre_escuela}</h1></div>{location && <button disabled={plan.locked} onClick={() => { audio.stop(); setLocating(true); setTab('explore'); }} aria-label="Cambiar ubicación de la escuela"><MapPin size={20}/></button>}</div>
+            <div className={styles.tabs} role="tablist" aria-label="Preparar visita">{[['explore','Explorar'],['route','Tu recorrido · ' + plan.items.length]].map(([value,label],index) => { const disabled = value === 'route' && !location; return <button key={value} ref={el => { tabRefs.current[index]=el; }} role="tab" disabled={disabled} aria-selected={tab===value} aria-controls={'visit-'+value} id={'visit-tab-'+value} tabIndex={tab===value ? 0 : -1} onClick={() => !disabled && stopAndTab(value)} onKeyDown={event => { if (disabled) return; if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) { event.preventDefault(); const next=event.key==='Home'?0:event.key==='End'?1:1-index; if (next === 1 && !location) return; stopAndTab(next?'route':'explore'); tabRefs.current[next]?.focus(); } }}>{tab===value && <motion.i layoutId="visit-tab" className={styles.activeTab} transition={{ duration:reduced?0:.25 }}/>}<span>{label}</span></button>; })}</div>
+        </header>
+        {errors}<p className={styles.save} role="status">{saveLabel}{school ? ' · Ubicación confirmada' : ' · Paso 1: confirma la ubicación'}</p>
+        <div className={styles.body} id="visit-route" role="tabpanel" aria-labelledby="visit-tab-route" hidden={tab!=='route'}>{route}</div>
+        {!flight && <div className={styles.body} id="visit-explore" role="tabpanel" aria-labelledby="visit-tab-explore" hidden={tab!=='explore'}>
+            {choosing ? <><p className={styles.locationHint}><strong>Paso 1 de 2 · Confirma la escuela.</strong> Colócala bajo el marcador; después abriremos el mapa de lugares y narraciones cercanas.</p><div className={styles.locationPicker}><TakeoffMap purpose="school" schoolName={visit.nombre_escuela} initial={location ? {latitude:location[0],longitude:location[1]} : suggestedSchoolLocation ? {latitude:suggestedSchoolLocation[0],longitude:suggestedSchoolLocation[1]} : null} busy={plan.locked} onCancel={location ? () => setLocating(false) : undefined} onConfirm={point => { plan.edit(plan.items,{...plan.context,school_location:point}); setLocating(false); }}/></div></> : <>
+                <div className={styles.toolbar}><label><Headphones size={17}/><select aria-label="Nivel de las narraciones" value={phaseId} disabled={plan.locked} onChange={event => plan.items.length ? setLevelChange(event.target.value) : changePhase(event.target.value)}>{EDUCATION_PHASES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><div className={styles.mode}><button aria-pressed="true">Mapa</button>{flightRehearsalEnabled && <button onClick={() => { audio.stop(); setFlight(true); }}>Vuelo 3D</button>}<button onClick={() => setPicker(true)} aria-label="Abrir biblioteca"><BookOpen size={18}/></button></div></div>
+                <p className={styles.exploreHint}><strong>Paso 2 de 2 · Explora alrededor de la escuela.</strong> Verás las narraciones que ya existen y, en amarillo, lugares cercanos para los que puedes crear una narración.</p>
+                <div className={styles.workspace}><div className={styles.mapColumn}><PreparationMap userId={data.userId} schoolLocation={location} schoolName={visit.nombre_escuela} onSelect={poi => { audio.stop(); setSelected(String(poi.id)); }} onNarrationSaved={poi => { if (!poi?.id) return; setCatalogUpdates(previous => [...previous.filter(item => String(item.id) !== String(poi.id)),poi]); setSelected(String(poi.id)); }}/>{current && <motion.section className={styles.place} key={current.id} initial={reduced?false:{opacity:0,y:15}} animate={{opacity:1,y:0}} transition={{duration:.24}} aria-label="Lugar seleccionado"><div className={styles.placeHeading}><h2>{current.name}</h2><button aria-label="Cerrar lugar" onClick={() => { audio.stop(); setSelected(null); }}><X size={20}/></button></div><p>{phase.label} · {durationLabel(current.audio_duration_seconds)}</p><div className={styles.actions}><button className={styles.secondary} disabled={!usableAudio(current.audio_url)} onClick={() => audio.toggle(current)}><Headphones size={17}/>{audio.id===current.id && audio.status==='playing'?'Pausar':'Escuchar'}</button><button className={styles.primary} disabled={plan.locked || !usableAudio(current.audio_url) || selectedIds.has(String(current.id)) || plan.items.length>=MAX_SEQUENCE_ITEMS} onClick={() => add(current)}>{selectedIds.has(String(current.id))?'Agregado':usableAudio(current.audio_url)?'Agregar al recorrido':'Audio pendiente'}</button></div>{!usableAudio(current.audio_url) && <p>{current.is_official?'Solicita esta versión a coordinación.':'Esta versión aún necesita audio.'}</p>}{audio.error && <p role="alert">{audio.error}</p>}</motion.section>}</div><aside className={styles.desktopSequence}>{route}</aside></div>
+                <button className={styles.routeBar} onClick={() => stopAndTab('route')}><span><strong>{plan.items.length} narraciones</strong><small>{duration}</small></span><span>Ver recorrido <ChevronRight size={17}/></span></button>
             </>}
-        </section>
-        {picker && <PreparationDialog title="Agregar narraciones" onClose={closePicker}>
-            <p role="status" className="text-sm font-semibold text-blue-700">{plan.items.length} en tu secuencia · Se agregan al final</p>
-            <NarrationLibrary catalog={catalog} selectedIds={plan.items.map(p => p.id)} onAdd={add} addDisabled={plan.locked || plan.items.length >= MAX_SEQUENCE_ITEMS} audio={audio} schoolLocation={schoolLocation} initialQuery={pickerQuery} />
-            <button className={`${primary} sticky bottom-0 w-full shadow-lg`} onClick={closePicker}>Volver a mi secuencia</button>
-        </PreparationDialog>}
-        {rehearsing && <Rehearsal items={plan.items} audio={audio} onClose={() => { audio.stop(); setRehearsing(false); }} />}
-        {reusing && <PreparationDialog title="Reutilizar preparación" onClose={() => setReusing(false)}><p className="text-sm text-slate-600">Reemplazará tu selección actual con un nuevo borrador. Las otras visitas conservarán su preparación.</p>{previous.map(p => {
-            const missing = p.items.some(item => !catalog.some(source => String(source.id) === item.id));
-            return <button key={p.id} disabled={plan.locked || missing} className={`${secondary} w-full !justify-start !text-left`} onClick={() => { plan.edit(p.items.map(item => snapshot(catalog.find(source => String(source.id) === item.id)))); setReusing(false); }}><span>{p.visit?.nombre_escuela || `Visita del ${visitLabel(p.visit_date)}`}<span className="mt-1 block text-xs font-normal text-slate-500">{p.items.length} narraciones · {visitLabel(p.visit_date)}</span>{missing && <span className="mt-1 block text-xs text-amber-800">Contiene narraciones que ya no están disponibles</span>}</span></button>;
-        })}</PreparationDialog>}
-    </>;
+        </div>}
+        {flight && location && <div className={styles.flight}><RehearsalMap visit={visit} schoolLocation={location} departure={{latitude:location[0],longitude:location[1]}} pois={flightPois} selectedIds={selectedIds} selectedOrder={plan.items.map(item=>item.id)} audio={audio} google3d onAdd={add} addDisabled={plan.locked || plan.items.length>=MAX_SEQUENCE_ITEMS} onExit={() => { audio.stop(); setFlight(false); }} onOpenRoute={() => { audio.stop(); setFlightRoute(true); }} paused={flightRoute || picker || rehearsing || reusing} /><p className={styles.flightSave} role="status">{saveLabel}</p>{flightRoute && <PreparationDialog title="Tu recorrido" onClose={() => { audio.stop(); setFlightRoute(false); }}>{errors}{route}</PreparationDialog>}</div>}
+        {picker && <PreparationDialog title="Agregar narraciones" onClose={() => { audio.stop(); setPicker(false); }}><p>{phase.label} · {plan.items.length}/{MAX_SEQUENCE_ITEMS} seleccionadas</p><NarrationLibrary catalog={versions} selectedIds={plan.items.map(item=>item.id)} onAdd={add} addDisabled={plan.locked || plan.items.length>=MAX_SEQUENCE_ITEMS} audio={audio} schoolLocation={location}/><button className={styles.primary} onClick={() => { audio.stop(); setPicker(false); }}>Listo</button></PreparationDialog>}
+        {rehearsing && <Rehearsal items={plan.items} audio={audio} onClose={() => { audio.stop(); setRehearsing(false); }}/>}
+        {levelChange && <PreparationDialog title="Cambiar nivel" onClose={() => setLevelChange(null)}><p>El recorrido usará las versiones de {educationPhase(levelChange)?.label}. Las que no tengan audio quedarán pendientes.</p><button className={styles.primary} onClick={() => changePhase(levelChange)}>Cambiar nivel</button></PreparationDialog>}
+        {reusing && <PreparationDialog title="Reutilizar recorrido" onClose={() => setReusing(false)}><p>Reemplaza la selección actual; conserva la ubicación de esta escuela.</p>{previous.map(previousPlan => <button key={previousPlan.id} className={styles.secondary} disabled={plan.locked || previousPlan.items.some(item=>!catalog.some(poi=>String(poi.id)===item.id))} onClick={() => { plan.edit(previousPlan.items.map(item=>snapshot(catalog.find(poi=>String(poi.id)===item.id),phaseId))); setReusing(false); }}>{previousPlan.visit?.nombre_escuela || visitLabel(previousPlan.visit_date)} · {previousPlan.items.length} narraciones</button>)}</PreparationDialog>}
+    </div>;
 }

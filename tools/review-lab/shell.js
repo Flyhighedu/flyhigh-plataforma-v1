@@ -103,7 +103,7 @@ function createPanel(role, index) {
     if (more.open) document.querySelectorAll('.more-controls').forEach(other => { if (other !== more) other.open = false; });
     measure();
   });
-  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['mobile', 'Abrir en celular'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar'], ['reset-permissions', 'Restablecer permisos']];
+  const actions = [['view', viewModes[role.id] === 'phone' ? 'Vista amplia' : 'Vista celular'], ['focus', 'Enfocar'], ['signin', 'Entrar'], ['mobile', 'Abrir en celular'], ['home', 'Inicio'], ['reload', 'Recargar'], ['offline', 'Sin red'], ['note', 'Anotar'], ['inspect', 'Inspeccionar'], ['reset-permissions', 'Restablecer mic/cámara']];
   for (const [action, label] of actions) {
     const button = document.createElement('button'); button.textContent = label; button.dataset.action = action;
     button.addEventListener('click', async () => {

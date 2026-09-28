@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel } from '../src/lib/narration-preparation.mjs';
-import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, normalizeHeading, FLIGHT_SPEEDS, flightLimitsForSpeed } from '../src/lib/flight-rehearsal.mjs';
+import { buildSequence, coordinates, distanceKm, moveItem, snapshot, sequenceChanged, durationLabel, fingerprint, preparationContext, mergePreparedSources } from '../src/lib/narration-preparation.mjs';
+import { advanceFlight, closestPoi, distanceMeters, fallbackZoom, flightCamera, normalizeHeading, FLIGHT_SPEEDS, flightLimitsForSpeed, selectFlightPois } from '../src/lib/flight-rehearsal.mjs';
 
 const catalog = [
     { id: 'official_a', name: 'Museo', audio_url: 'https://example.test/a.wav', narrative_script: 'Museo original' },
@@ -63,6 +63,16 @@ test('The nearest POI is derived without mutating the flight state', () => {
     assert.equal(closestPoi(position, pois, 100)?.poi.id, 'near');
     assert.equal(closestPoi(position, pois, 5), null);
 });
+test('The 3D POI layer is spatially bounded and capped before markers are created', () => {
+    const center = { latitude: 19.4326, longitude: -99.1332 };
+    const pois = Array.from({ length: 80 }, (_, index) => ({ id: String(index), latitude: center.latitude + index * 0.0001, longitude: center.longitude }));
+    pois.push({ id: 'distant', latitude: 20.2, longitude: -99.1332 });
+    const selected = selectFlightPois(pois, center, { radius: 5000, limit: 12 });
+    assert.equal(selected.length, 12);
+    assert.deepEqual(selected.map(item => item.id), Array.from({ length: 12 }, (_, index) => String(index)));
+    assert.ok(!selected.some(item => item.id === 'distant'));
+    assert.deepEqual(selectFlightPois(pois, null), []);
+});
 test('The compatible map represents gimbal tilt with a bounded zoom range', () => {
     assert.equal(fallbackZoom(-20), 15.5);
     assert.equal(fallbackZoom(-90), 17.5);
@@ -102,4 +112,34 @@ test('Returning from the horizon restores flat ground before calculating the cam
 test('Duration distinguishes unknown from a playable length', () => {
     assert.equal(durationLabel(null), 'Duración por confirmar');
     assert.equal(durationLabel(65), '1:05');
+});
+
+test('Phase selection saves the actual audio without falling back to General', () => {
+    const source = {...catalog[0], narrative_versions:{phase_2:{narrative_script:'Preescolar',audio_url:'https://example.test/phase2.wav'}}};
+    const selected = buildSequence([{id:source.id,phase_id:'phase_2'}],[source],'ready');
+    assert.equal(selected[0].audio_url,source.narrative_versions.phase_2.audio_url);
+    assert.equal(selected[0].phase_id,'phase_2');
+    assert.equal(sequenceChanged(selected,[source]),false);
+    assert.equal(sequenceChanged(selected,[{...source,narrative_versions:{}}]),true);
+    assert.equal(snapshot(source,'phase_3').audio_url,null);
+    assert.throws(()=>buildSequence([{id:source.id,phase_id:'phase_3'}],[source],'ready'));
+    assert.throws(()=>snapshot(source,'invalid'));
+    assert.notEqual(fingerprint(snapshot(source)),fingerprint(selected[0]));
+    assert.deepEqual(buildSequence([source.id],[source],'ready'),[snapshot(source)]);
+});
+test('Pilot school location is validated and isolated from school fields', () => {
+    const value = preparationContext({phase_id:'phase_3',school_location:{latitude:19.4,longitude:-102,source:'official'},school_id:42});
+    assert.deepEqual(value,{phase_id:'phase_3',school_location:{latitude:19.4,longitude:-102,source:'pilot'}});
+    assert.deepEqual(preparationContext(),{phase_id:'general',school_location:null});
+    for (const invalid of [null,[],{phase_id:'invalid'},{school_location:{latitude:null,longitude:0}},{school_location:{latitude:91,longitude:0}}]) assert.throws(()=>preparationContext(invalid));
+});
+test('Server snapshots refresh only their own version in the picker', () => {
+    const source = {...catalog[0],narrative_versions:{phase_2:{audio_url:'https://example.test/old.wav'},phase_3:{narrative_script:'Keep'}}};
+    const updated = {...snapshot(source,'phase_2'),audio_url:'https://example.test/new.wav'};
+    const [merged] = mergePreparedSources([source],[updated]);
+    assert.equal(merged.audio_url,source.audio_url);
+    assert.equal(merged.narrative_versions.phase_2.audio_url,updated.audio_url);
+    assert.equal(merged.narrative_versions.phase_3.narrative_script,'Keep');
+    assert.equal(sequenceChanged([updated],[merged]),false);
+    assert.equal(source.narrative_versions.phase_2.audio_url,'https://example.test/old.wav');
 });

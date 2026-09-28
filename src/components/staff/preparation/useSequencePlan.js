@@ -1,15 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fingerprint } from '@/lib/narration-preparation.mjs';
+import { fingerprint, preparationContext } from '@/lib/narration-preparation.mjs';
 
 function restore(key, initialPlan, visit) {
-    const fallback = { items: initialPlan?.items || [], status: initialPlan?.status || 'draft', dirty: false, conflict: false };
+    const context = preparationContext(initialPlan?.preparation_context || {});
+    const fallback = { context, items: initialPlan?.items || [], status: initialPlan?.status || 'draft', dirty: false, conflict: false };
     if (initialPlan?.content_changed || (initialPlan && initialPlan.visit_date !== visit.fecha_programada)) fallback.status = 'draft';
     try {
         const cached = JSON.parse(localStorage.getItem(key));
         if (!cached || !Array.isArray(cached.items) || cached.items.length > 40 || cached.items.some(item => !item || typeof item.id !== 'string' || typeof item.name !== 'string')) return fallback;
-        return { items: cached.items, status: 'draft', dirty: true, conflict: cached.revision !== (initialPlan?.revision || 0) || cached.date !== visit.fecha_programada };
+        return { context: preparationContext(cached.context || context), items: cached.items, status: 'draft', dirty: true, conflict: cached.revision !== (initialPlan?.revision || 0) || cached.date !== visit.fecha_programada };
     } catch { return fallback; }
 }
 
@@ -23,17 +24,17 @@ export default function useSequencePlan({ visit, userId, initialPlan }) {
     const [localError, setLocalError] = useState('');
     const busy = useRef(false);
 
-    const cache = useCallback((items, baseRevision) => {
-        try { localStorage.setItem(key, JSON.stringify({ items, revision: baseRevision, date: visit.fecha_programada })); setLocalError(''); }
+    const cache = useCallback((items, baseRevision, context) => {
+        try { localStorage.setItem(key, JSON.stringify({ items, context, revision: baseRevision, date: visit.fecha_programada })); setLocalError(''); }
         catch { setLocalError('No pudimos guardar una copia en este dispositivo. Espera la confirmación de guardado antes de salir.'); }
     }, [key, visit.fecha_programada]);
 
-    const edit = useCallback(items => {
+    const edit = useCallback((items, context = draft.context) => {
         if (busy.current || saveState === 'conflict') return;
-        cache(items, revision);
-        setDraft({ items, status: 'draft', dirty: true, conflict: false });
+        cache(items, revision, context);
+        setDraft({ items, context, status: 'draft', dirty: true, conflict: false });
         setError(''); setSaveState('pending');
-    }, [cache, revision, saveState]);
+    }, [cache, revision, saveState, draft.context]);
 
     const save = useCallback(async status => {
         if (busy.current || saveState === 'conflict') return;
@@ -41,7 +42,7 @@ export default function useSequencePlan({ visit, userId, initialPlan }) {
         try {
             const response = await fetch('/api/staff/preparation', {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ visitId: visit.id, visitDate: visit.fecha_programada, revision, ids: draft.items.map(p => p.id), status, fingerprints: draft.items.map(fingerprint) }),
+                body: JSON.stringify({ visitId: visit.id, visitDate: visit.fecha_programada, revision, selections: draft.items.map(p => ({ id: p.id, phase_id: p.phase_id || 'general' })), context: draft.context, status, fingerprints: draft.items.map(fingerprint) }),
             });
             const result = await response.json();
             if (!response.ok) {
@@ -53,13 +54,13 @@ export default function useSequencePlan({ visit, userId, initialPlan }) {
             // The server may have a more recent source than the loaded catalog.
             // Keep the picker and stale-content checks aligned with what was saved.
             setSavedSources(result.plan.items);
-            setDraft({ items: result.plan.items, status: result.plan.status, dirty: false, conflict: false });
+            setDraft({ context: preparationContext(result.plan.preparation_context || draft.context), items: result.plan.items, status: result.plan.status, dirty: false, conflict: false });
             setSaveState('saved');
             try { localStorage.removeItem(key); } catch { /* Server copy is already safe. */ }
         } catch {
             setSaveState('error'); setError('No se pudo guardar. Comprueba la conexión y reintenta antes de dejar la secuencia lista.');
         } finally { busy.current = false; }
-    }, [draft.items, key, revision, saveState, visit.id, visit.fecha_programada]);
+    }, [draft.items, draft.context, key, revision, saveState, visit.id, visit.fecha_programada]);
 
     useEffect(() => {
         if (!draft.dirty || saveState !== 'pending') return;

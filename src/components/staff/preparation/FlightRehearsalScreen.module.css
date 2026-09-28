@@ -123,3 +123,5 @@
     .googleLayout .joystick { margin-bottom: 0; }
     .originPicker { bottom: 40px; padding: 8px 12px; }
 }
+
+.locationSearch { position:absolute; z-index:600; top:0; left:0; right:0; }.takeoffHeading { top:90px; left:55px; right:55px; background:white; padding:8px; border-radius:12px; text-shadow:none; }.takeoffMap .takeoffCanvas :global(.leaflet-top) { top:90px; }.planAction { margin-top:10px; width:100%; min-height:44px; background:#2462d3; color:white; font-weight:700; border-radius:10px; padding:10px; }.planAction:disabled { background:#3f3f46; color:#fff; }.routeAccess { position:absolute; top:76px; left:50%; transform:translateX(-50%); z-index:15; min-height:44px; padding:8px 14px; background:#2462d3; color:white; border-radius:12px; font-size:12px; }.schoolMarker { background:#2462d3; }

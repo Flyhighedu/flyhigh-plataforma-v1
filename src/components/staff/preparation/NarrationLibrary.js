@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Check, Headphones, Loader2, Pause, Play, Plus, Search, X } from 'lucide-react';
 import { narrationReadiness } from '@/lib/narration-workflow.mjs';
@@ -10,6 +10,7 @@ import { Notice, secondary } from './PreparationUI';
 
 export function PreparationDialog({ title, onClose, children }) {
     const ref = useRef(null);
+    const titleId = useId();
     useEffect(() => {
         const dialog = ref.current;
         const previous = document.activeElement;
@@ -17,9 +18,9 @@ export function PreparationDialog({ title, onClose, children }) {
         dialog.showModal(); document.body.style.overflow = 'hidden';
         return () => { dialog.close(); document.body.style.overflow = overflow; previous?.focus?.(); };
     }, []);
-    return <dialog ref={ref} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby="preparation-dialog-title" className="m-auto max-h-[92dvh] w-[calc(100%_-_1rem)] max-w-2xl rounded-3xl bg-[#f3f7fb] p-0 text-[#071a33] shadow-2xl backdrop:bg-slate-950/60">
+    return <dialog ref={ref} onCancel={event => { event.preventDefault(); onClose(); }} aria-labelledby={titleId} className="m-auto max-h-[92dvh] w-[calc(100%_-_1rem)] max-w-2xl rounded-3xl bg-[#f3f7fb] p-0 text-[#071a33] shadow-2xl backdrop:bg-slate-950/60">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
-            <h2 id="preparation-dialog-title" className="text-lg font-extrabold">{title}</h2>
+            <h2 id={titleId} className="text-lg font-extrabold">{title}</h2>
             <button autoFocus onClick={onClose} aria-label="Cerrar" className={secondary}><X size={19} /></button>
         </div><div className="space-y-4 p-4 sm:p-6">{children}</div>
     </dialog>;
@@ -45,12 +46,12 @@ export default function NarrationLibrary({ catalog, selectedIds = [], onAdd, add
             const playing = audio.id === p.id && audio.status === 'playing';
             const loading = audio.id === p.id && audio.status === 'loading';
             const available = usableAudio(p.audio_url);
-            return <article key={p.id} className={`rounded-2xl border bg-white p-4 ${selected ? 'border-blue-300' : 'border-slate-200'}`}>
-                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-600"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
+            return <article key={p.id} className={`rounded-2xl border bg-white p-4 ${selected ? 'border-blue-700' : 'border-slate-200'}`}>
+                <div className="flex items-start gap-3"><span className="rounded-xl bg-blue-700 p-2.5 text-white"><Headphones size={20} /></span><div className="min-w-0 flex-1"><h3 className="font-bold leading-snug">{p.name}</h3><p className="mt-1 text-xs text-slate-500">{p.is_general_topic ? 'Tema general' : 'Lugar'} · {p.is_official ? 'Oficial' : 'Personal'}{p.distance != null && ` · ${p.distance.toFixed(1)} km`}</p><p className="mt-1 text-xs text-slate-500">{available ? durationLabel(p.audio_duration_seconds) : 'Audio pendiente'}</p></div></div>
                 {p.is_official && !narrationReadiness(readNarrations(p)).ready && <details className="mt-2 text-xs text-amber-800"><summary className="min-h-11 cursor-pointer py-3">Versiones por nivel pendientes</summary><p>Solicita a tu coordinación completar estos niveles.</p></details>}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button disabled={!available || loading} onClick={() => audio.toggle(p)} aria-label={`${playing ? 'Pausar' : 'Escuchar'} ${p.name}`} className={secondary}>{loading ? <Loader2 size={16} className="animate-spin" /> : playing ? <Pause size={16} /> : <Play size={16} />}{playing ? 'Pausar' : 'Escuchar'}</button>
-                    {onAdd && <button disabled={selected || !available || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-50 px-3 text-sm font-bold text-blue-700 disabled:text-slate-500">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregada' : 'Agregar'}</button>}
+                    {onAdd && <button disabled={selected || !available || addDisabled} onClick={() => onAdd(p)} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-3 text-sm font-bold text-white disabled:bg-neutral-200 disabled:text-neutral-600">{selected ? <Check size={17} /> : <Plus size={17} />}{selected ? 'Agregada' : 'Agregar'}</button>}
                     {p.narrative_script && <button onClick={() => setExpanded(expanded === p.id ? null : p.id)} aria-expanded={expanded === p.id} className="min-h-11 px-2 text-xs font-semibold text-slate-600">{expanded === p.id ? 'Cerrar guion' : 'Ver guion'}</button>}
                 </div>
                 {expanded === p.id && <p className="mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600">{p.narrative_script}</p>}

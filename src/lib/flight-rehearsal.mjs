@@ -13,6 +13,9 @@ export const FLIGHT_SPEEDS = Object.freeze([
     Object.freeze({ id: 'fast', label: 'Rápida', horizontalMetersPerSecond: 18, climbMetersPerSecond: 6, yawDegreesPerSecond: 70 }),
 ]);
 
+export const FLIGHT_POI_RADIUS_METERS = 5000;
+export const MAX_FLIGHT_POI_MARKERS = 48;
+
 export function flightLimitsForSpeed(id) {
     return { ...FLIGHT_LIMITS, ...(FLIGHT_SPEEDS.find(speed => speed.id === id) || FLIGHT_SPEEDS[1]) };
 }
@@ -86,4 +89,16 @@ export function closestPoi(position, pois, maximumDistanceMeters = Infinity) {
         }
     }
     return match ? { poi: match, distance: bestDistance } : null;
+}
+
+export function selectFlightPois(pois, center, { radius = FLIGHT_POI_RADIUS_METERS, limit = MAX_FLIGHT_POI_MARKERS } = {}) {
+    if (!center || !Number.isFinite(Number(center.latitude)) || !Number.isFinite(Number(center.longitude))) return [];
+    const maximum = Math.max(1, Math.floor(Number(limit) || MAX_FLIGHT_POI_MARKERS));
+    return (pois || [])
+        .filter(poi => Number.isFinite(Number(poi?.latitude)) && Number.isFinite(Number(poi?.longitude)))
+        .map(poi => ({ poi, distance: distanceMeters(center, poi) }))
+        .filter(entry => Number.isFinite(entry.distance) && entry.distance <= radius)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, maximum)
+        .map(entry => entry.poi);
 }
