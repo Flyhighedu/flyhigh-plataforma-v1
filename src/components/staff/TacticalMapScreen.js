@@ -13,6 +13,8 @@ import MapPlacePreview from '@/components/shared/MapPlacePreview';
 import { findExistingPlace } from '@/lib/narration-catalog.mjs';
 import NarrationMapSearch from '@/components/shared/NarrationMapSearch';
 import useNativePOITap from '@/hooks/useNativePOITap';
+import { coordinates } from '@/lib/narration-preparation.mjs';
+import { parseCulturalPois } from '@/lib/cultural-pois.mjs';
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapWithNoSSR = dynamic(() => import('./TacticalMapLeaflet'), { ssr: false, loading: () => (
@@ -45,14 +47,16 @@ const PremiumRadarIcon = () => (
     </div>
 );
 
-export default function TacticalMapScreen({ userId, profile, onClose = null, embedded = false, onContentChange, initialCenter = null, preparationMode = false, onNarrationSelect = null, onNarrationSaved = null, referencePoint = null }) {
+export default function TacticalMapScreen({ userId, profile, onClose = null, embedded = false, onContentChange, initialCenter = null, preparationMode = false, onNarrationSelect = null, onNarrationSaved = null, referencePoint = null, catalog = null, preparation = null }) {
     const router = useRouter();
     const handleBack = onClose || (() => router.back());
-    const [pois, setPois] = useState([]);
+    const [storedPois, setPois] = useState([]);
+    const pois = catalog ?? storedPois;
     const [loadError, setLoadError] = useState('');
     const [loadAttempt, setLoadAttempt] = useState(0);
     const [mapCenter, setMapCenter] = useState(() => initialCenter || null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!catalog);
+    const [discoveryMessage, setDiscoveryMessage] = useState('');
     const [view, setView] = useState('map'); // 'map' | 'list'
     const [poiFilter, setPoiFilter] = useState('all'); // 'all' | 'map' | 'general'
     const [isSaving, setIsSaving] = useState(false);
@@ -95,11 +99,11 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
 
     // Load POIs — Cache-first + parallel fetch for instant pin rendering
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || catalog) return;
 
         // Phase 4: Serve from localStorage cache INSTANTLY while fetching fresh data
         try {
-            const cached = localStorage.getItem('flyhigh_pois_cache');
+            const cached = localStorage.getItem('flyhigh_pois_cache:' + userId);
             if (cached) {
                 const { data: cachedPois, ts } = JSON.parse(cached);
                 if (cachedPois?.length > 0 && Date.now() - ts < 300000) { // 5 min TTL
@@ -139,13 +143,13 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                         narrative_script: p.narrative_script ? '1' : null, // Just a flag, not the full text
                         audio_url: p.audio_url ? '1' : null
                     }));
-                    localStorage.setItem('flyhigh_pois_cache', JSON.stringify({ data: slimForCache, ts: Date.now() }));
+                    localStorage.setItem('flyhigh_pois_cache:' + userId, JSON.stringify({ data: slimForCache, ts: Date.now() }));
                 } catch (_) { /* quota exceeded, ignore */ }
             } catch (err) { setLoadError(err.message || 'No se pudieron cargar los puntos.'); }
             finally { setLoading(false); }
         };
         load();
-    }, [userId, loadAttempt]);
+    }, [userId, loadAttempt, catalog]);
 
     useEffect(() => {
         if (initialCenter && Number.isFinite(initialCenter.lat) && Number.isFinite(initialCenter.lng)) {
@@ -292,7 +296,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
     // ═══ Overpass Cultural POI Search (unchanged) ═══
     const handleSearchCulturalPois = async () => {
         // Toggle: Si ya hay puntos, los borramos (apagar radar)
-        if (suggestedPois.length > 0) {
+        if (suggestedPois.length > 0 && !preparationMode) {
             setSuggestedPois([]);
             return;
         }
@@ -303,6 +307,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
         }
 
         setIsSearchingCulturalPois(true);
+        setDiscoveryMessage('Buscando lugares cercanos…');
         try {
             const sw = mapBounds._southWest;
             const ne = mapBounds._northEast;
@@ -320,6 +325,12 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                 throw new Error(failure.error || 'No se pudo consultar el mapa.');
             }
             const data = await res.json();
+            if (preparationMode) {
+                const found = parseCulturalPois(data.elements, { latitude: (sw.lat + ne.lat) / 2, longitude: (sw.lng + ne.lng) / 2 }, pois, Infinity);
+                setSuggestedPois(found.filter(poi => !findExistingPlace(pois, poi)));
+                setDiscoveryMessage(found.length ? 'Los puntos pequeños son lugares disponibles.' : 'No encontramos lugares adicionales aquí. Puedes buscar en la biblioteca.');
+                return;
+            }
 
             let newPois = (Array.isArray(data.elements) ? data.elements : []).map(el => {
                 const lat = el.type === 'node' ? el.lat : el.center?.lat;
@@ -342,7 +353,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                 const wikiTag = el.tags?.wikipedia;
                 const wikidataTag = el.tags?.wikidata;
 
-                if (!lat || !lon || !name) return null;
+                if (!coordinates(lat, lon) || !name) return null;
 
                 let desc = 'Punto de interés geográfico, cultural o recreativo.';
                 let cat = 'landmark';
@@ -487,7 +498,8 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             })();
         } catch (err) {
             console.warn('Cultural POI search failed:', err);
-            alert(err.message || 'Error al buscar sitios culturales. Por favor, intenta de nuevo.');
+            if (preparationMode) setDiscoveryMessage('No pudimos buscar más lugares. Tus narraciones siguen disponibles; puedes reintentar.');
+            else alert(err.message || 'Error al buscar sitios culturales. Por favor, intenta de nuevo.');
         } finally {
             setIsSearchingCulturalPois(false);
         }
@@ -695,12 +707,12 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
             {/* Content */}
             {view === 'map' ? (
                 <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-                    {preparationMode && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2200 }}><NarrationMapSearch onSelect={setMapCenter} onLocate={locate}/></div>}
-                    {preparationMode && <div aria-label="Tipos de puntos" style={{ position: 'absolute', top: 72, left: 12, right: 74, zIndex: 2100, display: 'flex', gap: 9, flexWrap: 'wrap', padding: '6px 9px', borderRadius: 12, background: 'rgba(255,255,255,.92)', boxShadow: '0 4px 16px rgba(15,23,42,.12)', color: '#475569', fontSize: 10, fontWeight: 700, pointerEvents: 'none' }}><span>🏫 Escuela</span><span>✓ Con narración</span><span>★ Sin narración</span></div>}
+                    {preparationMode && <p role="status" style={{ position: 'absolute', bottom: 45, left: 12, right: 12, zIndex: 450, width: 'fit-content', maxWidth: 'calc(100% - 24px)', padding: '5px 8px', borderRadius: 6, background: '#ffffffed', color: '#475569', fontSize: 11, pointerEvents: 'none' }}>{discoveryMessage}</p>}
                     <MapWithNoSSR
                         pois={pois}
                         referencePoint={referencePoint}
-                        suggestedPois={suggestedPois}
+                        preparation={preparation}
+                        suggestedPois={preparationMode ? suggestedPois.filter(poi => !findExistingPlace(pois, poi)) : suggestedPois}
                         userLocation={userLocation}
                         mapCenter={mapCenter}
                         onMarkerClick={handleMarkerClick}
@@ -724,9 +736,9 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                     )}
 
                     {/* Cultural POI Search Toggle */}
-                    <div style={{ position: 'absolute', bottom: 24, right: 16, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'absolute', bottom: preparationMode ? 3 : 24, right: preparationMode ? 12 : 16, zIndex: preparationMode ? 450 : 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {/* Radar Ripple Effect */}
-                        {isSearchingCulturalPois && (
+                        {isSearchingCulturalPois && !preparationMode && (
                             <>
                                 <div style={{ position: 'absolute', width: 56, height: 56, borderRadius: '50%', background: '#60A5FA', animation: 'radarPulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite', pointerEvents: 'none' }} />
                                 <div style={{ position: 'absolute', width: 56, height: 56, borderRadius: '50%', background: '#60A5FA', animation: 'radarPulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite', animationDelay: '1s', pointerEvents: 'none' }} />
@@ -737,12 +749,12 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                             disabled={isSearchingCulturalPois}
                             style={{
                                 position: 'relative',
-                                height: 56, 
-                                width: isSearchingCulturalPois ? 260 : 196,
+                                height: preparationMode ? 40 : 56,
+                                width: preparationMode ? 174 : isSearchingCulturalPois ? 260 : 196,
                                 borderRadius: 28,
-                                background: isSearchingCulturalPois ? '#2563EB' : (suggestedPois.length > 0 ? '#F59E0B' : '#FFFFFF'),
+                                background: preparationMode ? '#FFFFFF' : isSearchingCulturalPois ? '#2563EB' : (suggestedPois.length > 0 ? '#F59E0B' : '#FFFFFF'),
                                 border: 'none', 
-                                color: isSearchingCulturalPois ? '#FFFFFF' : (suggestedPois.length > 0 ? '#FFFFFF' : '#0F172A'),
+                                color: preparationMode ? '#334155' : isSearchingCulturalPois ? '#FFFFFF' : (suggestedPois.length > 0 ? '#FFFFFF' : '#0F172A'),
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                                 boxShadow: isSearchingCulturalPois ? '0 12px 28px -6px rgba(37,99,235,0.6)' : (suggestedPois.length > 0 ? '0 12px 28px -6px rgba(245,158,11,0.5)' : '0 12px 28px -6px rgba(0,0,0,0.15)'),
                                 cursor: isSearchingCulturalPois ? 'wait' : 'pointer',
@@ -752,7 +764,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                             }}
                             title="Buscar sitios culturales e históricos"
                         >
-                            {isSearchingCulturalPois ? (
+                            {preparationMode ? <span style={{ fontSize:12, fontWeight:600 }}>{isSearchingCulturalPois ? 'Buscando lugares…' : 'Buscar en esta zona'}</span> : isSearchingCulturalPois ? (
                                 <>
                                     <PremiumRadarIcon />
                                     <span key={radarTextIndex} style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', animation: 'poiSlideText 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both' }}>
@@ -797,7 +809,7 @@ export default function TacticalMapScreen({ userId, profile, onClose = null, emb
                     </button>
 
                     {/* Groq AI Quota Badge */}
-                    {groqQuota && (
+                    {groqQuota && !preparationMode && (
                         <div style={{
                             position: 'absolute', bottom: 24, left: 16, zIndex: 9999,
                             background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)',

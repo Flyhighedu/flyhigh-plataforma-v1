@@ -7,7 +7,7 @@ import { CalendarDays, ChevronRight, List, Map, MapPin } from 'lucide-react';
 import { coordinates, visitLabel } from '@/lib/narration-preparation.mjs';
 import { PreparationShell, LoadingPreparation, Notice, usePreparationData, planLabel, secondary, card } from './PreparationUI';
 
-const PreparationMap = dynamic(() => import('./PreparationMap'), { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-2xl bg-slate-200" /> });
+const ScheduleMap = dynamic(() => import('./ScheduleMap'), { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-2xl bg-slate-200" /> });
 
 export default function ScheduleScreen() {
     const { data, loading, error, retry } = usePreparationData();
@@ -36,7 +36,7 @@ export default function ScheduleScreen() {
                 </div>
             </div>
             {!data.visits.length && <div className={`${card} py-10 text-center`}><CalendarDays size={32} className="mx-auto mb-3 text-blue-500" /><h2 className="font-bold">Tu cronograma está despejado</h2><p className="mt-2 text-sm text-slate-500">Cuando se programe una visita, podrás prepararla aquí.</p><Link href="/staff/narraciones" className={`${secondary} mt-5`}>Explorar narraciones</Link></div>}
-            {view === 'map' && data.visits.length > 0 && <><PreparationMap markers={markers} onSelect={setSelectedId} selectedId={selectedId} />{selected && visitCard(selected)}<p className="text-xs text-slate-500">Todas las visitas siguen disponibles abajo, incluidas las que no tienen ubicación.</p></>}
+            {view === 'map' && data.visits.length > 0 && <><ScheduleMap markers={markers} onSelect={setSelectedId} selectedId={selectedId} />{selected && visitCard(selected)}<p className="text-xs text-slate-500">Todas las visitas siguen disponibles abajo, incluidas las que no tienen ubicación.</p></>}
             <div className="space-y-3">{data.visits.map(visitCard)}</div>
             {data.visits.length === 300 && <p className="text-sm text-slate-500">Se muestran las próximas 300 visitas.</p>}
         </>}

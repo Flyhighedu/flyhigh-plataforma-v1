@@ -4,7 +4,7 @@ import { EDUCATION_PHASES } from './education-phases.mjs';
 export const MAX_SEQUENCE_ITEMS = 40;
 
 export function coordinates(lat, lng) {
-    if (lat == null || lng == null || lat === '' || lng === '') return null;
+    if ([lat, lng].some(value => !['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim()))) return null;
     const pair = [Number(lat), Number(lng)];
     return pair.every(Number.isFinite) && Math.abs(pair[0]) <= 90 && Math.abs(pair[1]) <= 180 ? pair : null;
 }
@@ -90,10 +90,14 @@ export function preparationContext(input = {}) {
         if (!pair) throw new Error('Ubicación escolar inválida.');
         location = { latitude: pair[0], longitude: pair[1], source: 'pilot' };
     }
-    return { phase_id: phaseId, school_location: location };
+    return { phase_id: phaseId, school_location: location, ...(input.review !== undefined ? { review: null } : {}) };
 }
 export function mergePreparedSources(catalog, sources) {
-    return catalog.map(poi => sources.filter(item => item.id === String(poi.id)).reduce((result, item) => item.phase_id && item.phase_id !== 'general'
-        ? { ...result, narrative_versions: { ...result.narrative_versions, [item.phase_id]: { ...result.narrative_versions?.[item.phase_id], ...item } } }
-        : { ...result, ...item }, poi));
+    return catalog.map(poi => sources.filter(item => item.id === String(poi.id)).reduce((result, item) => {
+        const narration = snapshot(item, 'general');
+        const source = item.model_version === 2 ? { ...result, latitude: item.location?.latitude ?? null, longitude: item.location?.longitude ?? null, is_general_topic: item.is_general_topic } : result;
+        return item.phase_id && item.phase_id !== 'general'
+            ? { ...source, narrative_versions: { ...source.narrative_versions, [item.phase_id]: { ...source.narrative_versions?.[item.phase_id], ...narration } } }
+            : { ...source, ...narration };
+    }, poi));
 }

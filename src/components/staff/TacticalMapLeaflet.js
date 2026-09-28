@@ -10,10 +10,12 @@ import { narrationOrigin } from '@/components/shared/useNarrationEntrance';
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { coordinates } from '@/lib/narration-preparation.mjs';
+import usePreparationLayers from './preparation/usePreparationLayers';
 
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const hasCoordinates = poi => Number.isFinite(Number(poi?.latitude)) && Number.isFinite(Number(poi?.longitude));
+const hasCoordinates = poi => Boolean(coordinates(poi?.latitude, poi?.longitude));
 
 const CAT_COLORS = {
     school: '#3B82F6', parking: '#8B5CF6', hazard: '#EF4444',
@@ -103,7 +105,7 @@ const userIcon = L.divIcon({
 
 export default function TacticalMapLeaflet({
     pois = [], suggestedPois = [], userLocation, mapCenter, referencePoint = null,
-    onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap
+    onMarkerClick, onBoundsChange, onSuggestedPoiClick, onLongPress, onMapTap, preparation = null
 }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -124,16 +126,16 @@ export default function TacticalMapLeaflet({
     useEffect(() => { onMapTapRef.current = onMapTap; }, [onMapTap]);
 
     useEffect(() => {
-        if (mapRef.current && Number.isFinite(Number(mapCenter?.lat)) && Number.isFinite(Number(mapCenter?.lng))) mapRef.current.flyTo([Number(mapCenter.lat), Number(mapCenter.lng)], mapCenter.zoom || 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .4 });
+        if (mapRef.current && coordinates(mapCenter?.lat, mapCenter?.lng)) mapRef.current.flyTo([Number(mapCenter.lat), Number(mapCenter.lng)], mapCenter.zoom || 14, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .4 });
     }, [mapCenter]);
 
     // Initialize map once
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
 
-        const center = Number.isFinite(Number(mapCenter?.lat)) && Number.isFinite(Number(mapCenter?.lng)) ? [Number(mapCenter.lat), Number(mapCenter.lng)] : Number.isFinite(Number(userLocation?.lat)) && Number.isFinite(Number(userLocation?.lng)) ? [Number(userLocation.lat), Number(userLocation.lng)] : [19.4326, -99.1332];
+        const center = coordinates(mapCenter?.lat, mapCenter?.lng) || coordinates(userLocation?.lat, userLocation?.lng) || [19.4326, -99.1332];
         const map = L.map(containerRef.current, {
-            center, zoom: 14, zoomControl: false,
+            center, zoom: mapCenter?.zoom || 14, zoomControl: false,
             attributionControl: false
         });
 
@@ -225,7 +227,7 @@ export default function TacticalMapLeaflet({
         });
 
         mapRef.current = map;
-        if (referencePoint && Number.isFinite(Number(referencePoint.latitude)) && Number.isFinite(Number(referencePoint.longitude))) {
+        if (hasCoordinates(referencePoint)) {
             referenceMarkerRef.current = L.marker([Number(referencePoint.latitude), Number(referencePoint.longitude)], {
                 icon: makeIcon({ ...referencePoint, _reference: true }, true),
                 interactive: false,
@@ -264,7 +266,7 @@ export default function TacticalMapLeaflet({
     // Sync user location marker
     useEffect(() => {
         const map = mapRef.current;
-        if (!map || !Number.isFinite(Number(userLocation?.lat)) || !Number.isFinite(Number(userLocation?.lng))) return;
+        if (!map || !coordinates(userLocation?.lat, userLocation?.lng)) return;
 
         if (userMarkerRef.current) {
             userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
@@ -279,7 +281,7 @@ export default function TacticalMapLeaflet({
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        if (!referencePoint || !Number.isFinite(Number(referencePoint.latitude)) || !Number.isFinite(Number(referencePoint.longitude))) {
+        if (!hasCoordinates(referencePoint)) {
             referenceMarkerRef.current?.remove();
             referenceMarkerRef.current = null;
             return;
@@ -303,7 +305,7 @@ export default function TacticalMapLeaflet({
     useEffect(() => {
         const map = mapRef.current;
         const layer = markersLayerRef.current;
-        if (!map || !layer) return;
+        if (!map || !layer || preparation) return;
 
         // Build a key representing the POI data (not label state)
         const dataKey = pois.filter(hasCoordinates)
@@ -342,13 +344,13 @@ export default function TacticalMapLeaflet({
                 });
             });
         }
-    }, [pois, onMarkerClick, showLabels]);
+    }, [pois, onMarkerClick, showLabels, preparation]);
 
     // Sync Suggested POI markers — tap opens modal directly
     useEffect(() => {
         const map = mapRef.current;
         const layer = suggestedLayerRef.current;
-        if (!map || !layer) return;
+        if (!map || !layer || preparation) return;
 
         // Clear all suggested markers at once
         layer.clearLayers();
@@ -368,7 +370,9 @@ export default function TacticalMapLeaflet({
             layer.addLayer(marker);
             suggestedMarkersRef.current.push(marker);
         });
-    }, [suggestedPois, onSuggestedPoiClick, showLabels]);
+    }, [suggestedPois, onSuggestedPoiClick, showLabels, preparation]);
+
+    usePreparationLayers(mapRef, pois, suggestedPois, preparation, onMarkerClick, onSuggestedPoiClick);
 
     return (
         <>

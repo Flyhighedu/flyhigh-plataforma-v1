@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdmin } from '@supabase/supabase-js';
 import { GET as officialLibrary } from '@/app/api/official-pois/route';
-import { buildSequence, fingerprint, sequenceChanged, preparationContext, coordinates } from '@/lib/narration-preparation.mjs';
+import { fingerprint, preparationContext } from '@/lib/narration-preparation.mjs';
+import { buildPreparationSequence, preparationContentChanged, preparationItemFingerprint, poiBehavior } from '@/lib/preparation-model.mjs';
 
 export const dynamic = 'force-dynamic';
 const json = (data, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -55,20 +56,19 @@ export async function GET(request) {
             if (visitId && !visits.data.length) return json({ error: 'Esta visita no está disponible.' }, 404);
             return json({ visits: visits.data });
         }
-        const [visits, plans, pois] = await Promise.all([
+        const [visits, plans, pois, preferences] = await Promise.all([
             query, db.from('visit_narration_plans').select('*, visit:proximas_escuelas(nombre_escuela, cct)').eq('user_id', user.id), catalog(db, user.id),
+            db.from('pilot_poi_preferences').select('poi_id, behavior').eq('user_id', user.id),
         ]);
-        if (visits.error || plans.error) return storageError(visits.error || plans.error);
+        if (visits.error || plans.error || preferences.error) return storageError(visits.error || plans.error || preferences.error);
         if (visitId && !visits.data.length) return json({ error: 'Esta visita no está disponible.' }, 404);
-        return json({ userId: user.id, visits: visits.data, catalog: pois, plans: plans.data.map(plan => ({
-            ...plan, content_changed: sequenceChanged(plan.items, pois),
+        return json({ userId: user.id, visits: visits.data, catalog: pois, preferences: preferences.data, plans: plans.data.map(plan => ({
+            ...plan, content_changed: preparationContentChanged(plan.items, pois),
         })) });
     } catch (error) { return storageError(error); }
 }
 
-export async function PUT(request) {
-    const auth = await identity();
-    if (auth.error) return auth.error;
+async function acceptsOrigin(request) {
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin) {
         let reviewOrigin;
@@ -78,8 +78,14 @@ export async function PUT(request) {
                 reviewOrigin = new URL(runtime.mobileBaseURL).origin;
             } catch { /* No configured mobile gateway: keep the same-origin restriction. */ }
         }
-        if (origin !== reviewOrigin) return json({ error: 'Origen inválido.' }, 403);
+        if (origin !== reviewOrigin) return false;
     }
+    return true;
+}
+export async function PUT(request) {
+    const auth = await identity();
+    if (auth.error) return auth.error;
+    if (!await acceptsOrigin(request)) return json({ error: 'Origen inválido.' }, 403);
     try {
         const body = await request.json();
         if (!Number.isSafeInteger(body.visitId) || body.visitId <= 0 || !Number.isInteger(body.revision) || body.revision < 0) return json({ error: 'Visita o versión inválida.' }, 400);
@@ -90,20 +96,22 @@ export async function PUT(request) {
         if (body.visitDate !== visit.fecha_programada) return json({ error: 'La visita cambió de fecha. Recarga antes de confirmar la preparación.' }, 409);
         let items, context;
         try {
-            items = buildSequence(body.selections ?? body.ids, await catalog(db, user.id), body.status);
+            const existing = await db.from('visit_narration_plans').select('items, preparation_context').eq('user_id',user.id).eq('visit_id',body.visitId).maybeSingle();
+            if (existing.error) return storageError(existing.error);
+            items = buildPreparationSequence(body.selections ?? body.ids, await catalog(db, user.id), body.status, existing.data?.items || []);
             if (body.context === undefined) {
-                const existing = await db.from('visit_narration_plans').select('preparation_context').eq('user_id',user.id).eq('visit_id',body.visitId).maybeSingle();
-                if (existing.error) return storageError(existing.error);
                 context = preparationContext({ ...existing.data?.preparation_context, phase_id: items[0]?.phase_id || 'general' });
             }
             if (body.context !== undefined) {
                 context = preparationContext(body.context);
                 if (items.some(item => (item.phase_id || 'general') !== context.phase_id)) throw new Error('Las narraciones deben corresponder al nivel elegido.');
-                if (body.status === 'ready' && !context.school_location) throw new Error('Confirma la ubicación de la escuela antes de confirmar el recorrido.');
             }
+            if (body.status === 'ready' && !context.school_location) throw new Error('Confirma la ubicación de la escuela antes de confirmar el recorrido.');
+            // Reserved for later review stages; no client can assert a 3D review.
+            if (body.modelVersion === 2) context.review = null;
         }
         catch (error) { return json({ error: error.message }, 400); }
-        if (body.status === 'ready' && JSON.stringify(body.fingerprints) !== JSON.stringify(items.map(fingerprint))) {
+        if (body.status === 'ready' && JSON.stringify(body.fingerprints) !== JSON.stringify(items.map(body.modelVersion === 2 ? preparationItemFingerprint : fingerprint))) {
             return json({ error: 'Una narración cambió. Actualiza el contenido y revisa la secuencia antes de confirmarla.' }, 409);
         }
         const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -124,4 +132,23 @@ export async function PUT(request) {
         if (error instanceof SyntaxError) return json({ error: 'Solicitud inválida.' }, 400);
         return storageError(error);
     }
+}
+
+export async function PATCH(request) {
+    const auth = await identity();
+    if (auth.error) return auth.error;
+    if (!await acceptsOrigin(request)) return json({ error: 'Origen inválido.' }, 403);
+    try {
+        const body = await request.json();
+        if (typeof body.poiId !== 'string' || !body.poiId || body.poiId.length > 160) return json({ error: 'Lugar inválido.' }, 400);
+        let behavior;
+        try { behavior = poiBehavior(body.behavior); } catch (error) { return json({ error: error.message }, 400); }
+        const source = (await catalog(auth.db, auth.user.id)).find(poi => String(poi.id) === body.poiId && !poi.is_general_topic);
+        if (!source) return json({ error: 'Este lugar no está disponible.' }, 400);
+        const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+        const preference = { user_id: auth.user.id, poi_id: body.poiId, behavior, updated_at: new Date().toISOString() };
+        const result = await admin.from('pilot_poi_preferences').upsert(preference);
+        if (result.error) return storageError(result.error);
+        return json({ preference: { poi_id: body.poiId, behavior } });
+    } catch (error) { return error instanceof SyntaxError ? json({ error: 'Solicitud inválida.' }, 400) : storageError(error); }
 }

@@ -14,11 +14,12 @@ async function main() {
     const env = readEnv(path.join(root, '.env.review.local'));
     const { baseURL } = validateEnvironment(env, readEnv(path.join(root, '.env.local')));
     const accounts = JSON.parse(fs.readFileSync(path.join(root, '.review-lab/test-accounts.json'), 'utf8'));
+    const runtime = JSON.parse(fs.readFileSync(path.join(root, '.review-lab/runtime.json'), 'utf8'));
     const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     await seedPreparationVisits(admin);
     async function session(role) {
         let jar = [];
-        const client = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { cookies: { getAll: () => jar, setAll: values => { jar = values; } } });
+        const client = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { cookieOptions: { name: `sb-${new URL(runtime.publicBackendURL).hostname.split('.')[0]}-auth-token` }, cookies: { getAll: () => jar, setAll: values => { jar = values; } } });
         const result = await client.auth.signInWithPassword(accounts[role]);
         assert.ifError(result.error);
         return { client, user: result.data.user, cookie: jar.map(c => `${c.name}=${c.value}`).join('; ') };
@@ -49,9 +50,38 @@ async function main() {
         assert.equal(result.body.plan.status, 'draft');
         assert.equal((await call(pilot, 'PUT', body)).status, 409, 'Stale creation must not overwrite');
         body = { ...body, revision: result.body.plan.revision, status: 'ready', fingerprints: result.body.plan.items.map(fingerprint) };
+        assert.equal((await call(pilot, 'PUT', body)).status, 400, 'Legacy requests cannot confirm without a school');
+        body.context = { phase_id: 'general', school_location: { latitude: 19.417, longitude: -102.055 } };
         result = await call(pilot, 'PUT', body);
         assert.equal(result.status, 200, JSON.stringify(result.body));
         assert.equal(result.body.plan.status, 'ready');
+        const { preparationItemFingerprint } = await import('../../src/lib/preparation-model.mjs');
+        const physical = playable.find(p => !p.is_general_topic && p.latitude != null && p.longitude != null);
+        assert.ok(physical, 'Test requires a geographic POI');
+        const oldPreference = await admin.from('pilot_poi_preferences').select('*').eq('user_id', pilot.user.id).eq('poi_id', String(physical.id)).maybeSingle();
+        assert.ifError(oldPreference.error);
+        try {
+            assert.equal((await call(pilot, 'PATCH', { poiId: String(physical.id), behavior: 'reference' })).status, 200);
+            assert.equal((await call(pilot, 'PATCH', { poiId: String(physical.id), behavior: 'unknown' })).status, 400);
+            const privateRead = await assistant.client.from('pilot_poi_preferences').select('*').eq('user_id', pilot.user.id);
+            assert.ifError(privateRead.error); assert.deepEqual(privateRead.data, []);
+            const directWrite = await pilot.client.from('pilot_poi_preferences').upsert({user_id:pilot.user.id,poi_id:String(physical.id),behavior:'route'});
+            assert.ok(directWrite.error, 'Preferences cannot bypass the authenticated API');
+            const selections = ids.map(id => ({id,behavior:id===String(physical.id)?'reference':'route'}));
+            const changed = await call(pilot, 'PUT', {...body, modelVersion:2, ids:undefined, selections, status:'draft', revision:result.body.plan.revision});
+            assert.equal(changed.status,200,JSON.stringify(changed.body));
+            assert.equal(changed.body.plan.items.find(p=>p.id===String(physical.id)).behavior,'reference');
+            assert.equal(changed.body.plan.preparation_context.review,null);
+            const overridden = await call(pilot,'PUT',{...body,modelVersion:2,ids:undefined,selections:selections.map(p=>({...p,behavior:'route'})),status:'draft',revision:changed.body.plan.revision});
+            assert.equal(overridden.status,200);
+            const habit = await admin.from('pilot_poi_preferences').select('behavior').eq('user_id',pilot.user.id).eq('poi_id',String(physical.id)).single();
+            assert.equal(habit.data.behavior,'reference','Per-visit override must not overwrite habit');
+            result = await call(pilot,'PUT',{...body,modelVersion:2,revision:overridden.body.plan.revision,status:'ready',fingerprints:overridden.body.plan.items.map(preparationItemFingerprint)});
+            assert.equal(result.status,200,JSON.stringify(result.body));
+        } finally {
+            if(oldPreference.data) await admin.from('pilot_poi_preferences').upsert(oldPreference.data);
+            else await admin.from('pilot_poi_preferences').delete().eq('user_id',pilot.user.id).eq('poi_id',String(physical.id));
+        }
         const readBack = await call(pilot, 'GET', null, '?visit=' + visit.id);
         assert.deepEqual(readBack.body.plans.find(p => p.visit_id === visit.id).items.map(p => p.id), ids);
         assert.equal((await call(assistant)).body.plans.some(p => p.user_id === pilot.user.id), false, 'Plans must be private to their owner');
@@ -76,7 +106,7 @@ async function main() {
             const response = await fetch(baseURL + route, { headers: { Cookie: pilot.cookie }, redirect: 'manual' });
             assert.equal(response.status, 200, route);
         }
-        console.log('PASS: auth, future visits, ordered save/read, confirmation, draft after edit, RLS, optimistic concurrency, invalid content, no operational writes, 3 routes.');
+        console.log('PASS: auth, future visits, legacy school validation, v2 route/reference, private preferences and visit override, ordered save/read, confirmation, draft after edit, RLS, optimistic concurrency, invalid content, no operational writes, 3 routes.');
     } finally {
         const removed = await admin.from('proximas_escuelas').delete().eq('id', visit.id).eq('registrado_via', 'review-lab');
         assert.ifError(removed.error);

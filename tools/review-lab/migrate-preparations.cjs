@@ -11,7 +11,9 @@ async function migratePreparations(input = readEnv(path.join(root, '.env.review.
     await client.connect();
     try {
         await client.query('BEGIN');
-        await client.query(fs.readFileSync(path.join(root, 'supabase/migrations/20260925120000_visit_narration_plans.sql'), 'utf8'));
+        for (const name of ['20260925120000_visit_narration_plans.sql', '20260927180000_preparation_location_and_phase.sql', '20260928010000_preparation_poi_preferences.sql']) {
+            await client.query(fs.readFileSync(path.join(root, 'supabase/migrations', name), 'utf8'));
+        }
         await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { await client.end(); }

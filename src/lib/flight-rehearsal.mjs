@@ -1,3 +1,4 @@
+import { coordinates } from './narration-preparation.mjs';
 const EARTH_RADIUS_METERS = 6371000;
 
 export const FLIGHT_LIMITS = Object.freeze({
@@ -92,10 +93,10 @@ export function closestPoi(position, pois, maximumDistanceMeters = Infinity) {
 }
 
 export function selectFlightPois(pois, center, { radius = FLIGHT_POI_RADIUS_METERS, limit = MAX_FLIGHT_POI_MARKERS } = {}) {
-    if (!center || !Number.isFinite(Number(center.latitude)) || !Number.isFinite(Number(center.longitude))) return [];
+    if (!coordinates(center?.latitude, center?.longitude)) return [];
     const maximum = Math.max(1, Math.floor(Number(limit) || MAX_FLIGHT_POI_MARKERS));
     return (pois || [])
-        .filter(poi => Number.isFinite(Number(poi?.latitude)) && Number.isFinite(Number(poi?.longitude)))
+        .filter(poi => coordinates(poi?.latitude, poi?.longitude))
         .map(poi => ({ poi, distance: distanceMeters(center, poi) }))
         .filter(entry => Number.isFinite(entry.distance) && entry.distance <= radius)
         .sort((a, b) => a.distance - b.distance)

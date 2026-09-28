@@ -1,85 +1,48 @@
 'use client';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { preparationItemFingerprint, normalizePreparationItems } from '@/lib/preparation-model.mjs';
+import { createPreparationStore, restorePreparation } from '@/lib/preparation-store.mjs';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { fingerprint, preparationContext } from '@/lib/narration-preparation.mjs';
-
-function restore(key, initialPlan, visit) {
-    const context = preparationContext(initialPlan?.preparation_context || {});
-    const fallback = { context, items: initialPlan?.items || [], status: initialPlan?.status || 'draft', dirty: false, conflict: false };
-    if (initialPlan?.content_changed || (initialPlan && initialPlan.visit_date !== visit.fecha_programada)) fallback.status = 'draft';
-    try {
-        const cached = JSON.parse(localStorage.getItem(key));
-        if (!cached || !Array.isArray(cached.items) || cached.items.length > 40 || cached.items.some(item => !item || typeof item.id !== 'string' || typeof item.name !== 'string')) return fallback;
-        return { context: preparationContext(cached.context || context), items: cached.items, status: 'draft', dirty: true, conflict: cached.revision !== (initialPlan?.revision || 0) || cached.date !== visit.fecha_programada };
-    } catch { return fallback; }
-}
-
-export default function useSequencePlan({ visit, userId, initialPlan }) {
-    const key = `flyhigh:visit-draft:${userId}:${visit.id}`;
-    const [draft, setDraft] = useState(() => restore(key, initialPlan, visit));
-    const [revision, setRevision] = useState(initialPlan?.revision || 0);
-    const [savedSources, setSavedSources] = useState([]);
-    const [saveState, setSaveState] = useState(() => draft.conflict ? 'conflict' : draft.dirty ? 'pending' : 'saved');
-    const [error, setError] = useState(() => draft.conflict ? 'Hay un borrador local de otra versión de esta visita. Revisa la versión guardada antes de continuar.' : '');
-    const [localError, setLocalError] = useState('');
-    const busy = useRef(false);
-
-    const cache = useCallback((items, baseRevision, context) => {
-        try { localStorage.setItem(key, JSON.stringify({ items, context, revision: baseRevision, date: visit.fecha_programada })); setLocalError(''); }
-        catch { setLocalError('No pudimos guardar una copia en este dispositivo. Espera la confirmación de guardado antes de salir.'); }
-    }, [key, visit.fecha_programada]);
-
-    const edit = useCallback((items, context = draft.context) => {
-        if (busy.current || saveState === 'conflict') return;
-        cache(items, revision, context);
-        setDraft({ items, context, status: 'draft', dirty: true, conflict: false });
-        setError(''); setSaveState('pending');
-    }, [cache, revision, saveState, draft.context]);
-
-    const save = useCallback(async status => {
-        if (busy.current || saveState === 'conflict') return;
-        busy.current = true; setSaveState('saving'); setError('');
-        try {
-            const response = await fetch('/api/staff/preparation', {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ visitId: visit.id, visitDate: visit.fecha_programada, revision, selections: draft.items.map(p => ({ id: p.id, phase_id: p.phase_id || 'general' })), context: draft.context, status, fingerprints: draft.items.map(fingerprint) }),
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                setSaveState(response.status === 409 ? 'conflict' : 'error');
-                setError(result.error || 'No se pudo guardar. Tu borrador se conserva en este dispositivo.');
-                return;
-            }
-            setRevision(result.plan.revision);
-            // The server may have a more recent source than the loaded catalog.
-            // Keep the picker and stale-content checks aligned with what was saved.
-            setSavedSources(result.plan.items);
-            setDraft({ context: preparationContext(result.plan.preparation_context || draft.context), items: result.plan.items, status: result.plan.status, dirty: false, conflict: false });
-            setSaveState('saved');
-            try { localStorage.removeItem(key); } catch { /* Server copy is already safe. */ }
-        } catch {
-            setSaveState('error'); setError('No se pudo guardar. Comprueba la conexión y reintenta antes de dejar la secuencia lista.');
-        } finally { busy.current = false; }
-    }, [draft.items, draft.context, key, revision, saveState, visit.id, visit.fecha_programada]);
-
+export default function useSequencePlan({ visit, userId, initialPlan, catalog = [] }) {
+    const [store] = useState(() => {
+        const key = `flyhigh:visit-draft:${userId}:${visit.id}`;
+        const read = suffix => { try { return JSON.parse(localStorage.getItem(key + suffix)); } catch { return null; } };
+        return createPreparationStore({
+            initial: restorePreparation(initialPlan, read(''), visit, catalog, read(':recovery')),
+            cache: state => localStorage.setItem(key, JSON.stringify({ items: state.items, context: state.context, revision: state.revision, date: visit.fecha_programada })),
+            clearCache: () => localStorage.removeItem(key),
+            saveRecovery: value => localStorage.setItem(key + ':recovery', JSON.stringify(value)),
+            clearRecovery: () => localStorage.removeItem(key + ':recovery'),
+            persist: async (state, status) => {
+                const response = await fetch('/api/staff/preparation', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ modelVersion: 2, visitId: visit.id, visitDate: visit.fecha_programada, revision: state.revision,
+                        selections: state.items.map(item => ({ id: item.id, phase_id: item.phase_id || 'general', behavior: item.behavior })),
+                        context: state.context, status, fingerprints: state.items.map(preparationItemFingerprint) }) });
+                const result = await response.json();
+                if (!response.ok) throw Object.assign(new Error(result.error || 'No se pudo guardar. Tu borrador se conserva.'), { status: response.status });
+                return result.plan;
+            },
+        });
+    });
+    const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+    useEffect(() => { store.start(); return store.stop; }, [store]);
     useEffect(() => {
-        if (!draft.dirty || saveState !== 'pending') return;
-        const timer = setTimeout(() => save('draft'), 500);
-        return () => clearTimeout(timer);
-    }, [draft.dirty, save, saveState]);
-
-    useEffect(() => {
-        if (!draft.dirty) return;
+        if (!state.dirty) return;
         const warn = event => { event.preventDefault(); event.returnValue = ''; };
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
-    }, [draft.dirty]);
-
-    const discardLocal = () => {
-        try { localStorage.removeItem(key); } catch { /* Reload still obtains the server copy. */ }
-        window.location.reload();
+    }, [state.dirty]);
+    const [recoveryError, setRecoveryError] = useState('');
+    const loadSaved = async () => {
+        try {
+            const response = await fetch(`/api/staff/preparation?visit=${visit.id}`, { cache: 'no-store' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'No se pudo cargar la versión guardada.');
+            const plan = data.plans.find(item => item.visit_id === visit.id);
+            store.loadSaved(plan ? { ...plan, items: normalizePreparationItems(plan.items, data.catalog), status: plan.content_changed ? 'draft' : plan.status } : null);
+            setRecoveryError('');
+        } catch (error) { setRecoveryError(error.message); }
     };
-    return { ...draft, revision, savedSources, saveState, error, localError, edit, save,
-        locked: saveState === 'saving' || saveState === 'conflict',
-        retry: () => save('draft'), discardLocal };
+    return { ...state, error: recoveryError || state.error, edit: store.edit, save: store.save,
+        undo: store.undo, recover: store.recover, loadSaved, locked: state.saveState === 'conflict', retry: () => store.save('draft') };
 }
